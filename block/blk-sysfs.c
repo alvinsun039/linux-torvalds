@@ -275,6 +275,35 @@ static ssize_t queue_dma_alignment_show(struct request_queue *q, char *page)
 	return queue_var_show(queue_dma_alignment(q), page);
 }
 
+static ssize_t
+queue_unpriv_sgio_show(struct request_queue *q, char *page)
+{
+	int bit;
+
+	bit = test_bit(QUEUE_FLAG_UNPRIV_SGIO, &q->queue_flags);
+	return queue_var_show(bit, page);
+}
+
+static ssize_t
+queue_unpriv_sgio_store(struct request_queue *q, const char *page, size_t count)
+{
+	unsigned long val;
+	ssize_t ret;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	ret = queue_var_store(&val, page, count);
+	if (ret < 0)
+		return ret;
+
+	if (val)
+		blk_queue_flag_set(QUEUE_FLAG_UNPRIV_SGIO, q);
+	else
+		blk_queue_flag_clear(QUEUE_FLAG_UNPRIV_SGIO, q);
+	return ret;
+}
+
 #define QUEUE_SYSFS_BIT_FNS(name, flag, neg)				\
 static ssize_t								\
 queue_##name##_show(struct request_queue *q, char *page)		\
@@ -502,6 +531,7 @@ QUEUE_RO_ENTRY(queue_discard_max_hw, "discard_max_hw_bytes");
 QUEUE_RW_ENTRY(queue_discard_max, "discard_max_bytes");
 QUEUE_RO_ENTRY(queue_discard_zeroes_data, "discard_zeroes_data");
 
+QUEUE_RW_ENTRY(queue_unpriv_sgio, "unpriv_sgio");
 QUEUE_RO_ENTRY(queue_write_same_max, "write_same_max_bytes");
 QUEUE_RO_ENTRY(queue_write_zeroes_max, "write_zeroes_max_bytes");
 QUEUE_RO_ENTRY(queue_zone_append_max, "zone_append_max_bytes");
@@ -624,6 +654,7 @@ static struct attribute *queue_attrs[] = {
 	&queue_discard_max_entry.attr,
 	&queue_discard_max_hw_entry.attr,
 	&queue_discard_zeroes_data_entry.attr,
+	&queue_unpriv_sgio_entry.attr,
 	&queue_write_same_max_entry.attr,
 	&queue_write_zeroes_max_entry.attr,
 	&queue_zone_append_max_entry.attr,

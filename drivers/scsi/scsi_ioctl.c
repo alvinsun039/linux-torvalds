@@ -354,8 +354,11 @@ static int scsi_fill_sghdr_rq(struct scsi_device *sdev, struct request *rq,
 		return -EMSGSIZE;
 	if (copy_from_user(scmd->cmnd, hdr->cmdp, hdr->cmd_len))
 		return -EFAULT;
+	if (blk_queue_unpriv_sgio(sdev->request_queue))
+		goto next;
 	if (!scsi_cmd_allowed(scmd->cmnd, open_for_write))
 		return -EPERM;
+next:
 	scmd->cmd_len = hdr->cmd_len;
 
 	rq->timeout = msecs_to_jiffies(hdr->timeout);
@@ -554,9 +557,13 @@ static int sg_scsi_ioctl(struct request_queue *q, bool open_for_write,
 		goto error;
 
 	err = -EPERM;
+	if (blk_queue_unpriv_sgio(q))
+		goto next;
+
 	if (!scsi_cmd_allowed(scmd->cmnd, open_for_write))
 		goto error;
 
+next:
 	/* default.  possible overridden later */
 	scmd->allowed = 5;
 
