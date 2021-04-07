@@ -11582,8 +11582,12 @@ static int __set_sregs_common(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs,
 	if (kvm_set_apic_base(vcpu, &apic_base_msr))
 		return -EINVAL;
 
-	if (vcpu->arch.guest_state_protected)
+	/* For HYGON CSV2 guest, we need update some regs to support migration */
+	if (vcpu->arch.guest_state_protected && !is_vendor_hygon())
 		return 0;
+
+	if (vcpu->arch.guest_state_protected)
+		goto skip_dt_cr2_cr3;
 
 	dt.size = sregs->idt.limit;
 	dt.address = sregs->idt.base;
@@ -11598,6 +11602,7 @@ static int __set_sregs_common(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs,
 	kvm_register_mark_dirty(vcpu, VCPU_EXREG_CR3);
 	static_call_cond(kvm_x86_post_set_cr3)(vcpu, sregs->cr3);
 
+skip_dt_cr2_cr3:
 	kvm_set_cr8(vcpu, sregs->cr8);
 
 	*mmu_reset_needed |= vcpu->arch.efer != sregs->efer;
@@ -11609,6 +11614,9 @@ static int __set_sregs_common(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs,
 
 	*mmu_reset_needed |= kvm_read_cr4(vcpu) != sregs->cr4;
 	static_call(kvm_x86_set_cr4)(vcpu, sregs->cr4);
+
+	if (vcpu->arch.guest_state_protected)
+		return 0;
 
 	if (update_pdptrs) {
 		idx = srcu_read_lock(&vcpu->kvm->srcu);
