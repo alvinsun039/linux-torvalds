@@ -462,6 +462,12 @@ config IDEAPAD_LAPTOP
 	  This is a driver for Lenovo IdeaPad netbooks contains drivers for
 	  rfkill switch, hotkey, fan control and backlight control.
 
+config LENOVO_ZX_LAPTOP
+	tristate "Lenovo zhaoxin EC"
+	help
+	  Lenovo machine EC driver provides access to nodes for touchpad,
+	  performance, backlight, and other addresses.
+
 config LENOVO_YMC
 	tristate "Lenovo Yoga Tablet Mode Control"
 	depends on ACPI_WMI
