@@ -15,6 +15,7 @@
 #include <linux/scatterlist.h>
 #include <crypto/internal/hash.h>
 #include <crypto/internal/akcipher.h>
+#include <linux/machine_t.h>
 
 #include "ccp-crypto.h"
 
@@ -38,6 +39,10 @@ MODULE_PARM_DESC(des3_disable, "Disable use of 3DES - any non-zero value");
 static unsigned int rsa_disable;
 module_param(rsa_disable, uint, 0444);
 MODULE_PARM_DESC(rsa_disable, "Disable use of RSA - any non-zero value");
+
+static unsigned int sm_disable;
+module_param(sm_disable, uint, 0444);
+MODULE_PARM_DESC(sm_disable, "Disable use of SM2/SM3/SM4 - any non-zero value");
 
 /* List heads for the supported algorithms */
 static LIST_HEAD(hash_algs);
@@ -321,6 +326,17 @@ struct scatterlist *ccp_crypto_sg_table_add(struct sg_table *table,
 static int ccp_register_algs(void)
 {
 	int ret;
+
+#ifdef CONFIG_HYGON_GM
+	if (!sm_disable && is_vendor_hygon()) {
+		ret = ccp_register_sm2_hygon_algs(&akcipher_algs);
+		if (ret)
+			return ret;
+
+		/* Return on hygon platform */
+		return 0;
+	}
+#endif
 
 	if (!aes_disable) {
 		ret = ccp_register_aes_algs(&skcipher_algs);
