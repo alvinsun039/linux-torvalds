@@ -3630,6 +3630,24 @@ void xhci_free_device_endpoint_resources(struct xhci_hcd *xhci,
 				xhci->num_active_eps);
 }
 
+static void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev);
+
+static int xhci_reset_device_quirk(struct usb_hcd *hcd, struct usb_device *udev)
+{
+	int ret;
+
+	xhci_free_dev(hcd, udev);
+
+	/* Wait the Disable Slot command finish. */
+	msleep(20);
+
+	ret = xhci_alloc_dev(hcd, udev);
+	if (ret == 1)
+		return 0;
+	else
+		return -EINVAL;
+}
+
 /*
  * This submits a Reset Device Command, which will set the device state to 0,
  * set the device address to 0, and disable all the endpoints except the default
@@ -3699,6 +3717,9 @@ static int xhci_discover_or_reset_device(struct usb_hcd *hcd,
 	if (GET_SLOT_STATE(le32_to_cpu(slot_ctx->dev_state)) ==
 						SLOT_STATE_DISABLED)
 		return 0;
+
+	if (xhci->quirks & XHCI_ETRON_HOST)
+		return xhci_reset_device_quirk(hcd, udev);
 
 	trace_xhci_discover_or_reset_device(slot_ctx);
 
