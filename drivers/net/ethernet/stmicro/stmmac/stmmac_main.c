@@ -1822,6 +1822,7 @@ static int __init_dma_tx_desc_rings(struct stmmac_priv *priv,
 		tx_q->tx_skbuff_dma[i].map_as_page = false;
 		tx_q->tx_skbuff_dma[i].len = 0;
 		tx_q->tx_skbuff_dma[i].last_segment = false;
+		tx_q->tx_skbuff_dma[i].is_jumbo = false;
 		tx_q->tx_skbuff[i] = NULL;
 	}
 
