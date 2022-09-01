@@ -5716,24 +5716,26 @@ _scsih_io_done(struct MPT3SAS_ADAPTER *ioc, u16 smid, u8 msix_index, u32 reply)
 	struct MPT3SAS_DEVICE *sas_device_priv_data;
 	u32 response_code = 0;
 
-	mpi_reply = mpt3sas_base_get_reply_virt_addr(ioc, reply);
-
 	scmd = mpt3sas_scsih_scsi_lookup_get(ioc, smid);
 	if (scmd == NULL)
 		return 1;
 
+	sas_device_priv_data = scmd->device->hostdata;
+	if (!sas_device_priv_data || !sas_device_priv_data->sas_target) {
+		scmd->result = DID_NO_CONNECT << 16;
+		goto out;
+	}
 	_scsih_set_satl_pending(scmd, false);
 
 	mpi_request = mpt3sas_base_get_msg_frame(ioc, smid);
 
+	mpi_reply = mpt3sas_base_get_reply_virt_addr(ioc, reply);
 	if (mpi_reply == NULL) {
 		scmd->result = DID_OK << 16;
 		goto out;
 	}
 
-	sas_device_priv_data = scmd->device->hostdata;
-	if (!sas_device_priv_data || !sas_device_priv_data->sas_target ||
-	     sas_device_priv_data->sas_target->deleted) {
+	if (sas_device_priv_data->sas_target->deleted) {
 		scmd->result = DID_NO_CONNECT << 16;
 		goto out;
 	}
