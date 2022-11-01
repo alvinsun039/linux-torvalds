@@ -47,6 +47,8 @@ static unsigned int udp_child_hash_entries_max = UDP_HTABLE_SIZE_MAX;
 static int tcp_plb_max_rounds = 31;
 static int tcp_plb_max_cong_thresh = 256;
 static unsigned int tcp_tw_reuse_delay_max = TCP_PAWS_MSL * MSEC_PER_SEC;
+static int tcp_tw_timeout_min = 1 * HZ;
+static int tcp_tw_timeout_max = 600 * HZ;
 
 /* obsolete */
 static int sysctl_tcp_low_latency __read_mostly;
@@ -993,6 +995,15 @@ static struct ctl_table ipv4_net_table[] = {
 		.maxlen		= sizeof(u8),
 		.mode		= 0644,
 		.proc_handler	= proc_dou8vec_minmax,
+	},
+	{
+		.procname	= "tcp_tw_timeout",
+		.data		= &init_net.ipv4.sysctl_tcp_tw_timeout,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies_minmax,
+		.extra1		= &tcp_tw_timeout_min,
+		.extra2		= &tcp_tw_timeout_max
 	},
 	{
 		.procname	= "tcp_orphan_retries",
