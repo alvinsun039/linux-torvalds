@@ -41,7 +41,7 @@ static void roh_device_release(struct device *device)
 	kfree(dev);
 }
 
-static int roh_device_uevent(struct device *device, struct kobj_uevent_env *env)
+static int roh_device_uevent(const struct device *device, struct kobj_uevent_env *env)
 {
 	struct roh_device *dev = container_of(device, struct roh_device, dev);
 
@@ -464,7 +464,7 @@ int roh_core_init(void)
 
 	ret = class_register(&roh_class);
 	if (ret) {
-		pr_err("roh_core: couldn't create roh device class.\n");
+		pr_err("roh_core: couldn't create roh device class, ret = %d\n", ret);
 		return ret;
 	}
 
