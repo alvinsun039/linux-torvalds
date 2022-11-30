@@ -445,6 +445,9 @@ static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 	if (!hr_dev->active)
 		goto error_out;
 
+	context->pid = current->pid;
+	INIT_LIST_HEAD(&context->list);
+
 	ret = ib_copy_from_udata(&ucmd, udata,
 				 min(udata->inlen, sizeof(ucmd)));
 	if (ret)
@@ -478,6 +481,12 @@ static int hns_roce_alloc_ucontext(struct ib_ucontext *uctx,
 	if (ret)
 		goto error_fail_copy_to_udata;
 
+	mutex_lock(&hr_dev->uctx_list_mutex);
+	list_add(&context->list, &hr_dev->uctx_list);
+	mutex_unlock(&hr_dev->uctx_list_mutex);
+
+	hns_roce_register_uctx_debugfs(hr_dev, context);
+
 	return 0;
 
 error_fail_copy_to_udata:
@@ -500,6 +509,12 @@ static void hns_roce_dealloc_ucontext(struct ib_ucontext *ibcontext)
 {
 	struct hns_roce_ucontext *context = to_hr_ucontext(ibcontext);
 	struct hns_roce_dev *hr_dev = to_hr_dev(ibcontext->device);
+
+	mutex_lock(&hr_dev->uctx_list_mutex);
+	list_del(&context->list);
+	mutex_unlock(&hr_dev->uctx_list_mutex);
+
+	hns_roce_unregister_uctx_debugfs(context);
 
 	hns_roce_unregister_udca(hr_dev, context);
 
@@ -1016,6 +1031,7 @@ static void hns_roce_teardown_hca(struct hns_roce_dev *hr_dev)
 		hns_roce_cleanup_dca(hr_dev);
 
 	hns_roce_cleanup_bitmap(hr_dev);
+	mutex_destroy(&hr_dev->uctx_list_mutex);
 }
 
 /**
@@ -1036,7 +1052,7 @@ static int hns_roce_setup_hca(struct hns_roce_dev *hr_dev)
 	spin_lock_init(&hr_dev->dip_list_lock);
 
 	INIT_LIST_HEAD(&hr_dev->uctx_list);
-	spin_lock_init(&hr_dev->uctx_list_lock);
+	mutex_init(&hr_dev->uctx_list_mutex);
 
 	if (hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_CQ_RECORD_DB ||
 	    hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_QP_RECORD_DB) {
