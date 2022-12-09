@@ -2016,14 +2016,19 @@ int __make_dmalistbd_h2b_H(struct bspveth_rxtx_q *prxtx_queue,
 	shm_head = pshmq_head->head;
 
 	for (i = 0; i < cnt; i++) {
+		struct sk_buff *skb;
+
 		off = pbdbase_v[QUEUE_MASK(host_tail + i)].off;
 
 		if (i == (cnt - 1))
 			pdmalbase_v[i].chl = 0x9;
 		else
 			pdmalbase_v[i].chl = 0x0000001;
-		pdmalbase_v[i].len =
-		    (pbdinfobase_v[QUEUE_MASK(host_tail + i)].pdma_v)->len;
+		skb = pbdinfobase_v[QUEUE_MASK(host_tail + i)].pdma_v;
+		if (!skb)
+			continue;
+
+		pdmalbase_v[i].len = skb->len;
 		pdmalbase_v[i].slow =
 		    lower_32_bits(pbdbase_v[QUEUE_MASK(host_tail + i)].dma_p);
 		pdmalbase_v[i].shi =
