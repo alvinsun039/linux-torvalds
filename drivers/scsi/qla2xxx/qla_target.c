@@ -684,7 +684,7 @@ void qla24xx_delete_sess_fn(struct work_struct *work)
 	fc_port_t *fcport = container_of(work, struct fc_port, del_work);
 	struct qla_hw_data *ha = NULL;
 
-	if (!fcport || !fcport->vha || !fcport->vha->hw)
+	if (!fcport->vha || !fcport->vha->hw)
 		return;
 
 	ha = fcport->vha->hw;
