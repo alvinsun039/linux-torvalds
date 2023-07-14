@@ -13,6 +13,8 @@
 #include <linux/cc_platform.h>
 #include <linux/mem_encrypt.h>
 
+#include <linux/machine_t.h>
+
 /* Override for DMA direct allocation check - ARCH_HAS_FORCE_DMA_UNENCRYPTED */
 bool force_dma_unencrypted(struct device *dev)
 {
@@ -45,6 +47,11 @@ static void print_mem_encrypt_feature_info(void)
 
 	if (cpu_feature_enabled(X86_FEATURE_TDX_GUEST)) {
 		pr_cont(" Intel TDX\n");
+		return;
+	}
+
+	if (is_vendor_hygon()) {
+		print_hygon_cc_feature_info();
 		return;
 	}
 
