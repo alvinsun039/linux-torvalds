@@ -24,6 +24,7 @@
 #include <asm/trapnr.h>
 #include <asm/fpu/xcr.h>
 #include <asm/debugreg.h>
+#include <linux/machine_t.h>
 
 #include "mmu.h"
 #include "x86.h"
@@ -2274,14 +2275,16 @@ void __init sev_hardware_setup(void)
 
 out:
 	if (boot_cpu_has(X86_FEATURE_SEV))
-		pr_info("SEV %s (ASIDs %u - %u)\n",
+		pr_info("%s %s (ASIDs %u - %u)\n",
+			is_vendor_hygon() ? "CSV" : "SEV",
 			sev_supported ? min_sev_asid <= max_sev_asid ? "enabled" :
 								       "unusable" :
 								       "disabled",
 			min_sev_asid, max_sev_asid);
 	if (boot_cpu_has(X86_FEATURE_SEV_ES))
-		pr_info("SEV-ES %s (ASIDs %u - %u)\n",
+		pr_info("%s %s (ASIDs %u - %u)\n",
 			sev_es_supported ? "enabled" : "disabled",
+			is_vendor_hygon() ? "CSV2" : "SEV-ES",
 			min_sev_asid > 1 ? 1 : 0, min_sev_asid - 1);
 
 	sev_enabled = sev_supported;
