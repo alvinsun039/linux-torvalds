@@ -55,7 +55,7 @@
 
 #define LPFC_DEF_DEVLOSS_TMO	30
 #define LPFC_MIN_DEVLOSS_TMO	1
-#define LPFC_MAX_DEVLOSS_TMO	255
+#define LPFC_MAX_DEVLOSS_TMO	755
 
 #define LPFC_MAX_INFO_TMP_LEN	100
 #define LPFC_INFO_MORE_STR	"\nCould be more info...\n"
