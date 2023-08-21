@@ -2653,6 +2653,12 @@ static void set_recommended_min_free_kbytes(void)
 	}
 
 update_wmarks:
+	if (khugepaged_threshold_suit()) {
+		/* potential THP used, reserved 1% free memory */
+		recommended_min = (unsigned long)nr_free_buffer_pages() / 100;
+		recommended_min <<= (PAGE_SHIFT-10);	/* convert to kb unit */
+		min_free_kbytes = max_t(int, min_free_kbytes, recommended_min);
+	}
 	setup_per_zone_wmarks();
 }
 
