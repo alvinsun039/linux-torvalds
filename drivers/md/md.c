@@ -653,8 +653,20 @@ void mddev_put(struct mddev *mddev)
 static void md_safemode_timeout(struct timer_list *t);
 static void md_start_sync(struct work_struct *ws);
 
-void mddev_init(struct mddev *mddev)
+static void active_io_release(struct percpu_ref *ref)
 {
+	struct mddev *mddev = container_of(ref, struct mddev, active_io);
+
+	wake_up(&mddev->sb_wait);
+}
+
+int mddev_init(struct mddev *mddev)
+{
+
+	if (percpu_ref_init(&mddev->active_io, active_io_release,
+			    PERCPU_REF_ALLOW_REINIT, GFP_KERNEL))
+		return -ENOMEM;
+
 	mutex_init(&mddev->open_mutex);
 	mutex_init(&mddev->reconfig_mutex);
 	mutex_init(&mddev->sync_mutex);
@@ -679,8 +691,16 @@ void mddev_init(struct mddev *mddev)
 
 	INIT_WORK(&mddev->sync_work, md_start_sync);
 	INIT_WORK(&mddev->del_work, mddev_delayed_delete);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(mddev_init);
+
+void mddev_destroy(struct mddev *mddev)
+{
+	percpu_ref_exit(&mddev->active_io);
+}
+EXPORT_SYMBOL_GPL(mddev_destroy);
 
 static struct mddev *mddev_find_locked(dev_t unit)
 {
@@ -725,13 +745,16 @@ static struct mddev *mddev_alloc(dev_t unit)
 	new = kzalloc(sizeof(*new), GFP_KERNEL);
 	if (!new)
 		return ERR_PTR(-ENOMEM);
-	mddev_init(new);
+
+	error = mddev_init(new);
+	if (error)
+		goto out_free_new;
 
 	spin_lock(&all_mddevs_lock);
 	if (unit) {
 		error = -EEXIST;
 		if (mddev_find_locked(unit))
-			goto out_free_new;
+			goto out_destroy_new;
 		new->unit = unit;
 		if (MAJOR(unit) == MD_MAJOR)
 			new->md_minor = MINOR(unit);
@@ -742,7 +765,7 @@ static struct mddev *mddev_alloc(dev_t unit)
 		error = -ENODEV;
 		new->unit = mddev_alloc_unit();
 		if (!new->unit)
-			goto out_free_new;
+			goto out_destroy_new;
 		new->md_minor = MINOR(new->unit);
 		new->hold_active = UNTIL_STOP;
 	}
@@ -750,8 +773,11 @@ static struct mddev *mddev_alloc(dev_t unit)
 	list_add(&new->all_mddevs, &all_mddevs);
 	spin_unlock(&all_mddevs_lock);
 	return new;
-out_free_new:
+
+out_destroy_new:
 	spin_unlock(&all_mddevs_lock);
+	mddev_destroy(new);
+out_free_new:
 	kfree(new);
 	return ERR_PTR(error);
 }
@@ -762,6 +788,7 @@ static void mddev_free(struct mddev *mddev)
 	list_del(&mddev->all_mddevs);
 	spin_unlock(&all_mddevs_lock);
 
+	mddev_destroy(mddev);
 	kfree(mddev);
 }
 
@@ -5836,12 +5863,6 @@ static void md_safemode_timeout(struct timer_list *t)
 }
 
 static int start_dirty_degraded;
-static void active_io_release(struct percpu_ref *ref)
-{
-	struct mddev *mddev = container_of(ref, struct mddev, active_io);
-
-	wake_up(&mddev->sb_wait);
-}
 
 int md_run(struct mddev *mddev)
 {
@@ -5922,15 +5943,10 @@ int md_run(struct mddev *mddev)
 		nowait = nowait && bdev_nowait(rdev->bdev);
 	}
 
-	err = percpu_ref_init(&mddev->active_io, active_io_release,
-				PERCPU_REF_ALLOW_REINIT, GFP_KERNEL);
-	if (err)
-		return err;
-
 	if (!bioset_initialized(&mddev->bio_set)) {
 		err = bioset_init(&mddev->bio_set, BIO_POOL_SIZE, 0, BIOSET_NEED_BVECS);
 		if (err)
-			goto exit_active_io;
+			return err;
 	}
 	if (!bioset_initialized(&mddev->sync_set)) {
 		err = bioset_init(&mddev->sync_set, BIO_POOL_SIZE, 0, BIOSET_NEED_BVECS);
@@ -6127,8 +6143,6 @@ exit_sync_set:
 	bioset_exit(&mddev->sync_set);
 exit_bio_set:
 	bioset_exit(&mddev->bio_set);
-exit_active_io:
-	percpu_ref_exit(&mddev->active_io);
 	return err;
 }
 EXPORT_SYMBOL_GPL(md_run);
@@ -6352,7 +6366,6 @@ static void __md_stop(struct mddev *mddev)
 	module_put(pers->owner);
 	clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
 
-	percpu_ref_exit(&mddev->active_io);
 	bioset_exit(&mddev->bio_set);
 	bioset_exit(&mddev->sync_set);
 	bioset_exit(&mddev->io_clone_set);
