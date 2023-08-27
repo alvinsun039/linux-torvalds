@@ -3659,7 +3659,7 @@ static int __ieee80211_csa_finalize(struct ieee80211_link_data *link_data)
 		changed |= BSS_CHANGED_EHT_PUNCTURING;
 	}
 
-	ieee80211_link_info_change_notify(sdata, &sdata->deflink, changed);
+	ieee80211_link_info_change_notify(sdata, link_data, changed);
 
 	if (link_data->csa_block_tx) {
 		ieee80211_wake_vif_queues(local, sdata,
