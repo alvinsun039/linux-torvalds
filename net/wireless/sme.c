@@ -705,6 +705,7 @@ static bool cfg80211_is_all_idle(void)
 	 * as chan dfs state, etc.
 	 */
 	for_each_rdev(rdev) {
+		wiphy_lock(&rdev->wiphy);
 		list_for_each_entry(wdev, &rdev->wiphy.wdev_list, list) {
 			wdev_lock(wdev);
 			if (wdev->conn || wdev->connected ||
@@ -712,6 +713,7 @@ static bool cfg80211_is_all_idle(void)
 				is_all_idle = false;
 			wdev_unlock(wdev);
 		}
+		wiphy_unlock(&rdev->wiphy);
 	}
 
 	return is_all_idle;
