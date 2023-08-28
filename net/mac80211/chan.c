@@ -579,7 +579,7 @@ bool ieee80211_is_radar_required(struct ieee80211_local *local)
 {
 	struct ieee80211_sub_if_data *sdata;
 
-	lockdep_assert_held(&local->mtx);
+	lockdep_assert_wiphy(local->hw.wiphy);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
@@ -610,7 +610,6 @@ ieee80211_chanctx_radar_required(struct ieee80211_local *local,
 	bool required = false;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
-	lockdep_assert_held(&local->mtx);
 
 	rcu_read_lock();
 	list_for_each_entry_rcu(sdata, &local->interfaces, list) {
@@ -672,7 +671,6 @@ static int ieee80211_add_chanctx(struct ieee80211_local *local,
 	u32 changed;
 	int err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	/* turn idle off *before* setting channel -- some drivers need that */
@@ -697,7 +695,6 @@ ieee80211_new_chanctx(struct ieee80211_local *local,
 	struct ieee80211_chanctx *ctx;
 	int err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	ctx = ieee80211_alloc_chanctx(local, chanreq, mode);
@@ -811,8 +808,6 @@ static void ieee80211_recalc_radar_chanctx(struct ieee80211_local *local,
 	bool radar_enabled;
 
 	lockdep_assert_wiphy(local->hw.wiphy);
-	/* for ieee80211_is_radar_required */
-	lockdep_assert_held(&local->mtx);
 
 	radar_enabled = ieee80211_chanctx_radar_required(local, chanctx);
 
@@ -985,7 +980,7 @@ __ieee80211_link_copy_chanctx_to_vlans(struct ieee80211_link_data *link,
 	if (WARN_ON(sdata->vif.type != NL80211_IFTYPE_AP))
 		return;
 
-	lockdep_assert_held(&local->mtx);
+	lockdep_assert_wiphy(local->hw.wiphy);
 
 	/* Check that conf exists, even when clearing this function
 	 * must be called with the AP's channel context still there
@@ -1225,7 +1220,6 @@ ieee80211_link_use_reserved_reassign(struct ieee80211_link_data *link)
 	u64 changed = 0;
 	int err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	new_ctx = link->reserved_chanctx;
@@ -1378,7 +1372,6 @@ static int ieee80211_chsw_switch_vifs(struct ieee80211_local *local,
 	struct ieee80211_chanctx *ctx, *old_ctx;
 	int i, err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	vif_chsw = kcalloc(n_vifs, sizeof(vif_chsw[0]), GFP_KERNEL);
@@ -1423,7 +1416,6 @@ static int ieee80211_chsw_switch_ctxs(struct ieee80211_local *local)
 	struct ieee80211_chanctx *ctx;
 	int err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	list_for_each_entry(ctx, &local->chanctx_list, list) {
@@ -1463,7 +1455,6 @@ static int ieee80211_vif_use_reserved_switch(struct ieee80211_local *local)
 	int err, n_assigned, n_reserved, n_ready;
 	int n_ctx = 0, n_vifs_switch = 0, n_vifs_assign = 0, n_vifs_ctxless = 0;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	/*
@@ -1750,15 +1741,13 @@ int ieee80211_link_use_channel(struct ieee80211_link_data *link,
 	u8 radar_detect_width = 0;
 	int ret;
 
-	lockdep_assert_held(&local->mtx);
+	lockdep_assert_wiphy(local->hw.wiphy);
 
 	if (sdata->vif.active_links &&
 	    !(sdata->vif.active_links & BIT(link->link_id))) {
 		ieee80211_link_update_chanreq(link, chanreq);
 		return 0;
 	}
-
-	lockdep_assert_wiphy(local->hw.wiphy);
 
 	ret = cfg80211_chandef_dfs_required(local->hw.wiphy,
 					    &chanreq->oper,
@@ -1812,7 +1801,6 @@ int ieee80211_link_use_reserved_context(struct ieee80211_link_data *link)
 	struct ieee80211_chanctx *old_ctx;
 	int err;
 
-	lockdep_assert_held(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	new_ctx = link->reserved_chanctx;
@@ -1937,10 +1925,8 @@ void ieee80211_link_release_channel(struct ieee80211_link_data *link)
 
 	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
-	if (rcu_access_pointer(link->conf->chanctx_conf)) {
-		lockdep_assert_held(&sdata->local->mtx);
+	if (rcu_access_pointer(link->conf->chanctx_conf))
 		__ieee80211_link_release_channel(link);
-	}
 }
 
 void ieee80211_link_vlan_copy_chanctx(struct ieee80211_link_data *link)

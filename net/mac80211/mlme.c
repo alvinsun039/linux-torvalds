@@ -2046,7 +2046,6 @@ static void ieee80211_chswitch_work(struct wiphy *wiphy,
 		return;
 
 	sdata_lock(sdata);
-	mutex_lock(&local->mtx);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	if (!ifmgd->associated)
@@ -2099,7 +2098,6 @@ static void ieee80211_chswitch_work(struct wiphy *wiphy,
 	ieee80211_sta_reset_conn_monitor(sdata);
 
 out:
-	mutex_unlock(&local->mtx);
 	sdata_unlock(sdata);
 }
 
@@ -2182,8 +2180,6 @@ ieee80211_sta_abort_chanswitch(struct ieee80211_link_data *link)
 	if (!local->ops->abort_channel_switch)
 		return;
 
-	mutex_lock(&local->mtx);
-
 	ieee80211_link_unreserve_chanctx(link);
 
 	if (link->csa_block_tx)
@@ -2192,8 +2188,6 @@ ieee80211_sta_abort_chanswitch(struct ieee80211_link_data *link)
 
 	link->csa_block_tx = false;
 	link->conf->csa_active = false;
-
-	mutex_unlock(&local->mtx);
 
 	drv_abort_channel_switch(sdata);
 }
@@ -2240,7 +2234,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	}
 
 	if (res < 0)
-		goto lock_and_drop_connection;
+		goto drop_connection;
 
 	if (beacon && link->conf->csa_active &&
 	    !link->u.mgd.csa_waiting_bcn) {
@@ -2264,7 +2258,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 			   csa_ie.chanreq.oper.center_freq1,
 			   csa_ie.chanreq.oper.center_freq2);
 
-		goto lock_and_drop_connection;
+		goto drop_connection;
 	}
 
 	if (!cfg80211_chandef_usable(local->hw.wiphy, &csa_ie.chanreq.oper,
@@ -2280,7 +2274,7 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 			   csa_ie.chanreq.oper.center_freq1,
 			   csa_ie.chanreq.oper.freq1_offset,
 			   csa_ie.chanreq.oper.center_freq2);
-		goto lock_and_drop_connection;
+		goto drop_connection;
 	}
 
 	if (cfg80211_chandef_identical(&csa_ie.chanreq.oper,
@@ -2303,7 +2297,6 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	 */
 	ieee80211_teardown_tdls_peers(sdata);
 
-	mutex_lock(&local->mtx);
 	conf = rcu_dereference_protected(link->conf->chanctx_conf,
 					 lockdep_is_held(&local->hw.wiphy->mtx));
 	if (!conf) {
@@ -2344,7 +2337,6 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 	if (link->csa_block_tx)
 		ieee80211_stop_vif_queues(local, sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
-	mutex_unlock(&local->mtx);
 
 	cfg80211_ch_switch_started_notify(sdata->dev, &csa_ie.chanreq.oper,
 					  link->link_id, csa_ie.count,
@@ -2363,8 +2355,6 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 				 &link->u.mgd.chswitch_work,
 				 timeout);
 	return;
- lock_and_drop_connection:
-	mutex_lock(&local->mtx);
  drop_connection:
 	/*
 	 * This is just so that the disconnect flow will know that
@@ -2378,7 +2368,6 @@ ieee80211_sta_process_chanswitch(struct ieee80211_link_data *link,
 
 	wiphy_work_queue(sdata->local->hw.wiphy,
 			 &ifmgd->csa_connection_drop_work);
-	mutex_unlock(&local->mtx);
 }
 
 static bool
@@ -2775,14 +2764,14 @@ void ieee80211_dfs_cac_timer_work(struct wiphy *wiphy, struct wiphy_work *work)
 	struct cfg80211_chan_def chandef = link->conf->chanreq.oper;
 	struct ieee80211_sub_if_data *sdata = link->sdata;
 
-	mutex_lock(&sdata->local->mtx);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
 	if (sdata->wdev.cac_started) {
 		ieee80211_link_release_channel(link);
 		cfg80211_cac_event(sdata->dev, &chandef,
 				   NL80211_RADAR_CAC_FINISHED,
 				   GFP_KERNEL);
 	}
-	mutex_unlock(&sdata->local->mtx);
 }
 
 static bool
@@ -3049,7 +3038,7 @@ ieee80211_sta_wmm_params(struct ieee80211_local *local,
 
 static void __ieee80211_stop_poll(struct ieee80211_sub_if_data *sdata)
 {
-	lockdep_assert_held(&sdata->local->mtx);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	sdata->u.mgd.flags &= ~IEEE80211_STA_CONNECTION_POLL;
 	ieee80211_run_deferred_scan(sdata->local);
@@ -3057,9 +3046,9 @@ static void __ieee80211_stop_poll(struct ieee80211_sub_if_data *sdata)
 
 static void ieee80211_stop_poll(struct ieee80211_sub_if_data *sdata)
 {
-	mutex_lock(&sdata->local->mtx);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
 	__ieee80211_stop_poll(sdata);
-	mutex_unlock(&sdata->local->mtx);
 }
 
 static u64 ieee80211_handle_bss_capability(struct ieee80211_link_data *link,
@@ -3263,6 +3252,7 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	};
 
 	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(local->hw.wiphy);
 
 	if (WARN_ON_ONCE(tx && !frame_buf))
 		return;
@@ -3419,7 +3409,6 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 	sdata->vif.bss_conf.eht_puncturing = 0;
 
 	ifmgd->flags = 0;
-	mutex_lock(&local->mtx);
 
 	for (link_id = 0; link_id < ARRAY_SIZE(sdata->link); link_id++) {
 		struct ieee80211_link_data *link;
@@ -3438,7 +3427,6 @@ static void ieee80211_set_disassoc(struct ieee80211_sub_if_data *sdata,
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
 		sdata->deflink.csa_block_tx = false;
 	}
-	mutex_unlock(&local->mtx);
 
 	/* existing TX TSPEC sessions no longer exist */
 	memset(ifmgd->tx_tspec, 0, sizeof(ifmgd->tx_tspec));
@@ -3461,9 +3449,10 @@ static void ieee80211_reset_ap_probe(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	struct ieee80211_local *local = sdata->local;
 
-	mutex_lock(&local->mtx);
+	lockdep_assert_wiphy(local->hw.wiphy);
+
 	if (!(ifmgd->flags & IEEE80211_STA_CONNECTION_POLL))
-		goto out;
+		return;
 
 	__ieee80211_stop_poll(sdata);
 
@@ -3472,7 +3461,7 @@ static void ieee80211_reset_ap_probe(struct ieee80211_sub_if_data *sdata)
 	mutex_unlock(&local->iflist_mtx);
 
 	if (ieee80211_hw_check(&sdata->local->hw, CONNECTION_MONITOR))
-		goto out;
+		return;
 
 	/*
 	 * We've received a probe response, but are not sure whether
@@ -3484,8 +3473,6 @@ static void ieee80211_reset_ap_probe(struct ieee80211_sub_if_data *sdata)
 	mod_timer(&ifmgd->conn_mon_timer,
 		  round_jiffies_up(jiffies +
 				   IEEE80211_CONNECTION_IDLE_TIME));
-out:
-	mutex_unlock(&local->mtx);
 }
 
 static void ieee80211_sta_tx_wmm_ac_notify(struct ieee80211_sub_if_data *sdata,
@@ -3617,6 +3604,8 @@ static void ieee80211_mgd_probe_ap(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_if_managed *ifmgd = &sdata->u.mgd;
 	bool already = false;
 
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
 	if (WARN_ON_ONCE(ieee80211_vif_is_mld(&sdata->vif)))
 		return;
 
@@ -3628,16 +3617,12 @@ static void ieee80211_mgd_probe_ap(struct ieee80211_sub_if_data *sdata,
 	if (!ifmgd->associated)
 		goto out;
 
-	mutex_lock(&sdata->local->mtx);
-
 	if (sdata->local->tmp_channel || sdata->local->scanning) {
-		mutex_unlock(&sdata->local->mtx);
 		goto out;
 	}
 
 	if (sdata->local->suspending) {
 		/* reschedule after resume */
-		mutex_unlock(&sdata->local->mtx);
 		ieee80211_reset_ap_probe(sdata);
 		goto out;
 	}
@@ -3665,8 +3650,6 @@ static void ieee80211_mgd_probe_ap(struct ieee80211_sub_if_data *sdata,
 		already = true;
 
 	ifmgd->flags |= IEEE80211_STA_CONNECTION_POLL;
-
-	mutex_unlock(&sdata->local->mtx);
 
 	if (already)
 		goto out;
@@ -3750,6 +3733,8 @@ static void ___ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 	u8 frame_buf[IEEE80211_DEAUTH_FRAME_LEN];
 	bool tx;
 
+	lockdep_assert_wiphy(local->hw.wiphy);
+
 	if (!ifmgd->associated)
 		return;
 
@@ -3785,7 +3770,6 @@ static void ___ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 					WLAN_REASON_DEAUTH_LEAVING :
 					WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY,
 			       tx, frame_buf);
-	mutex_lock(&local->mtx);
 	/* the other links will be destroyed */
 	sdata->vif.bss_conf.csa_active = false;
 	sdata->deflink.u.mgd.csa_waiting_bcn = false;
@@ -3794,7 +3778,6 @@ static void ___ieee80211_disconnect(struct ieee80211_sub_if_data *sdata)
 					  IEEE80211_QUEUE_STOP_REASON_CSA);
 		sdata->deflink.csa_block_tx = false;
 	}
-	mutex_unlock(&local->mtx);
 
 	ieee80211_report_disconnect(sdata, frame_buf, sizeof(frame_buf), tx,
 				    WLAN_REASON_DISASSOC_DUE_TO_INACTIVITY,
@@ -3891,6 +3874,7 @@ static void ieee80211_destroy_auth_data(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_mgd_auth_data *auth_data = sdata->u.mgd.auth_data;
 
 	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (!assoc) {
 		/*
@@ -3907,10 +3891,8 @@ static void ieee80211_destroy_auth_data(struct ieee80211_sub_if_data *sdata,
 						  BSS_CHANGED_BSSID);
 		sdata->u.mgd.flags = 0;
 
-		mutex_lock(&sdata->local->mtx);
 		ieee80211_link_release_channel(&sdata->deflink);
 		ieee80211_vif_set_links(sdata, 0, 0);
-		mutex_unlock(&sdata->local->mtx);
 	}
 
 	cfg80211_put_bss(sdata->local->hw.wiphy, auth_data->bss);
@@ -3931,6 +3913,7 @@ static void ieee80211_destroy_assoc_data(struct ieee80211_sub_if_data *sdata,
 	struct ieee80211_mgd_assoc_data *assoc_data = sdata->u.mgd.assoc_data;
 
 	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (status != ASSOC_SUCCESS) {
 		/*
@@ -3965,10 +3948,8 @@ static void ieee80211_destroy_assoc_data(struct ieee80211_sub_if_data *sdata,
 			cfg80211_assoc_failure(sdata->dev, &data);
 		}
 
-		mutex_lock(&sdata->local->mtx);
 		ieee80211_link_release_channel(&sdata->deflink);
 		ieee80211_vif_set_links(sdata, 0, 0);
-		mutex_unlock(&sdata->local->mtx);
 	}
 
 	kfree(assoc_data);
@@ -5241,7 +5222,6 @@ static int ieee80211_prep_channel(struct ieee80211_sub_if_data *sdata,
 	if (!link)
 		return 0;
 
-	mutex_lock(&local->mtx);
 	rcu_read_lock();
 	link->needed_rx_chains = min(ieee80211_max_rx_chains(link, cbss),
 				     local->rx_chains);
@@ -5267,7 +5247,6 @@ static int ieee80211_prep_channel(struct ieee80211_sub_if_data *sdata,
 						 IEEE80211_CHANCTX_SHARED);
 	}
  out:
-	mutex_unlock(&local->mtx);
 	return ret;
 }
 
@@ -7416,6 +7395,8 @@ int ieee80211_mgd_auth(struct ieee80211_sub_if_data *sdata,
 	int err;
 	bool cont_auth, wmm_used;
 
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
+
 	/* prepare auth data structure */
 
 	switch (req->auth_type) {
@@ -7574,9 +7555,7 @@ int ieee80211_mgd_auth(struct ieee80211_sub_if_data *sdata,
 		eth_zero_addr(sdata->deflink.u.mgd.bssid);
 		ieee80211_link_info_change_notify(sdata, &sdata->deflink,
 						  BSS_CHANGED_BSSID);
-		mutex_lock(&sdata->local->mtx);
 		ieee80211_link_release_channel(&sdata->deflink);
-		mutex_unlock(&sdata->local->mtx);
 	}
 	ifmgd->auth_data = NULL;
 	kfree(auth_data);
