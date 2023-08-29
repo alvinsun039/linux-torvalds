@@ -1158,49 +1158,6 @@ struct ieee80211_sub_if_data *vif_to_sdata(struct ieee80211_vif *p)
 	wiphy_dereference(sdata->local->hw.wiphy, p)
 
 static inline int
-ieee80211_chanwidth_get_shift(enum nl80211_chan_width width)
-{
-	switch (width) {
-	case NL80211_CHAN_WIDTH_5:
-		return 2;
-	case NL80211_CHAN_WIDTH_10:
-		return 1;
-	default:
-		return 0;
-	}
-}
-
-static inline int
-ieee80211_chandef_get_shift(struct cfg80211_chan_def *chandef)
-{
-	return ieee80211_chanwidth_get_shift(chandef->width);
-}
-
-static inline int
-ieee80211_vif_get_shift(struct ieee80211_vif *vif)
-{
-	struct ieee80211_chanctx_conf *chanctx_conf;
-	int shift = 0;
-
-	rcu_read_lock();
-	chanctx_conf = rcu_dereference(vif->bss_conf.chanctx_conf);
-	if (chanctx_conf)
-		shift = ieee80211_chandef_get_shift(&chanctx_conf->def);
-	rcu_read_unlock();
-
-	return shift;
-}
-
-#define for_each_link_data(sdata, __link)					\
-	struct ieee80211_sub_if_data *__sdata = sdata;				\
-	for (int __link_id = 0;							\
-	     __link_id < ARRAY_SIZE((__sdata)->link); __link_id++)		\
-		if ((!(__sdata)->vif.valid_links ||				\
-		     (__sdata)->vif.valid_links & BIT(__link_id)) &&		\
-		    ((__link) = sdata_dereference((__sdata)->link[__link_id],	\
-						  (__sdata))))
-
-static inline int
 ieee80211_get_mbssid_beacon_len(struct cfg80211_mbssid_elems *elems,
 				struct cfg80211_rnr_elems *rnr_elems,
 				u8 i)
@@ -2066,7 +2023,7 @@ struct sk_buff *
 ieee80211_build_data_template(struct ieee80211_sub_if_data *sdata,
 			      struct sk_buff *skb, u32 info_flags);
 void ieee80211_tx_monitor(struct ieee80211_local *local, struct sk_buff *skb,
-			  int retry_count, int shift, bool send_to_cooked,
+			  int retry_count, bool send_to_cooked,
 			  struct ieee80211_tx_status *status);
 
 void ieee80211_check_fast_xmit(struct sta_info *sta);
@@ -2243,8 +2200,7 @@ const char *ieee80211_conn_mode_str(enum ieee80211_conn_mode mode);
 enum ieee80211_conn_bw_limit
 ieee80211_min_bw_limit_from_chandef(struct cfg80211_chan_def *chandef);
 int ieee80211_frame_duration(enum nl80211_band band, size_t len,
-			     int rate, int erp, int short_preamble,
-			     int shift);
+			     int rate, int erp, int short_preamble);
 void ieee80211_regulatory_limit_wmm_params(struct ieee80211_sub_if_data *sdata,
 					   struct ieee80211_tx_queue_params *qparam,
 					   int ac);
