@@ -235,7 +235,6 @@ static void __ieee80211_sta_join_ibss(struct ieee80211_sub_if_data *sdata,
 	bool radar_required;
 	int err;
 
-	sdata_assert_lock(sdata);
 	lockdep_assert_wiphy(local->hw.wiphy);
 
 	/* Reset own TSF to allow time synchronization work. */
@@ -402,7 +401,7 @@ static void ieee80211_sta_join_ibss(struct ieee80211_sub_if_data *sdata,
 	u32 rate_flags;
 	int shift;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (beacon_int < 10)
 		beacon_int = 10;
@@ -483,7 +482,7 @@ int ieee80211_ibss_csa_beacon(struct ieee80211_sub_if_data *sdata,
 	u16 capability = WLAN_CAPABILITY_IBSS;
 	u64 tsf;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (ifibss->privacy)
 		capability |= WLAN_CAPABILITY_PRIVACY;
@@ -525,7 +524,7 @@ int ieee80211_ibss_finish_csa(struct ieee80211_sub_if_data *sdata, u64 *changed)
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
 	struct cfg80211_bss *cbss;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	/* When not connected/joined, sending CSA doesn't make sense. */
 	if (ifibss->state != IEEE80211_IBSS_MLME_JOINED)
@@ -645,7 +644,7 @@ static int ieee80211_sta_active_ibss(struct ieee80211_sub_if_data *sdata)
 	int active = 0;
 	struct sta_info *sta;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	rcu_read_lock();
 
@@ -731,16 +730,12 @@ static void ieee80211_csa_connection_drop_work(struct wiphy *wiphy,
 		container_of(work, struct ieee80211_sub_if_data,
 			     u.ibss.csa_connection_drop_work);
 
-	sdata_lock(sdata);
-
 	ieee80211_ibss_disconnect(sdata);
 	synchronize_rcu();
 	skb_queue_purge(&sdata->skb_queue);
 
 	/* trigger a scan to find another IBSS network to join */
 	wiphy_work_queue(sdata->local->hw.wiphy, &sdata->work);
-
-	sdata_unlock(sdata);
 }
 
 static void ieee80211_ibss_csa_mark_radar(struct ieee80211_sub_if_data *sdata)
@@ -775,7 +770,7 @@ ieee80211_ibss_process_chanswitch(struct ieee80211_sub_if_data *sdata,
 	};
 	u32 vht_cap_info = 0;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	switch (ifibss->chandef.width) {
 	case NL80211_CHAN_WIDTH_5:
@@ -945,7 +940,7 @@ static void ieee80211_rx_mgmt_auth_ibss(struct ieee80211_sub_if_data *sdata,
 {
 	u16 auth_alg, auth_transaction;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (len < 24 + 6)
 		return;
@@ -1277,7 +1272,7 @@ static void ieee80211_sta_merge_ibss(struct ieee80211_sub_if_data *sdata)
 {
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	mod_timer(&ifibss->timer,
 		  round_jiffies(jiffies + IEEE80211_IBSS_MERGE_INTERVAL));
@@ -1308,7 +1303,7 @@ static void ieee80211_sta_create_ibss(struct ieee80211_sub_if_data *sdata)
 	u16 capability;
 	int i;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	if (ifibss->fixed_bssid) {
 		memcpy(bssid, ifibss->bssid, ETH_ALEN);
@@ -1418,7 +1413,7 @@ static void ieee80211_sta_find_ibss(struct ieee80211_sub_if_data *sdata)
 	const u8 *bssid = NULL;
 	int active_ibss;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	active_ibss = ieee80211_sta_active_ibss(sdata);
 	ibss_dbg(sdata, "sta_find_ibss (active_ibss=%d)\n", active_ibss);
@@ -1509,7 +1504,7 @@ static void ieee80211_rx_mgmt_probe_req(struct ieee80211_sub_if_data *sdata,
 	struct beacon_data *presp;
 	u8 *pos, *end;
 
-	sdata_assert_lock(sdata);
+	lockdep_assert_wiphy(sdata->local->hw.wiphy);
 
 	presp = sdata_dereference(ifibss->presp, sdata);
 
@@ -1605,10 +1600,8 @@ void ieee80211_ibss_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 	mgmt = (struct ieee80211_mgmt *) skb->data;
 	fc = le16_to_cpu(mgmt->frame_control);
 
-	sdata_lock(sdata);
-
 	if (!sdata->u.ibss.ssid_len)
-		goto mgmt_out; /* not ready to merge yet */
+		return; /* not ready to merge yet */
 
 	switch (fc & IEEE80211_FCTL_STYPE) {
 	case IEEE80211_STYPE_PROBE_REQ:
@@ -1648,9 +1641,6 @@ void ieee80211_ibss_rx_queued_mgmt(struct ieee80211_sub_if_data *sdata,
 			break;
 		}
 	}
-
- mgmt_out:
-	sdata_unlock(sdata);
 }
 
 void ieee80211_ibss_work(struct ieee80211_sub_if_data *sdata)
@@ -1658,15 +1648,13 @@ void ieee80211_ibss_work(struct ieee80211_sub_if_data *sdata)
 	struct ieee80211_if_ibss *ifibss = &sdata->u.ibss;
 	struct sta_info *sta;
 
-	sdata_lock(sdata);
-
 	/*
 	 * Work could be scheduled after scan or similar
 	 * when we aren't even joined (or trying) with a
 	 * network.
 	 */
 	if (!ifibss->ssid_len)
-		goto out;
+		return;
 
 	spin_lock_bh(&ifibss->incomplete_lock);
 	while (!list_empty(&ifibss->incomplete_stations)) {
@@ -1692,9 +1680,6 @@ void ieee80211_ibss_work(struct ieee80211_sub_if_data *sdata)
 		WARN_ON(1);
 		break;
 	}
-
- out:
-	sdata_unlock(sdata);
 }
 
 static void ieee80211_ibss_timer(struct timer_list *t)
