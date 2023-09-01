@@ -896,6 +896,10 @@ int rtw89_fw_download(struct rtw89_dev *rtwdev, enum rtw89_fw_type type)
 		goto fwdl_err;
 	}
 
+	if (rtwdev->chip->chip_id == RTL8922A &&
+	    (fw_suit->type == RTW89_FW_NORMAL || fw_suit->type == RTW89_FW_WOWLAN))
+		rtw89_write32(rtwdev, R_BE_SECURE_BOOT_MALLOC_INFO, 0x20248000);
+
 	ret = mac->fwdl_check_path_ready(rtwdev, true);
 	if (ret) {
 		rtw89_err(rtwdev, "[ERR]H2C path ready\n");
