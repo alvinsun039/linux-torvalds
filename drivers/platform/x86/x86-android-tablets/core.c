@@ -308,7 +308,6 @@ static __init int x86_android_tablet_probe(struct platform_device *pdev)
 {
 	const struct x86_dev_info *dev_info;
 	const struct dmi_system_id *id;
-	struct gpio_chip *chip;
 	int i, ret = 0;
 
 	id = dmi_first_match(x86_android_tablet_ids);
@@ -318,20 +317,6 @@ static __init int x86_android_tablet_probe(struct platform_device *pdev)
 	dev_info = id->driver_data;
 	/* Allow x86_android_tablet_device use before probe() exits */
 	x86_android_tablet_device = pdev;
-
-	/*
-	 * The broken DSDTs on these devices often also include broken
-	 * _AEI (ACPI Event Interrupt) handlers, disable these.
-	 */
-	if (dev_info->invalid_aei_gpiochip) {
-		chip = gpiochip_find(dev_info->invalid_aei_gpiochip,
-				     gpiochip_find_match_label);
-		if (!chip) {
-			pr_err("error cannot find GPIO chip %s\n", dev_info->invalid_aei_gpiochip);
-			return -ENODEV;
-		}
-		acpi_gpiochip_free_interrupts(chip);
-	}
 
 	/*
 	 * Since this runs from module_init() it cannot use -EPROBE_DEFER,
