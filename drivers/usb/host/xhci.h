@@ -1859,6 +1859,7 @@ struct xhci_hcd {
 #define XHCI_NEC_HOST		BIT_ULL(2)
 #define XHCI_AMD_PLL_FIX	BIT_ULL(3)
 #define XHCI_SPURIOUS_SUCCESS	BIT_ULL(4)
+#define XHCI_USB3_NOOP		BIT_ULL(63)
 /*
  * Certain Intel host controllers have a limit to the number of endpoint
  * contexts they can handle.  Ideally, they would signal that they can't handle
