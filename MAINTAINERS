@@ -19431,6 +19431,7 @@ S:	Supported
 W:	http://kernsec.org/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/pcmoore/lsm.git
 F:	security/
+F:	tools/testing/selftests/lsm/
 X:	security/selinux/
 
 SELINUX SECURITY MODULE
