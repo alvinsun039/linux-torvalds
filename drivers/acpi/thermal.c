@@ -44,14 +44,6 @@
 #define ACPI_THERMAL_MAX_ACTIVE		10
 #define ACPI_THERMAL_MAX_LIMIT_STR_LEN	65
 
-#define ACPI_TRIPS_PASSIVE	BIT(0)
-#define ACPI_TRIPS_ACTIVE	BIT(1)
-#define ACPI_TRIPS_DEVICES	BIT(2)
-
-#define ACPI_TRIPS_THRESHOLDS	(ACPI_TRIPS_PASSIVE | ACPI_TRIPS_ACTIVE)
-
-#define ACPI_TRIPS_INIT		(ACPI_TRIPS_THRESHOLDS | ACPI_TRIPS_DEVICES)
-
 #define TEMP_MIN_DECIK		2180
 
 /*
@@ -61,12 +53,11 @@
  * 2.TODO: Devices listed in _PSL, _ALx, _TZD may change.
  *   We need to re-bind the cooling devices of a thermal zone when this occurs.
  */
-#define ACPI_THERMAL_TRIPS_EXCEPTION(flags, tz, str) \
+#define ACPI_THERMAL_TRIPS_EXCEPTION(tz, str) \
 do { \
-	if (flags != ACPI_TRIPS_INIT) \
-		acpi_handle_info(tz->device->handle, \
-			"ACPI thermal trip point %s changed\n" \
-			"Please report to linux-acpi@vger.kernel.org\n", str); \
+	acpi_handle_info(tz->device->handle, \
+			 "ACPI thermal trip point %s changed\n" \
+			 "Please report to linux-acpi@vger.kernel.org\n", str); \
 } while (0)
 
 static int act;
@@ -255,7 +246,7 @@ static void acpi_thermal_update_passive_trip(struct acpi_thermal *tz)
 
 	update_acpi_thermal_trip_temp(acpi_trip, get_passive_temp(tz));
 	if (!acpi_trip->valid)
-		ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_PASSIVE, tz, "state");
+		ACPI_THERMAL_TRIPS_EXCEPTION(tz, "state");
 }
 
 static bool update_passive_devices(struct acpi_thermal *tz, bool compare)
@@ -273,7 +264,7 @@ static bool update_passive_devices(struct acpi_thermal *tz, bool compare)
 	}
 
 	if (compare && memcmp(&tz->trips.passive.devices, &devices, sizeof(devices)))
-		ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_PASSIVE, tz, "device");
+		ACPI_THERMAL_TRIPS_EXCEPTION(tz, "device");
 
 	memcpy(&tz->trips.passive.devices, &devices, sizeof(devices));
 	return true;
@@ -290,7 +281,7 @@ static void acpi_thermal_update_passive_devices(struct acpi_thermal *tz)
 		return;
 
 	update_acpi_thermal_trip_temp(acpi_trip, THERMAL_TEMP_INVALID);
-	ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_PASSIVE, tz, "state");
+	ACPI_THERMAL_TRIPS_EXCEPTION(tz, "state");
 }
 
 static long get_active_temp(struct acpi_thermal *tz, int index)
@@ -325,7 +316,7 @@ static void acpi_thermal_update_active_trip(struct acpi_thermal *tz, int index)
 
 	update_acpi_thermal_trip_temp(acpi_trip, get_active_temp(tz, index));
 	if (!acpi_trip->valid)
-		ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_ACTIVE, tz, "state");
+		ACPI_THERMAL_TRIPS_EXCEPTION(tz, "state");
 }
 
 static bool update_active_devices(struct acpi_thermal *tz, int index, bool compare)
@@ -345,7 +336,7 @@ static bool update_active_devices(struct acpi_thermal *tz, int index, bool compa
 	}
 
 	if (compare && memcmp(&tz->trips.active[index].devices, &devices, sizeof(devices)))
-		ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_ACTIVE, tz, "device");
+		ACPI_THERMAL_TRIPS_EXCEPTION(tz, "device");
 
 	memcpy(&tz->trips.active[index].devices, &devices, sizeof(devices));
 	return true;
@@ -362,7 +353,7 @@ static void acpi_thermal_update_active_devices(struct acpi_thermal *tz, int inde
 		return;
 
 	update_acpi_thermal_trip_temp(acpi_trip, THERMAL_TEMP_INVALID);
-	ACPI_THERMAL_TRIPS_EXCEPTION(ACPI_TRIPS_ACTIVE, tz, "state");
+	ACPI_THERMAL_TRIPS_EXCEPTION(tz, "state");
 }
 
 static int acpi_thermal_adjust_trip(struct thermal_trip *trip, void *data)
