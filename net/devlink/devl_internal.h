@@ -59,6 +59,7 @@ struct devlink {
 	refcount_t refcount;
 	struct rcu_work rwork;
 	struct devlink_rel *rel;
+	struct xarray nested_rels;
 
 	KY_KABI_RESERVE(1)
 	KY_KABI_RESERVE(2)
