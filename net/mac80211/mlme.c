@@ -8203,8 +8203,10 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 		err = ieee80211_prep_channel(sdata, NULL, i,
 					     assoc_data->link[i].bss, true,
 					     &assoc_data->link[i].conn);
-		if (err)
+		if (err) {
+			req->links[i].error = err;
 			goto err_clear;
+		}
 	}
 
 	memcpy(vif_cfg->ssid, assoc_data->ssid, assoc_data->ssid_len);
