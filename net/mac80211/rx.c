@@ -2417,12 +2417,12 @@ ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx)
 	 * decrypted them already.
 	 */
 	if (status->flag & RX_FLAG_DECRYPTED)
-		return 0;
+		return RX_CONTINUE;
 
 	/* drop unicast protected dual (that wasn't protected) */
 	if (ieee80211_is_action(fc) &&
 	    mgmt->u.action.category == WLAN_CATEGORY_PROTECTED_DUAL_OF_ACTION)
-		return -EACCES;
+		return RX_DROP_U_UNPROT_DUAL;
 
 	if (rx->sta && test_sta_flag(rx->sta, WLAN_STA_MFP)) {
 		if (unlikely(!ieee80211_has_protected(fc) &&
@@ -2434,13 +2434,13 @@ ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx)
 				 * during 4-way-HS (key is installed after HS).
 				 */
 				if (!rx->key)
-					return 0;
+					return RX_CONTINUE;
 
 				cfg80211_rx_unprot_mlme_mgmt(rx->sdata->dev,
 							     rx->skb->data,
 							     rx->skb->len);
 			}
-			return -EACCES;
+			return RX_DROP_U_UNPROT_UCAST_MGMT;
 		}
 		/* BIP does not use Protected field, so need to check MMIE */
 		if (unlikely(ieee80211_is_multicast_robust_mgmt_frame(rx->skb) &&
@@ -2450,14 +2450,14 @@ ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx)
 				cfg80211_rx_unprot_mlme_mgmt(rx->sdata->dev,
 							     rx->skb->data,
 							     rx->skb->len);
-			return -EACCES;
+			return RX_DROP_U_UNPROT_MCAST_MGMT;
 		}
 		if (unlikely(ieee80211_is_beacon(fc) && rx->key &&
 			     ieee80211_get_mmie_keyidx(rx->skb) < 0)) {
 			cfg80211_rx_unprot_mlme_mgmt(rx->sdata->dev,
 						     rx->skb->data,
 						     rx->skb->len);
-			return -EACCES;
+			return RX_DROP_U_UNPROT_BEACON;
 		}
 		/*
 		 * When using MFP, Action frames are not allowed prior to
@@ -2465,12 +2465,12 @@ ieee80211_drop_unencrypted_mgmt(struct ieee80211_rx_data *rx)
 		 */
 		if (unlikely(ieee80211_is_action(fc) && !rx->key &&
 			     ieee80211_is_robust_mgmt_frame(rx->skb)))
-			return -EACCES;
+			return RX_DROP_U_UNPROT_ACTION;
 
 		/* drop unicast public action frames when using MPF */
 		if (is_unicast_ether_addr(mgmt->da) &&
 		    ieee80211_is_protected_dual_of_public_action(rx->skb))
-			return -EACCES;
+			return RX_DROP_U_UNPROT_UNICAST_PUB_ACTION;
 	}
 
 	return RX_CONTINUE;
@@ -3408,10 +3408,7 @@ ieee80211_rx_h_mgmt_check(struct ieee80211_rx_data *rx)
 		rx->flags |= IEEE80211_RX_BEACON_REPORTED;
 	}
 
-	if (ieee80211_drop_unencrypted_mgmt(rx))
-		return RX_DROP_U_UNPROT_ACTION;
-
-	return RX_CONTINUE;
+	return ieee80211_drop_unencrypted_mgmt(rx);
 }
 
 static bool
