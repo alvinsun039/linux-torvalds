@@ -726,6 +726,16 @@ config PCENGINES_APU2
 	  To compile this driver as a module, choose M here: the module
 	  will be called pcengines-apuv2.
 
+config INSPUR_WMI
+	tristate "Inspur WMI hotkeys driver"
+	depends on ACPI_WMI
+	depends on INPUT
+	help
+	  This driver provides support for Inspur WMI hotkeys.
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called inspur-wmi.
+
 config BARCO_P50_GPIO
 	tristate "Barco P50 GPIO driver for identify LED/button"
 	depends on GPIOLIB
