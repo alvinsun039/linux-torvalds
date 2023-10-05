@@ -330,7 +330,6 @@ static __cold struct io_ring_ctx *io_ring_ctx_alloc(struct io_uring_params *p)
 	spin_lock_init(&ctx->completion_lock);
 	spin_lock_init(&ctx->timeout_lock);
 	INIT_WQ_LIST(&ctx->iopoll_list);
-	INIT_LIST_HEAD(&ctx->io_buffers_pages);
 	INIT_LIST_HEAD(&ctx->io_buffers_comp);
 	INIT_LIST_HEAD(&ctx->defer_list);
 	INIT_LIST_HEAD(&ctx->timeout_list);
@@ -4856,6 +4855,10 @@ static int __init io_uring_init(void)
 	req_cachep = kmem_cache_create("io_kiocb", sizeof(struct io_kiocb), &kmem_args,
 				SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT |
 				SLAB_TYPESAFE_BY_RCU);
+
+	io_buf_cachep = kmem_cache_create("io_buffer", sizeof(struct io_buffer), 0,
+				SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT,
+				NULL);
 
 	iou_wq = alloc_workqueue("iou_exit", WQ_UNBOUND, 64);
 

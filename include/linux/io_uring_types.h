@@ -354,8 +354,6 @@ struct io_ring_ctx {
 	struct wait_queue_head		rsrc_quiesce_wq;
 	unsigned			rsrc_quiesce;
 
-	struct list_head		io_buffers_pages;
-
 	/* hashed buffered write serialization */
 	struct io_wq_hash		*hash_map;
 
