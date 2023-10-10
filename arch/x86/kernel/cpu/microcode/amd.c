@@ -540,12 +540,8 @@ int __init save_microcode_in_initrd_amd(unsigned int cpuid_1_eax)
 	struct cont_desc desc = { 0 };
 	enum ucode_state ret;
 	struct cpio_data cp;
-	const char *path = ucode_path;
 
-	if (is_vendor_hygon())
-		path = "kernel/x86/microcode/HygonGenuine.bin";
-
-	cp = find_microcode_in_initrd(path);
+	find_blobs_in_containers(cpuid_1_eax, &cp);
 	if (!(cp.data && cp.size))
 		return -EINVAL;
 
