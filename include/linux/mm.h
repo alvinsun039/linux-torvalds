@@ -1798,6 +1798,11 @@ static inline void vma_set_access_pid_bit(struct vm_area_struct *vma)
 }
 #endif /* CONFIG_NUMA_BALANCING */
 
+static inline int folio_last_cpupid(struct folio *folio)
+{
+	return page_cpupid_last(&folio->page);
+}
+
 static inline int folio_xchg_access_time(struct folio *folio, int time)
 {
 	return xchg_page_access_time(&folio->page, time);
