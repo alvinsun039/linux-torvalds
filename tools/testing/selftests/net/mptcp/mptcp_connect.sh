@@ -676,7 +676,7 @@ run_test_transparent()
 	# the required infrastructure in MPTCP sockopt code. To support TOS, the
 	# following function has been exported (T). Not great but better than
 	# checking for a specific kernel version.
-	if ! mptcp_lib_kallsyms_has "T ip_sock_set_tos$"; then
+	if ! mptcp_lib_kallsyms_has "T __ip_sock_set_tos$"; then
 		mptcp_lib_pr_skip "${msg} not supported by the kernel"
 		mptcp_lib_result_skip "${TEST_GROUP}"
 		return
