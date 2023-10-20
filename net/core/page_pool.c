@@ -810,7 +810,7 @@ static void page_pool_empty_ring(struct page_pool *pool)
 	}
 }
 
-static void page_pool_free(struct page_pool *pool)
+static void __page_pool_destroy(struct page_pool *pool)
 {
 	if (pool->disconnect)
 		pool->disconnect(pool);
@@ -865,7 +865,7 @@ static int page_pool_release(struct page_pool *pool)
 	in_softirq = page_pool_producer_lock(pool);
 	page_pool_producer_unlock(pool, in_softirq);
 	if (!inflight)
-		page_pool_free(pool);
+		__page_pool_destroy(pool);
 
 	return inflight;
 }
