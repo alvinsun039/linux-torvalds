@@ -245,10 +245,7 @@ operations:
       name: get
       doc: Get devlink instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-        - dump
-
+      dont-validate: [ strict, dump ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -272,9 +269,7 @@ operations:
       name: port-get
       doc: Get devlink port instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit-port
         post: devlink-nl-post-doit
@@ -300,9 +295,7 @@ operations:
       name: sb-get
       doc: Get shared buffer instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -326,9 +319,7 @@ operations:
       name: sb-pool-get
       doc: Get shared buffer pool instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -353,9 +344,7 @@ operations:
       name: sb-port-pool-get
       doc: Get shared buffer port-pool combinations and threshold.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit-port
         post: devlink-nl-post-doit
@@ -381,9 +370,7 @@ operations:
       name: sb-tc-pool-bind-get
       doc: Get shared buffer port-TC to pool bindings and threshold.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit-port
         post: devlink-nl-post-doit
@@ -410,9 +397,7 @@ operations:
       name: param-get
       doc: Get param instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -436,9 +421,7 @@ operations:
       name: region-get
       doc: Get region instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit-port-optional
         post: devlink-nl-post-doit
@@ -463,10 +446,7 @@ operations:
       name: info-get
       doc: Get device information, like driver name, hardware and firmware versions etc.
       attribute-set: devlink
-      dont-validate:
-        - strict
-        - dump
-
+      dont-validate: [ strict, dump ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -490,9 +470,7 @@ operations:
       name: health-reporter-get
       doc: Get health reporter instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit-port-optional
         post: devlink-nl-post-doit
@@ -515,9 +493,7 @@ operations:
       name: trap-get
       doc: Get trap instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -541,9 +517,7 @@ operations:
       name: trap-group-get
       doc: Get trap group instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -567,9 +541,7 @@ operations:
       name: trap-policer-get
       doc: Get trap policer instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -593,9 +565,7 @@ operations:
       name: rate-get
       doc: Get rate instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -620,9 +590,7 @@ operations:
       name: linecard-get
       doc: Get line card instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-
+      dont-validate: [ strict ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
@@ -646,10 +614,7 @@ operations:
       name: selftests-get
       doc: Get device selftest instances.
       attribute-set: devlink
-      dont-validate:
-        - strict
-        - dump
-
+      dont-validate: [ strict, dump ]
       do:
         pre: devlink-nl-pre-doit
         post: devlink-nl-post-doit
