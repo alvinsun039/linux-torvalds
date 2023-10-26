@@ -44,6 +44,7 @@ static const struct rtw89_pci_info rtw8922a_pci_info = {
 	.cpwm_addr		= R_BE_PCIE_CRPWM,
 	.tx_dma_ch_mask		= 0,
 	.bd_idx_addr_low_power	= NULL,
+	.dma_addr_set		= &rtw89_pci_ch_dma_addr_set_be,
 	.bd_ram_table		= NULL,
 
 	.ltr_set		= rtw89_pci_ltr_set_v2,
