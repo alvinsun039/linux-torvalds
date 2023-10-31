@@ -66,6 +66,9 @@ OPTIONS
           kmaps            - Print kernel and module maps (perf script
                              and perf report without browser)
 
+--debug-file::
+	Write debug output to a specified file.
+
 DESCRIPTION
 -----------
 Performance counters for Linux are a new kernel-based subsystem
