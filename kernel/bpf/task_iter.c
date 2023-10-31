@@ -842,9 +842,7 @@ struct bpf_iter_task_vma_kern {
 	struct bpf_iter_task_vma_kern_data *data;
 } __attribute__((aligned(8)));
 
-__diag_push();
-__diag_ignore_all("-Wmissing-prototypes",
-		  "Global functions as their definitions will be in vmlinux BTF");
+__bpf_kfunc_start_defs();
 
 __bpf_kfunc int bpf_iter_task_vma_new(struct bpf_iter_task_vma *it,
 				      struct task_struct *task, u64 addr)
@@ -910,7 +908,7 @@ __bpf_kfunc void bpf_iter_task_vma_destroy(struct bpf_iter_task_vma *it)
 	}
 }
 
-__diag_pop();
+__bpf_kfunc_end_defs();
 
 #ifdef CONFIG_CGROUPS
 
@@ -922,9 +920,7 @@ struct bpf_iter_css_task_kern {
 	struct css_task_iter *css_it;
 } __attribute__((aligned(8)));
 
-__diag_push();
-__diag_ignore_all("-Wmissing-prototypes",
-		  "Global functions as their definitions will be in vmlinux BTF");
+__bpf_kfunc_start_defs();
 
 __bpf_kfunc int bpf_iter_css_task_new(struct bpf_iter_css_task *it,
 		struct cgroup_subsys_state *css, unsigned int flags)
@@ -970,7 +966,7 @@ __bpf_kfunc void bpf_iter_css_task_destroy(struct bpf_iter_css_task *it)
 	bpf_mem_free(&bpf_global_ma, kit->css_it);
 }
 
-__diag_pop();
+__bpf_kfunc_end_defs();
 
 #endif /* CONFIG_CGROUPS */
 
@@ -993,9 +989,7 @@ enum {
 	BPF_TASK_ITER_PROC_THREADS
 };
 
-__diag_push();
-__diag_ignore_all("-Wmissing-prototypes",
-		  "Global functions as their definitions will be in vmlinux BTF");
+__bpf_kfunc_start_defs();
 
 __bpf_kfunc int bpf_iter_task_new(struct bpf_iter_task *it,
 		struct task_struct *task, unsigned int flags)
@@ -1062,7 +1056,7 @@ __bpf_kfunc void bpf_iter_task_destroy(struct bpf_iter_task *it)
 {
 }
 
-__diag_pop();
+__bpf_kfunc_end_defs();
 
 DEFINE_PER_CPU(struct mmap_unlock_irq_work, mmap_unlock_work);
 
