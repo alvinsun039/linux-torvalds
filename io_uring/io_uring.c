@@ -3815,8 +3815,9 @@ static int io_uring_install_fd(struct file *file)
  */
 static struct file *io_uring_get_file(struct io_ring_ctx *ctx)
 {
-	return anon_inode_getfile_secure("[io_uring]", &io_uring_fops, ctx,
-					 O_RDWR | O_CLOEXEC, NULL);
+	/* Create a new inode so that the LSM can block the creation.  */
+        return anon_inode_create_getfile("[io_uring]", &io_uring_fops, ctx,
+                                         O_RDWR | O_CLOEXEC, NULL);
 }
 
 static __cold int io_uring_create(unsigned entries, struct io_uring_params *p,
