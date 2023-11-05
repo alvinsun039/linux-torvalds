@@ -47,8 +47,13 @@
 	     : "m" (this_cpu_off), "0" (ptr));		\
 	(typeof(*(ptr)) __kernel __force *)tcp_ptr__;	\
 })
+
+#define PER_CPU_VAR(var)	%__percpu_seg:(var)__percpu_rel
+
 #else
 #define __percpu_prefix		""
+
+#define PER_CPU_VAR(var)	(var)__percpu_rel
 #endif
 
 #define __percpu_arg(x)		__percpu_prefix "%" #x
