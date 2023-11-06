@@ -56,14 +56,14 @@ int io_unregister_pbuf_ring(struct io_ring_ctx *ctx, void __user *arg);
 
 unsigned int __io_put_kbuf(struct io_kiocb *req, unsigned issue_flags);
 
-void io_kbuf_recycle_legacy(struct io_kiocb *req, unsigned issue_flags);
+bool io_kbuf_recycle_legacy(struct io_kiocb *req, unsigned issue_flags);
 
 void io_put_bl(struct io_ring_ctx *ctx, struct io_buffer_list *bl);
 struct io_buffer_list *io_pbuf_get_bl(struct io_ring_ctx *ctx,
 				      unsigned long bgid);
 int io_pbuf_mmap(struct file *file, struct vm_area_struct *vma);
 
-static inline void io_kbuf_recycle_ring(struct io_kiocb *req)
+static inline bool io_kbuf_recycle_ring(struct io_kiocb *req)
 {
 	/*
 	 * We don't need to recycle for REQ_F_BUFFER_RING, we can just clear
@@ -86,8 +86,10 @@ static inline void io_kbuf_recycle_ring(struct io_kiocb *req)
 		} else {
 			req->buf_index = req->buf_list->bgid;
 			req->flags &= ~REQ_F_BUFFER_RING;
+			return true;
 		}
 	}
+	return false;
 }
 
 static inline bool io_do_buffer_select(struct io_kiocb *req)
@@ -97,12 +99,13 @@ static inline bool io_do_buffer_select(struct io_kiocb *req)
 	return !(req->flags & (REQ_F_BUFFER_SELECTED|REQ_F_BUFFER_RING));
 }
 
-static inline void io_kbuf_recycle(struct io_kiocb *req, unsigned issue_flags)
+static inline bool io_kbuf_recycle(struct io_kiocb *req, unsigned issue_flags)
 {
 	if (req->flags & REQ_F_BUFFER_SELECTED)
-		io_kbuf_recycle_legacy(req, issue_flags);
+		return io_kbuf_recycle_legacy(req, issue_flags);
 	if (req->flags & REQ_F_BUFFER_RING)
-		io_kbuf_recycle_ring(req);
+		return io_kbuf_recycle_ring(req);
+	return false;
 }
 
 static inline unsigned int __io_put_kbuf_list(struct io_kiocb *req,
