@@ -139,6 +139,7 @@ int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe)
  */
 int io_read_mshot_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
+	struct io_rw *rw = io_kiocb_to_cmd(req, struct io_rw);
 	int ret;
 
 	/* must be used with provided buffers */
@@ -148,6 +149,9 @@ int io_read_mshot_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	ret = io_prep_rw(req, sqe);
 	if (unlikely(ret))
 		return ret;
+
+	if (rw->addr || rw->len)
+		return -EINVAL;
 
 	req->flags |= REQ_F_APOLL_MULTISHOT;
 	return 0;
