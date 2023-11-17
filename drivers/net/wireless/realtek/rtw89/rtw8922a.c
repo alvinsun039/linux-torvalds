@@ -3,6 +3,7 @@
  */
 
 #include "debug.h"
+#include "efuse.h"
 #include "fw.h"
 #include "mac.h"
 #include "phy.h"
@@ -21,6 +22,17 @@ static const struct rtw89_rfkill_regs rtw8922a_rfkill_regs = {
 	.mode = {R_BE_GPIO_EXT_CTRL + 2,
 		 (B_BE_GPIO_MOD_9 | B_BE_GPIO_IO_SEL_9) >> 16,
 		 0x0},
+};
+
+static const struct rtw89_efuse_block_cfg rtw8922a_efuse_blocks[] = {
+	[RTW89_EFUSE_BLOCK_SYS]			= {.offset = 0x00000, .size = 0x310},
+	[RTW89_EFUSE_BLOCK_RF]			= {.offset = 0x10000, .size = 0x240},
+	[RTW89_EFUSE_BLOCK_HCI_DIG_PCIE_SDIO]	= {.offset = 0x20000, .size = 0x4800},
+	[RTW89_EFUSE_BLOCK_HCI_DIG_USB]		= {.offset = 0x30000, .size = 0x890},
+	[RTW89_EFUSE_BLOCK_HCI_PHY_PCIE]	= {.offset = 0x40000, .size = 0x200},
+	[RTW89_EFUSE_BLOCK_HCI_PHY_USB3]	= {.offset = 0x50000, .size = 0x80},
+	[RTW89_EFUSE_BLOCK_HCI_PHY_USB2]	= {.offset = 0x60000, .size = 0x0},
+	[RTW89_EFUSE_BLOCK_ADIE]		= {.offset = 0x70000, .size = 0x10},
 };
 
 #ifdef CONFIG_PM
@@ -90,6 +102,7 @@ const struct rtw89_chip_info rtw8922a_chip_info = {
 	.limit_efuse_size	= 0x40000,
 	.dav_phy_efuse_size	= 0,
 	.dav_log_efuse_size	= 0,
+	.efuse_blocks		= rtw8922a_efuse_blocks,
 	.phycap_addr		= 0x1700,
 	.phycap_size		= 0x38,
 
