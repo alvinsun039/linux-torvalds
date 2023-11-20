@@ -1153,19 +1153,32 @@ static DEFINE_MUTEX(sysrq_mutex);
 
 /*
  * writing 'C' to /proc/sysrq-trigger is like sysrq-C
+ * Normally, only the first character written is processed.
+ * However, if the first character is an underscore,
+ * all characters are processed.
  */
 static ssize_t write_sysrq_trigger(struct file *file, const char __user *buf,
 				   size_t count, loff_t *ppos)
 {
-	if (count) {
+	bool bulk = false;
+	size_t i;
+
+	for (i = 0; i < count; i++) {
 		char c;
 
-		if (get_user(c, buf))
+		if (get_user(c, buf + i))
 			return -EFAULT;
 
-		mutex_lock(&sysrq_mutex);
-		__handle_sysrq(c, false);
-		mutex_unlock(&sysrq_mutex);
+		if (c == '_') {
+			bulk = true;
+		} else {
+			mutex_lock(&sysrq_mutex);
+			__handle_sysrq(c, false);
+			mutex_unlock(&sysrq_mutex);
+		}
+
+		if (!bulk)
+			break;
 	}
 
 	return count;
