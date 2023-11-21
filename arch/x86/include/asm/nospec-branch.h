@@ -212,7 +212,7 @@
  */
 .macro VALIDATE_UNRET_END
 #if defined(CONFIG_NOINSTR_VALIDATION) && \
-	(defined(CONFIG_CPU_UNRET_ENTRY) || defined(CONFIG_CPU_SRSO))
+	(defined(CONFIG_MITIGATION_UNRET_ENTRY) || defined(CONFIG_CPU_SRSO))
 	ANNOTATE_RETPOLINE_SAFE
 	nop
 #endif
@@ -280,7 +280,7 @@
  * kernel can support nested alternatives with arbitrary nesting.
  */
 .macro CALL_UNTRAIN_RET
-#if defined(CONFIG_CPU_UNRET_ENTRY) || defined(CONFIG_CPU_SRSO)
+#if defined(CONFIG_MITIGATION_UNRET_ENTRY) || defined(CONFIG_CPU_SRSO)
 	ALTERNATIVE_2 "", "call entry_untrain_ret", X86_FEATURE_UNRET, \
 		          "call srso_alias_untrain_ret", X86_FEATURE_SRSO_ALIAS
 #endif
@@ -367,7 +367,7 @@ extern void __x86_return_thunk(void);
 static inline void __x86_return_thunk(void) {}
 #endif
 
-#ifdef CONFIG_CPU_UNRET_ENTRY
+#ifdef CONFIG_MITIGATION_UNRET_ENTRY
 extern void retbleed_return_thunk(void);
 #else
 static inline void retbleed_return_thunk(void) {}
