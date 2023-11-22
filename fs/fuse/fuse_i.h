@@ -1475,6 +1475,9 @@ static inline struct file *fuse_file_passthrough(struct fuse_file *ff)
 #endif
 }
 
+ssize_t fuse_passthrough_read_iter(struct kiocb *iocb, struct iov_iter *iter);
+ssize_t fuse_passthrough_write_iter(struct kiocb *iocb, struct iov_iter *iter);
+
 #ifdef CONFIG_SYSCTL
 extern int fuse_sysctl_register(void);
 extern void fuse_sysctl_unregister(void);
