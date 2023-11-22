@@ -1516,7 +1516,7 @@ ssize_t generic_copy_file_range(struct file *file_in, loff_t pos_in,
 				struct file *file_out, loff_t pos_out,
 				size_t len, unsigned int flags)
 {
-	lockdep_assert(sb_write_started(file_inode(file_out)->i_sb));
+	lockdep_assert(file_write_started(file_out));
 	/* May only be called from within ->copy_file_range() methods */
 	if (WARN_ON_ONCE(flags))
 		return -EINVAL;
