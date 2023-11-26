@@ -188,6 +188,10 @@ struct page_pool {
 
 	/* Slow/Control-path information follows */
 	struct page_pool_params_slow slow;
+	/* User-facing fields, protected by page_pools_lock */
+	struct {
+		u32 id;
+	} user;
 
 	KY_KABI_RESERVE(1)
 	KY_KABI_RESERVE(2)
