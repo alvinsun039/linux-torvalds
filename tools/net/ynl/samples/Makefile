@@ -18,7 +18,7 @@ include $(wildcard *.d)
 
 all: $(BINS)
 
-$(BINS): ../lib/ynl.a ../generated/protos.a
+$(BINS): ../lib/ynl.a ../generated/protos.a $(SRCS)
 
 clean:
 	rm -f *.o *.d *~
