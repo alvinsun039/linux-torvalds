@@ -113,6 +113,7 @@ available subsections can be seen below.
    wmi
    dpll
    crypto/index
+   tee
 
 .. only::  subproject and html
 
