@@ -210,13 +210,6 @@ static const struct {
 	{ "arm64.nolse",		"id_aa64isar0.atomic=0" },
 };
 
-static int __init parse_nokaslr(char *unused)
-{
-	/* nokaslr param handling is done by early cpufeature code */
-	return 0;
-}
-early_param("nokaslr", parse_nokaslr);
-
 static int __init parse_hexdigit(const char *p, u64 *v)
 {
 	// skip "0x" if it comes next
