@@ -76,6 +76,7 @@ Contents:
    mptcp-sysctl
    multiqueue
    napi
+   net_cachelines/index
    netconsole
    netdev-features
    netdevices
