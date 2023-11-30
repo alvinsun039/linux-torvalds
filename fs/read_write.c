@@ -1516,13 +1516,12 @@ ssize_t generic_copy_file_range(struct file *file_in, loff_t pos_in,
 				struct file *file_out, loff_t pos_out,
 				size_t len, unsigned int flags)
 {
-	lockdep_assert(file_write_started(file_out));
 	/* May only be called from within ->copy_file_range() methods */
 	if (WARN_ON_ONCE(flags))
 		return -EINVAL;
 
-	return do_splice_direct(file_in, &pos_in, file_out, &pos_out,
-				len > MAX_RW_COUNT ? MAX_RW_COUNT : len, 0);
+	return splice_file_range(file_in, &pos_in, file_out, &pos_out,
+				 min_t(size_t, len, MAX_RW_COUNT));
 }
 EXPORT_SYMBOL(generic_copy_file_range);
 
