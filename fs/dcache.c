@@ -341,10 +341,18 @@ static inline void __d_set_inode_and_type(struct dentry *dentry,
 					  unsigned type_flags)
 {
 	unsigned flags;
+	struct dentry *parent;
+
+	parent = dentry->d_parent;
+	if ((dentry->d_flags & DCACHE_NEGATIVE_ACCOUNT) && parent) {
+		WARN_ON(!inode);
+		atomic_dec(&parent->d_neg_dnum);
+	}
 
 	dentry->d_inode = inode;
 	flags = READ_ONCE(dentry->d_flags);
-	flags &= ~(DCACHE_ENTRY_TYPE | DCACHE_FALLTHRU);
+	flags &= ~(DCACHE_ENTRY_TYPE | DCACHE_FALLTHRU |
+			DCACHE_NEGATIVE_ACCOUNT);
 	flags |= type_flags;
 	smp_store_release(&dentry->d_flags, flags);
 }
@@ -363,6 +371,7 @@ static inline void __d_clear_type_and_inode(struct dentry *dentry)
 static void dentry_free(struct dentry *dentry)
 {
 	WARN_ON(!hlist_unhashed(&dentry->d_u.d_alias));
+	WARN_ON(dentry->d_flags & DCACHE_NEGATIVE_ACCOUNT);
 	if (unlikely(dname_external(dentry))) {
 		struct external_name *p = external_name(dentry);
 		if (likely(atomic_dec_and_test(&p->u.count))) {
@@ -601,8 +610,14 @@ static void __dentry_kill(struct dentry *dentry)
 	/* if it was on the hash then remove it */
 	__d_drop(dentry);
 	dentry_unlist(dentry, parent);
-	if (parent)
+	if (parent) {
+		if (dentry->d_flags & DCACHE_NEGATIVE_ACCOUNT) {
+			atomic_dec(&parent->d_neg_dnum);
+			dentry->d_flags &= ~DCACHE_NEGATIVE_ACCOUNT;
+		}
+
 		spin_unlock(&parent->d_lock);
+	}
 	if (dentry->d_inode)
 		dentry_unlink_inode(dentry);
 	else
@@ -660,6 +675,34 @@ static inline struct dentry *lock_parent(struct dentry *dentry)
 	return __lock_parent(dentry);
 }
 
+/*
+ * Return true if dentry is negative and exceed negative dentry limit.
+ */
+static inline bool limit_negative_dentry(struct dentry *dentry)
+{
+	struct dentry *parent;
+
+	parent = dentry->d_parent;
+	if (unlikely(!parent))
+		return false;
+
+	WARN_ON((atomic_read(&parent->d_neg_dnum) < 0));
+	if (!dentry->d_inode) {
+		if (!(dentry->d_flags & DCACHE_NEGATIVE_ACCOUNT)) {
+			unsigned int flags = READ_ONCE(dentry->d_flags);
+
+			flags |= DCACHE_NEGATIVE_ACCOUNT;
+			WRITE_ONCE(dentry->d_flags, flags);
+			atomic_inc(&parent->d_neg_dnum);
+		}
+
+		if (atomic_read(&parent->d_neg_dnum) >= NEG_DENTRY_LIMIT)
+			return true;
+	}
+
+	return false;
+}
+
 static inline bool retain_dentry(struct dentry *dentry)
 {
 	WARN_ON(d_in_lookup(dentry));
@@ -677,6 +720,9 @@ static inline bool retain_dentry(struct dentry *dentry)
 	}
 
 	if (unlikely(dentry->d_flags & DCACHE_DONTCACHE))
+		return false;
+
+	if (unlikely(limit_negative_dentry(dentry)))
 		return false;
 
 	/* retain; LRU fodder */
@@ -834,8 +880,25 @@ static inline bool fast_dput(struct dentry *dentry)
 			DCACHE_DISCONNECTED | DCACHE_DONTCACHE;
 
 	/* Nothing to do? Dropping the reference was all we needed? */
-	if (d_flags == (DCACHE_REFERENCED | DCACHE_LRU_LIST) && !d_unhashed(dentry))
-		return true;
+	if (d_flags == (DCACHE_REFERENCED | DCACHE_LRU_LIST) && !d_unhashed(dentry)) {
+		/*
+		 * If the dentry is not negative dentry, return true directly,
+		 * avoid holding dentry lock in the fast put path.
+		 */
+		if (dentry->d_inode)
+			return true;
+		/*
+		 * If dentry is negative and need to be limitted, it maybe need
+		 * to be killed, so shouldn't fast put and retain in memory.
+		 */
+		spin_lock(&dentry->d_lock);
+		if (likely(!limit_negative_dentry(dentry))) {
+			spin_unlock(&dentry->d_lock);
+			return true;
+		}
+
+		goto dentry_locked;
+	}
 
 	/*
 	 * Not the fast normal case? Get the lock. We've already decremented
@@ -844,6 +907,7 @@ static inline bool fast_dput(struct dentry *dentry)
 	 */
 	spin_lock(&dentry->d_lock);
 
+dentry_locked:
 	/*
 	 * Did somebody else grab a reference to it in the meantime, and
 	 * we're no longer the last user after all? Alternatively, somebody
@@ -1810,6 +1874,7 @@ static struct dentry *__d_alloc(struct super_block *sb, const struct qstr *name)
 	seqcount_spinlock_init(&dentry->d_seq, &dentry->d_lock);
 	dentry->d_inode = NULL;
 	dentry->d_parent = dentry;
+	atomic_set(&dentry->d_neg_dnum, 0);
 	dentry->d_sb = sb;
 	dentry->d_op = NULL;
 	dentry->d_fsdata = NULL;
