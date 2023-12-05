@@ -235,4 +235,10 @@ static inline void nmi_backtrace_stall_snap(const struct cpumask *btp) {}
 static inline void nmi_backtrace_stall_check(const struct cpumask *btp) {}
 #endif
 
+#ifdef CONFIG_SDEI_WATCHDOG
+extern bool disable_sdei_nmi_watchdog;
+#else
+#define disable_sdei_nmi_watchdog 1
+#endif
+
 #endif
