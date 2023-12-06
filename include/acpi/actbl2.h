@@ -897,7 +897,15 @@ enum acpi_madt_type {
 	ACPI_MADT_TYPE_APLIC = 26,
 	ACPI_MADT_TYPE_PLIC = 27,
 	ACPI_MADT_TYPE_RESERVED = 28,	/* 28 to 0x7F are reserved */
-	ACPI_MADT_TYPE_OEM_RESERVED = 0x80	/* 0x80 to 0xFF are reserved for OEM use */
+	ACPI_MADT_TYPE_OEM_RESERVED = 0x80,	/* 0x80 to 0xFF are reserved for OEM use */
+	/**
+	 * Add for SW64
+	 * Due to the fact that the interrupt controller structures
+	 * of SW64 have not yet been added to the ACPI specification,
+	 * interrupt controller structure types reserved for OEM are
+	 * used(start from 0x80).
+	 */
+	ACPI_MADT_TYPE_SW_CINTC = 0x80,
 };
 
 /*
@@ -1324,6 +1332,28 @@ struct acpi_madt_plic {
 
 struct acpi_madt_oem_data {
 	ACPI_FLEX_ARRAY(u8, oem_data);
+};
+
+/* 0x80: Sunway Core Interrupt Controller (To be added to ACPI spec) */
+
+struct acpi_madt_sw_cintc {
+	struct acpi_subtable_header header;
+	u8 version;
+	u8 reserved0;
+	u32 flags;
+	u32 reserved1;
+	u32 hardware_id;
+	u32 uid;
+	u64 boot_flag_address;
+};
+
+/* Values for version field above */
+
+enum acpi_madt_sw_cintc_version {
+	ACPI_MADT_SW_CINTC_VERSION_NONE = 0,
+	ACPI_MADT_SW_CINTC_VERSION_V1 = 1,
+	ACPI_MADT_SW_CINTC_VERSION_V2 = 2,
+	ACPI_MADT_SW_CINTC_VERSION_RESERVED = 3 /* 3 and greater are reserved */
 };
 
 /*
