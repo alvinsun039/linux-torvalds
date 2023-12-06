@@ -230,6 +230,15 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 		}
 		break;
 
+	case ACPI_MADT_TYPE_SW_CINTC:
+		{
+			struct acpi_madt_sw_cintc *p =
+				(struct acpi_madt_sw_cintc *)header;
+			pr_debug("SW CINTC (version[%u] flags[0x%x] hardware_id[0x%x])\n",
+				p->version, p->flags, p->hardware_id);
+		}
+		break;
+
 	default:
 		pr_warn("Found unsupported MADT entry (type = 0x%x)\n",
 			header->type);
