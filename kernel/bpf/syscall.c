@@ -294,7 +294,6 @@ static int bpf_map_update_value(struct bpf_map *map, struct file *map_file,
 		}
 	}
 	bpf_enable_instrumentation();
-	maybe_wait_bpf_programs(map);
 
 	return err;
 }
@@ -1741,6 +1740,7 @@ static int map_update_elem(union bpf_attr *attr, bpfptr_t uattr)
 	}
 
 	err = bpf_map_update_value(map, fd_file(f), key, value, attr->flags);
+	maybe_wait_bpf_programs(map);
 
 	kvfree(value);
 free_key:
@@ -1974,6 +1974,8 @@ int generic_map_update_batch(struct bpf_map *map, struct file *map_file,
 
 	kvfree(value);
 	kvfree(key);
+
+	maybe_wait_bpf_programs(map);
 	return err;
 }
 
