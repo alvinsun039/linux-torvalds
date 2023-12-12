@@ -517,7 +517,7 @@ void xsc_page_release_dynamic(struct xsc_rq *rq,
 		page_pool_recycle_direct(rq->page_pool, dma_info->page);
 	} else {
 		xsc_page_dma_unmap(rq, dma_info);
-		page_pool_put_defragged_page(rq->page_pool,
+		page_pool_put_unrefed_page(rq->page_pool,
 					     dma_info->page,
 					     -1, true);
 	}
