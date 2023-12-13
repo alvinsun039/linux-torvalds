@@ -421,6 +421,7 @@ enum {
 	/* keep async read/write and isreg together and in order */
 	REQ_F_SUPPORT_NOWAIT_BIT,
 	REQ_F_ISREG_BIT,
+	REQ_F_POLL_NO_LAZY_BIT,
 	REQ_F_CAN_POLL_BIT,
 	REQ_F_CANCEL_SEQ_BIT,
 	REQ_F_BL_EMPTY_BIT,
@@ -493,6 +494,8 @@ enum {
 	REQ_F_CLEAR_POLLIN	= IO_REQ_FLAG(REQ_F_CLEAR_POLLIN_BIT),
 	/* hashed into ->cancel_hash_locked, protected by ->uring_lock */
 	REQ_F_HASH_LOCKED	= IO_REQ_FLAG(REQ_F_HASH_LOCKED_BIT),
+	/* don't use lazy poll wake for this request */
+	REQ_F_POLL_NO_LAZY	= BIT(REQ_F_POLL_NO_LAZY_BIT),
 	/* file is pollable */
 	REQ_F_CAN_POLL		= IO_REQ_FLAG(REQ_F_CAN_POLL_BIT),
 	/* cancel sequence is set and valid */
