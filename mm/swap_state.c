@@ -541,7 +541,7 @@ fail_put_swap:
  * the swap entry is no longer in use.
  *
  * get/put_swap_device() aren't needed to call this function, because
- * __read_swap_cache_async() call them and swap_readpage() holds the
+ * __read_swap_cache_async() call them and swap_read_folio() holds the
  * swap cache folio lock.
  */
 struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
@@ -559,7 +559,7 @@ struct page *read_swap_cache_async(swp_entry_t entry, gfp_t gfp_mask,
 	mpol_cond_put(mpol);
 
 	if (page_allocated)
-		swap_readpage(&folio->page, false, plug);
+		swap_read_folio(folio, false, plug);
 	return folio_file_page(folio, swp_offset(entry));
 }
 
@@ -676,7 +676,7 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 		if (!folio)
 			continue;
 		if (page_allocated) {
-			swap_readpage(&folio->page, false, &splug);
+			swap_read_folio(folio, false, &splug);
 			if (offset != entry_offset) {
 				folio_set_readahead(folio);
 				count_vm_event(SWAP_RA);
@@ -692,7 +692,7 @@ skip:
 	folio = __read_swap_cache_async(entry, gfp_mask, mpol, ilx,
 					&page_allocated, false);
 	if (unlikely(page_allocated))
-		swap_readpage(&folio->page, false, NULL);
+		swap_read_folio(folio, false, NULL);
 	zswap_folio_swapin(folio);
 	return folio_file_page(folio, swp_offset(entry));
 }
@@ -850,7 +850,7 @@ static struct page *swap_vma_readahead(swp_entry_t targ_entry, gfp_t gfp_mask,
 		if (!folio)
 			continue;
 		if (page_allocated) {
-			swap_readpage(&folio->page, false, &splug);
+			swap_read_folio(folio, false, &splug);
 			if (i != ra_info.offset) {
 				folio_set_readahead(folio);
 				count_vm_event(SWAP_RA);
@@ -868,7 +868,7 @@ skip:
 	folio = __read_swap_cache_async(targ_entry, gfp_mask, mpol, targ_ilx,
 					&page_allocated, false);
 	if (unlikely(page_allocated))
-		swap_readpage(&folio->page, false, NULL);
+		swap_read_folio(folio, false, NULL);
 	zswap_folio_swapin(folio);
 	return folio_file_page(folio, swp_offset(entry));
 }
