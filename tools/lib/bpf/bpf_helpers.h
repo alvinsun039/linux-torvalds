@@ -189,6 +189,8 @@ enum libbpf_tristate {
 	!!sym;											\
 })
 
+#define __arg_ctx __attribute__((btf_decl_tag("arg:ctx")))
+#define __arg_nonnull __attribute((btf_decl_tag("arg:nonnull")))
 #define __arg_arena __attribute((btf_decl_tag("arg:arena")))
 
 #ifndef ___bpf_concat
