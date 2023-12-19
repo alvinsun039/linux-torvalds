@@ -99,6 +99,14 @@ void *io_pages_map(struct page ***out_pages, unsigned short *npages,
 void io_pages_unmap(void *ptr, struct page ***pages, unsigned short *npages,
 		    bool put_pages);
 
+enum {
+	IO_EVENTFD_OP_SIGNAL_BIT,
+	IO_EVENTFD_OP_FREE_BIT,
+};
+
+void io_eventfd_ops(struct rcu_head *rcu);
+void io_activate_pollwq(struct io_ring_ctx *ctx);
+
 #if defined(CONFIG_PROVE_LOCKING)
 static inline void io_lockdep_assert_cq_locked(struct io_ring_ctx *ctx)
 {
