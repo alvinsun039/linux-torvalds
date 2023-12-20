@@ -31,6 +31,7 @@ config KVM
 	select KVM_MMIO
 	select KVM_XFER_TO_GUEST_WORK
 	select KVM_GENERIC_MMU_NOTIFIER
+	select SCHED_INFO
 	help
 	  Support hosting virtualized guest machines.
 
