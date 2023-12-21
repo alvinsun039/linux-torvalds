@@ -31,6 +31,7 @@
 #include <linux/pid_namespace.h>
 #include <linux/refcount.h>
 #include <linux/user_namespace.h>
+#include <linux/ky_kabi.h>
 
 /** Default max number of pages that can be used in a single read request */
 #define FUSE_DEFAULT_MAX_PAGES_PER_REQ 32
@@ -173,6 +174,8 @@ struct fuse_inode {
 #endif
 	/** Submount specific lookup tracking */
 	struct fuse_submount_lookup *submount_lookup;
+
+	KY_KABI_RESERVE(1)
 };
 
 /** FUSE inode state bits */
@@ -501,6 +504,8 @@ struct fuse_dev {
 
 	/** list entry on fc->devices */
 	struct list_head entry;
+
+	KY_KABI_RESERVE(1)
 };
 
 enum fuse_dax_mode {
@@ -867,6 +872,11 @@ struct fuse_conn {
 
 	/* New writepages go into this bucket */
 	struct fuse_sync_bucket __rcu *curr_bucket;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
+	KY_KABI_RESERVE(3)
+	KY_KABI_RESERVE(4)
 };
 
 /*
