@@ -191,6 +191,15 @@ chk_msk_cestab()
 		 "${cestab}" "....chk ${cestab} cestab" ""
 }
 
+# $1: cestab nr
+chk_msk_cestab()
+{
+	local cestab=$1
+
+	__chk_nr "mptcp_lib_get_counter ${ns} MPTcpExtMPCurrEstab" \
+		 "${cestab}" "....chk ${cestab} cestab" ""
+}
+
 wait_connected()
 {
 	local listener_ns="${1}"
