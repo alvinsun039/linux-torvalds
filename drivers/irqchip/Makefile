@@ -123,8 +123,8 @@ obj-$(CONFIG_APPLE_AIC)			+= irq-apple-aic.o
 obj-$(CONFIG_MCHP_EIC)			+= irq-mchp-eic.o
 obj-$(CONFIG_SUNPLUS_SP7021_INTC)	+= irq-sp7021-intc.o
 obj-$(CONFIG_PHYTIUM_IXIC)		+= irq-phytium-ixic.o
-obj-$(CONFIG_SW64_INTC_V2)     		+= irq-sw64-intc-v2.o
-obj-$(CONFIG_SW64_LPC_INTC)		+= irq-sw64-lpc-intc.o
+obj-$(CONFIG_SW64_PINTC)		+= irq-sunway-pintc.o
+obj-$(CONFIG_SW64_LPC_INTC)		+= irq-sunway-lpc-intc.o
 obj-$(CONFIG_SW64_IRQ_CPU)		+= irq-sunway-cpu.o
 
 ifeq ($(CONFIG_UNCORE_XUELANG),y)
