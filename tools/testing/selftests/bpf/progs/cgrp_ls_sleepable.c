@@ -15,7 +15,7 @@ struct {
 	__type(value, long);
 } map_a SEC(".maps");
 
-__u32 target_pid;
+__s32 target_pid;
 __u64 cgroup_id;
 
 void bpf_rcu_read_lock(void) __ksym;
