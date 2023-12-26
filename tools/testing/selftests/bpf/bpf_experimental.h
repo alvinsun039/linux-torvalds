@@ -254,6 +254,11 @@ extern void bpf_throw(u64 cookie) __ksym;
 		}									\
 	 })
 
+#ifndef bpf_nop_mov
+#define bpf_nop_mov(var) \
+	asm volatile("%[reg]=%[reg]"::[reg]"r"((short)var))
+#endif
+
 /* Description
  *	Assert that a conditional expression is true.
  * Returns
