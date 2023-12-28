@@ -331,7 +331,6 @@ typedef int (*report_zones_cb)(struct blk_zone *zone, unsigned int idx,
 			       void *data);
 
 void disk_set_zoned(struct gendisk *disk);
-void disk_clear_zoned(struct gendisk *disk);
 
 #ifdef CONFIG_BLK_DEV_ZONED
 #define BLK_ALL_ZONES  ((unsigned int)-1)
