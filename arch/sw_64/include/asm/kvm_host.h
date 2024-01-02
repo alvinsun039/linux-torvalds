@@ -124,10 +124,6 @@ struct kvm_vcpu_arch {
 
 	/* Cache some mmu pages needed inside spinlock regions */
 	struct kvm_mmu_memory_cache mmu_page_cache;
-
-	/* guest live migration */
-	unsigned long migration_mark;
-	unsigned long shtclock;
 };
 
 struct vmem_info {
