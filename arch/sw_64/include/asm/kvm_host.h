@@ -66,16 +66,11 @@
 #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - _AC(1, ULL))
 
 struct kvm_arch_memory_slot {
-	unsigned long host_phys_addr;
-	bool valid;
 };
 
 struct kvm_arch {
 	unsigned long host_phys_addr;
 	unsigned long size;
-
-	/* segment table */
-	unsigned long *seg_pgd;
 
 	struct swvm_mem mem;
 	/* Addtional stage page table*/
@@ -165,9 +160,6 @@ struct kvm_vcpu_stat {
 	u64 ipi_exits;
 	u64 timer_exits;
 	u64 debug_exits;
-#ifdef CONFIG_KVM_MEMHOTPLUG
-	u64 memhotplug_exits;
-#endif
 	u64 fatal_error_exits;
 	u64 halt_exits;
 	u64 halt_successful_poll;
@@ -205,9 +197,6 @@ extern struct dfx_sw64_kvm_stats_debugfs_item dfx_sw64_debugfs_entries[];
 
 extern struct kvm_stats_debugfs_item debugfs_entries[];
 
-#ifdef CONFIG_KVM_MEMHOTPLUG
-void vcpu_mem_hotplug(struct kvm_vcpu *vcpu, unsigned long start_addr);
-#endif
 #ifdef CONFIG_SUBARCH_C4
 #define KVM_ARCH_WANT_MMU_NOTIFIER
 #endif
