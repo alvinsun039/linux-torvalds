@@ -5283,6 +5283,8 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 	if (WARN_ON(!sta))
 		goto out_err;
 
+	sta->sta.spp_amsdu = assoc_data->spp_amsdu;
+
 	if (ieee80211_vif_is_mld(&sdata->vif)) {
 		for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
 			if (!assoc_data->link[link_id].bss)
@@ -8531,6 +8533,8 @@ int ieee80211_mgd_assoc(struct ieee80211_sub_if_data *sdata,
 		if (err)
 			goto err_free;
 	}
+
+	assoc_data->spp_amsdu = req->flags & ASSOC_REQ_SPP_AMSDU;
 
 	if (ifmgd->auth_data && !ifmgd->auth_data->done) {
 		err = -EBUSY;
