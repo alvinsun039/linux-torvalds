@@ -24,6 +24,7 @@ SYM_FUNC_START(__arch_clear_user)
 	add	x2, x0, x1
 	subs	x1, x1, #8
 	b.mi	2f
+	.align 5
 1:
 USER(9f, sttr	xzr, [x0])
 	add	x0, x0, #8
