@@ -320,7 +320,7 @@ static inline bool arch_vdso_cycles_ok(u64 cycles)
 static __always_inline u64 vdso_calc_ns(const struct vdso_data *vd, u64 cycles, u64 base)
 {
 	/*
-	 * Due to the MSB/Sign-bit being used as invald marker (see
+	 * Due to the MSB/Sign-bit being used as invalid marker (see
 	 * arch_vdso_cycles_valid() above), the effective mask is S64_MAX.
 	 */
 	u64 delta = (cycles - vd->cycle_last) & S64_MAX;
