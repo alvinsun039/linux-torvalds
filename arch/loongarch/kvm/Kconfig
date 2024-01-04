@@ -23,6 +23,7 @@ config KVM
 	depends on HAVE_KVM
 	select HAVE_KVM_DIRTY_RING_ACQ_REL
 	select HAVE_KVM_VCPU_ASYNC_IOCTL
+	select KVM_COMMON
 	select HAVE_KVM_IRQ_ROUTING
 	select HAVE_KVM_IRQCHIP
 	select HAVE_KVM_IRQFD
@@ -32,7 +33,6 @@ config KVM
 	select KVM_GENERIC_MMU_NOTIFIER
 	select KVM_MMIO
 	select KVM_XFER_TO_GUEST_WORK
-	select PREEMPT_NOTIFIERS
 	select KVM_VFIO
 	select SCHED_INFO
 	help
