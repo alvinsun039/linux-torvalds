@@ -1651,6 +1651,7 @@ BPF_CALL_2(bpf_kptr_xchg, void *, dst, void *, ptr)
 {
 	unsigned long *kptr = dst;
 
+	/* This helper may be inlined by verifier. */
 	return xchg(kptr, (unsigned long)ptr);
 }
 
