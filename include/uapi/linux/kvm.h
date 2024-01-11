@@ -917,10 +917,7 @@ struct kvm_enable_cap {
 #define KVM_CAP_MEMORY_ATTRIBUTES 233
 #define KVM_CAP_GUEST_MEMFD 234
 #define KVM_CAP_VM_TYPES 235
-
 #define KVM_CAP_SEV_ES_GHCB 500
-
-#ifdef KVM_CAP_IRQ_ROUTING
 
 struct kvm_irq_routing_irqchip {
 	__u32 irqchip;
@@ -985,8 +982,6 @@ struct kvm_irq_routing {
 	__u32 flags;
 	struct kvm_irq_routing_entry entries[];
 };
-
-#endif
 
 #define KVM_IRQFD_FLAG_DEASSIGN (1 << 0)
 /*
