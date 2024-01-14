@@ -2278,12 +2278,11 @@ static int ath12k_setup_peer_smps(struct ath12k *ar, struct ath12k_vif *arvif,
 					 ath12k_smps_map[smps]);
 }
 
-static void ath12k_bss_assoc(struct ieee80211_hw *hw,
-			     struct ieee80211_vif *vif,
+static void ath12k_bss_assoc(struct ath12k *ar,
+			     struct ath12k_vif *arvif,
 			     struct ieee80211_bss_conf *bss_conf)
 {
-	struct ath12k *ar = hw->priv;
-	struct ath12k_vif *arvif = ath12k_vif_to_arvif(vif);
+	struct ieee80211_vif *vif = arvif->vif;
 	struct ath12k_wmi_peer_assoc_arg peer_arg;
 	struct ieee80211_sta *ap_sta;
 	struct ath12k_peer *peer;
@@ -2373,11 +2372,9 @@ static void ath12k_bss_assoc(struct ieee80211_hw *hw,
 			    arvif->vdev_id, ret);
 }
 
-static void ath12k_bss_disassoc(struct ieee80211_hw *hw,
-				struct ieee80211_vif *vif)
+static void ath12k_bss_disassoc(struct ath12k *ar,
+				struct ath12k_vif *arvif)
 {
-	struct ath12k *ar = hw->priv;
-	struct ath12k_vif *arvif = ath12k_vif_to_arvif(vif);
 	int ret;
 
 	lockdep_assert_held(&ar->conf_mutex);
@@ -2503,13 +2500,12 @@ static int ath12k_mac_fils_discovery(struct ath12k_vif *arvif,
 	return ret;
 }
 
-static void ath12k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
-					   struct ieee80211_vif *vif,
-					   struct ieee80211_bss_conf *info,
-					   u64 changed)
+static void ath12k_mac_bss_info_changed(struct ath12k *ar,
+					struct ath12k_vif *arvif,
+					struct ieee80211_bss_conf *info,
+					u64 changed)
 {
-	struct ath12k *ar = hw->priv;
-	struct ath12k_vif *arvif = ath12k_vif_to_arvif(vif);
+	struct ieee80211_vif *vif = arvif->vif;
 	struct cfg80211_chan_def def;
 	u32 param_id, param_value;
 	enum nl80211_band band;
@@ -2522,7 +2518,7 @@ static void ath12k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
 	u8 rateidx;
 	u32 rate;
 
-	mutex_lock(&ar->conf_mutex);
+	lockdep_assert_held(&ar->conf_mutex);
 
 	if (changed & BSS_CHANGED_BEACON_INT) {
 		arvif->beacon_interval = info->beacon_int;
@@ -2678,9 +2674,9 @@ static void ath12k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
 
 	if (changed & BSS_CHANGED_ASSOC) {
 		if (vif->cfg.assoc)
-			ath12k_bss_assoc(hw, vif, info);
+			ath12k_bss_assoc(ar, arvif, info);
 		else
-			ath12k_bss_disassoc(hw, vif);
+			ath12k_bss_disassoc(ar, arvif);
 	}
 
 	if (changed & BSS_CHANGED_TXPOWER) {
@@ -2782,6 +2778,19 @@ static void ath12k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
 
 	if (changed & BSS_CHANGED_EHT_PUNCTURING)
 		arvif->punct_bitmap = info->eht_puncturing;
+}
+
+static void ath12k_mac_op_bss_info_changed(struct ieee80211_hw *hw,
+					   struct ieee80211_vif *vif,
+					   struct ieee80211_bss_conf *info,
+					   u64 changed)
+{
+	struct ath12k *ar = hw->priv;
+	struct ath12k_vif *arvif = ath12k_vif_to_arvif(vif);
+
+	mutex_lock(&ar->conf_mutex);
+
+	ath12k_mac_bss_info_changed(ar, arvif, info, changed);
 
 	mutex_unlock(&ar->conf_mutex);
 }
