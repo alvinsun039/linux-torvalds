@@ -10,6 +10,7 @@
 #include <linux/filter.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h> /* skb_shared_info */
+#include <linux/ky_kabi.h>
 
 /**
  * DOC: XDP RX-queue information
@@ -64,6 +65,11 @@ struct xdp_rxq_info {
 	struct xdp_mem_info mem;
 	unsigned int napi_id;
 	u32 frag_size;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
+	KY_KABI_RESERVE(3)
+	KY_KABI_RESERVE(4)
 } ____cacheline_aligned; /* perf critical, avoid false-sharing */
 
 struct xdp_txq_info {
