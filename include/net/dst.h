@@ -20,6 +20,7 @@
 #include <net/neighbour.h>
 #include <asm/processor.h>
 #include <linux/indirect_call_wrapper.h>
+#include <linux/ky_kabi.h>
 
 struct sk_buff;
 
@@ -92,6 +93,15 @@ struct dst_entry {
 #ifdef CONFIG_64BIT
 	struct lwtunnel_state   *lwtstate;
 #endif
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
+	KY_KABI_RESERVE(3)
+	KY_KABI_RESERVE(4)
+	KY_KABI_RESERVE(5)
+	KY_KABI_RESERVE(6)
+	KY_KABI_RESERVE(7)
+	KY_KABI_RESERVE(8)
 };
 
 struct dst_metrics {

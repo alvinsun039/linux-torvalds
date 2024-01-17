@@ -9,6 +9,7 @@
 
 #include <net/dst.h>
 #include <net/fib_rules.h>
+#include <linux/ky_kabi.h>
 
 enum l3mdev_type {
 	L3MDEV_TYPE_UNSPEC,
@@ -43,6 +44,11 @@ struct l3mdev_ops {
 	/* IPv6 ops */
 	struct dst_entry * (*l3mdev_link_scope_lookup)(const struct net_device *dev,
 						 struct flowi6 *fl6);
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
+	KY_KABI_RESERVE(3)
+	KY_KABI_RESERVE(4)
 };
 
 #ifdef CONFIG_NET_L3_MASTER_DEV
