@@ -16,6 +16,7 @@
 #include <linux/vmalloc.h>
 #include <net/netlink.h>
 #include <uapi/linux/netfilter/ipset/ip_set.h>
+#include <linux/ky_kabi.h>
 
 #define _IP_SET_MODULE_DESC(a, b, c)		\
 	MODULE_DESCRIPTION(a " type of IP sets, revisions " b "-" c)
@@ -190,6 +191,9 @@ struct ip_set_type_variant {
 	void (*cancel_gc)(struct ip_set *set);
 	/* Region-locking is used */
 	bool region_lock;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
 };
 
 struct ip_set_region {
@@ -236,6 +240,9 @@ struct ip_set_type {
 
 	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
 	struct module *me;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
 };
 
 /* register and unregister set type */
@@ -280,6 +287,9 @@ struct ip_set {
 	size_t offset[IPSET_EXT_ID_MAX];
 	/* The type specific data */
 	void *data;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
 };
 
 static inline void
