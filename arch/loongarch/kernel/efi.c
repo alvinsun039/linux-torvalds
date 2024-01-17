@@ -301,4 +301,6 @@ void __init efi_init(void)
 
 		early_memunmap(tbl, sizeof(*tbl));
 	}
+
+	efi_esrt_init();
 }
