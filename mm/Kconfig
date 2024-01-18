@@ -1233,6 +1233,18 @@ config LOCK_MM_AND_FIND_VMA
 config IOMMU_MM_DATA
 	bool
 
+config ETMEM
+	bool "Enable etmem feature"
+	depends on MMU
+	depends on X86 || ARM64
+	default n
+	help
+	  etmem is a tiered memory extension technology that uses DRAM and memory
+	  compression/high-performance storage media to form tiered memory storage.
+	  Memory data is tiered, and cold data is migrated from memory media to
+	  high-performance storage media to release memory space and reduce
+	  memory costs.
+
 source "mm/damon/Kconfig"
 
 endmenu
