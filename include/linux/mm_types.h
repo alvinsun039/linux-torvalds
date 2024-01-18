@@ -31,6 +31,7 @@
 
 struct address_space;
 struct mem_cgroup;
+struct kvm;
 
 /*
  * Each physical page in the system has a struct page associated with
@@ -983,6 +984,9 @@ struct mm_struct {
 			struct mem_cgroup *memcg;
 #endif
 		} lru_gen;
+#endif
+#if IS_ENABLED(CONFIG_ETMEM) && IS_ENABLED(CONFIG_KVM)
+		struct kvm *kvm;
 #endif /* CONFIG_LRU_GEN */
 	} __randomize_layout;
 
