@@ -14,7 +14,7 @@
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
- * based on ixgbe_sriov.c, Copyright(c) 1999 - 2017 Intel Corporation.
+ * based on txgbe_sriov.c, Copyright(c) 1999 - 2017 Intel Corporation.
  * Contact Information:
  * Linux NICS <linux.nics@intel.com>
  * e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
@@ -1296,7 +1296,7 @@ void txgbe_ping_all_vfs(struct txgbe_adapter *adapter)
 }
 
 /**
- * ixgbe_set_all_vfs - update vfs queues
+ * txgbe_set_all_vfs - update vfs queues
  * @adapter: Pointer to adapter struct
  *
  * Update setting transmit and receive queues for all vfs
@@ -1695,7 +1695,7 @@ int txgbe_ndo_set_vf_spoofchk(struct net_device *netdev, int vf, bool setting)
 #endif /* HAVE_VF_SPOOFCHK_CONFIGURE */
 
 /**
- * ixgbe_set_vf_rx_tx - Set VF rx tx
+ * txgbe_set_vf_rx_tx - Set VF rx tx
  * @adapter: Pointer to adapter struct
  * @vf: VF identifier
  *

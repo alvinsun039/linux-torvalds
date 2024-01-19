@@ -14,7 +14,7 @@
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
- * based on ixgbe_ethtool.c, Copyright(c) 1999 - 2017 Intel Corporation.
+ * based on txgbe_ethtool.c, Copyright(c) 1999 - 2017 Intel Corporation.
  * Contact Information:
  * Linux NICS <linux.nics@intel.com>
  * e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
@@ -4325,7 +4325,7 @@ static int txgbe_add_ethtool_fdir_entry(struct txgbe_adapter *adapter,
 	if (!(adapter->flags & TXGBE_FLAG_FDIR_PERFECT_CAPABLE))
 		return -EOPNOTSUPP;
 
-	/* ring_cookie is a masked into a set of queues and ixgbe pools or
+	/* ring_cookie is a masked into a set of queues and txgbe pools or
 	 * we use drop index
 	 */
 	if (fsp->ring_cookie == RX_CLS_FLOW_DISC) {

@@ -455,6 +455,7 @@ struct txgbe_ring {
 					 */
 	u16 next_to_use;
 	u16 next_to_clean;
+	u16 rx_offset;
 
 #ifdef HAVE_PTP_1588_CLOCK
 	unsigned long last_rx_timestamp;
@@ -560,6 +561,7 @@ struct txgbe_ring_feature {
 
 
 #if (PAGE_SIZE < 8192)
+#define TXGBE_MAX_2K_FRAME_BUILD_SKB (TXGBE_RXBUFFER_1536 - NET_IP_ALIGN)
 #define TXGBE_2K_TOO_SMALL_WITH_PADDING \
 ((NET_SKB_PAD + TXGBE_RXBUFFER_1536) > SKB_WITH_OVERHEAD(TXGBE_RXBUFFER_2K))
 
@@ -615,9 +617,14 @@ static inline unsigned int txgbe_rx_bufsz(struct txgbe_ring __maybe_unused *ring
 		return (PAGE_SIZE < 8192) ? TXGBE_RXBUFFER_4K :
 					    TXGBE_RXBUFFER_3K;
 #endif
-#ifdef HAVE_XDP_SUPPORT
+
 	if (test_bit(__TXGBE_RX_3K_BUFFER, &ring->state))
 		return TXGBE_RXBUFFER_3K;
+#if 0
+#if (PAGE_SIZE < 8192)
+	if (ring_uses_build_skb(ring))
+		return TXGBE_MAX_2K_FRAME_BUILD_SKB;
+#endif
 #endif
 	return TXGBE_RXBUFFER_2K;
 #endif
@@ -639,10 +646,7 @@ static inline unsigned int txgbe_rx_pg_order(struct txgbe_ring __maybe_unused *r
 
 static inline unsigned int txgbe_rx_offset(struct txgbe_ring *rx_ring)
 {
-	if (rx_ring->xdp_prog)
-		return TXGBE_SKB_PAD;
-	else
-		return 0;
+	return ring_uses_build_skb(rx_ring) ? TXGBE_SKB_PAD : 0;
 }
 
 
@@ -959,6 +963,7 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_KR_PRO_DOWN                 (1U << 27)
 #define TXGBE_FLAG2_KR_PRO_REINIT               (1U << 28)
 #define TXGBE_FLAG2_ECC_ERR_RESET               (1U << 29)
+#define TXGBE_FLAG2_RX_LEGACY					(1U << 30)
 #define TXGBE_FLAG2_PCIE_NEED_RECOVER           (1U << 31)
 #define TXGBE_FLAG2_PCIE_NEED_Q_RESET           (1U << 30)
 /* amlite: new SW-FW mbox */

@@ -14,7 +14,7 @@
  * The full GNU General Public License is included in this distribution in
  * the file called "COPYING".
  *
- * based on ixgbe_mbx.h, Copyright(c) 1999 - 2017 Intel Corporation.
+ * based on txgbe_mbx.h, Copyright(c) 1999 - 2017 Intel Corporation.
  * Contact Information:
  * Linux NICS <linux.nics@intel.com>
  * e1000-devel Mailing List <e1000-devel@lists.sourceforge.net>
@@ -122,7 +122,7 @@ enum txgbe_pfvf_api_rev {
 #define TXGBE_VF_GET_FW_VERSION 0x11 /* get fw version */
 #define TXGBE_VF_BACKUP		0x8001 /* VF requests backup */
 
-/* mode choices for IXGBE_VF_UPDATE_XCAST_MODE */
+/* mode choices for TXGBE_VF_UPDATE_XCAST_MODE */
 enum txgbevf_xcast_modes {
 	TXGBEVF_XCAST_MODE_NONE = 0,
 	TXGBEVF_XCAST_MODE_MULTI,
