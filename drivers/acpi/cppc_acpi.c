@@ -1202,7 +1202,7 @@ int cppc_get_nominal_perf(int cpunum, u64 *nominal_perf)
 /**
  * cppc_get_highest_perf - Get the highest performance register value.
  * @cpunum: CPU from which to get highest performance.
- * @hight_perf: Return address.
+ * @highest_perf: Return address.
  *
  * Return: 0 for success, -EIO otherwise.
  */
