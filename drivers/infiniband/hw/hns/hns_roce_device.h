@@ -1298,6 +1298,12 @@ static inline enum ib_port_state get_port_state(struct net_device *net_dev)
 		IB_PORT_ACTIVE : IB_PORT_DOWN;
 }
 
+static inline struct net_device *get_hr_netdev(struct hns_roce_dev *hr_dev,
+					       u8 port)
+{
+	return hr_dev->iboe.netdevs[port];
+}
+
 static inline u8 get_hr_bus_num(struct hns_roce_dev *hr_dev)
 {
 	return hr_dev->pci_dev->bus->number;
