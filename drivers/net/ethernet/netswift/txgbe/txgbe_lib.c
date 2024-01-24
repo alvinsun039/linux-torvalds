@@ -799,6 +799,7 @@ static void txgbe_add_ring(struct txgbe_ring *ring,
 	ring->next = head->ring;
 	head->ring = ring;
 	head->count++;
+	head->next_update = jiffies + 1;
 }
 
 /**
@@ -896,8 +897,11 @@ static int txgbe_alloc_q_vector(struct txgbe_adapter *adapter,
 	q_vector->tx.work_limit = adapter->tx_work_limit;
 	q_vector->rx.work_limit = adapter->rx_work_limit;
 
-	/* initialize pointer to rings */
-	ring = q_vector->ring;
+	/* Initialize setting for adaptive ITR */
+	q_vector->tx.itr = TXGBE_ITR_ADAPTIVE_MAX_USECS |
+			   TXGBE_ITR_ADAPTIVE_LATENCY;
+	q_vector->rx.itr = TXGBE_ITR_ADAPTIVE_MAX_USECS |
+			   TXGBE_ITR_ADAPTIVE_LATENCY;
 
 	/* intialize ITR */
 	if (txr_count && !rxr_count) {
@@ -913,6 +917,9 @@ static int txgbe_alloc_q_vector(struct txgbe_adapter *adapter,
 		else
 			q_vector->itr = adapter->rx_itr_setting;
 	}
+
+	/* initialize pointer to rings */
+	ring = q_vector->ring;
 
 	while (txr_count) {
 		/* assign generic ring traits */

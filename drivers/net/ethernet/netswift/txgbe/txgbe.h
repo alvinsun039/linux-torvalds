@@ -653,6 +653,7 @@ static inline unsigned int txgbe_rx_offset(struct txgbe_ring *rx_ring)
 #endif
 struct txgbe_ring_container {
 	struct txgbe_ring *ring;        /* pointer to linked list of rings */
+	unsigned long next_update;      /* jiffies value of last update */
 	unsigned int total_bytes;       /* total bytes processed this int */
 	unsigned int total_packets;     /* total packets processed this int */
 	u16 work_limit;                 /* total work allowed per interrupt */
@@ -809,6 +810,14 @@ struct hwmon_buff {
 #define TXGBE_20K_ITR           200
 #define TXGBE_16K_ITR           248
 #define TXGBE_12K_ITR           336
+
+#define TXGBE_ITR_ADAPTIVE_MIN_INC	2
+#define TXGBE_ITR_ADAPTIVE_MIN_USECS	10
+#define TXGBE_ITR_ADAPTIVE_MAX_USECS	84
+#define TXGBE_ITR_ADAPTIVE_LATENCY	0x80
+#define TXGBE_ITR_ADAPTIVE_BULK		0x00
+#define TXGBE_ITR_ADAPTIVE_MASK_USECS	(TXGBE_ITR_ADAPTIVE_LATENCY - \
+					 TXGBE_ITR_ADAPTIVE_MIN_INC)
 
 /* txgbe_test_staterr - tests bits in Rx descriptor status and error fields */
 static inline __le32 txgbe_test_staterr(union txgbe_rx_desc *rx_desc,

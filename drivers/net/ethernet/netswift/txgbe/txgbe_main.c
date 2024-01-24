@@ -3037,6 +3037,7 @@ enum latency_range {
 	latency_invalid = 255
 };
 
+#if 0
 /**
  * txgbe_update_itr - update the dynamic ITR value based on statistics
  * @q_vector: structure containing interrupt and ring information
@@ -3102,6 +3103,203 @@ static void txgbe_update_itr(struct txgbe_q_vector *q_vector,
 	/* write updated itr to ring container */
 	ring_container->itr = itr_setting;
 }
+#endif
+
+static inline bool txgbe_container_is_rx(struct txgbe_q_vector *q_vector,
+					 struct txgbe_ring_container *rc)
+{
+	return &q_vector->rx == rc;
+}
+/**
+ * ixgbe_update_itr - update the dynamic ITR value based on statistics
+ * @q_vector: structure containing interrupt and ring information
+ * @ring_container: structure containing ring performance data
+ *
+ *      Stores a new ITR value based on packets and byte
+ *      counts during the last interrupt.  The advantage of per interrupt
+ *      computation is faster updates and more accurate ITR for the current
+ *      traffic pattern.  Constants in this function were computed
+ *      based on theoretical maximum wire speed and thresholds were set based
+ *      on testing data as well as attempting to minimize response time
+ *      while increasing bulk throughput.
+ **/
+static void txgbe_update_itr(struct txgbe_q_vector *q_vector,
+			     struct txgbe_ring_container *ring_container)
+{
+	unsigned int itr = TXGBE_ITR_ADAPTIVE_MIN_USECS |
+			   TXGBE_ITR_ADAPTIVE_LATENCY;
+	unsigned int avg_wire_size, packets, bytes;
+	unsigned long next_update = jiffies;
+
+	/* If we don't have any rings just leave ourselves set for maximum
+	 * possible latency so we take ourselves out of the equation.
+	 */
+	if (!ring_container->ring)
+		return;
+
+	/* If we didn't update within up to 1 - 2 jiffies we can assume
+	 * that either packets are coming in so slow there hasn't been
+	 * any work, or that there is so much work that NAPI is dealing
+	 * with interrupt moderation and we don't need to do anything.
+	 */
+	if (time_after(next_update, ring_container->next_update))
+		goto clear_counts;
+
+	packets = ring_container->total_packets;
+	bytes = ring_container->total_bytes;
+
+	if (txgbe_container_is_rx(q_vector, ring_container)) {
+		/* If Rx and there are 1 to 23 packets and bytes are less than
+		 * 12112 assume insufficient data to use bulk rate limiting
+		 * approach. Instead we will focus on simply trying to target
+		 * receiving 8 times as much data in the next interrupt.
+		 */
+		if (packets && packets < 24 && bytes < 12112) {
+			itr = TXGBE_ITR_ADAPTIVE_LATENCY;
+			avg_wire_size = (bytes + packets * 24) * 2;
+			avg_wire_size = clamp_t(unsigned int,
+						avg_wire_size, 2560, 12800);
+			goto adjust_for_speed;
+		}
+	}
+
+	/* Less than 48 packets we can assume that our current interrupt delay
+	 * is only slightly too low. As such we should increase it by a small
+	 * fixed amount.
+	 */
+	if (packets < 48) {
+		itr = (q_vector->itr >> 2) + TXGBE_ITR_ADAPTIVE_MIN_INC;
+		if (itr > TXGBE_ITR_ADAPTIVE_MAX_USECS)
+			itr = TXGBE_ITR_ADAPTIVE_MAX_USECS;
+
+		/* If sample size is 0 - 7 we should probably switch
+		 * to latency mode instead of trying to control
+		 * things as though we are in bulk.
+		 *
+		 * Otherwise if the number of packets is less than 48
+		 * we should maintain whatever mode we are currently
+		 * in. The range between 8 and 48 is the cross-over
+		 * point between latency and bulk traffic.
+		 */
+		if (packets < 8)
+			itr += TXGBE_ITR_ADAPTIVE_LATENCY;
+		else
+			itr += ring_container->itr & TXGBE_ITR_ADAPTIVE_LATENCY;
+		goto clear_counts;
+	}
+
+	/* Between 48 and 96 is our "goldilocks" zone where we are working
+	 * out "just right". Just report that our current ITR is good for us.
+	 */
+	if (packets < 96) {
+		itr = q_vector->itr >> 2;
+		goto clear_counts;
+	}
+
+	/* If packet count is 96 or greater we are likely looking at a slight
+	 * overrun of the delay we want. Try halving our delay to see if that
+	 * will cut the number of packets in half per interrupt.
+	 */
+	if (packets < 256) {
+		itr = q_vector->itr >> 3;
+		if (itr < TXGBE_ITR_ADAPTIVE_MIN_USECS)
+			itr = TXGBE_ITR_ADAPTIVE_MIN_USECS;
+		goto clear_counts;
+	}
+
+	/* The paths below assume we are dealing with a bulk ITR since number
+	 * of packets is 256 or greater. We are just going to have to compute
+	 * a value and try to bring the count under control, though for smaller
+	 * packet sizes there isn't much we can do as NAPI polling will likely
+	 * be kicking in sooner rather than later.
+	 */
+	itr = TXGBE_ITR_ADAPTIVE_BULK;
+
+	/* If packet counts are 256 or greater we can assume we have a gross
+	 * overestimation of what the rate should be. Instead of trying to fine
+	 * tune it just use the formula below to try and dial in an exact value
+	 * give the current packet size of the frame.
+	 */
+	avg_wire_size = bytes / packets;
+
+	/* The following is a crude approximation of:
+	 *  wmem_default / (size + overhead) = desired_pkts_per_int
+	 *  rate / bits_per_byte / (size + ethernet overhead) = pkt_rate
+	 *  (desired_pkt_rate / pkt_rate) * usecs_per_sec = ITR value
+	 *
+	 * Assuming wmem_default is 212992 and overhead is 640 bytes per
+	 * packet, (256 skb, 64 headroom, 320 shared info), we can reduce the
+	 * formula down to
+	 *
+	 *  (170 * (size + 24)) / (size + 640) = ITR
+	 *
+	 * We first do some math on the packet size and then finally bitshift
+	 * by 8 after rounding up. We also have to account for PCIe link speed
+	 * difference as ITR scales based on this.
+	 */
+	if (avg_wire_size <= 60) {
+		/* Start at 50k ints/sec */
+		avg_wire_size = 5120;
+	} else if (avg_wire_size <= 316) {
+		/* 50K ints/sec to 16K ints/sec */
+		avg_wire_size *= 40;
+		avg_wire_size += 2720;
+	} else if (avg_wire_size <= 1084) {
+		/* 16K ints/sec to 9.2K ints/sec */
+		avg_wire_size *= 15;
+		avg_wire_size += 11452;
+	} else if (avg_wire_size <= 1980) {
+		/* 9.2K ints/sec to 8K ints/sec */
+		avg_wire_size *= 5;
+		avg_wire_size += 22420;
+	} else {
+		/* plateau at a limit of 8K ints/sec */
+		avg_wire_size = 32256;
+	}
+
+adjust_for_speed:
+	/* Resultant value is 256 times larger than it needs to be. This
+	 * gives us room to adjust the value as needed to either increase
+	 * or decrease the value based on link speeds of 10G, 2.5G, 1G, etc.
+	 *
+	 * Use addition as we have already recorded the new latency flag
+	 * for the ITR value.
+	 */
+	switch (q_vector->adapter->link_speed) {
+	case TXGBE_LINK_SPEED_10GB_FULL:
+	case TXGBE_LINK_SPEED_100_FULL:
+	default:
+		itr += DIV_ROUND_UP(avg_wire_size,
+				    TXGBE_ITR_ADAPTIVE_MIN_INC * 256) *
+		       TXGBE_ITR_ADAPTIVE_MIN_INC;
+		break;
+	case TXGBE_LINK_SPEED_1GB_FULL:
+	case TXGBE_LINK_SPEED_10_FULL:
+		itr += DIV_ROUND_UP(avg_wire_size,
+				    TXGBE_ITR_ADAPTIVE_MIN_INC * 64) *
+		       TXGBE_ITR_ADAPTIVE_MIN_INC;
+		break;
+	}
+
+	/* In the case of a latency specific workload only allow us to
+	 * reduce the ITR by at most 2us. By doing this we should dial
+	 * in so that our number of interrupts is no more than 2x the number
+	 * of packets for the least busy workload. So for example in the case
+	 * of a TCP worload the ack packets being received would set the
+	 * the interrupt rate as they are a latency specific workload.
+	 */
+	if ((itr & TXGBE_ITR_ADAPTIVE_LATENCY) && itr < ring_container->itr)
+		itr = ring_container->itr - TXGBE_ITR_ADAPTIVE_MIN_INC;
+clear_counts:
+	/* write back value */
+	ring_container->itr = itr;
+
+	/* next update should occur within next jiffy */
+	ring_container->next_update = next_update + 1;
+
+	ring_container->total_bytes = 0;
+	ring_container->total_packets = 0;
+}
 
 /**
  * txgbe_write_eitr - write EITR register in hardware specific way
@@ -3123,6 +3321,7 @@ void txgbe_write_eitr(struct txgbe_q_vector *q_vector)
 	wr32(hw, TXGBE_PX_ITR(v_idx), itr_reg);
 }
 
+#if 0
 static void txgbe_set_itr(struct txgbe_q_vector *q_vector)
 {
 	u16 new_itr = q_vector->itr;
@@ -3159,7 +3358,29 @@ static void txgbe_set_itr(struct txgbe_q_vector *q_vector)
 		txgbe_write_eitr(q_vector);
 	}
 }
+#endif
 
+static void txgbe_set_itr(struct txgbe_q_vector *q_vector)
+{
+	u32 new_itr;
+
+	txgbe_update_itr(q_vector, &q_vector->tx);
+	txgbe_update_itr(q_vector, &q_vector->rx);
+
+	/* use the smallest value of new ITR delay calculations */
+	new_itr = min(q_vector->rx.itr, q_vector->tx.itr);
+
+	/* Clear latency flag if set, shift into correct position */
+	new_itr &= TXGBE_ITR_ADAPTIVE_MASK_USECS;
+	new_itr <<= 2;
+
+	if (new_itr != q_vector->itr) {
+		/* save the algorithm value here */
+		q_vector->itr = new_itr;
+
+		txgbe_write_eitr(q_vector);
+	}
+}
 /**
  * txgbe_check_overtemp_subtask - check for over temperature
  * @adapter: pointer to adapter
