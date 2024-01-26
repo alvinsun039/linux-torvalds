@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR MIT */
 /**************************************************************************
  *
  * Copyright © 2009-2022 VMware, Inc., Palo Alto, CA., USA
