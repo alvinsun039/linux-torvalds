@@ -538,6 +538,14 @@ config SERIAL_8250_PERICOM
 	  I/O UARTs that are not covered by the more generic SERIAL_8250_PCI
 	  option.
 
+config SERIAL_8250_ASPEED_SUART
+	tristate "Aspeed SIO UART"
+	depends on SERIAL_8250
+	depends on OF
+	help
+	  If you want to use the SIO UART (SUART) device on your platforms,
+	  enable this option. If unsure, say Y.
+
 config SERIAL_8250_PXA
 	tristate "PXA serial port support"
 	depends on SERIAL_8250
