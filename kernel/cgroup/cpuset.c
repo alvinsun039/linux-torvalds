@@ -43,6 +43,7 @@
 #include <linux/sched/isolation.h>
 #include <linux/cgroup.h>
 #include <linux/wait.h>
+#include <linux/ky_kabi.h>
 
 DEFINE_STATIC_KEY_FALSE(cpusets_pre_enable_key);
 DEFINE_STATIC_KEY_FALSE(cpusets_enabled_key);
@@ -183,6 +184,11 @@ struct cpuset {
 
 	/* Handle for cpuset.cpus.partition */
 	struct cgroup_file partition_file;
+
+	KY_KABI_RESERVE(1)
+	KY_KABI_RESERVE(2)
+	KY_KABI_RESERVE(3)
+	KY_KABI_RESERVE(4)
 };
 
 /*
