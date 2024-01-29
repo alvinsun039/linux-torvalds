@@ -657,7 +657,6 @@ Out:
 	TRACE_RESUME(error);
 
 	if (error) {
-		suspend_stats.failed_resume_noirq++;
 		dpm_save_failed_step(SUSPEND_RESUME_NOIRQ);
 		dpm_save_failed_dev(dev_name(dev));
 		pm_dev_err(dev, state, async ? " async noirq" : " noirq", error);
@@ -809,7 +808,6 @@ Out:
 	complete_all(&dev->power.completion);
 
 	if (error) {
-		suspend_stats.failed_resume_early++;
 		dpm_save_failed_step(SUSPEND_RESUME_EARLY);
 		dpm_save_failed_dev(dev_name(dev));
 		pm_dev_err(dev, state, async ? " async early" : " early", error);
@@ -964,7 +962,6 @@ static void __device_resume(struct device *dev, pm_message_t state, bool async)
 	TRACE_RESUME(error);
 
 	if (error) {
-		suspend_stats.failed_resume++;
 		dpm_save_failed_step(SUSPEND_RESUME);
 		dpm_save_failed_dev(dev_name(dev));
 		pm_dev_err(dev, state, async ? " async" : "", error);
@@ -1318,10 +1315,9 @@ static int dpm_noirq_suspend_devices(pm_message_t state)
 	if (!error)
 		error = async_error;
 
-	if (error) {
-		suspend_stats.failed_suspend_noirq++;
+	if (error)
 		dpm_save_failed_step(SUSPEND_SUSPEND_NOIRQ);
-	}
+
 	dpm_show_time(starttime, state, error, "noirq");
 	trace_suspend_resume(TPS("dpm_suspend_noirq"), state.event, false);
 	return error;
@@ -1504,8 +1500,8 @@ int dpm_suspend_late(pm_message_t state)
 	async_synchronize_full();
 	if (!error)
 		error = async_error;
+
 	if (error) {
-		suspend_stats.failed_suspend_late++;
 		dpm_save_failed_step(SUSPEND_SUSPEND_LATE);
 		dpm_resume_early(resume_event(state));
 	}
@@ -1784,10 +1780,10 @@ int dpm_suspend(pm_message_t state)
 	async_synchronize_full();
 	if (!error)
 		error = async_error;
-	if (error) {
-		suspend_stats.failed_suspend++;
+
+	if (error)
 		dpm_save_failed_step(SUSPEND_SUSPEND);
-	}
+
 	dpm_show_time(starttime, state, error, NULL);
 	trace_suspend_resume(TPS("dpm_suspend"), state.event, false);
 	return error;
@@ -1938,11 +1934,11 @@ int dpm_suspend_start(pm_message_t state)
 	int error;
 
 	error = dpm_prepare(state);
-	if (error) {
-		suspend_stats.failed_prepare++;
+	if (error)
 		dpm_save_failed_step(SUSPEND_PREPARE);
-	} else
+	else
 		error = dpm_suspend(state);
+
 	dpm_show_time(starttime, state, error, "start");
 	return error;
 }
