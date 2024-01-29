@@ -37,9 +37,9 @@ __bpf_kfunc_end_defs();
  * Build the BTF kfunc ID set for bpf_log2l. The BTF_KFUNCS_* macros
  * ensure that the BTF information for this function is recorded.
  */
-BTF_SET8_START(bpf_log2l_ids)
+BTF_KFUNCS_START(bpf_log2l_ids)
 BTF_ID_FLAGS(func, bpf_log2l)
-BTF_SET8_END(bpf_log2l_ids)
+BTF_KFUNCS_END(bpf_log2l_ids)
 
 /*
  * Define the kfunc set structure. The owner field is set to THIS_MODULE.
