@@ -18,6 +18,7 @@
 #include <linux/falloc.h>
 #include <linux/uio.h>
 #include <linux/fs.h>
+#define _NEED_FILE_LOCK_FIELD_MACROS
 #include <linux/filelock.h>
 
 static int fuse_send_open(struct fuse_mount *fm, u64 nodeid,
