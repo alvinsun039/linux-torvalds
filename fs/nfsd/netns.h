@@ -10,7 +10,6 @@
 
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
-#define _NEED_FILE_LOCK_FIELD_MACROS
 #include <linux/filelock.h>
 #include <linux/nfs4.h>
 #include <linux/percpu_counter.h>
