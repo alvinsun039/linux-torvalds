@@ -158,49 +158,52 @@ COMPAT_SYSCALL_DEFINE2(truncate, const char __user *, path, compat_off_t, length
 }
 #endif
 
-long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
+long do_ftruncate(struct file *file, loff_t length, int small)
 {
 	struct inode *inode;
 	struct dentry *dentry;
+	int error;
+
+	/* explicitly opened as large or we are on 64-bit box */
+	if (file->f_flags & O_LARGEFILE)
+		small = 0;
+
+	dentry = file->f_path.dentry;
+	inode = dentry->d_inode;
+	if (!S_ISREG(inode->i_mode) || !(file->f_mode & FMODE_WRITE))
+		return -EINVAL;
+
+	/* Cannot ftruncate over 2^31 bytes without large file support */
+	if (small && length > MAX_NON_LFS)
+		return -EINVAL;
+
+	/* Check IS_APPEND on real upper inode */
+	if (IS_APPEND(file_inode(file)))
+		return -EPERM;
+	sb_start_write(inode->i_sb);
+	error = security_file_truncate(file);
+	if (!error)
+		error = do_truncate(file_mnt_idmap(file), dentry, length,
+				    ATTR_MTIME | ATTR_CTIME, file);
+	sb_end_write(inode->i_sb);
+
+	return error;
+}
+
+long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
+{
 	struct fd f;
 	int error;
 
-	error = -EINVAL;
 	if (length < 0)
-		goto out;
-	error = -EBADF;
+		return -EINVAL;
 	f = fdget(fd);
 	if (!fd_file(f))
-		goto out;
+		return -EBADF;
 
-	/* explicitly opened as large or we are on 64-bit box */
-	if (fd_file(f)->f_flags & O_LARGEFILE)
-		small = 0;
+	error = do_ftruncate(fd_file(f), length, small);
 
-	dentry = fd_file(f)->f_path.dentry;
-	inode = dentry->d_inode;
-	error = -EINVAL;
-	if (!S_ISREG(inode->i_mode) || !(fd_file(f)->f_mode & FMODE_WRITE))
-		goto out_putf;
-
-	error = -EINVAL;
-	/* Cannot ftruncate over 2^31 bytes without large file support */
-	if (small && length > MAX_NON_LFS)
-		goto out_putf;
-
-	error = -EPERM;
-	/* Check IS_APPEND on real upper inode */
-	if (IS_APPEND(file_inode(fd_file(f))))
-		goto out_putf;
-	sb_start_write(inode->i_sb);
-	error = security_file_truncate(fd_file(f));
-	if (!error)
-		error = do_truncate(file_mnt_idmap(fd_file(f)), dentry, length,
-				    ATTR_MTIME | ATTR_CTIME, fd_file(f));
-	sb_end_write(inode->i_sb);
-out_putf:
 	fdput(f);
-out:
 	return error;
 }
 
