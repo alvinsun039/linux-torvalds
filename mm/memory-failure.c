@@ -2803,3 +2803,4 @@ retry:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(soft_offline_page);
