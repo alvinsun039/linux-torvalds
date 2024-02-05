@@ -133,6 +133,21 @@ static inline void *alloc_pgtable_page_noprof(int nid, gfp_t gfp)
 }
 #define alloc_pgtable_page(...)	alloc_hooks(alloc_pgtable_page_noprof(__VA_ARGS__))
 
+/*
+ * This must be called after device probe completes. During probe
+ * use rlookup_amd_iommu() get the iommu.
+ */
+static inline struct amd_iommu *get_amd_iommu_from_dev(struct device *dev)
+{
+	return iommu_get_iommu_dev(dev, struct amd_iommu, iommu);
+}
+
+/* This must be called after device probe completes. */
+static inline struct amd_iommu *get_amd_iommu_from_dev_data(struct iommu_dev_data *dev_data)
+{
+	return iommu_get_iommu_dev(dev_data->dev, struct amd_iommu, iommu);
+}
+
 bool translation_pre_enabled(struct amd_iommu *iommu);
 bool amd_iommu_is_attach_deferred(struct device *dev);
 int __init add_special_device(u8 type, u8 id, u32 *devid, bool cmd_line);
