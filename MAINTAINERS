@@ -24024,6 +24024,7 @@ M:	Vitaly Wool <vitaly.wool@konsulko.com>
 L:	linux-mm@kvack.org
 S:	Maintained
 F:	mm/zswap.c
+F:	tools/testing/selftests/cgroup/test_zswap.c
 
 THE REST
 M:	Linus Torvalds <torvalds@linux-foundation.org>
