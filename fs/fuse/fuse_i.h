@@ -1483,6 +1483,7 @@ ssize_t fuse_passthrough_splice_read(struct file *in, loff_t *ppos,
 ssize_t fuse_passthrough_splice_write(struct pipe_inode_info *pipe,
 				      struct file *out, loff_t *ppos,
 				      size_t len, unsigned int flags);
+ssize_t fuse_passthrough_mmap(struct file *file, struct vm_area_struct *vma);
 
 #ifdef CONFIG_SYSCTL
 extern int fuse_sysctl_register(void);
