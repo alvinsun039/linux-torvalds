@@ -11,6 +11,11 @@
 #define PIDFD_NONBLOCK	O_NONBLOCK
 #define PIDFD_THREAD	O_EXCL
 
+/* Flags for pidfd_send_signal(). */
+#define PIDFD_SIGNAL_THREAD		(1UL << 0)
+#define PIDFD_SIGNAL_THREAD_GROUP	(1UL << 1)
+#define PIDFD_SIGNAL_PROCESS_GROUP	(1UL << 2)
+
 #define PIDFS_IOCTL_MAGIC 0xFF
 
 #define PIDFD_GET_CGROUP_NAMESPACE            _IO(PIDFS_IOCTL_MAGIC, 1)
