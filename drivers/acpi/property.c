@@ -80,6 +80,9 @@ static bool acpi_nondev_subnode_extract(union acpi_object *desc,
 	acpi_handle scope = NULL;
 	bool result;
 
+	if (acpi_graph_ignore_port(handle))
+		return false;
+
 	dn = kzalloc(sizeof(*dn), GFP_KERNEL);
 	if (!dn)
 		return false;
