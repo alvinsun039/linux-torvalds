@@ -91,7 +91,6 @@ struct vmw_kms_sou_define_gmrfb {
 struct vmw_screen_object_unit {
 	struct vmw_display_unit base;
 
-	unsigned long buffer_size; /**< Size of allocated buffer */
 	struct vmw_bo *buffer; /**< Backing store buffer */
 
 	bool defined;
@@ -242,7 +241,6 @@ static void vmw_sou_crtc_mode_set_nofb(struct drm_crtc *crtc)
 		int x, y;
 
 		sou->buffer = vps->bo;
-		sou->buffer_size = vps->bo_size;
 
 		conn_state = sou->base.connector.state;
 		vmw_conn_state = vmw_connector_state_to_vcs(conn_state);
@@ -257,7 +255,6 @@ static void vmw_sou_crtc_mode_set_nofb(struct drm_crtc *crtc)
 
 	} else {
 		sou->buffer = NULL;
-		sou->buffer_size = 0;
 	}
 }
 
