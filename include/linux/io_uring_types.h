@@ -429,7 +429,7 @@ enum {
 	REQ_F_ISREG_BIT,
 	REQ_F_CAN_POLL_BIT,
 	REQ_F_CANCEL_SEQ_BIT,
-
+	REQ_F_BL_EMPTY_BIT,
 	/* not a real bit, just to check we're not overflowing the space */
 	__REQ_F_LAST_BIT,
 };
@@ -503,6 +503,8 @@ enum {
 	REQ_F_CAN_POLL		= IO_REQ_FLAG(REQ_F_CAN_POLL_BIT),
 	/* cancel sequence is set and valid */
 	REQ_F_CANCEL_SEQ	= IO_REQ_FLAG(REQ_F_CANCEL_SEQ_BIT),
+	/* buffer list was empty after selection of buffer */
+	REQ_F_BL_EMPTY		= IO_REQ_FLAG(REQ_F_BL_EMPTY_BIT),
 };
 
 typedef void (*io_req_tw_func_t)(struct io_kiocb *req, struct io_tw_state *ts);
