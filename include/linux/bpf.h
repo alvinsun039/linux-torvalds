@@ -286,10 +286,7 @@ struct bpf_map_owner {
 };
 
 struct bpf_map {
-	/* The first two cachelines with read-mostly members of which some
-	 * are also accessed in fast-path (e.g. ops, max_entries).
-	 */
-	const struct bpf_map_ops *ops ____cacheline_aligned;
+	const struct bpf_map_ops *ops;
 	struct bpf_map *inner_map_meta;
 #ifdef CONFIG_SECURITY
 	void *security;
@@ -311,17 +308,14 @@ struct bpf_map {
 	struct obj_cgroup *objcg;
 #endif
 	char name[BPF_OBJ_NAME_LEN];
-	/* The 3rd and 4th cacheline with misc members to avoid false sharing
-	 * particularly with refcounting.
-	 */
-	atomic64_t refcnt ____cacheline_aligned;
+	struct mutex freeze_mutex;
+	atomic64_t refcnt;
 	atomic64_t usercnt;
 	/* rcu is used before freeing and work is only used during freeing */
 	union {
 		struct work_struct work;
 		struct rcu_head rcu;
 	};
-	struct mutex freeze_mutex;
 	atomic64_t writecnt;
 	spinlock_t owner_lock;
 	struct bpf_map_owner *owner;
