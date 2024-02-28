@@ -3191,8 +3191,7 @@ int __ieee80211_request_smps_mgd(struct ieee80211_sub_if_data *sdata,
 	if (WARN_ON_ONCE(sdata->vif.type != NL80211_IFTYPE_STATION))
 		return -EINVAL;
 
-	if (ieee80211_vif_is_mld(&sdata->vif) &&
-	    !(sdata->vif.active_links & BIT(link->link_id)))
+	if (!ieee80211_vif_link_active(&sdata->vif, link->link_id))
 		return 0;
 
 	old_req = link->u.mgd.req_smps;
@@ -3315,8 +3314,7 @@ static void ieee80211_set_cqm_rssi_link(struct ieee80211_sub_if_data *sdata,
 	conf->cqm_rssi_high = rssi_high;
 	link->u.mgd.last_cqm_event_signal = 0;
 
-	if (ieee80211_vif_is_mld(&sdata->vif) &&
-		!(sdata->vif.active_links & BIT(link->link_id)))
+	if (!ieee80211_vif_link_active(&sdata->vif, link->link_id))
 		return;
 
 	if (sdata->u.mgd.associated &&
