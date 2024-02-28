@@ -1480,7 +1480,8 @@ static void mt7921_channel_switch(struct ieee80211_hw *hw,
 }
 
 static void mt7921_abort_channel_switch(struct ieee80211_hw *hw,
-					struct ieee80211_vif *vif)
+					struct ieee80211_vif *vif,
+					struct ieee80211_bss_conf *link_conf)
 {
 	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
 
