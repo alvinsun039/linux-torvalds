@@ -12,6 +12,7 @@
 #include <linux/stop_machine.h>
 #include <asm/patch.h>
 #include <asm/percpu.h>
+#include <asm/cfi.h>
 #include "bpf_jit.h"
 
 #define RV_MAX_REG_ARGS 8
@@ -463,6 +464,12 @@ static int emit_call(u64 addr, bool fixed_addr, struct rv_jit_context *ctx)
 	}
 
 	return emit_jump_and_link(RV_REG_RA, off, fixed_addr, ctx);
+}
+
+static inline void emit_kcfi(u32 hash, struct rv_jit_context *ctx)
+{
+	if (IS_ENABLED(CONFIG_CFI_CLANG))
+		emit(hash, ctx);
 }
 
 static int emit_load_8(bool sign_ext, u8 rd, s32 off, u8 rs, struct rv_jit_context *ctx)
@@ -1113,6 +1120,8 @@ static int __arch_prepare_bpf_trampoline(struct bpf_tramp_image *im,
 		emit_sd(RV_REG_SP, stack_size - 16, RV_REG_FP, ctx);
 		emit_addi(RV_REG_FP, RV_REG_SP, stack_size, ctx);
 	} else {
+		/* emit kcfi hash */
+		emit_kcfi(cfi_get_func_hash(func_addr), ctx);
 		/* For the trampoline called directly, just handle
 		 * the frame of trampoline.
 		 */
@@ -2089,7 +2098,7 @@ int bpf_jit_emit_insn(const struct bpf_insn *insn, struct rv_jit_context *ctx,
 	return 0;
 }
 
-void bpf_jit_build_prologue(struct rv_jit_context *ctx)
+void bpf_jit_build_prologue(struct rv_jit_context *ctx, bool is_subprog)
 {
 	int i, stack_adjust = 0, store_offset, bpf_stack_adjust;
 
@@ -2119,6 +2128,9 @@ void bpf_jit_build_prologue(struct rv_jit_context *ctx)
 	stack_adjust += bpf_stack_adjust;
 
 	store_offset = stack_adjust - 8;
+
+	/* emit kcfi type preamble immediately before the  first insn */
+	emit_kcfi(is_subprog ? cfi_bpf_subprog_hash : cfi_bpf_hash, ctx);
 
 	/* nops reserved for auipc+jalr pair */
 	for (i = 0; i < RV_FENTRY_NINSNS; i++)
