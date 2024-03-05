@@ -715,7 +715,7 @@ static inline int pud_none(pud_t pud)
 }
 
 #define pud_leaf pud_leaf
-static inline int pud_leaf(pud_t pud)
+static inline bool pud_leaf(pud_t pud)
 {
 	if ((pud_val(pud) & _REGION_ENTRY_TYPE_MASK) != _REGION_ENTRY_TYPE_R3)
 		return 0;
@@ -723,7 +723,7 @@ static inline int pud_leaf(pud_t pud)
 }
 
 #define pmd_leaf pmd_leaf
-static inline int pmd_leaf(pmd_t pmd)
+static inline bool pmd_leaf(pmd_t pmd)
 {
 	return (pmd_val(pmd) & _SEGMENT_ENTRY_LARGE) != 0;
 }
