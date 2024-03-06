@@ -67,6 +67,10 @@ struct bpf_testmod_ops {
 		struct module *owner;
 	};
 
+	struct bpf_testmod_ops2 {
+		int (*test_1)(void);
+	};
+
 	/* The following pointers are used to test the maps having multiple
 	 * pages of trampolines.
 	 */
