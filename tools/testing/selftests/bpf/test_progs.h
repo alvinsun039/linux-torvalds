@@ -425,6 +425,9 @@ static inline bool check_test_support(int error)
 		system(cmd);						\
 	})
 
+int start_libbpf_log_capture(void);
+char *stop_libbpf_log_capture(void);
+
 static inline __u64 ptr_to_u64(const void *ptr)
 {
 	return (__u64) (unsigned long) ptr;
