@@ -29,3 +29,4 @@ xdp_bonding                              # failed to auto-attach program 'trace_
 xdp_metadata                             # JIT does not support calling kernel function                                (kfunc)
 test_task_under_cgroup                   # JIT does not support calling kernel function                                (kfunc)
 verifier_arena                           # JIT does not support arena
+arena_htab                               # JIT does not support arena
