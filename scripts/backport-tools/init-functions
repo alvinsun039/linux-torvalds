@@ -10,6 +10,7 @@ STABLE_MIN_VER=$(grep PATCHLEVEL $SOURCE_ROOT/Makefile | head -n1 | awk {'print 
 STABLE_BRANCH_ID=$(git log v${STABLE_MAJ_VER}.${STABLE_MIN_VER} --oneline -1 | awk -F' ' '{print $1}')
 STABLE_BRANCH_FULLHASH=$(git rev-parse $STABLE_BRANCH_ID)
 STABLE_BRANCH="6.1 5.15 5.10 5.4 4.19 4.9 4.4"
+KYLIN_BRANCH="klas-v11-next klad-v11-next klinux-v11-next"
 
 ARCH=`uname -m`
 Arch=`echo $ARCH | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/amd64/x86/ -e s/aarch64.*/arm64/ -e s/mips64el/mips/ -e s/loongarch64.*/loongarch/`
@@ -33,17 +34,14 @@ function better_gdct()
 function branch2name()
 {
 	case "$1" in
-		"kylinos-next")
-			printf "%-13s" "v10-sp4-devel"
+		"klas-v11-next")
+			printf "%-13s" "S11-SP0-DEVEL"
 			;;
-		"stable-52-sp3")
-			printf "%-13s" "v10-sp3"
+		"klad-v11-next")
+			printf "%-13s" "D11-SP0-DEVEL"
 			;;
-		"stable-25")
-			printf "%-13s" "v10-sp2"
-			;;
-		"stable-23")
-			printf "%-13s" "v10-sp1"
+		"klinux-v11-next")
+			printf "%-13s" "V11-SP0-DEVEL"
 			;;
 	esac
 }

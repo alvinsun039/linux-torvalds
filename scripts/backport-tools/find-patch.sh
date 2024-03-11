@@ -59,8 +59,6 @@ if [ "$PULL_REPO" = "true" ]; then
 	git pull --rebase --autostash --tags
 fi
 
-KYLIN_BRANCH="kylinos-next stable-52-sp3 stable-25 stable-23"
-
 SCID=$(git log --oneline -1 $CID | awk '{print $1}')
 CTITLE=$(git log --pretty=%s -1 $CID)
 CTAG=$(gdct $CID)
