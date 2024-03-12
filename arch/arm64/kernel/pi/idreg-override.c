@@ -198,7 +198,6 @@ static const struct ftr_set_desc sw_features __prel64_initconst = {
 		FIELD("nokaslr", ARM64_SW_FEATURE_OVERRIDE_NOKASLR, NULL),
 		FIELD("hvhe", ARM64_SW_FEATURE_OVERRIDE_HVHE, hvhe_filter),
 		FIELD("rodataoff", ARM64_SW_FEATURE_OVERRIDE_RODATA_OFF, NULL),
-		FIELD("nowxn", ARM64_SW_FEATURE_OVERRIDE_NOWXN, NULL),
 		{}
 	},
 };
@@ -233,9 +232,8 @@ static const struct {
 	{ "arm64.nomte",		"id_aa64pfr1.mte=0" },
 	{ "nokaslr",			"arm64_sw.nokaslr=1" },
 	{ "arm64.nolse",		"id_aa64isar0.atomic=0" },
-	{ "rodata=off",			"arm64_sw.rodataoff=1 arm64_sw.nowxn=1" },
+	{ "rodata=off",			"arm64_sw.rodataoff=1" },
 	{ "arm64.nolva",		"id_aa64mmfr2.varange=0" },
-	{ "arm64.nowxn",		"arm64_sw.nowxn=1" },
 };
 
 static int __init parse_hexdigit(const char *p, u64 *v)
