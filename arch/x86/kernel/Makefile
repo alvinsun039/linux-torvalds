@@ -162,4 +162,6 @@ ifeq ($(CONFIG_X86_64),y)
 	obj-$(CONFIG_PCI)		+= zhaoxin_kh40000.o
 endif
 
+obj-$(CONFIG_HYGON_CSV)			+= csv.o
+
 obj-$(CONFIG_KYLIN_DIFFERENCES)		+= machine_t.o
