@@ -17,6 +17,8 @@
 #include "platform-access.h"
 #include "dbc.h"
 
+#include "hygon/psp-dev.h"
+
 struct psp_device *psp_master;
 
 static struct psp_device *psp_alloc_struct(struct sp_device *sp)
@@ -187,7 +189,11 @@ int psp_dev_init(struct sp_device *sp)
 	iowrite32(-1, psp->io_regs + psp->vdata->intsts_reg);
 
 	/* Request an irq */
-	ret = sp_request_psp_irq(psp->sp, psp_irq_handler, psp->name, psp);
+	if (is_vendor_hygon()) {
+		ret = sp_request_hygon_psp_irq(psp->sp, psp_irq_handler, psp->name, psp);
+	} else {
+		ret = sp_request_psp_irq(psp->sp, psp_irq_handler, psp->name, psp);
+	}
 	if (ret) {
 		dev_err(dev, "psp: unable to allocate an IRQ\n");
 		goto e_err;
