@@ -2364,7 +2364,7 @@ BPF_TRACE_DEFN_x(10);
 BPF_TRACE_DEFN_x(11);
 BPF_TRACE_DEFN_x(12);
 
-static int __bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_prog *prog)
+int bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_prog *prog)
 {
 	struct tracepoint *tp = btp->tp;
 
@@ -2380,11 +2380,6 @@ static int __bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_prog *
 
 	return tracepoint_probe_register_may_exist(tp, (void *)btp->bpf_func,
 						   prog);
-}
-
-int bpf_probe_register(struct bpf_raw_event_map *btp, struct bpf_prog *prog)
-{
-	return __bpf_probe_register(btp, prog);
 }
 
 int bpf_probe_unregister(struct bpf_raw_event_map *btp, struct bpf_prog *prog)
