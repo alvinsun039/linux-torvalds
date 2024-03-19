@@ -2784,7 +2784,6 @@ do_request:
 		pending = set_next_request();
 		spin_unlock_irq(&floppy_lock);
 		if (!pending) {
-			do_floppy = NULL;
 			unlock_fdc();
 			return;
 		}
