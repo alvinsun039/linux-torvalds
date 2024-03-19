@@ -2492,7 +2492,7 @@ __bpf_kfunc void bpf_rcu_read_unlock(void)
 __diag_pop();
 
 BTF_SET8_START(generic_btf_ids)
-#ifdef CONFIG_KEXEC_CORE
+#ifdef CONFIG_CRASH_DUMP
 BTF_ID_FLAGS(func, crash_kexec, KF_DESTRUCTIVE)
 #endif
 BTF_ID_FLAGS(func, bpf_obj_new_impl, KF_ACQUIRE | KF_RET_NULL)
