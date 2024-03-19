@@ -380,7 +380,7 @@ static ssize_t charge_control_start_threshold_show(struct device *dev,
 	if (err)
 		return err;
 
-	return sprintf(buf, "%d\n", start);
+	return sysfs_emit(buf, "%d\n", start);
 }
 
 static ssize_t charge_control_end_threshold_show(struct device *dev,
@@ -393,7 +393,7 @@ static ssize_t charge_control_end_threshold_show(struct device *dev,
 	if (err)
 		return err;
 
-	return sprintf(buf, "%d\n", end);
+	return sysfs_emit(buf, "%d\n", end);
 }
 
 static ssize_t charge_control_thresholds_show(struct device *dev,
@@ -406,7 +406,7 @@ static ssize_t charge_control_thresholds_show(struct device *dev,
 	if (err)
 		return err;
 
-	return sprintf(buf, "%d %d\n", start, end);
+	return sysfs_emit(buf, "%d %d\n", start, end);
 }
 
 static ssize_t charge_control_start_threshold_store(struct device *dev,
@@ -563,7 +563,7 @@ static ssize_t fn_lock_state_show(struct device *dev,
 	if (err)
 		return err;
 
-	return sprintf(buf, "%d\n", on);
+	return sysfs_emit(buf, "%d\n", on);
 }
 
 static ssize_t fn_lock_state_store(struct device *dev,
