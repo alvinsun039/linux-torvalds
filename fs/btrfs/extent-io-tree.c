@@ -1281,7 +1281,7 @@ int convert_extent_bit(struct extent_io_tree *tree, u64 start, u64 end,
 	struct extent_state *prealloc = NULL;
 	struct rb_node **p = NULL;
 	struct rb_node *parent = NULL;
-	int err = 0;
+	int ret = 0;
 	u64 last_start;
 	u64 last_end;
 	bool first_iteration = true;
@@ -1320,7 +1320,7 @@ again:
 	if (!state) {
 		prealloc = alloc_extent_state_atomic(prealloc);
 		if (!prealloc) {
-			err = -ENOMEM;
+			ret = -ENOMEM;
 			goto out;
 		}
 		prealloc->start = start;
@@ -1371,14 +1371,14 @@ hit_next:
 	if (state->start < start) {
 		prealloc = alloc_extent_state_atomic(prealloc);
 		if (!prealloc) {
-			err = -ENOMEM;
+			ret = -ENOMEM;
 			goto out;
 		}
-		err = split_state(tree, state, prealloc, start);
-		if (err)
-			extent_io_tree_panic(tree, state, "split", err);
+		ret = split_state(tree, state, prealloc, start);
+		if (ret)
+			extent_io_tree_panic(tree, state, "split", ret);
 		prealloc = NULL;
-		if (err)
+		if (ret)
 			goto out;
 		if (state->end <= end) {
 			set_state_bits(tree, state, bits, NULL);
@@ -1411,7 +1411,7 @@ hit_next:
 
 		prealloc = alloc_extent_state_atomic(prealloc);
 		if (!prealloc) {
-			err = -ENOMEM;
+			ret = -ENOMEM;
 			goto out;
 		}
 
@@ -1423,8 +1423,8 @@ hit_next:
 		prealloc->end = this_end;
 		inserted_state = insert_state(tree, prealloc, bits, NULL);
 		if (IS_ERR(inserted_state)) {
-			err = PTR_ERR(inserted_state);
-			extent_io_tree_panic(tree, prealloc, "insert", err);
+			ret = PTR_ERR(inserted_state);
+			extent_io_tree_panic(tree, prealloc, "insert", ret);
 		}
 		cache_state(inserted_state, cached_state);
 		if (inserted_state == prealloc)
@@ -1441,13 +1441,13 @@ hit_next:
 	if (state->start <= end && state->end > end) {
 		prealloc = alloc_extent_state_atomic(prealloc);
 		if (!prealloc) {
-			err = -ENOMEM;
+			ret = -ENOMEM;
 			goto out;
 		}
 
-		err = split_state(tree, state, prealloc, end + 1);
-		if (err)
-			extent_io_tree_panic(tree, state, "split", err);
+		ret = split_state(tree, state, prealloc, end + 1);
+		if (ret)
+			extent_io_tree_panic(tree, state, "split", ret);
 
 		set_state_bits(tree, prealloc, bits, NULL);
 		cache_state(prealloc, cached_state);
@@ -1469,7 +1469,7 @@ out:
 	if (prealloc)
 		free_extent_state(prealloc);
 
-	return err;
+	return ret;
 }
 
 /*
