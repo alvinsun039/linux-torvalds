@@ -2,8 +2,6 @@
 #ifndef IOU_RSRC_H
 #define IOU_RSRC_H
 
-#include "alloc_cache.h"
-
 enum {
 	IORING_RSRC_FILE		= 0,
 	IORING_RSRC_BUFFER		= 1,
@@ -28,10 +26,7 @@ struct io_rsrc_data {
 };
 
 struct io_rsrc_node {
-	union {
-		struct io_cache_entry		cache;
-		struct io_ring_ctx		*ctx;
-	};
+	struct io_ring_ctx		*ctx;
 	int				refs;
 	bool				empty;
 	u16				type;

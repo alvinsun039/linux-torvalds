@@ -212,7 +212,7 @@ struct io_submit_state {
 };
 
 struct io_alloc_cache {
-	struct io_wq_work_node	list;
+	void			**entries;
 	unsigned int		nr_cached;
 	unsigned int		max_cached;
 	size_t			elem_size;
