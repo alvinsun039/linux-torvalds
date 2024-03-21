@@ -2,11 +2,13 @@
 
 . $(dirname $0)/init-functions
 
-ret=0
-
 SEVERITY_LEVEL="Low"
 K2CI_ARCH=""
 
+# Exit Return Values
+# [ 0] -> Success.
+# [-1] -> Cherry Pick Failed.
+# [-2] -> Bad Commit ID.
 function do_exit()
 {
 	if [ $1 == 0 ];then
@@ -143,7 +145,6 @@ mainline_commit=$(git log -1 --format="%b" $1 \
 tag=$(gdct $mainline_commit)
 if [ -z "$tag" ];then
 	echo -e "${RED}Not found tag, fallback to 'git describe'.${NC}"
-	ret=-2
 	tag=$(git describe $mainline_commit)
 fi
 
@@ -183,5 +184,5 @@ git commit -s --amend -m "$msg" --author="$AUTHOR" --date="$AUTHOR_DATE"
 # need find fixes?
 [ ! -z $FIND_FIXES ] && find_fixes $mainline_commit
 
-# exit
-do_exit $ret
+# Exit
+do_exit 0
