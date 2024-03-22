@@ -1109,6 +1109,7 @@ static int __trace_fprobe_create(int argc, const char *argv[])
 	char gbuf[MAX_EVENT_NAME_LEN];
 	char sbuf[KSYM_NAME_LEN];
 	char abuf[MAX_BTF_ARGS_LEN];
+	char *dbuf = NULL;
 	bool is_tracepoint = false;
 	struct module *tp_mod = NULL;
 	struct tracepoint *tpoint = NULL;
@@ -1203,6 +1204,10 @@ static int __trace_fprobe_create(int argc, const char *argv[])
 		goto out;
 	}
 
+	ret = traceprobe_expand_dentry_args(argc, argv, &dbuf);
+	if (ret)
+		goto out;
+
 	/* setup a probe */
 	tf = alloc_trace_fprobe(group, event, symbol, tpoint, tp_mod,
 				argc, is_return);
@@ -1251,6 +1256,7 @@ out:
 	trace_probe_log_clear();
 	kfree(new_argv);
 	kfree(symbol);
+	kfree(dbuf);
 	return ret;
 
 parse_error:
