@@ -117,7 +117,7 @@ struct ast_i2c_chan *ast_i2c_create(struct drm_device *dev)
 
 	i2c = kzalloc(sizeof(struct ast_i2c_chan), GFP_KERNEL);
 	if (!i2c)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	i2c->adapter.owner = THIS_MODULE;
 	i2c->adapter.class = I2C_CLASS_DDC;
@@ -143,10 +143,11 @@ struct ast_i2c_chan *ast_i2c_create(struct drm_device *dev)
 
 	ret = drmm_add_action_or_reset(dev, ast_i2c_release, i2c);
 	if (ret)
-		return NULL;
+		return ERR_PTR(ret);
+
 	return i2c;
 
 out_kfree:
 	kfree(i2c);
-	return NULL;
+	return ERR_PTR(ret);
 }
