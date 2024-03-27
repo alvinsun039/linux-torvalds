@@ -15,6 +15,7 @@
 #include "io_uring.h"
 #include "openclose.h"
 #include "rsrc.h"
+#include "memmap.h"
 
 struct io_rsrc_update {
 	struct file			*file;
