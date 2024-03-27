@@ -408,6 +408,8 @@ check_deps() {
 	ARCH="${ARCH:-$(uname -m)}"
 	if [ "$ARCH" = "x86_64" ]; then
 		ARCH="x86"
+	elif [ "$ARCH" = "aarch64" ]; then
+		ARCH="arm64"
 	fi
 
 	local -r abidiff_min_version="2.4"
