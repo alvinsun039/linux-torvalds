@@ -14,6 +14,7 @@
 #include <linux/kexec.h>
 #include <linux/utsname.h>
 #include <linux/stop_machine.h>
+#include <generated/utsrelease.h>
 
 static char dump_stack_arch_desc_str[128];
 
@@ -61,6 +62,8 @@ void dump_stack_print_info(const char *log_lvl)
 	       init_utsname()->release,
 	       (int)strcspn(init_utsname()->version, " "),
 	       init_utsname()->version, BUILD_ID_VAL);
+
+	printk("Source Version: %s\n", SOURCE_VERSION);
 
 	if (dump_stack_arch_desc_str[0] != '\0')
 		printk("%sHardware name: %s\n",

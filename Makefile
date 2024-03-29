@@ -368,7 +368,11 @@ include $(srctree)/scripts/Kbuild.include
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(call read-file, include/config/kernel.release)
 KERNELVERSION = $(VERSION)$(if $(PATCHLEVEL),.$(PATCHLEVEL)$(if $(SUBLEVEL),.$(SUBLEVEL)))$(EXTRAVERSION)
-export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
+SOURCEVERSION = $(shell git rev-parse HEAD 2>/dev/null)
+ifeq ($(SOURCEVERSION),)
+SOURCEVERSION = $(shell cat .sourceversion 2>/dev/null | head -n 1)
+endif
+export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION SOURCEVERSION
 
 include $(srctree)/scripts/subarch.include
 
@@ -1239,7 +1243,8 @@ define filechk_utsrelease.h
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2;    \
 	  exit 1;                                                         \
 	fi;                                                               \
-	echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"
+	(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\";                  \
+	echo \#define SOURCE_VERSION \"$${SOURCEVERSION:-Unknown}\";)
 endef
 
 define filechk_version.h

@@ -52,6 +52,7 @@ static int osinfo_proc_show(struct seq_file *m, void *v)
 	totalram = i.totalram << (PAGE_SHIFT - 10);
 
 	seq_printf(m, "Kernel Version:\t\t%s\n", UTS_RELEASE);
+	seq_printf(m, "Source Version:\t\t%s\n", SOURCE_VERSION);
 	seq_printf(m, "Upstream Version:\t%d.%d.%d\n", LINUX_VERSION_MAJOR,
 		   LINUX_VERSION_PATCHLEVEL,
 		   LINUX_VERSION_SUBLEVEL);
