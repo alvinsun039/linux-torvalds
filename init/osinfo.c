@@ -41,6 +41,10 @@ static void get_uptime_format_string(char *buf)
 		(time.tv_nsec / (NSEC_PER_SEC / 100)));
 }
 
+void __weak print_cpuid_info(struct seq_file *m)
+{
+}
+
 static int osinfo_proc_show(struct seq_file *m, void *v)
 {
 	struct sysinfo i;
@@ -64,6 +68,8 @@ static int osinfo_proc_show(struct seq_file *m, void *v)
 		   PAGE_SIZE >> 10);
 	seq_printf(m, "Uptime:\t\t\t%s\n", uptime_buf);
 	seq_printf(m, "Cmdline:\t\t%s\n", saved_command_line);
+
+	print_cpuid_info(m);
 
 	return 0;
 }
