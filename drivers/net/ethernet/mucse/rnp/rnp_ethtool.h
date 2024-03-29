@@ -65,7 +65,7 @@ struct rnp_rx_queue_ring_stat {
 	 RNP_NUM_RX_QUEUES *                                             \
 		 (sizeof(struct rnp_rx_queue_stats) / sizeof(u64) +      \
 		  sizeof(struct rnp_queue_stats) / sizeof(u64) +         \
-		  sizeof(struct rnp_rx_queue_ring_stat) / sizeof(u64)))
+		  sizeof(struct rnp_rx_queue_ring_stat) / sizeof(u64)- 2 ))
 
 #define RNP_STATS_LEN                                     \
 	(RNP_GLOBAL_STATS_LEN + RNP_HWSTRINGS_STATS_LEN + \

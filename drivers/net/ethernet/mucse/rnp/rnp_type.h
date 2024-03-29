@@ -8,11 +8,11 @@
 #include <linux/mdio.h>
 #include <linux/netdevice.h>
 
-#if IS_ENABLED(CONFIG_MXGBE_FIX_VF_QUEUE)
+#if IS_ENABLED(CONFIG_MXGBE_FIX_VF_QUEUE) && !defined(FIX_VF_QUEUE)
 #define FIX_VF_QUEUE
 #endif /* IS_ENABLED(CONFIG_MXGBE_FIX_VF_QUEUE) */
 
-#if IS_ENABLED(CONFIG_MXGBE_FIX_MAC_PADDING)
+#if IS_ENABLED(CONFIG_MXGBE_FIX_MAC_PADDING) && !defined(FIX_MAC_PADDING)
 #define FIX_MAC_PADDING
 #endif /* IS_ENABLED(CONFIG_MXGBE_FIX_MAC_PADDING) */
 
@@ -39,12 +39,6 @@
 #if IS_ENABLED(CONFIG_FT_PADDING)
 #define FT_PADDING
 #endif /* IS_ENABLED(CONFIG_FT_PADDING) */
-
-// maybe euler can close this ?
-//#if IS_ENABLED(CONFIG_ARM64)
-//#define NO_BQL_TEST
-//#endif
-
 
 #if (PAGE_SIZE < 8192)
 /* if page_size is 4k, no need use this */
@@ -661,6 +655,7 @@ struct rnp_hw_stats {
 	/* === mac rx === */
 	u64 mac_rx_broadcast;
 	u64 mac_rx_multicast;
+	u64 mac_rx_csum_err;
 	u64 tx_broadcast;
 	u64 tx_multicast;
 

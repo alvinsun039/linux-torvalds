@@ -550,8 +550,8 @@ static void rnp_process_skb_fields(struct rnp_ring *rx_ring,
 			__vlan_hwaccel_put_tag(
 					skb, htons(ETH_P_8021Q), vid);
 		}
+		rx_ring->rx_stats.vlan_remove++;
 	}
-	rx_ring->rx_stats.vlan_remove++;
 
 	skb_record_rx_queue(skb, rx_ring->queue_index);
 
@@ -581,6 +581,7 @@ static bool rnp_check_csum_error(struct rnp_ring *rx_ring,
 	/* if rxcsum off nothing todo */
 	if (!(netdev->features & NETIF_F_RXCSUM))
 		return err;
+	
 
 	if (unlikely(rnp_test_staterr(rx_desc, RNP_RXD_STAT_ERR_MASK))) {
 		rx_debug_printk("rx error: VEB:%s mark:0x%x cmd:0x%x\n",
@@ -4494,9 +4495,9 @@ void rnp_update_stats(struct rnp_adapter *adapter)
 
 	hw->ops.update_hw_status(hw, hw_stats, net_stats);
 
-	adapter->hw_csum_rx_error = hw_csum_rx_error;
+	adapter->hw_csum_rx_error = hw_csum_rx_error + hw_stats->mac_rx_csum_err;
 	adapter->hw_csum_rx_good = hw_csum_rx_good;
-	net_stats->rx_errors = hw_csum_rx_error;
+	net_stats->rx_errors =adapter->hw_csum_rx_error;
 }
 
 /**

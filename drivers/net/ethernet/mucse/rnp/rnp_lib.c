@@ -592,12 +592,6 @@ static int rnp_alloc_q_vector(struct rnp_adapter *adapter,
 	int rxr_idx = r_idx, txr_idx = r_idx;
 	int cpu_offset = 0;
 
-	DPRINTK(PROBE, INFO,
-		"eth_queue_idx:%d v_idx:%d(off:%d) ring:%d ring_cnt:%d,",
-		eth_queue_idx, v_idx, adapter->q_vector_off, r_idx,
-		r_count);
-	DPRINTK(PROBE, INFO, "step:%d\n", step);
-
 	txr_count = rxr_count = r_count;
 
 	ring_count = txr_count + rxr_count;

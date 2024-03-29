@@ -1420,10 +1420,11 @@ static void rnp_set_rx_mode_hw_ops_n10(struct rnp_hw *hw,
 				       bool sriov_flag)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
-	u32 fctrl;
+	u32 fctrl, value;
 	netdev_features_t features = netdev->features;
 	int count;
 	struct rnp_eth_info *eth = &hw->eth;
+	struct rnp_mac_info *mac = &hw->mac;
 
 	/* broadcast always bypass */
 	fctrl = eth_rd32(eth, RNP10_ETH_DMAC_FCTRL) | RNP10_FCTRL_BPE;
@@ -1467,13 +1468,18 @@ static void rnp_set_rx_mode_hw_ops_n10(struct rnp_hw *hw,
 	else
 		eth->ops.set_vlan_filter(eth, false);
 
+	value = mac_rd32(mac, RNP10_MAC_RX_CFG);
 	if ((hw->addr_ctrl.user_set_promisc == true) ||
 	    (adapter->priv_flags & RNP_PRIV_FLAG_REC_HDR_LEN_ERR)) {
 		/* set pkt_len_err and hdr_len_err default to 1 */
 		eth_wr32(eth, RNP10_ETH_ERR_MASK_VECTOR,
 			 INNER_L4_BIT | PKT_LEN_ERR | HDR_LEN_ERR);
+		/* set mac checksum off */
+		mac_wr32(mac, RNP10_MAC_RX_CFG, value & (~RNP_IPC_MASK_XLGMAC));
 	} else {
 		eth_wr32(eth, RNP10_ETH_ERR_MASK_VECTOR, INNER_L4_BIT);
+		/* set mac checksum off */
+		mac_wr32(mac, RNP10_MAC_RX_CFG, value | RNP_IPC_MASK_XLGMAC);
 	}
 	/* also update mtu */
 	hw->ops.set_mtu(hw, netdev->mtu);
@@ -2111,6 +2117,8 @@ rnp_update_hw_status_hw_ops_n10(struct rnp_hw *hw,
 	net_stats->rx_crc_errors = 0;
 	net_stats->rx_errors = 0;
 
+	hw_stats->mac_rx_csum_err = 0;
+
 	for (port = 0; port < 4; port++) {
 		/* we use Hardware stats? */
 		net_stats->rx_crc_errors +=
@@ -2124,6 +2132,9 @@ rnp_update_hw_status_hw_ops_n10(struct rnp_hw *hw,
 			eth_rd32(eth, RNP10_RXTRANS_GLEN_ERR_PKTS(port)) +
 			eth_rd32(eth, RNP10_RXTRANS_IPH_ERR_PKTS(port)) +
 			eth_rd32(eth, RNP10_RXTRANS_LEN_ERR_PKTS(port));
+
+		hw_stats->mac_rx_csum_err +=
+			eth_rd32(eth, RNP10_RXTRANS_CSUM_ERR_PKTS(port));
 	}
 	/* === drop === */
 	hw_stats->invalid_dropped_packets =
@@ -3468,10 +3479,10 @@ static void rnp10_get_strings(struct net_device *netdev, u32 stringset,
 			p += ETH_GSTRING_LEN;
 			sprintf(p, "queue%u_rx_alloc_page", i);
 			p += ETH_GSTRING_LEN;
-			sprintf(p, "queue%u_rx_csum_offload_errs", i);
-			p += ETH_GSTRING_LEN;
-			sprintf(p, "queue%u_rx_csum_offload_good", i);
-			p += ETH_GSTRING_LEN;
+			//sprintf(p, "queue%u_rx_csum_offload_errs", i);
+			//p += ETH_GSTRING_LEN;
+			//sprintf(p, "queue%u_rx_csum_offload_good", i);
+			//p += ETH_GSTRING_LEN;
 			sprintf(p, "queue%u_rx_poll_again_count", i);
 			p += ETH_GSTRING_LEN;
 			sprintf(p, "queue%u_rx_rm_vlan_packets", i);
@@ -3862,8 +3873,8 @@ static void rnp10_get_ethtool_stats(struct net_device *netdev,
 		data[i++] = ring->rx_stats.alloc_rx_page_failed;
 		data[i++] = ring->rx_stats.alloc_rx_buff_failed;
 		data[i++] = ring->rx_stats.alloc_rx_page;
-		data[i++] = ring->rx_stats.csum_err;
-		data[i++] = ring->rx_stats.csum_good;
+		//data[i++] = ring->rx_stats.csum_err;
+		//data[i++] = ring->rx_stats.csum_good;
 		data[i++] = ring->rx_stats.poll_again_count;
 		data[i++] = ring->rx_stats.vlan_remove;
 
@@ -4067,7 +4078,7 @@ static void rnp_mac_set_rx_n10(struct rnp_mac_info *mac, bool status)
 		do {
 			mac_wr32(mac, RNP10_MAC_RX_CFG,
 				 mac_rd32(mac, RNP10_MAC_RX_CFG) |
-				 0x01 | RNP_IPC_MASK_XLGMAC);
+				 0x01);
 			usleep_range(100, 200);
 			value = mac_rd32(mac, RNP10_MAC_RX_CFG);
 			count++;
