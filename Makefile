@@ -5,6 +5,8 @@ SUBLEVEL = 22
 EXTRAVERSION =
 NAME = Hurr durr I'ma ninja sloth
 
+export KBUILD_BUILD_USER=KYLINSOFT
+
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
 # More info can be located in ./README
@@ -695,7 +697,6 @@ include $(srctree)/arch/$(SRCARCH)/Makefile
 export KBUILD_DEFCONFIG KBUILD_KCONFIG CC_VERSION_TEXT
 
 # Kylin defined
-export KBUILD_BUILD_USER=KYLINSOFT
 export KBUILD_DEFCONFIG=generic_defconfig
 
 config: outputmakefile scripts_basic FORCE
