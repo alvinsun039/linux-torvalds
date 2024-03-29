@@ -44,6 +44,16 @@ static inline bool is_ftd2000(void)
 	return false;
 }
 
+static inline bool is_ftd3000(void)
+{
+	return false;
+}
+
+static inline bool is_fte2000(void)
+{
+	return false;
+}
+
 static inline bool is_fts5000(void)
 {
 	return false;
