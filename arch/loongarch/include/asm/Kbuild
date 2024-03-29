@@ -11,6 +11,7 @@ generic-y += stat.h
 generic-y += fcntl.h
 generic-y += ioctl.h
 generic-y += ioctls.h
+generic-y += machine_t.h
 generic-y += mman.h
 generic-y += msgbuf.h
 generic-y += sembuf.h
