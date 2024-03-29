@@ -5,7 +5,7 @@
 
 ccflags-y := -fno-function-sections -fno-data-sections
 
-obj-y                          := main.o version.o mounts.o
+obj-y                          := main.o version.o mounts.o osinfo.o
 ifneq ($(CONFIG_BLK_DEV_INITRD),y)
 obj-y                          += noinitramfs.o
 else
@@ -62,3 +62,10 @@ CFLAGS_version-timestamp.o := -include include/generated/utsversion.h
 KASAN_SANITIZE_version-timestamp.o := n
 KCSAN_SANITIZE_version-timestamp.o := n
 GCOV_PROFILE_version-timestamp.o := n
+
+#
+# Build osinfo.c with finnal UTS_VERSION
+#
+
+$(obj)/osinfo.o: include/generated/utsversion.h
+CFLAGS_osinfo.o := -include include/generated/utsversion.h
