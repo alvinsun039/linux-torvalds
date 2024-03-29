@@ -154,6 +154,14 @@ config TCG_ATMEL
 	  will be accessible from within Linux.  To compile this driver 
 	  as a module, choose M here; the module will be called tpm_atmel.
 
+config TCG_AX99100_SPI
+	tristate "AX99100_SPI TPM Interface"
+	default m
+	help
+	  ax99100_spi driver contain tcm and tpm on pcie.
+	  the tcm is tcm1, tpm contain tpm1 and tpm2 module
+	  the ax99100_spi driver can identify which chip it is.
+
 config TCG_INFINEON
 	tristate "Infineon Technologies TPM Interface"
 	depends on PNP
