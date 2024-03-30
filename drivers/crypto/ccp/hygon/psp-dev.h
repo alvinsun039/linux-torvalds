@@ -46,6 +46,8 @@ extern struct hygon_psp_hooks_table {
 	long (*sev_ioctl)(struct file *file, unsigned int ioctl, unsigned long arg);
 } hygon_psp_hooks;
 
+int fixup_hygon_psp_caps(struct psp_device *psp);
+
 #define PSP_MUTEX_TIMEOUT 60000
 struct psp_mutex {
 	volatile uint64_t locked;

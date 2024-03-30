@@ -24,6 +24,17 @@
 /* Function and variable pointers for hooks */
 struct hygon_psp_hooks_table hygon_psp_hooks;
 
+int fixup_hygon_psp_caps(struct psp_device *psp)
+{
+	/* the hygon psp is unavailable if bit0 is cleared in feature reg */
+	if (!(psp->capability & PSP_CAPABILITY_SEV))
+		return -ENODEV;
+
+	psp->capability &= ~(PSP_CAPABILITY_TEE |
+			     PSP_CAPABILITY_PSP_SECURITY_REPORTING);
+	return 0;
+}
+
 static struct psp_misc_dev *psp_misc;
 #define HYGON_PSP_IOC_TYPE 'H'
 enum HYGON_PSP_OPCODE {
