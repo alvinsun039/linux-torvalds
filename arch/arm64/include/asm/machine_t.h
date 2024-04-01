@@ -8,6 +8,9 @@
 
 #include <asm/cputype.h>
 
+void cpu_version_init(void);
+bool phytium_check_cpu_type(u32 cpu_type);
+
 /*
  * Phytium CPU VENDOR_ID defined as:
  * SIGNATURE_32 ('P','H','Y','T') in bios
@@ -76,7 +79,7 @@ static inline bool is_ft1500a(void)
 
 static inline bool is_ft2000a4(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_2000_4_X);
 }
 
 static inline bool is_ft2000ahk(void)
@@ -91,32 +94,32 @@ static inline bool is_ft2000plus(void)
 
 static inline bool is_ft2500(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_S2500_64);
 }
 
 static inline bool is_ftd2000(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_D2000_8);
 }
 
 static inline bool is_ft2000_pc(void)
 {
-	return false;
+	return is_part(MIDR_FT_2000A_4) && !is_ft2500();
 }
 
 static inline bool is_ftd3000(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_D3000);
 }
 
 static inline bool is_fte2000(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_E2000);
 }
 
 static inline bool is_fts5000(void)
 {
-	return false;
+	return phytium_check_cpu_type(PHYTIUM_CPU_S5000);
 }
 
 static inline bool is_ft_all(void)

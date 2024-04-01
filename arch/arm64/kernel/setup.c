@@ -53,6 +53,7 @@
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
+#include <asm/machine_t.h>
 
 static int num_standard_resources;
 static struct resource *standard_resources;
@@ -355,6 +356,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 		unflatten_device_tree();
 
 	bootmem_init();
+
+	/* Try to read cpu version. */
+	cpu_version_init();
 
 	kasan_init();
 
