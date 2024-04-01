@@ -10,6 +10,7 @@
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
 #include <asm/fpsimd.h>
+#include <asm/machine_t.h>
 
 #include <linux/bitops.h>
 #include <linux/bug.h>
@@ -178,6 +179,7 @@ static int c_show(struct seq_file *m, void *v)
 {
 	int i, j;
 	bool compat = personality(current->personality) == PER_LINUX32;
+	const char *arm64_model_name = get_arm64_model_name();
 
 	for_each_online_cpu(i) {
 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
@@ -189,9 +191,7 @@ static int c_show(struct seq_file *m, void *v)
 		 * "processor".  Give glibc what it expects.
 		 */
 		seq_printf(m, "processor\t: %d\n", i);
-		if (compat)
-			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
+		seq_printf(m, "model name\t: %s\n", arm64_model_name);
 
 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
 			   loops_per_jiffy / (500000UL/HZ),
@@ -238,6 +238,7 @@ static int c_show(struct seq_file *m, void *v)
 		seq_printf(m, "CPU revision\t: %d\n\n", MIDR_REVISION(midr));
 	}
 
+	kfree(arm64_model_name);
 	return 0;
 }
 

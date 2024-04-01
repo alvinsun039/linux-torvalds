@@ -10,6 +10,7 @@
 
 void cpu_version_init(void);
 bool phytium_check_cpu_type(u32 cpu_type);
+const char *get_arm64_model_name(void);
 
 /*
  * Phytium CPU VENDOR_ID defined as:
