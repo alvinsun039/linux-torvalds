@@ -280,6 +280,16 @@ extern int bpf_path_d_path(struct path *path, char *buf, size_t buf__sz) __ksym;
 		}									\
 	 })
 
+#ifdef __BPF_FEATURE_MAY_GOTO
+#define cond_break					\
+	({ __label__ l_break, l_continue;		\
+	 asm volatile goto("may_goto %l[l_break]"	\
+		      :::: l_break);			\
+	goto l_continue;				\
+	l_break: break;					\
+	l_continue:;					\
+	})
+#else
 #define cond_break					\
 	({ __label__ l_break, l_continue;		\
 	 asm volatile goto("1:.byte 0xe5;			\
@@ -291,6 +301,7 @@ extern int bpf_path_d_path(struct path *path, char *buf, size_t buf__sz) __ksym;
 	l_break: break;					\
 	l_continue:;					\
 	})
+#endif
 
 #ifndef bpf_nop_mov
 #define bpf_nop_mov(var) \
