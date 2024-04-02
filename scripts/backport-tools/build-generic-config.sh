@@ -46,7 +46,14 @@ done
 CROSS_SOURCE_ARCH=$(echo -e $CROSS_ARCH | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 			-e s/amd64/x86/ -e s/aarch64.*/arm64/ -e s/mips64el/mips/ \
 			-e s/loongarch64.*/loongarch/)
-OPT="CROSS_COMPILE=${CROSS_ARCH}-linux-gnu- ARCH=${CROSS_SOURCE_ARCH}"
+if [ $(uname -m) != $CROSS_ARCH ]; then
+	OPT="CROSS_COMPILE=${CROSS_ARCH}-linux-gnu- ARCH=${CROSS_SOURCE_ARCH}"
+
+	if [ -z "$(which ${CROSS_ARCH}-linux-gnu-gcc 2>/dev/null)" ]; then
+		echo -e "${RED}Not found ${CROSS_ARCH}-linux-gnu-gcc, Please confirm that the cross-compilation environment has been installed.${NC}"
+		exit -2;
+	fi
+fi
 
 function make_defconfig()
 {
