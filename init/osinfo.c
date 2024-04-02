@@ -21,24 +21,41 @@
 static void get_uptime_format_string(char *buf)
 {
 	struct timespec64 time;
-	u64 uptime_secs, minutes, hours, days, pos = 0;
+	u64 nseconds, seconds, minutes, hours, days;
+	u64 remainder, pos = 0;
 
 	ktime_get_boottime_ts64(&time);
-	uptime_secs = (u64)time.tv_sec;
 
-	days = uptime_secs / (60*60*24);
-	hours = (uptime_secs / (60*60)) % 24;
-	minutes = (uptime_secs / (60)) % 60;
+	/* days = tv_sec / (60 * 60 * 24) */
+	days = (u64)time.tv_sec;
+	remainder = do_div(days, 60 * 60 * 24);
 
-	if (days)
-		pos += sprintf(buf, "%lld %s, ", days, days > 1 ? "days" : "day");
-	if (hours)
-		pos += sprintf(buf + pos, "%lld %s, ", hours, hours > 1 ? "hours" : "hour");
-	if (minutes)
-		pos += sprintf(buf + pos, "%lld %s, ", minutes, minutes > 1 ? "minutes" : "minute");
+	/* hours = (tc_sec / (60 * 60)) % 24 */
+	hours = remainder;
+	remainder = do_div(hours, 60 * 60);
 
-	sprintf(buf + pos, "%llu.%02lu seconds", uptime_secs % 60,
-		(time.tv_nsec / (NSEC_PER_SEC / 100)));
+	/* minutes = (tv_sec / 60) % 60 */
+	minutes = remainder;
+	seconds = do_div(minutes, 60);
+
+	if (days) {
+		pos += sprintf(buf, "%lld %s, ", days,
+			       days > 1 ? "days" : "day");
+	}
+	if (hours) {
+		pos += sprintf(buf + pos, "%lld %s, ", hours,
+			       hours > 1 ? "hours" : "hour");
+	}
+	if (minutes) {
+		pos += sprintf(buf + pos, "%lld %s, ", minutes,
+			       minutes > 1 ? "minutes" : "minute");
+	}
+
+	/* nseconds = tv_nsec / (NSEC_PER_SEC / 100) */
+	nseconds = (u64)time.tv_nsec;
+	do_div(nseconds, NSEC_PER_SEC / 100);
+
+	sprintf(buf + pos, "%llu.%02llu seconds", seconds, nseconds);
 }
 
 void __weak print_cpuid_info(struct seq_file *m)
