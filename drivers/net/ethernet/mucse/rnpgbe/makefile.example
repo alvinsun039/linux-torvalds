@@ -5,7 +5,7 @@
 #
 #
 
-obj-$(CONFIG_MXGBE) += rnpgbe.o
+obj-$(CONFIG_MGBE) += rnpgbe.o
 rnpgbe-objs :=   \
 		rnpgbe_main.o \
 		rnpgbe_common.o \
@@ -18,6 +18,6 @@ rnpgbe-objs :=   \
 		rnpgbe_param.o \
 		rnpgbe_sysfs.o \
 		rnpgbe_sfc.o \
-		rnpgbe_ptp.o 
+		rnpgbe_ptp.o
 
 rnpgbe-$(CONFIG_DEBUG_FS) += rnpgbe_debugfs.o
