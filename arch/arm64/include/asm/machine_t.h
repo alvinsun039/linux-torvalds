@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /*
- *  Copyright (C) 2018-2024 KylinSoft Corporation.
+ * Authors:
+ *   Jackie Liu <liuyun01@kylinos.cn>
+ *   Riwen Lu <luriwen@kylinos.cn>
+ *
+ * Copyright (C) 2018-2024 KylinSoft Corporation.
  */
 
 #ifndef __MACHINE_TYPE_H_
@@ -16,7 +20,7 @@ const char *get_arm64_model_name(void);
  * Phytium CPU VENDOR_ID defined as:
  * SIGNATURE_32 ('P','H','Y','T') in bios
  */
-#define PHYTIUM_VENDOR_ID	0x54594850
+#define PHYTIUM_VENDOR_ID		0x54594850
 
 /* Phytium 2000a4 */
 #define PHYTIUM_CPU_2000_4_X		0x000300
@@ -65,76 +69,121 @@ const char *get_arm64_model_name(void);
 
 static inline bool is_part(u32 cpuid)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return (read_cpuid_id() & MIDR_CPU_MODEL_MASK) == cpuid;
 }
 
 static inline bool is_implementer(u32 implementer)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return read_cpuid_implementor() == implementer;
 }
 
 static inline bool is_ft1500a(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return is_part(MIDR_FT_1500A);
 }
 
 static inline bool is_ft2000a4(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_2000_4_X);
 }
 
 static inline bool is_ft2000ahk(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return is_part(MIDR_FT_2000AHK);
 }
 
 static inline bool is_ft2000plus(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return is_part(MIDR_FT_2000PLUS);
 }
 
 static inline bool is_ft2500(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_S2500_64);
 }
 
 static inline bool is_ftd2000(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_D2000_8);
 }
 
 static inline bool is_ft2000_pc(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return is_part(MIDR_FT_2000A_4) && !is_ft2500();
 }
 
 static inline bool is_ftd3000(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_D3000);
 }
 
 static inline bool is_fte2000(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_E2000);
 }
 
 static inline bool is_fts5000(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return phytium_check_cpu_type(PHYTIUM_CPU_S5000);
 }
 
 static inline bool is_ft_all(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_PHYTIUM))
+		return false;
+
 	return is_implementer(ARM_CPU_IMP_PHYTIUM);
 }
 
 static inline bool is_kunpeng920(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_HISI))
+		return false;
+
 	return is_part(MIDR_HISI_TSV110) || is_part(MIDR_HISI_TSV200);
 }
 
 static inline bool is_hisi(void)
 {
+	if (!IS_BUILTIN(CONFIG_ARCH_HISI))
+		return false;
+
 	return is_implementer(ARM_CPU_IMP_HISI);
 }
 
