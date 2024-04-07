@@ -1584,7 +1584,7 @@ static void module_license_taint_check(struct module *mod, const char *license)
 			pr_warn("%s: module license '%s' taints kernel.\n",
 				mod->name, license);
 		add_taint_module(mod, TAINT_PROPRIETARY_MODULE,
-				 LOCKDEP_NOW_UNRELIABLE);
+				 LOCKDEP_STILL_OK);
 	}
 }
 
