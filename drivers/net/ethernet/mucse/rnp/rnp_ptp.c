@@ -11,7 +11,6 @@
 #include "rnp_regs.h"
 #include "rnp_ptp.h"
 
-
 /* PTP and HW Timer ops */
 static void config_hw_tstamping(void __iomem *ioaddr, u32 data)
 {
@@ -182,7 +181,7 @@ static int rnp_ptp_adjfreq(struct ptp_clock_info *ptp, long scaled_ppm)
 	unsigned long flags;
 	u32 addend;
 
-	if (pf == NULL) {
+	if (!pf) {
 		printk(KERN_DEBUG "adapter_of contail is null\n");
 		return 0;
 	}
@@ -257,7 +256,6 @@ static int rnp_ptp_settime(struct ptp_clock_info *ptp,
 	return 0;
 }
 
-
 static int rnp_ptp_feature_enable(struct ptp_clock_info *ptp,
 				  struct ptp_clock_request *rq, int on)
 {
@@ -293,14 +291,16 @@ static int rnp_ptp_setup_ptp(struct rnp_adapter *pf, u32 value)
 	/* program Sub Second Increment reg
 	 * we use kernel-system clock
 	 */
-	pf->hwts_ops->config_sub_second_increment(
-		pf->ptp_addr, pf->clk_ptp_rate, pf->gmac4, &sec_inc);
+	pf->hwts_ops->config_sub_second_increment(pf->ptp_addr,
+						  pf->clk_ptp_rate,
+						  pf->gmac4,
+						  &sec_inc);
 	/* 4.If use fine correction approash then,
 	 * Program MAC_Timestamp_Addend register
 	 */
 	if (sec_inc == 0) {
 		pr_info("%s:%d the sec_inc is zero this is a bug\n",
-		       __func__, __LINE__);
+			__func__, __LINE__);
 		return -EFAULT;
 	}
 	temp = div_u64(1000000000ULL, sec_inc);
@@ -490,15 +490,14 @@ int rnp_ptp_set_ts_config(struct rnp_adapter *pf, struct ifreq *ifr)
 		((config.rx_filter == HWTSTAMP_FILTER_NONE) ? 0 : 1);
 	pf->ptp_tx_en = config.tx_type == HWTSTAMP_TX_ON;
 
-	netdev_info(
-		pf->netdev,
-		"ptp config rx filter 0x%.2x tx_type 0x%.2x rx_en[%d] tx_en[%d]\n",
-		config.rx_filter, config.tx_type, pf->ptp_rx_en,
-		pf->ptp_tx_en);
-	if (!pf->ptp_rx_en && !pf->ptp_tx_en)
+	netdev_info(pf->netdev,
+		    "ptp config rx filter 0x%.2x tx_type 0x%.2x rx_en[%d] tx_en[%d]\n",
+		    config.rx_filter, config.tx_type, pf->ptp_rx_en,
+		    pf->ptp_tx_en);
+	if (!pf->ptp_rx_en && !pf->ptp_tx_en) {
 		/*rx and tx is not use hardware ts so clear the ptp register */
 		pf->hwts_ops->config_hw_tstamping(pf->ptp_addr, 0);
-	else {
+	} else {
 		value = (RNP_PTP_TCR_TSENA | RNP_PTP_TCR_TSCFUPDT |
 			 RNP_PTP_TCR_TSCTRLSSR | tstamp_all | ptp_v2 |
 			 ptp_over_ethernet | ptp_over_ipv6_udp |
@@ -545,12 +544,12 @@ int rnp_ptp_register(struct rnp_adapter *pf)
 
 	/*default mac clock rate is 100Mhz */
 	pf->clk_ptp_rate = 50000000; // 100Mhz
-	if (pf->pdev == NULL)
+	if (!pf->pdev)
 		pr_info("pdev dev is null\n");
 
 	pf->ptp_clock =
 		ptp_clock_register(&pf->ptp_clock_ops, &pf->pdev->dev);
-	if (pf->ptp_clock == NULL)
+	if (!pf->ptp_clock)
 		pci_err(pf->pdev, "ptp clock register failed\n");
 
 	if (IS_ERR(pf->ptp_clock)) {
@@ -573,8 +572,6 @@ void rnp_ptp_unregister(struct rnp_adapter *pf)
 			 "rnp_ptp");
 	}
 }
-
-
 
 void rnp_tx_hwtstamp_work(struct work_struct *work)
 {
@@ -663,7 +660,7 @@ void rnp_ptp_get_rx_hwstamp(struct rnp_adapter *adapter,
 		return;
 	}
 
-	if (likely(!((desc->wb.cmd) & RNP_RXD_STAT_PTP)))
+	if (likely(!(desc->wb.cmd & RNP_RXD_STAT_PTP)))
 		return;
 	hwtstamps = skb_hwtstamps(skb);
 	/* because of rx hwstamp store before the mac head
@@ -676,9 +673,9 @@ void rnp_ptp_get_rx_hwstamp(struct rnp_adapter *adapter,
 	 */
 	skb_copy_from_linear_data_offset(skb, RNP_RX_TIME_RESERVE,
 					 &tsvalueh, RNP_RX_SEC_SIZE);
-	skb_copy_from_linear_data_offset(
-		skb, RNP_RX_TIME_RESERVE + RNP_RX_SEC_SIZE, &tsvaluel,
-		RNP_RX_NANOSEC_SIZE);
+	skb_copy_from_linear_data_offset(skb, RNP_RX_TIME_RESERVE +
+					 RNP_RX_SEC_SIZE, &tsvaluel,
+					 RNP_RX_NANOSEC_SIZE);
 	skb_pull(skb, RNP_RX_HWTS_OFFSET);
 	tsvalueh = ntohl(tsvalueh);
 	tsvaluel = ntohl(tsvaluel);

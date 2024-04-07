@@ -44,7 +44,6 @@
 #define RNP10_MAX_TCAM_FILTERS 4096
 #define RNP10_MAX_TUPLE5_FILTERS 128
 
-
 /* setup queue speed limit to max_rate */
 static void rnp_dma_set_tx_maxrate_n10(struct rnp_dma_info *dma, u16 queue,
 				       u32 max_rate)
@@ -135,16 +134,12 @@ static s32 rnp_eth_set_rar_n10(struct rnp_eth_info *eth, u32 index, u8 *addr,
 
 	eth_dbg(eth, "    RAR[%d] <= %pM.  vmdq:%d enable:0x%x\n", index,
 		addr);
-
-
-	/*
-	 * HW expects these in big endian so we reverse the byte
+	/* HW expects these in big endian so we reverse the byte
 	 * order from network order (big endian) to little endian
 	 */
 	rar_low = ((u32)addr[5] | ((u32)addr[4] << 8) |
 		   ((u32)addr[3] << 16) | ((u32)addr[2] << 24));
-	/*
-	 * Some parts put the VMDq setting in the extra RAH bits,
+	/* Some parts put the VMDq setting in the extra RAH bits,
 	 * so save everything except the lower 16 bits that hold part
 	 * of the address and the address valid bit.
 	 */
@@ -187,8 +182,7 @@ static s32 rnp_eth_clear_rar_n10(struct rnp_eth_info *eth, u32 index)
 		return RNP_ERR_INVALID_ARGUMENT;
 	}
 
-	/*
-	 * Some parts put the VMDq setting in the extra RAH bits,
+	/* Some parts put the VMDq setting in the extra RAH bits,
 	 * so save everything except the lower 16 bits that hold part
 	 * of the address and the address valid bit.
 	 */
@@ -294,8 +288,7 @@ static void rnp10_set_mta(struct rnp_hw *hw, u8 *mc_addr)
 	hw->addr_ctrl.mta_in_use++;
 	vector = rnp10_mta_vector(eth, mc_addr);
 
-	/*
-	 * The MTA is a register array of 128 32-bit registers. It is treated
+	/* The MTA is a register array of 128 32-bit registers. It is treated
 	 * like an array of 4096 bits.  We want to set bit
 	 * BitArray[vector_value]. So we figure out what register the bit is
 	 * in, read it, OR in the new bit, then write back the new value.  The
@@ -355,8 +348,8 @@ static u8 *rnp_addr_list_itr(struct rnp_hw __maybe_unused *hw, u8 **mc_addr_ptr)
  *  multicast table.
  **/
 static s32 rnp_eth_update_mc_addr_list_n10(struct rnp_eth_info *eth,
-				    struct net_device *netdev,
-				    bool sriov_on)
+					   struct net_device *netdev,
+					   bool sriov_on)
 {
 	struct rnp_hw *hw = (struct rnp_hw *)eth->back;
 	struct netdev_hw_addr *ha;
@@ -366,8 +359,7 @@ static s32 rnp_eth_update_mc_addr_list_n10(struct rnp_eth_info *eth,
 	u8 *addr_list = NULL;
 	struct rnp_adapter *adapter = (struct rnp_adapter *)hw->back;
 
-	/*
-	 * Set the new number of MC addresses that we are being requested to
+	/* Set the new number of MC addresses that we are being requested to
 	 * use.
 	 */
 	hw->addr_ctrl.num_mc_addrs = netdev_mc_count(netdev);
@@ -519,8 +511,7 @@ static s32 rnp_eth_set_vfta_n10(struct rnp_eth_info *eth, u32 vlan, bool vlan_on
 	if (vlan > 4095)
 		return RNP_ERR_PARAM;
 
-	/*
-	 * The VFTA is a bitstring made up of 128 32-bit registers
+	/* The VFTA is a bitstring made up of 128 32-bit registers
 	 * that enable the particular VLAN id, much like the MTA:
 	 *    bits[11-5]: which register
 	 *    bits[4-0]:  which bit in the register
@@ -555,6 +546,7 @@ static void rnp_eth_clr_vfta_n10(struct rnp_eth_info *eth)
 	for (offset = 0; offset < eth->vft_size; offset++)
 		eth_wr32(eth, RNP10_VFTA(offset), 0);
 }
+
 /**
  *  rnp_eth_set_vlan_filter_n10 - Set VLAN filter table
  *  @eth: pointer to eth structure
@@ -761,7 +753,6 @@ static void rnp_eth_set_tuple5_n10(struct rnp_eth_info *eth,
 			port |= (htons(input->formatted.src_port) << 16);
 			port_mask |= (htons(input->formatted.src_port_mask)
 				      << 16);
-
 		}
 		if (input->formatted.dst_port != 0) {
 			port |= (htons(input->formatted.dst_port));
@@ -908,7 +899,7 @@ static void rnp_eth_set_vlan_strip_n10(struct rnp_eth_info *eth, u16 queue,
 	u32 offset = queue % 32;
 	u32 data = eth_rd32(eth, reg);
 
-	if (enable == true)
+	if (enable)
 		data |= (1 << offset);
 	else
 		data &= ~(1 << offset);
@@ -1064,7 +1055,7 @@ static void rnp_ncsi_set_mc_mta_n10(struct rnp_eth_info *eth)
 			mac[4] = ncsi_shm.mc[i].mc_addr_hi & 0xff;
 			mac[5] = (ncsi_shm.mc[i].mc_addr_hi >> 8) & 0xff;
 			if (is_multicast_ether_addr(mac) &&
-					!is_zero_ether_addr(mac))
+			    !is_zero_ether_addr(mac))
 				rnp10_set_mta(hw, mac);
 		}
 	}
@@ -1164,9 +1155,7 @@ static s32 rnp_reset_hw_ops_n10(struct rnp_hw *hw)
 
 #define N10_NIC_RESET 0
 	wr32(hw, RNP10_TOP_NIC_REST_N, N10_NIC_RESET);
-	/*
-	 * we need this
-	 */
+	/* we need this */
 	wmb();
 	wr32(hw, RNP10_TOP_NIC_REST_N, ~N10_NIC_RESET);
 
@@ -1215,8 +1204,9 @@ static s32 rnp_reset_hw_ops_n10(struct rnp_hw *hw)
 			} else if ((!(hw->fc.requested_mode & PAUSE_TX)) &&
 				   (!(hw->fc.requested_mode & PAUSE_RX))) {
 				   //do nothing
-			} else
+			} else {
 				pause_bits |= ASYM_PAUSE | SYM_PAUSE;
+			}
 		}
 		rnp_mbx_phy_read(hw, 4, &value);
 		value &= ~0xC00;
@@ -1454,8 +1444,7 @@ static void rnp_set_rx_mode_hw_ops_n10(struct rnp_hw *hw,
 		hw->addr_ctrl.user_set_promisc = false;
 	}
 
-	/*
-	 * Write addresses to available RAR registers, if there is not
+	/* Write addresses to available RAR registers, if there is not
 	 * sufficient space to store all the addresses then enable
 	 * unicast promiscuous mode
 	 */
@@ -1469,7 +1458,7 @@ static void rnp_set_rx_mode_hw_ops_n10(struct rnp_hw *hw,
 		eth->ops.set_vlan_filter(eth, false);
 
 	value = mac_rd32(mac, RNP10_MAC_RX_CFG);
-	if ((hw->addr_ctrl.user_set_promisc == true) ||
+	if (hw->addr_ctrl.user_set_promisc ||
 	    (adapter->priv_flags & RNP_PRIV_FLAG_REC_HDR_LEN_ERR)) {
 		/* set pkt_len_err and hdr_len_err default to 1 */
 		eth_wr32(eth, RNP10_ETH_ERR_MASK_VECTOR,
@@ -1572,7 +1561,6 @@ static void rnp_set_sriov_status_hw_ops_n10(struct rnp_hw *hw, bool status)
 #ifdef NIC_VF_FXIED
 	eth_wr32(eth, RNP10_VM_DMAC_MPSAR_RING(127), RNP_N10_MAX_VF - 1);
 #endif
-
 }
 
 static void rnp_set_sriov_vf_mc_hw_ops_n10(struct rnp_hw *hw, u16 mc_addr)
@@ -1589,7 +1577,6 @@ static void rnp_set_sriov_vf_mc_hw_ops_n10(struct rnp_hw *hw, u16 mc_addr)
 	mta_reg |= (1 << vector_bit);
 	eth_wr32(eth, RNP10_ETH_MULTICAST_HASH_TABLE(vector_reg), mta_reg);
 }
-
 
 static void rnp_update_sriov_info_hw_ops_n10(struct rnp_hw *hw)
 {
@@ -1746,8 +1733,7 @@ static s32 rnp_init_rx_addrs_hw_ops_n10(struct rnp_hw *hw)
 
 	hw_dbg(hw, "init_rx_addrs:rar_entries:%d, mac.addr:%pM\n",
 	       rar_entries, hw->mac.addr);
-	/*
-	 * If the current mac address is valid, assume it is a software override
+	/* If the current mac address is valid, assume it is a software override
 	 * to the permanent address.
 	 * Otherwise, use the permanent address from the eeprom.
 	 */
@@ -1855,8 +1841,8 @@ static void rnp_set_mbx_ifup_hw_ops_n10(struct rnp_hw *hw, int enable)
  *  Reads the links register to determine if link is up and the current speed
  **/
 static s32 rnp_check_mac_link_hw_ops_n10(struct rnp_hw *hw, rnp_link_speed *speed,
-				  bool *link_up, bool *duplex,
-				  bool link_up_wait_to_complete)
+					 bool *link_up, bool *duplex,
+					 bool link_up_wait_to_complete)
 {
 	if (hw->speed == 10)
 		*speed = RNP_LINK_SPEED_10_FULL;
@@ -1880,7 +1866,7 @@ static s32 rnp_check_mac_link_hw_ops_n10(struct rnp_hw *hw, rnp_link_speed *spee
 }
 
 static s32 rnp_setup_mac_link_hw_ops_n10(struct rnp_hw *hw, u32 adv, u32 autoneg,
-				  u32 speed, u32 duplex)
+					 u32 speed, u32 duplex)
 {
 	struct rnp_adapter *adpt = hw->back;
 	u32 value = 0;
@@ -1888,12 +1874,12 @@ static s32 rnp_setup_mac_link_hw_ops_n10(struct rnp_hw *hw, u32 adv, u32 autoneg
 	u32 value_r9 = 0;
 
 	rnp_logd(LOG_PHY,
-			"%s setup phy: phy_addr=%d speed=%d",
-			__func__, adpt->phy_addr, speed);
+		 "%s setup phy: phy_addr=%d speed=%d",
+		 __func__, adpt->phy_addr, speed);
 	rnp_logd(LOG_PHY, "duplex=%d autoneg=%d",
-			duplex, autoneg);
+		 duplex, autoneg);
 	rnp_logd(LOG_PHY, "is_backplane=%d is_sgmii=%d\n",
-			hw->is_backplane, hw->is_sgmii);
+		 hw->is_backplane, hw->is_sgmii);
 	/* Backplane type, support AN, unsupport set speed */
 	if (hw->is_backplane)
 		return rnp_set_lane_fun(hw, LANE_FUN_AN, autoneg, 0, 0, 0);
@@ -1922,8 +1908,7 @@ static s32 rnp_setup_mac_link_hw_ops_n10(struct rnp_hw *hw, u32 adv, u32 autoneg
 	}
 	rnp_mbx_phy_write(hw, RNP_YT8531_PHY_SPEC_CTRL, value);
 
-	/*
-	 * Clear autoneg_advertised and set new values based on input link
+	/* Clear autoneg_advertised and set new values based on input link
 	 * speed.
 	 */
 	hw->phy.autoneg_advertised = speed;
@@ -2171,7 +2156,6 @@ rnp_update_hw_status_hw_ops_n10(struct rnp_hw *hw,
 		((u64)mac_rd32(mac, RNP10_MAC_STATS_MULTICAST_HIGH) << 32);
 }
 
-
 enum n10_priv_bits {
 	n10_mac_loopback = 0,
 	n10_switch_loopback = 1,
@@ -2202,7 +2186,6 @@ static const char rnp10_priv_flags_strings[][ETH_GSTRING_LEN] = {
 };
 
 #define RNP10_PRIV_FLAGS_STR_LEN ARRAY_SIZE(rnp10_priv_flags_strings)
-
 
 const struct rnp_stats rnp10_gstrings_net_stats[] = {
 	RNP_NETDEV_STAT(rx_packets),
@@ -2294,7 +2277,6 @@ static int rnp10_get_regs_len(struct net_device *netdev)
 
 #define SUPPORTED_10000baseT 0
 
-
 static int rnp_set_autoneg_adv_from_hw(struct rnp_hw *hw,
 				       struct ethtool_link_ksettings *ks)
 {
@@ -2310,28 +2292,28 @@ static int rnp_set_autoneg_adv_from_hw(struct rnp_hw *hw,
 		rnp_mbx_phy_read(hw, 0x4, &value_r4);
 		rnp_mbx_phy_read(hw, 0x9, &value_r9);
 		if (value_r4 & 0x100) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 100baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     100baseT_Full);
 		}
 		if (value_r4 & 0x80) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 100baseT_Half);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     100baseT_Half);
 		}
 		if (value_r4 & 0x40) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10baseT_Full);
 		}
 		if (value_r4 & 0x20) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10baseT_Half);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10baseT_Half);
 		}
 		if (value_r9 & 0x200) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 1000baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     1000baseT_Full);
 		}
 		if (value_r9 & 0x100) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 1000baseT_Half);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     1000baseT_Half);
 		}
 	}
 
@@ -2356,43 +2338,43 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 
 	if (phy_type == PHY_TYPE_NONE) {
 		if (supported_link & RNP_LINK_SPEED_10GB_FULL) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseT_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseT_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseSR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseSR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseLR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseLR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseER_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseER_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseLR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseLR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseER_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseER_Full);
 		}
 
 		if (((supported_link & RNP_LINK_SPEED_10GB_FULL) ||
 		     (supported_link & RNP_LINK_SPEED_1GB_FULL))) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 1000baseX_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 1000baseX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     1000baseX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     1000baseX_Full);
 		}
 	}
 	if (phy_type == PHY_TYPE_SGMII) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				1000baseT_Full);
+						     1000baseT_Full);
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				100baseT_Full);
+						     100baseT_Full);
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				10baseT_Full);
+						     10baseT_Full);
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				100baseT_Half);
+						     100baseT_Half);
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				10baseT_Half);
+						     10baseT_Half);
 
 		rnp_set_autoneg_adv_from_hw(hw, ks);
 	}
@@ -2406,21 +2388,21 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 
 	if (supported_link & RNP_SFP_MODE_40G_CR4) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				40000baseCR4_Full);
+						     40000baseCR4_Full);
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				40000baseCR4_Full);
+						     40000baseCR4_Full);
 	}
 	if (supported_link & RNP_SFP_MODE_40G_SR4) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				40000baseSR4_Full);
+						     40000baseSR4_Full);
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				40000baseSR4_Full);
+						     40000baseSR4_Full);
 	}
 	if (supported_link & RNP_SFP_MODE_40G_LR4) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
-				40000baseLR4_Full);
+						     40000baseLR4_Full);
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				40000baseLR4_Full);
+						     40000baseLR4_Full);
 	}
 
 	/* add 25G support here */
@@ -2445,17 +2427,17 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 
 	if (hw->is_backplane) {
 		if (phy_type == PHY_TYPE_40G_BASE_KR4) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 40000baseKR4_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 40000baseKR4_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     40000baseKR4_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     40000baseKR4_Full);
 		}
 		if (phy_type == PHY_TYPE_10G_BASE_KR) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseKR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseKR_Full);
 			if (supported_link & RNP_LINK_SPEED_10GB_FULL)
-				ethtool_link_ksettings_add_link_mode(
-					ks, advertising, 10000baseKR_Full);
+				ethtool_link_ksettings_add_link_mode(ks, advertising,
+								     10000baseKR_Full);
 		}
 	}
 	if (supported_link & RNP_SFP_MODE_1G_LX ||
@@ -2463,27 +2445,27 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     1000baseX_Full);
 		if (supported_link & RNP_LINK_SPEED_1GB_FULL) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 1000baseX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     1000baseX_Full);
 		}
 	}
 
 	if (phy_type == PHY_TYPE_1G_BASE_KX) {
 		if (hw->is_backplane) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 1000baseKX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     1000baseKX_Full);
 			if (supported_link & RNP_LINK_SPEED_1GB_FULL)
-				ethtool_link_ksettings_add_link_mode(
-					ks, advertising, 1000baseKX_Full);
+				ethtool_link_ksettings_add_link_mode(ks, advertising,
+								     1000baseKX_Full);
 		}
 
 		if ((supported_link & RNP_SFP_MODE_1G_T) ||
-				(supported_link & RNP_LINK_SPEED_1GB_FULL)) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 1000baseT_Full);
+		    (supported_link & RNP_LINK_SPEED_1GB_FULL)) {
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     1000baseT_Full);
 			if (supported_link & RNP_LINK_SPEED_1GB_FULL)
-				ethtool_link_ksettings_add_link_mode(
-					ks, advertising, 1000baseT_Full);
+				ethtool_link_ksettings_add_link_mode(ks, advertising,
+								     1000baseT_Full);
 		}
 	}
 
@@ -2492,22 +2474,22 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     10000baseSR_Full);
 		if (supported_link & RNP_LINK_SPEED_10GB_FULL)
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseSR_Full);
 	}
 	if (phy_type == PHY_TYPE_10G_BASE_ER) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     10000baseER_Full);
 		if (supported_link & RNP_LINK_SPEED_10GB_FULL)
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseER_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseER_Full);
 	}
 	if (phy_type == PHY_TYPE_10G_BASE_LR) {
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     10000baseLR_Full);
 		if (supported_link & RNP_LINK_SPEED_10GB_FULL)
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseLR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseLR_Full);
 	}
 
 	if (hw->force_speed_stat == FORCE_SPEED_STAT_10G) {
@@ -2522,17 +2504,18 @@ static void rnp_phy_type_to_ethtool(struct rnp_adapter *adapter,
 						     1000baseX_Full);
 
 		if (phy_type == PHY_TYPE_1G_BASE_KX) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseSR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseSR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 10000baseLR_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseLR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     10000baseLR_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseLR_Full);
 		}
 	}
 }
+
 /**
  * rnp_get_settings_link_up - Get Link settings for when link is up
  * @hw: hw structure
@@ -2597,8 +2580,8 @@ static void rnp_get_settings_link_up(struct rnp_hw *hw,
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     10000baseT_Full);
 		if (hw->speed == SPEED_10000)
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 10000baseT_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     10000baseT_Full);
 		break;
 	case PHY_TYPE_1G_BASE_KX:
 		ethtool_link_ksettings_add_link_mode(ks, supported,
@@ -2606,10 +2589,10 @@ static void rnp_get_settings_link_up(struct rnp_hw *hw,
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
 						     Autoneg);
 		if (!!hw->is_backplane) {
-			ethtool_link_ksettings_add_link_mode(
-				ks, supported, 1000baseKX_Full);
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, 1000baseKX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, supported,
+							     1000baseKX_Full);
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     1000baseKX_Full);
 		}
 		ethtool_link_ksettings_add_link_mode(ks, supported,
 						     1000baseX_Full);
@@ -2788,18 +2771,18 @@ static int rnp_get_phy_mdix_from_hw(struct rnp_hw *hw)
 
 __maybe_unused static bool fiber_unsupport(u32 supported_link, u8 phy_type)
 {
-	if ((phy_type == PHY_TYPE_10G_BASE_KR) ||
-	    (phy_type == PHY_TYPE_10G_BASE_SR) ||
-	    (phy_type == PHY_TYPE_10G_BASE_LR) ||
-	    (phy_type == PHY_TYPE_10G_BASE_ER)) {
+	if (phy_type == PHY_TYPE_10G_BASE_KR ||
+	    phy_type == PHY_TYPE_10G_BASE_SR ||
+	    phy_type == PHY_TYPE_10G_BASE_LR ||
+	    phy_type == PHY_TYPE_10G_BASE_ER) {
 		if (!(supported_link & RNP_LINK_SPEED_10GB_FULL))
 			return true;
 	}
 
-	if ((phy_type == PHY_TYPE_40G_BASE_KR4) ||
-	    (phy_type == PHY_TYPE_40G_BASE_SR4) ||
-	    (phy_type == PHY_TYPE_40G_BASE_CR4) ||
-	    (phy_type == PHY_TYPE_40G_BASE_LR4)) {
+	if (phy_type == PHY_TYPE_40G_BASE_KR4 ||
+	    phy_type == PHY_TYPE_40G_BASE_SR4 ||
+	    phy_type == PHY_TYPE_40G_BASE_CR4 ||
+	    phy_type == PHY_TYPE_40G_BASE_LR4) {
 		if (!(supported_link & (RNP_LINK_SPEED_40GB_FULL |
 					RNP_LINK_SPEED_25GB_FULL)))
 			return true;
@@ -2917,12 +2900,13 @@ static int rnp10_get_link_ksettings(struct net_device *netdev,
 		if (hw->phy_type == PHY_TYPE_SGMII)
 			ethtool_link_ksettings_add_link_mode(ks, supported,
 							     Autoneg);
-		if (ks->base.autoneg == AUTONEG_ENABLE)
-			ethtool_link_ksettings_add_link_mode(
-				ks, advertising, Autoneg);
-		else
-			ethtool_link_ksettings_del_link_mode(
-				ks, advertising, Autoneg);
+		if (ks->base.autoneg == AUTONEG_ENABLE) {
+			ethtool_link_ksettings_add_link_mode(ks, advertising,
+							     Autoneg);
+		} else {
+			ethtool_link_ksettings_del_link_mode(ks, advertising,
+							     Autoneg);
+		}
 		ks->base.port = PORT_TP;
 		break;
 	case rnp_media_type_da:
@@ -2960,23 +2944,23 @@ static int rnp10_get_link_ksettings(struct net_device *netdev,
 	switch (hw->fc.requested_mode) {
 	case rnp_fc_full:
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				Pause);
+						     Pause);
 		break;
 	case rnp_fc_tx_pause:
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				Asym_Pause);
+						     Asym_Pause);
 		break;
 	case rnp_fc_rx_pause:
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				Pause);
+						     Pause);
 		ethtool_link_ksettings_add_link_mode(ks, advertising,
-				Asym_Pause);
+						     Asym_Pause);
 		break;
 	default:
 		ethtool_link_ksettings_del_link_mode(ks, advertising,
-				Pause);
+						     Pause);
 		ethtool_link_ksettings_del_link_mode(ks, advertising,
-				Asym_Pause);
+						     Asym_Pause);
 		break;
 	}
 
@@ -3001,13 +2985,13 @@ static int rnp10_get_link_ksettings(struct net_device *netdev,
 #endif
 #endif /* ETH_TP_MDI_X */
 	rnp_logd(LOG_ETHTOOL,
-			"%s %s set link: speed=%d port=%d duplex=%d autoneg=%d",
-			__func__, netdev->name, ks->base.speed, ks->base.port,
-			ks->base.duplex, ks->base.autoneg);
+		 "%s %s set link: speed=%d port=%d duplex=%d autoneg=%d",
+		 __func__, netdev->name, ks->base.speed, ks->base.port,
+		 ks->base.duplex, ks->base.autoneg);
 	rnp_logd(LOG_ETHTOOL,
-			"phy_address=%d, media_type=%d hw->phy_type:%d\n",
-			ks->base.phy_address,
-			hw->phy.media_type, hw->phy_type);
+		 "phy_address=%d, media_type=%d hw->phy_type:%d\n",
+		 ks->base.phy_address,
+		 hw->phy.media_type, hw->phy_type);
 	return 0;
 }
 
@@ -3029,12 +3013,12 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 	/* save autoneg out of ksettings */
 	autoneg = copy_ks.base.autoneg;
 	rnp_logd(LOG_ETHTOOL,
-			"%s %s set link: speed=%d port=%d duplex=%d autoneg=%d",
-			__func__, netdev->name, copy_ks.base.speed,
-			copy_ks.base.port, copy_ks.base.duplex,
-			copy_ks.base.autoneg);
+		 "%s %s set link: speed=%d port=%d duplex=%d autoneg=%d",
+		 __func__, netdev->name, copy_ks.base.speed,
+		 copy_ks.base.port, copy_ks.base.duplex,
+		 copy_ks.base.autoneg);
 	rnp_logd(LOG_ETHTOOL,
-			"phy_address=%d\n", copy_ks.base.phy_address);
+		 "phy_address=%d\n", copy_ks.base.phy_address);
 
 	/* get our own copy of the bits to check against */
 	memset(&safe_ks, 0, sizeof(struct ethtool_link_ksettings));
@@ -3063,11 +3047,11 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 		/* If autoneg was not already enabled */
 		if (!(adapter->an)) {
 			/* If autoneg is not supported, return error */
-			if (!ethtool_link_ksettings_test_link_mode(
-				    &safe_ks, supported, Autoneg)) {
-				netdev_info(
-					netdev,
-					"Autoneg not supported on this phy\n");
+			if (!ethtool_link_ksettings_test_link_mode(&safe_ks,
+								   supported,
+								   Autoneg)) {
+				netdev_info(netdev,
+					    "Autoneg not supported on this phy\n");
 				err = -EINVAL;
 				goto done;
 			}
@@ -3079,10 +3063,10 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 		if (ethtool_link_ksettings_test_link_mode(ks, advertising,
 							  100baseT_Full))
 			advertising_link_speed |= RNP_LINK_SPEED_100_FULL;
-		if (ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 1000baseT_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 1000baseX_Full) ||
+		if (ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  1000baseT_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  1000baseX_Full) ||
 		    ethtool_link_ksettings_test_link_mode(ks, advertising,
 							  1000baseKX_Full))
 			advertising_link_speed |= RNP_LINK_SPEED_1GB_FULL;
@@ -3096,28 +3080,28 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 		if (ethtool_link_ksettings_test_link_mode(ks, advertising,
 							  1000baseT_Half))
 			advertising_link_speed |= RNP_LINK_SPEED_1GB_HALF;
-		if (ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseT_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseKX4_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseKR_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseCR_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseSR_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 10000baseLR_Full))
+		if (ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseT_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseKX4_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseKR_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseCR_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseSR_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  10000baseLR_Full))
 			advertising_link_speed |= RNP_LINK_SPEED_10GB_FULL;
 
-		if (ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 40000baseKR4_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 40000baseCR4_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 40000baseSR4_Full) ||
-		    ethtool_link_ksettings_test_link_mode(
-			    ks, advertising, 40000baseLR4_Full))
+		if (ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  40000baseKR4_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  40000baseCR4_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  40000baseSR4_Full) ||
+		    ethtool_link_ksettings_test_link_mode(ks, advertising,
+							  40000baseLR4_Full))
 			advertising_link_speed |= RNP_LINK_SPEED_40GB_FULL;
 
 		if (advertising_link_speed) {
@@ -3127,7 +3111,7 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 			if (hw->force_speed_stat ==
 			     FORCE_SPEED_STAT_DISABLED) {
 				netdev_info(netdev,
-					"advertising_link_speed is 0\n");
+					    "advertising_link_speed is 0\n");
 				err = -EINVAL;
 				goto done;
 			}
@@ -3140,11 +3124,12 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 			/* If autoneg is supported 10GBASE_T is the only PHY
 			 * that can disable it, so otherwise return error
 			 */
-			if (ethtool_link_ksettings_test_link_mode(
-				    &safe_ks, supported, Autoneg) &&
+			if (ethtool_link_ksettings_test_link_mode(&safe_ks,
+								  supported,
+								  Autoneg) &&
 			    hw->phy.media_type != rnp_media_type_copper) {
 				netdev_info(netdev,
-					"Autoneg cannot be disabled on this phy\n");
+					    "Autoneg cannot be disabled on this phy\n");
 				err = -EINVAL;
 				goto done;
 			}
@@ -3178,9 +3163,8 @@ static int rnp10_set_link_ksettings(struct net_device *netdev,
 	 * This is needed because if advertise is 0 (as it is when autoneg
 	 * is disabled) then speed won't get set.
 	 */
-	if (hw->is_sgmii) {
+	if (hw->is_sgmii)
 		hw->duplex = ks->base.duplex;
-	}
 
 	/* this sets the link speed and restarts auto-neg */
 	while (test_and_set_bit(__RNP_IN_SFP_INIT, &adapter->state)) {
@@ -3222,10 +3206,10 @@ static void rnp10_get_drvinfo(struct net_device *netdev,
 		 rnp_driver_version, hw->pcode);
 
 	snprintf(drvinfo->fw_version, sizeof(drvinfo->fw_version),
-		 "%d.%d.%d.%d 0x%08x", ((char *)&(hw->fw_version))[3],
-		 ((char *)&(hw->fw_version))[2],
-		 ((char *)&(hw->fw_version))[1],
-		 ((char *)&(hw->fw_version))[0], hw->bd_uid);
+		 "%d.%d.%d.%d 0x%08x", ((char *)&hw->fw_version)[3],
+		 ((char *)&hw->fw_version)[2],
+		 ((char *)&hw->fw_version)[1],
+		 ((char *)&hw->fw_version)[0], hw->bd_uid);
 
 	strscpy(drvinfo->bus_info, pci_name(adapter->pdev),
 		sizeof(drvinfo->bus_info));
@@ -3323,7 +3307,7 @@ static int rnp10_set_pauseparam(struct net_device *netdev,
 		return -EINVAL;
 
 	/* we not support autoneg mode */
-	if ((pause->autoneg == AUTONEG_ENABLE) &&
+	if (pause->autoneg == AUTONEG_ENABLE &&
 	    !rnp_device_supports_autoneg_fc(hw))
 		return -EINVAL;
 
@@ -3353,8 +3337,9 @@ static int rnp10_set_pauseparam(struct net_device *netdev,
 
 			} else if ((!(hw->fc.requested_mode & PAUSE_TX)) &&
 				   (!(hw->fc.requested_mode & PAUSE_RX))) {
-			} else
+			} else {
 				pause_bits |= ASYM_PAUSE | SYM_PAUSE;
+			}
 		}
 		rnp_mbx_phy_read(hw, 4, &value);
 		value &= ~0xC00;
@@ -3367,7 +3352,6 @@ static int rnp10_set_pauseparam(struct net_device *netdev,
 			rnp_mbx_phy_write(hw, 0, value_r0);
 		}
 	}
-
 
 	/* if the thing changed then we'll update and use new autoneg */
 	if (memcmp(&fc, &hw->fc, sizeof(struct rnp_fc_info))) {
@@ -3518,7 +3502,6 @@ static void rnp10_get_strings(struct net_device *netdev, u32 stringset,
 	}
 }
 
-
 static int rnp10_get_sset_count(struct net_device *netdev, int sset)
 {
 	switch (sset) {
@@ -3566,7 +3549,6 @@ static u32 rnp10_get_priv_flags(struct net_device *netdev)
 	if (adapter->priv_flags & RNP_PRIV_FLAG_LLDP_EN_STAT)
 		priv_flags |= RNP10_LLDP_EN_STAT;
 
-
 	return priv_flags;
 }
 
@@ -3595,8 +3577,8 @@ static int rnp10_set_priv_flags(struct net_device *netdev, u32 priv_flags)
 		if (rnp_mbx_lldp_port_enable(hw, true) == 0) {
 			adapter->priv_flags |= RNP_PRIV_FLAG_LLDP_EN_STAT;
 		} else {
-			rnp_err("%s: set lldp enable faild!\n",
-					adapter->netdev->name);
+			rnp_err("%s: set lldp enable failed!\n",
+				adapter->netdev->name);
 			adapter->priv_flags &=
 				(~RNP_PRIV_FLAG_LLDP_EN_STAT);
 		}
@@ -3722,7 +3704,6 @@ skip_setup_vf_vlan:
 
 	return 0;
 }
-
 
 static void rnp10_get_ethtool_stats(struct net_device *netdev,
 				    struct ethtool_stats *stats, u64 *data)
@@ -3993,7 +3974,7 @@ static s32 rnp_phy_read_reg_hw_ops_n10(struct rnp_hw *hw, u32 reg_addr,
 }
 
 static s32 rnp_phy_write_reg_hw_ops_n10(struct rnp_hw *hw, u32 reg_addr,
-				        u32 device_type, u16 phy_data)
+					u32 device_type, u16 phy_data)
 {
 	s32 status = 0;
 
@@ -4003,7 +3984,7 @@ static s32 rnp_phy_write_reg_hw_ops_n10(struct rnp_hw *hw, u32 reg_addr,
 }
 
 static void rnp_set_vf_vlan_mode_hw_ops_n10(struct rnp_hw *hw, u16 vlan, int vf,
-				            bool enable)
+					    bool enable)
 {
 	struct rnp_eth_info *eth = &hw->eth;
 	struct rnp_adapter *adapter = (struct rnp_adapter *)hw->back;
@@ -4121,6 +4102,7 @@ static void rnp_mac_set_rx_n10(struct rnp_mac_info *mac, bool status)
 		mac_wr32(mac, RNP10_MAC_PKT_FLT, 0x0);
 	}
 }
+
 static void rnp_mac_fcs_n10(struct rnp_mac_info *mac, bool status)
 {
 	u32 value;
@@ -4149,8 +4131,7 @@ static s32 rnp_mac_fc_mode_n10(struct rnp_mac_info *mac)
 	u32 rxctl_reg, txctl_reg[RNP_MAX_TRAFFIC_CLASS];
 	int i;
 
-	/*
-	 * Validate the water mark configuration for packet buffer 0.  Zero
+	/* Validate the water mark configuration for packet buffer 0.  Zero
 	 * water marks indicate that the packet buffer was not configured
 	 * and the watermarks for packet buffer 0 should always be configured.
 	 */
@@ -4167,8 +4148,7 @@ static s32 rnp_mac_fc_mode_n10(struct rnp_mac_info *mac)
 		txctl_reg[i] = mac_rd32(mac, RNP10_MAC_Q0_TX_FLOW_CTRL(i));
 		txctl_reg[i] &= (~RNP10_TX_FLOW_ENABLE_MASK);
 	}
-	/*
-	 * The possible values of fc.current_mode are:
+	/* The possible values of fc.current_mode are:
 	 * 0: Flow control is completely disabled
 	 * 1: Rx flow control is enabled (we can receive pause frames,
 	 *    but not send pause frames).
@@ -4179,14 +4159,12 @@ static s32 rnp_mac_fc_mode_n10(struct rnp_mac_info *mac)
 	 */
 	switch (hw->fc.current_mode) {
 	case rnp_fc_none:
-		/*
-		 * Flow control is disabled by software override or autoneg.
+		/* Flow control is disabled by software override or autoneg.
 		 * The code below will actually disable it in the HW.
 		 */
 		break;
 	case rnp_fc_rx_pause:
-		/*
-		 * Rx Flow control is enabled and Tx Flow control is
+		/* Rx Flow control is enabled and Tx Flow control is
 		 * disabled by software override. Since there really
 		 * isn't a way to advertise that we are capable of RX
 		 * Pause ONLY, we will advertise that we support both
@@ -4196,8 +4174,7 @@ static s32 rnp_mac_fc_mode_n10(struct rnp_mac_info *mac)
 		rxctl_reg |= (RNP10_RX_FLOW_ENABLE_MASK);
 		break;
 	case rnp_fc_tx_pause:
-		/*
-		 * Tx Flow control is enabled, and Rx Flow control is
+		/* Tx Flow control is enabled, and Rx Flow control is
 		 * disabled by software override.
 		 */
 		for (i = 0; i < RNP_MAX_TRAFFIC_CLASS; i++)
