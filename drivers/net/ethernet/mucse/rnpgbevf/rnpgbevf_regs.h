@@ -18,7 +18,7 @@ enum NIC_MODE {
 #define RNPGBE_RING_BASE_N10 (0x8000)
 #define RNPGBE_RING_BASE_N500 (0x1000)
 
-#define RNPGBE_RING_OFFSET(i) (0x100 * i)
+#define RNPGBE_RING_OFFSET(i) (0x100 * (i))
 
 #define RNPGBE_DMA_RX_START (0x10)
 #define RNPGBE_DMA_RX_READY (0x14)
@@ -26,8 +26,8 @@ enum NIC_MODE {
 #define RNPGBE_DMA_TX_READY (0x1c)
 #define RNPGBE_DMA_INT_STAT (0x20)
 #define RNPGBE_DMA_INT_MASK (0x24)
-#define TX_INT_MASK (1 << 1)
-#define RX_INT_MASK (1 << 0)
+#define TX_INT_MASK (0x1 << 1)
+#define RX_INT_MASK (0x1 << 0)
 #define RNPGBE_DMA_INT_CLR (0x28)
 #define RNPGBE_DMA_INT_TRIG (0x2c)
 #define RNPGBE_DMA_REG_RX_DESC_BUF_BASE_ADDR_HI (0x30)
@@ -76,13 +76,13 @@ enum NIC_MODE {
 #define RNPGBE_DMA_STATS_MAC_TO_DMA (0x1a8)
 #define RNPGBE_DMA_STATS_SWITCH_TO_DMA (0x1ac)
 
-#define RNPVF500_VEB_VFMPRC(i) (0x4018 + 0x100 * i)
+#define RNPVF500_VEB_VFMPRC(i) (0x4018 + 0x100 * (i))
 #define VF_NUM_REG 0xa3000
 #define VF_NUM_REG_N10 0x75f000
 #define VF_NUM_REG_N500 (0xe000)
 /* 8bit: 7:vf_actiove 6:fun0/fun1 [5:0]:vf_num */
-#define VF_NUM(vfnum, fun) ((1 << 7) | (((fun)&0x1) << 6) | ((vfnum)&0x3f))
-#define PF_NUM(fun) (((fun)&0x1) << 6)
+#define VF_NUM(vfnum, fun) ((1 << 7) | (((fun) & 0x1) << 6) | ((vfnum) & 0x3f))
+#define PF_NUM(fun) (((fun) & 0x1) << 6)
 
 #define RING_VECTOR(n) (0x4000 + 0x04 * (n))
 
@@ -93,6 +93,7 @@ static inline unsigned int p_rnpgbevf_rd_reg(void *reg)
 	printk(KERN_DEBUG " rd-reg: %p ==> 0x%08x\n", reg, v);
 	return v;
 }
+
 #define p_rnpgbevf_wr_reg(reg, val)                                            \
 	do {                                                                   \
 		printk(KERN_DEBUG " wr-reg: %p <== 0x%08x \t#%-4d %s\n", (reg), (val),    \

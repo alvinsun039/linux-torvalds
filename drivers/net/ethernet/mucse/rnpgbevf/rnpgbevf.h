@@ -20,7 +20,7 @@
 
 #define RNPVF_RX_DMA_ATTR (DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
 
-#if defined(CONFIG_MGBEVF_OPTM_WITH_LPAGE) && !defined(OPTM_WITH_LPAGE)
+#if defined(CONFIG_MGBEVF_OPTM_WITH_LARGE) && !defined(OPTM_WITH_LARGE)
 #define OPTM_WITH_LPAGE
 #endif
 
@@ -467,7 +467,7 @@ struct rnpgbevf_hw {
 	u32 feature_flags;
 };
 
-#define VFNUM(mbx, num) ((num)&mbx->vf_num_mask)
+#define VFNUM(mbx, num) ((num) & mbx->vf_num_mask)
 
 enum irq_mode_enum {
 	irq_mode_msix,
