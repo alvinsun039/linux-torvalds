@@ -24,7 +24,7 @@
 #define FIX_VF_QUEUE
 #endif
 
-#if defined(CONFIG_MXGBEVF_FIX_MAC_PADDIN) && !defined(FIX_MAC_PADDIN)
+#if defined(CONFIG_MXGBEVF_FIX_MAC_PADDING) && !defined(FIX_MAC_PADDING)
 #define FIX_MAC_PADDIN
 #endif
 
