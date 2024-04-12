@@ -384,6 +384,12 @@ struct vmw_display_unit {
 	bool is_implicit;
 	int set_gui_x;
 	int set_gui_y;
+
+	struct {
+		struct hrtimer timer;
+		ktime_t period_ns;
+		struct drm_pending_vblank_event *event;
+	} vkms;
 };
 
 struct vmw_validation_ctx {
@@ -400,6 +406,7 @@ struct vmw_validation_ctx {
 /*
  * Shared display unit functions - vmwgfx_kms.c
  */
+void vmw_du_init(struct vmw_display_unit *du);
 void vmw_du_cleanup(struct vmw_display_unit *du);
 void vmw_du_crtc_save(struct drm_crtc *crtc);
 void vmw_du_crtc_restore(struct drm_crtc *crtc);
@@ -485,8 +492,6 @@ void vmw_du_plane_unpin_surf(struct vmw_plane_state *vps,
 int vmw_du_crtc_atomic_check(struct drm_crtc *crtc,
 			     struct drm_atomic_state *state);
 void vmw_du_crtc_atomic_begin(struct drm_crtc *crtc,
-			      struct drm_atomic_state *state);
-void vmw_du_crtc_atomic_flush(struct drm_crtc *crtc,
 			      struct drm_atomic_state *state);
 void vmw_du_crtc_reset(struct drm_crtc *crtc);
 struct drm_crtc_state *vmw_du_crtc_duplicate_state(struct drm_crtc *crtc);
