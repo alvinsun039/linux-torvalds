@@ -1149,6 +1149,8 @@ wait_on_io:
 
 	btree_node_lock_nopath_nofail(trans, &b->c, SIX_LOCK_intent);
 	btree_node_lock_nopath_nofail(trans, &b->c, SIX_LOCK_write);
+	if (unlikely(b->hash_val != btree_ptr_hash_val(k)))
+		goto out;
 
 	if (btree_node_dirty(b)) {
 		__bch2_btree_node_write(c, b, BTREE_WRITE_cache_reclaim);
@@ -1163,7 +1165,7 @@ wait_on_io:
 	btree_node_data_free(c, b);
 	bch2_btree_node_hash_remove(bc, b);
 	mutex_unlock(&bc->lock);
-
+out:
 	six_unlock_write(&b->c.lock);
 	six_unlock_intent(&b->c.lock);
 }
