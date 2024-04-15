@@ -124,13 +124,14 @@ static inline int get_pci_sbdf_id(struct pci_dev *pdev)
 	return PCI_SEG_DEVID_TO_SBDF(seg, devid);
 }
 
-static inline void *alloc_pgtable_page(int nid, gfp_t gfp)
+static inline void *alloc_pgtable_page_noprof(int nid, gfp_t gfp)
 {
 	struct page *page;
 
-	page = alloc_pages_node(nid, gfp | __GFP_ZERO, 0);
+	page = alloc_pages_node_noprof(nid, gfp | __GFP_ZERO, 0);
 	return page ? page_address(page) : NULL;
 }
+#define alloc_pgtable_page(...)	alloc_hooks(alloc_pgtable_page_noprof(__VA_ARGS__))
 
 bool translation_pre_enabled(struct amd_iommu *iommu);
 bool amd_iommu_is_attach_deferred(struct device *dev);
