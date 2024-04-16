@@ -25,7 +25,7 @@ static char arm64_model_name[MODEL_NAME_LEN];
 
 const char *get_arm64_model_name(void)
 {
-	return kstrdup(arm64_model_name, GFP_KERNEL);
+	return arm64_model_name;
 }
 
 struct cpu_mode_desc {
@@ -33,14 +33,14 @@ struct cpu_mode_desc {
 	const char *desc;
 };
 
-typedef struct {
+struct chip_id {
 	uint32_t reg[4];
-} chip_id_t;
+};
 
 static void print_phytium_cpuid_info(struct seq_file *m)
 {
 	struct arm_smccc_res res;
-	chip_id_t chip_id;
+	struct chip_id chip_id;
 
 	arm_smccc_smc(CPU_VERSION_SMC_FUNC_ID, 0x0, 0x0, 0x0, 0, 0, 0, 0, &res);
 
