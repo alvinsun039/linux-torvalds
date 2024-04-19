@@ -146,11 +146,6 @@ static inline void vcpu_set_twed(struct kvm_vcpu *vcpu)
 static inline void vcpu_set_twed(struct kvm_vcpu *vcpu) {}
 #endif
 
-static inline void vcpu_ptrauth_enable(struct kvm_vcpu *vcpu)
-{
-	vcpu->arch.hcr_el2 |= (HCR_API | HCR_APK);
-}
-
 static inline void vcpu_ptrauth_disable(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.hcr_el2 &= ~(HCR_API | HCR_APK);
