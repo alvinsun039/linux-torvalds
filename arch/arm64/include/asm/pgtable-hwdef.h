@@ -304,6 +304,7 @@
 #define TCR_HPD0		(UL(1) << TCR_HPD0_SHIFT)
 #define TCR_HPD1_SHIFT		42
 #define TCR_HPD1		(UL(1) << TCR_HPD1_SHIFT)
+#define TCR_TBID0		(UL(1) << 51)
 #define TCR_TBID1		(UL(1) << 52)
 #define TCR_NFD0		(UL(1) << 53)
 #define TCR_NFD1		(UL(1) << 54)
