@@ -3011,6 +3011,16 @@ __bpf_kfunc int bpf_wq_set_callback_impl(struct bpf_wq *wq,
 	return __bpf_async_set_callback(async, callback_fn, aux, flags, BPF_ASYNC_TYPE_WQ);
 }
 
+__bpf_kfunc void bpf_preempt_disable(void)
+{
+	preempt_disable();
+}
+
+__bpf_kfunc void bpf_preempt_enable(void)
+{
+	preempt_enable();
+}
+
 __bpf_kfunc_end_defs();
 
 BTF_SET8_START(generic_btf_ids)
@@ -3091,6 +3101,8 @@ BTF_ID_FLAGS(func, bpf_dynptr_clone)
 BTF_ID_FLAGS(func, bpf_wq_init)
 BTF_ID_FLAGS(func, bpf_wq_set_callback_impl)
 BTF_ID_FLAGS(func, bpf_wq_start)
+BTF_ID_FLAGS(func, bpf_preempt_disable)
+BTF_ID_FLAGS(func, bpf_preempt_enable)
 BTF_ID_FLAGS(func, bpf_iter_bits_new, KF_ITER_NEW)
 BTF_ID_FLAGS(func, bpf_iter_bits_next, KF_ITER_NEXT | KF_RET_NULL)
 BTF_ID_FLAGS(func, bpf_iter_bits_destroy, KF_ITER_DESTROY)

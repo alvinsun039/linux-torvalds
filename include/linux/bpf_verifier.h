@@ -429,6 +429,7 @@ struct bpf_verifier_state {
 	struct bpf_active_lock active_lock;
 	bool speculative;
 	bool active_rcu_lock;
+	u32 active_preempt_lock;
 	bool in_sleepable;
 
 	/* first and last insn idx of this verifier state */
