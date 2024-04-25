@@ -15391,6 +15391,12 @@ lpfc_pci_probe_one(struct pci_dev *pdev, const struct pci_device_id *pid)
 	int rc;
 	struct lpfc_sli_intf intf;
 
+	if (pci_hw_disabled(klinux_disabled_pci_table, pdev))
+		return -ENODEV;
+
+	pci_hw_deprecated(klinux_deprecated_pci_table, pdev);
+	pci_hw_unmaintained(klinux_unmaintained_pci_table, pdev);
+
 	if (pci_read_config_dword(pdev, LPFC_SLI_INTF, &intf.word0))
 		return -ENODEV;
 
