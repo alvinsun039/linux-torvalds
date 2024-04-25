@@ -2684,4 +2684,11 @@ void pci_uevent_ers(struct pci_dev *pdev, enum  pci_ers_result err_type);
 	WARN_ONCE(condition, "%s %s: " fmt, \
 		  dev_driver_string(&(pdev)->dev), pci_name(pdev), ##arg)
 
+const struct pci_device_id *pci_hw_deprecated(const struct pci_device_id *ids,
+					      struct pci_dev *dev);
+const struct pci_device_id *pci_hw_unmaintained(const struct pci_device_id *ids,
+						struct pci_dev *dev);
+const struct pci_device_id *pci_hw_disabled(const struct pci_device_id *ids,
+					    struct pci_dev *dev);
+
 #endif /* LINUX_PCI_H */
