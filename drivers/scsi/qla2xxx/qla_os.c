@@ -2885,6 +2885,21 @@ static void qla2x00_iocb_work_fn(struct work_struct *work)
 	spin_unlock_irqrestore(&vha->work_lock, flags);
 }
 
+static const struct pci_device_id klinux_deprecated_pci_table[] = {
+	{0}
+};
+
+static const struct pci_device_id klinux_unmaintained_pci_table[] = {
+	{ PCI_DEVICE(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2532) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP2031) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_QLOGIC, PCI_DEVICE_ID_QLOGIC_ISP8031) },
+	{0}
+};
+
+static const struct pci_device_id klinux_disabled_pci_table[] = {
+	{0}
+};
+
 static void
 qla_trace_init(void)
 {
@@ -2924,6 +2939,12 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct req_que *req = NULL;
 	struct rsp_que *rsp = NULL;
 	int i;
+
+	if (pci_hw_disabled(klinux_disabled_pci_table, pdev))
+		return -ENODEV;
+
+	pci_hw_deprecated(klinux_deprecated_pci_table, pdev);
+	pci_hw_unmaintained(klinux_unmaintained_pci_table, pdev);
 
 	bars = pci_select_bars(pdev, IORESOURCE_MEM | IORESOURCE_IO);
 	sht = &qla2xxx_driver_template;
