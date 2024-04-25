@@ -144,6 +144,39 @@ static void megasas_get_pd_info(struct megasas_instance *instance,
 static void
 megasas_set_ld_removed_by_fw(struct megasas_instance *instance);
 
+static const struct pci_device_id klinux_deprecated_pci_table[] = {
+	{0}	/* Terminating entry */
+};
+
+static const struct pci_device_id klinux_unmaintained_pci_table[] = {
+	/* gen2 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS0079GEN2) },
+	/* skinny */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS0073SKINNY) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS0071SKINNY) },
+	/* Fusion */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_FUSION) },
+
+	{0}	/* Terminating entry */
+};
+
+static const struct pci_device_id klinux_disabled_pci_table[] = {
+	/* xscale IOP */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1064R) },
+	/* ppc IOP */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1078R) },
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1078DE) },
+	/* gen2 */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_SAS1078GEN2) },
+
+	/* xscale IOP, vega */
+	{ PCI_DEVICE(PCI_VENDOR_ID_LSI_LOGIC, PCI_DEVICE_ID_LSI_VERDE_ZCR) },
+	/* xscale IOP */
+	{ PCI_DEVICE(PCI_VENDOR_ID_DELL, PCI_DEVICE_ID_DELL_PERC5) },
+
+	{0}	/* Terminating entry */
+};
+
 /*
  * PCI ID table for all supported controllers
  */
@@ -7457,6 +7490,12 @@ static int megasas_probe_one(struct pci_dev *pdev,
 	struct Scsi_Host *host;
 	struct megasas_instance *instance;
 	u16 control = 0;
+
+	if (pci_hw_disabled(klinux_disabled_pci_table, pdev))
+		return -ENODEV;
+
+	pci_hw_deprecated(klinux_deprecated_pci_table, pdev);
+	pci_hw_unmaintained(klinux_unmaintained_pci_table, pdev);
 
 	switch (pdev->device) {
 	case PCI_DEVICE_ID_LSI_AERO_10E0:
