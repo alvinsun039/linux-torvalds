@@ -185,6 +185,8 @@ static struct cpu_mode_desc phytium_cpu_platform[] = {
 	{ PHYTIUM_CPU_D2000_8_M8C,	"Phytium,D2000/8 M8C" },
 	{ PHYTIUM_CPU_D2000_8_EN8I,	"Phytium,D2000/8 EN8I" },
 
+	{ PHYTIUM_CPU_S5000,		"Phytium,S5000" },
+
 	{ PHYTIUM_CPU_E2000,		"Phytium,FT-E2000" },
 	{ PHYTIUM_CPU_D3000,		"Phytium,FT-D3000" },
 	{ }
@@ -258,7 +260,7 @@ static int __init arm64_init_model_name(void)
 	}
 
 	/* normal arm64 */
-	sprintf(arm64_model_name, "ARMv8 Processor rev %d (%s)\n",
+	sprintf(arm64_model_name, "ARMv8 Processor rev %d (%s)",
 		MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
 
 	return 0;
