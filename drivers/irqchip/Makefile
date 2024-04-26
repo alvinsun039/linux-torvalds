@@ -125,6 +125,7 @@ obj-$(CONFIG_SUNPLUS_SP7021_INTC)	+= irq-sp7021-intc.o
 obj-$(CONFIG_PHYTIUM_IXIC)		+= irq-phytium-ixic.o
 obj-$(CONFIG_SW64_PINTC)		+= irq-sunway-pintc.o
 obj-$(CONFIG_SW64_LPC_INTC)		+= irq-sunway-lpc-intc.o
+obj-$(CONFIG_SW64_PCI_INTX)		+= irq-sunway-pci-intx.o
 obj-$(CONFIG_SW64_IRQ_CPU)		+= irq-sunway-cpu.o
 
 ifeq ($(CONFIG_UNCORE_XUELANG),y)
