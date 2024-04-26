@@ -519,5 +519,6 @@ static inline bool is_zhaoxin_kh40000(void)
 #endif
 
 void kh40000_bind_dma_direct_ops(const struct dma_map_ops **ops);
+void kh40000_bind_iommu_dma_ops(struct device *dev);
 
 #endif /* _LINUX_DMA_MAP_OPS_H */
