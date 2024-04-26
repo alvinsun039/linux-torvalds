@@ -509,4 +509,15 @@ pci_p2pdma_map_segment(struct pci_p2pdma_map_state *state, struct device *dev,
 }
 #endif /* CONFIG_PCI_P2PDMA */
 
+#if defined(CONFIG_PCI) && defined(CONFIG_X86)
+bool is_zhaoxin_kh40000(void);
+#else
+static inline bool is_zhaoxin_kh40000(void)
+{
+	return false;
+}
+#endif
+
+void kh40000_bind_dma_direct_ops(const struct dma_map_ops **ops);
+
 #endif /* _LINUX_DMA_MAP_OPS_H */
