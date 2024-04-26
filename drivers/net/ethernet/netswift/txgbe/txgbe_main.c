@@ -12330,12 +12330,6 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		goto err_sw_init;
 
 
-	err = txgbe_fw_quirks(hw);
-	if (err) {
-		e_dev_err("load firmware quirks failed: %d.\n", err);
-		goto err_sw_init;
-	}
-
 #if defined(HAVE_UDP_ENC_RX_OFFLOAD) && defined(HAVE_UDP_TUNNEL_NIC_INFO)
 	netdev->udp_tunnel_nic_info = &txgbe_udp_tunnels;
 #endif
