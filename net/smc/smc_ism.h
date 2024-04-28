@@ -84,4 +84,9 @@ static inline bool smc_ism_is_virtual(struct smcd_dev *smcd)
 	return __smc_ism_is_virtual(chid);
 }
 
+static inline bool smc_ism_is_loopback(struct smcd_dev *smcd)
+{
+	return (smcd->ops->get_chid(smcd) == 0xFFFF);
+}
+
 #endif
