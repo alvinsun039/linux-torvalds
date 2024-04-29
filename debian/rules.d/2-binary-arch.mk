@@ -20,7 +20,7 @@ $(stampdir)/stamp-prepare-%: config-prepare-check-%
 	@echo Debug: $@
 	@touch $@
 $(stampdir)/stamp-prepare-tree-%: target_flavour = $*
-$(stampdir)/stamp-prepare-tree-%: $(archconfdir)/%_defconfig debian/scripts/fix-filenames
+$(stampdir)/stamp-prepare-tree-%: $(archconfdir)/openkylin_%_defconfig debian/scripts/fix-filenames
 	@echo Debug: $@
 	install -d $(builddir)/build-$*
 	touch $(builddir)/build-$*/linux-build
