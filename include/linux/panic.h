@@ -89,7 +89,7 @@ static inline void set_arch_panic_timeout(int timeout, int arch_default_timeout)
 #define TAINT_UNPRIVILEGED_BPF		31
 /* End */
 #define TAINT_FLAGS_COUNT		32
-#define TAINT_FLAGS_MAX			((1UL << TAINT_FLAGS_COUNT) - 1)
+#define TAINT_FLAGS_MAX			((1ULL << TAINT_FLAGS_COUNT) - 1)
 
 struct taint_flag {
 	char c_true;	/* character printed when tainted */
