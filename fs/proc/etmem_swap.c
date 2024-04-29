@@ -56,7 +56,7 @@ static ssize_t swap_pages_write(struct file *file, const char __user *buf,
 	}
 
 	if (!list_empty(&pagelist))
-		reclaim_pages(&pagelist, true);
+		reclaim_pages(&pagelist);
 
 	ret = count;
 	kfree(data_ptr_res);
