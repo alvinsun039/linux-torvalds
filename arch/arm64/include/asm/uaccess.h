@@ -438,7 +438,7 @@ static inline size_t probe_subpage_writeable(const char __user *uaddr,
 static inline unsigned long __must_check
 copy_mc_to_kernel(void *to, const void *from, unsigned long size)
 {
-	int ret;
+	unsigned long ret;
 
 	ret = memcpy_mcs(to, from, size);
 	return (ret == -EFAULT) ? size : 0;

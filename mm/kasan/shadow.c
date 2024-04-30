@@ -81,10 +81,10 @@ void *memcpy(void *dest, const void *src, size_t len)
 
 #ifdef __HAVE_ARCH_MEMCPY_MC
 #undef memcpy_mcs
-int memcpy_mcs(void *dest, const void *src, size_t len)
+unsigned long memcpy_mcs(void *dest, const void *src, size_t len)
 {
-	if (!check_memory_region((unsigned long)src, len, false, _RET_IP_) ||
-	    !check_memory_region((unsigned long)dest, len, true, _RET_IP_))
+	if (!kasan_check_range(src, len, false, _RET_IP_) ||
+	    !kasan_check_range(dest, len, true, _RET_IP_))
 		return (unsigned long)len;
 
 	return __memcpy_mcs(dest, src, len);
