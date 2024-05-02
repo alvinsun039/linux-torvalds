@@ -45,4 +45,18 @@ config TXGBE
 	  To compile this driver as a module, choose M here. The module
 	  will be called txgbe.
 
+config TXGBEVF
+	tristate "Wangxun(R) 10GbE PCI Express adapters virtual function"
+	default m
+	depends on PCI
+	help
+	  This driver supports Wangxun(R) 10GbE PCI Express family of
+	  adapters.
+
+	  More specific information on configuring the driver is in
+	  <file:Documentation/networking/device_drivers/ethernet/wangxun/txgbe.rst>.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called txgbevf.
+
 endif # NET_VENDOR_WANGXUN
