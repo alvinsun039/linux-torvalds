@@ -59,4 +59,18 @@ config TXGBEVF
 	  To compile this driver as a module, choose M here. The module
 	  will be called txgbevf.
 
+config NGBEVF
+	tristate "Wangxun(R) 1GbE PCI Express adapters virtual function"
+	default m
+	depends on PCI
+	help
+	  This driver supports Wangxun(R) 1GbE PCI Express family of
+	  adapters.
+
+	  More specific information on configuring the driver is in
+	  <file:Documentation/networking/device_drivers/ethernet/wangxun/ngbe.rst>.
+
+	  To compile this driver as a module, choose M here. The module
+	  will be called ngbevf.
+
 endif # NET_VENDOR_WANGXUN
