@@ -3030,7 +3030,19 @@ static int svm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr)
 		if (ret)
 			break;
 
-		svm->vmcb01.ptr->save.g_pat = data;
+		if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+			/* Unlike Intel, AMD takes the guest's CR0.CD into count.
+			*
+			* AMD does not have IPAT. To emulate it for the case of guests
+			* with no assigned devices,just set everything to WB. If guests
+			* have assigned devices,however,we cannot force WB for RAM
+			* pages only,so use the guest PAT directly.
+			*/
+			svm->vmcb01.ptr->save.g_pat = 0x0606060606060606;
+		} else {
+			svm->vmcb01.ptr->save.g_pat = data;
+		}
+
 		if (is_guest_mode(vcpu))
 			nested_vmcb02_compute_g_pat(svm);
 		vmcb_mark_dirty(svm->vmcb, VMCB_NPT);
