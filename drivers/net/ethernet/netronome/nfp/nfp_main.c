@@ -968,6 +968,8 @@ static int nfp_pci_probe(struct pci_dev *pdev,
 	struct nfp_pf *pf;
 	int err;
 
+	mark_partner_supported("NFP", "Corigine, Inc.", THIS_MODULE);
+
 	if ((pdev->vendor == PCI_VENDOR_ID_NETRONOME ||
 	     pdev->vendor == PCI_VENDOR_ID_CORIGINE) &&
 	    (pdev->device == PCI_DEVICE_ID_NFP3800_VF ||
