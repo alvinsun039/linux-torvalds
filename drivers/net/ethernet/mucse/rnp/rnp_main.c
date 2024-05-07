@@ -7017,6 +7017,8 @@ static int rnp_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct rnp_info *ii = rnp_info_tbl[id->driver_data];
 	int err;
 
+	mark_partner_supported_once(NULL, "MUCSE", THIS_MODULE);
+
 	/* Catch broken hardware that put the wrong VF device ID in
 	 * the PCIe SR-IOV capability.
 	 */
