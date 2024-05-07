@@ -435,6 +435,8 @@
 	arm64.nosve	[ARM64] Unconditionally disable Scalable Vector
 			Extension support
 
+	asciilogo	Enable YHKylin Logo on console output
+
 	ataflop=	[HW,M68k]
 
 	atarimouse=	[HW,MOUSE] Atari Mouse
