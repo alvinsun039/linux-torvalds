@@ -11815,6 +11815,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		u16 pvalue = 0;
 #endif
 
+	mark_partner_supported_once(NULL, "WANGXUN", THIS_MODULE);
+
 	err = pci_enable_device_mem(pdev);
 	if (err)
 		return err;
