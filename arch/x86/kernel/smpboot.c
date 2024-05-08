@@ -584,22 +584,34 @@ static inline int x86_sched_itmt_flags(void)
 	return sysctl_sched_itmt_enabled ? SD_ASYM_PACKING : 0;
 }
 
+static inline int zhaoxin_kh40000_sched_flags(void)
+{
+	if ((boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR ||
+	     boot_cpu_data.x86_vendor == X86_VENDOR_ZHAOXIN) &&
+	    (boot_cpu_data.x86 == 7 && boot_cpu_data.x86_model == 0x5b))
+		return SD_ASYM_PACKING;
+
+	return 0;
+}
+
 #ifdef CONFIG_SCHED_MC
 static int x86_core_flags(void)
 {
-	return cpu_core_flags() | x86_sched_itmt_flags();
+	return cpu_core_flags() | x86_sched_itmt_flags() |
+	       zhaoxin_kh40000_sched_flags();
 }
 #endif
 #ifdef CONFIG_SCHED_SMT
 static int x86_smt_flags(void)
 {
-	return cpu_smt_flags();
+	return cpu_smt_flags() | zhaoxin_kh40000_sched_flags();
 }
 #endif
 #ifdef CONFIG_SCHED_CLUSTER
 static int x86_cluster_flags(void)
 {
-	return cpu_cluster_flags() | x86_sched_itmt_flags();
+	return cpu_cluster_flags() | x86_sched_itmt_flags() |
+	       zhaoxin_kh40000_sched_flags();
 }
 #endif
 
@@ -608,7 +620,7 @@ static int x86_die_flags(void)
 	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU))
 	       return x86_sched_itmt_flags();
 
-	return 0;
+	return 0 | zhaoxin_kh40000_sched_flags();
 }
 
 /*
