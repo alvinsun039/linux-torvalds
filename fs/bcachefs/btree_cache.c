@@ -882,7 +882,6 @@ static struct btree *__bch2_btree_node_get(struct btree_trans *trans, struct btr
 	struct bch_fs *c = trans->c;
 	struct btree_cache *bc = &c->btree_cache;
 	struct btree *b;
-	struct bset_tree *t;
 	bool need_relock = false;
 	int ret;
 
@@ -1002,7 +1001,6 @@ struct btree *bch2_btree_node_get(struct btree_trans *trans, struct btree_path *
 {
 	struct bch_fs *c = trans->c;
 	struct btree *b;
-	struct bset_tree *t;
 	int ret;
 
 	EBUG_ON(level >= BTREE_MAX_DEPTH);
@@ -1079,7 +1077,6 @@ struct btree *bch2_btree_node_get_noiter(struct btree_trans *trans,
 	struct bch_fs *c = trans->c;
 	struct btree_cache *bc = &c->btree_cache;
 	struct btree *b;
-	struct bset_tree *t;
 	int ret;
 
 	EBUG_ON(level >= BTREE_MAX_DEPTH);
