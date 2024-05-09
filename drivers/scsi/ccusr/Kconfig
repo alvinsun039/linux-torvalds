@@ -1,0 +1,15 @@
+#
+# Kernel configuration file for the CCUSR
+#
+
+config CCUSR_RAID
+	tristate "CCUSR raid Adapter"
+	depends on PCI && SCSI
+	select BLK_DEV_BSGLIB
+	depends on ARM64 || X86_64
+	default m
+	help
+	  This driver supports ccuser serial RAID controller, which has
+	  PCI Express Gen4 interface with host and supports SAS/SATA HDD/SSD.
+	  To compile this driver as a module, choose M here: the module will
+	  be called ccusr.
