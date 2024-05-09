@@ -1120,7 +1120,7 @@ done:
 }
 
 static int iso_sock_accept(struct socket *sock, struct socket *newsock,
-			   int flags, bool kern)
+			   struct proto_accept_arg *arg)
 {
 	DEFINE_WAIT_FUNC(wait, woken_wake_function);
 	struct sock *sk = sock->sk, *ch;
@@ -1133,7 +1133,7 @@ static int iso_sock_accept(struct socket *sock, struct socket *newsock,
 	 */
 	lock_sock_nested(sk, SINGLE_DEPTH_NESTING);
 
-	timeo = sock_rcvtimeo(sk, flags & O_NONBLOCK);
+	timeo = sock_rcvtimeo(sk, arg->flags & O_NONBLOCK);
 
 	BT_DBG("sk %p timeo %ld", sk, timeo);
 

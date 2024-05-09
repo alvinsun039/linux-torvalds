@@ -423,7 +423,8 @@ unlock:
 	return err;
 }
 
-int af_alg_accept(struct sock *sk, struct socket *newsock, bool kern)
+int af_alg_accept(struct sock *sk, struct socket *newsock,
+		  struct proto_accept_arg *arg)
 {
 	struct alg_sock *ask = alg_sk(sk);
 	const struct af_alg_type *type;
@@ -438,7 +439,7 @@ int af_alg_accept(struct sock *sk, struct socket *newsock, bool kern)
 	if (!type)
 		goto unlock;
 
-	sk2 = sk_alloc(sock_net(sk), PF_ALG, GFP_KERNEL, &alg_proto, kern);
+	sk2 = sk_alloc(sock_net(sk), PF_ALG, GFP_KERNEL, &alg_proto, arg->kern);
 	err = -ENOMEM;
 	if (!sk2)
 		goto unlock;
@@ -484,10 +485,10 @@ unlock:
 }
 EXPORT_SYMBOL_GPL(af_alg_accept);
 
-static int alg_accept(struct socket *sock, struct socket *newsock, int flags,
-		      bool kern)
+static int alg_accept(struct socket *sock, struct socket *newsock,
+		      struct proto_accept_arg *arg)
 {
-	return af_alg_accept(sock->sk, newsock, kern);
+	return af_alg_accept(sock->sk, newsock, arg);
 }
 
 static const struct proto_ops alg_proto_ops = {
