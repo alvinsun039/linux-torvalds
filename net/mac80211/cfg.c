@@ -4031,7 +4031,7 @@ __ieee80211_channel_switch(struct wiphy *wiphy, struct net_device *dev,
 	}
 
 	cfg80211_ch_switch_started_notify(sdata->dev,
-					  &link_data->csa.chanreq.oper, 0,
+					  &link_data->csa.chanreq.oper, link_id,
 					  params->count, params->block_tx);
 
 	if (changed) {
