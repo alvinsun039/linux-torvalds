@@ -71,6 +71,7 @@ struct io_uring_sqe {
 		__u32		uring_cmd_flags;
 		__u32		waitid_flags;
 		__u32		futex_flags;
+		__u32		nop_flags;
 	};
 	__u64	user_data;	/* data to be passed back at completion time */
 	/* pack this to avoid bogus arm OABI complaints */
@@ -397,6 +398,13 @@ enum {
 #define IORING_MSG_RING_CQE_SKIP	(1U << 0)
 /* Pass through the flags from sqe->file_index to cqe->flags */
 #define IORING_MSG_RING_FLAGS_PASS	(1U << 1)
+
+/*
+ * IORING_OP_NOP flags (sqe->nop_flags)
+ *
+ * IORING_NOP_INJECT_RESULT	Inject result from sqe->result
+ */
+#define IORING_NOP_INJECT_RESULT	(1U << 0)
 
 /*
  * IO completion data structure (Completion Queue Entry)
