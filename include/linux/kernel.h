@@ -460,4 +460,16 @@ extern void mark_tech_preview(const char *msg, struct module *mod);
 extern void mark_partner_supported(const char *msg, const char *partner,
 				   struct module *mod);
 
+static __always_inline void mark_partner_supported_once(const char *msg,
+							const char *partner,
+							struct module *mod)
+{
+	static bool __section(".data.once") __already_done;
+
+	if (!__already_done) {
+		mark_partner_supported(msg, partner, mod);
+		__already_done = true;
+	}
+}
+
 #endif
