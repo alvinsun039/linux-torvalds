@@ -27,6 +27,7 @@
 /**
  * mark_hardware_unmaintained() - Mark hardware as unmaintained.
  * @driver_name: driver name
+ * @mod: module pointer
  * @fmt: format for device description
  * @...: args for device description
  *
@@ -40,15 +41,25 @@
  * specific hardware device. For example, a network device driver loading on a
  * specific device that is no longer maintained by the manufacturer.
  */
-void mark_hardware_unmaintained(const char *driver_name, char *fmt, ...)
+void mark_hardware_unmaintained(const char *driver_name, struct module *mod,
+				char *fmt, ...)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
 	char device_description[DEV_DESC_LEN];
 	va_list args;
+	const char *name = NULL;
+
+	if (driver_name)
+		name = driver_name;
+#ifdef CONFIG_MODULES
+	else if (mod)
+		name = mod->name;
+#endif
 
 	va_start(args, fmt);
 	vsnprintf(device_description, DEV_DESC_LEN, fmt, args);
-	pr_crit("Warning: Unmaintained hardware is detected:  %s:%s\n", driver_name,
+	pr_crit("Warning: Unmaintained hardware is detected: %s:%s\n",
+		name ?: "Kernel",
 		device_description);
 	va_end(args);
 #endif /* CONFIG_KYLIN_DIFFERENCES */
@@ -58,6 +69,7 @@ EXPORT_SYMBOL(mark_hardware_unmaintained);
 /**
  * mark_driver_unmaintained() - Mark a driver as unmaintained.
  * @driver_name: driver name
+ * @mod: module pointer
  *
  * Called to notify users that a driver will no longer be tested on a routine
  * basis and the driver code is no longer being updated. KLAS/KLAD may fix
@@ -69,10 +81,20 @@ EXPORT_SYMBOL(mark_hardware_unmaintained);
  * specific hardware device. For example, a network bonding driver or a higher
  * level storage layer driver that is no longer maintained upstream.
  */
-void mark_driver_unmaintained(const char *driver_name)
+void mark_driver_unmaintained(const char *driver_name, struct module *mod)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
-	pr_crit("Warning: Unmaintained driver is detected:  %s\n", driver_name);
+	const char *name = NULL;
+
+	if (driver_name)
+		name = driver_name;
+#ifdef CONFIG_MODULES
+	else if (mod)
+		name = mod->name;
+#endif
+
+	pr_crit("Warning: Unmaintained driver is detected: %s\n",
+		name ?: "Kernel");
 #endif /* CONFIG_KYLIN_DIFFERENCES */
 }
 EXPORT_SYMBOL(mark_driver_unmaintained);
@@ -80,6 +102,7 @@ EXPORT_SYMBOL(mark_driver_unmaintained);
 /**
  * mark_hardware_deprecated() - Mark hardware as deprecated.
  * @driver_name: driver name
+ * @mod: module pointer
  * @fmt: format for device description
  * @...: args for device description
  *
@@ -92,17 +115,26 @@ EXPORT_SYMBOL(mark_driver_unmaintained);
  * specific hardware device. For example, a network device driver loading on a
  * specific device that is no longer maintained by the manufacturer.
  */
-void mark_hardware_deprecated(const char *driver_name, char *fmt, ...)
+void mark_hardware_deprecated(const char *driver_name, struct module *mod,
+			      char *fmt, ...)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
 	char device_description[DEV_DESC_LEN];
 	va_list args;
+	const char *name = NULL;
+
+	if (driver_name)
+		name = driver_name;
+#ifdef CONFIG_MODULES
+	else if (mod)
+		name = mod->name;
+#endif
 
 	va_start(args, fmt);
 	vsnprintf(device_description, DEV_DESC_LEN, fmt, args);
 	pr_crit("Warning: Deprecated Hardware is detected: %s:%s will not be "
 		"maintained in a future major release and may be disabled.\n",
-		driver_name, device_description);
+		name ?: "Kernel", device_description);
 	va_end(args);
 #endif /* CONFIG_KYLIN_DIFFERENCES */
 }
@@ -111,6 +143,7 @@ EXPORT_SYMBOL(mark_hardware_deprecated);
 /**
  * mark_driver_deprecated() - Mark a driver as deprecated.
  * @driver_name: driver name
+ * @mod: module pointer
  *
  * Called to notify users that support for this driver is planned to be
  * unmaintained in a future major release, and will eventually be disabled in a
@@ -122,12 +155,21 @@ EXPORT_SYMBOL(mark_hardware_deprecated);
  * specific hardware device. For example, a network bonding driver or a higher
  * level storage layer driver that is no longer maintained upstream.
  */
-void mark_driver_deprecated(const char *driver_name)
+void mark_driver_deprecated(const char *driver_name, struct module *mod)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
+	const char *name = NULL;
+
+	if (driver_name)
+		name = driver_name;
+#ifdef CONFIG_MODULES
+	else if (mod)
+		name = mod->name;
+#endif
+
 	pr_crit("Warning: Deprecated Driver is detected: %s will not be "
 		"maintained in a future major release and may be disabled.\n",
-		driver_name);
+		name ?: "Kernel");
 #endif /* CONFIG_KYLIN_DIFFERENCES */
 }
 EXPORT_SYMBOL(mark_driver_deprecated);
@@ -135,6 +177,7 @@ EXPORT_SYMBOL(mark_driver_deprecated);
 /**
  * mark_hardware_disabled() - Mark a driver as removed.
  * @driver_name: driver name
+ * @mod: module pointer
  * @fmt: format for device description
  * @...: args for device description
  *
@@ -147,17 +190,26 @@ EXPORT_SYMBOL(mark_driver_deprecated);
  * specific hardware device. For example, a network device driver loading on a
  * specific device that is no longer maintained by the manufacturer.
  */
-void mark_hardware_disabled(const char *driver_name, char *fmt, ...)
+void mark_hardware_disabled(const char *driver_name, struct module *mod,
+			    char *fmt, ...)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
 	char device_description[DEV_DESC_LEN];
 	va_list args;
+	const char *name = NULL;
+
+	if (driver_name)
+		name = driver_name;
+#ifdef CONFIG_MODULES
+	else if (mod)
+		name = mod->name;
+#endif
 
 	va_start(args, fmt);
 	vsnprintf(device_description, DEV_DESC_LEN, fmt, args);
 	pr_crit("Warning: Disabled Hardware is detected: %s:%s is no longer "
 		"enabled in this release.\n",
-		driver_name, device_description);
+		name ?: "Kernel", device_description);
 	va_end(args);
 #endif /* CONFIG_KYLIN_DIFFERENCES */
 }
@@ -209,7 +261,8 @@ EXPORT_SYMBOL(mark_tech_preview);
  * kernel. Calling this function indicates that the driver or subsystem has
  * is not supported directly by KYLIN but by a partner engineer.
  */
-void mark_partner_supported(const char *msg, const char *partner, struct module *mod)
+void mark_partner_supported(const char *msg, const char *partner,
+			    struct module *mod)
 {
 #ifdef CONFIG_KYLIN_DIFFERENCES
 	const char *str = NULL;
@@ -221,7 +274,7 @@ void mark_partner_supported(const char *msg, const char *partner, struct module 
 		str = mod->name;
 #endif
 
-	pr_warn("Warning: %s is a Partner (%s) supported module and not supported "
+	pr_warn("Warning: %s is a partner (%s) supported and not supported "
 		"directly by KylinSoft Corporation.\n",
 		str ?: "Kernel", partner ?: "Unknown");
 	add_taint(TAINT_PARTNER_SUPPORTED, LOCKDEP_STILL_OK);

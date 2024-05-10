@@ -448,12 +448,16 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 	 (perms))
 
 struct module;
-void mark_hardware_unmaintained(const char *driver_name, char *fmt, ...);
-void mark_driver_unmaintained(const char *driver_name);
-void mark_hardware_deprecated(const char *driver_name, char *fmt, ...);
-void mark_driver_deprecated(const char *driver_name);
-void mark_hardware_disabled(const char *driver_name, char *fmt, ...);
-void mark_tech_preview(const char *msg, struct module *mod);
-void mark_partner_supported(const char *msg, const char *partner, struct module *mod);
+extern void mark_hardware_unmaintained(const char *driver_name,
+				       struct module *mod, char *fmt, ...);
+extern void mark_driver_unmaintained(const char *driver_name, struct module *mod);
+extern void mark_hardware_deprecated(const char *driver_name,
+				     struct module *mod, char *fmt, ...);
+extern void mark_driver_deprecated(const char *driver_name, struct module *mod);
+extern void mark_hardware_disabled(const char *driver_name, struct module *mod,
+				   char *fmt, ...);
+extern void mark_tech_preview(const char *msg, struct module *mod);
+extern void mark_partner_supported(const char *msg, const char *partner,
+				   struct module *mod);
 
 #endif

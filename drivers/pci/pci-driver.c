@@ -317,8 +317,10 @@ const struct pci_device_id *pci_hw_deprecated(const struct pci_device_id *ids,
 	if (!ret)
 		return NULL;
 
-	mark_hardware_deprecated(dev_driver_string(&dev->dev), "%04X:%04X @ %s",
-				 dev->device, dev->vendor, pci_name(dev));
+	mark_hardware_deprecated(dev_driver_string(&dev->dev), NULL,
+				 "%04X:%04X @ %s", dev->device, dev->vendor,
+				 pci_name(dev));
+
 	return ret;
 #else
 	return NULL;
@@ -346,8 +348,10 @@ const struct pci_device_id *pci_hw_unmaintained(const struct pci_device_id *ids,
 	if (!ret)
 		return NULL;
 
-	mark_hardware_unmaintained(dev_driver_string(&dev->dev), "%04X:%04X @ %s",
-				   dev->device, dev->vendor, pci_name(dev));
+	mark_hardware_unmaintained(dev_driver_string(&dev->dev), NULL,
+				   "%04X:%04X @ %s", dev->device, dev->vendor,
+				   pci_name(dev));
+
 	return ret;
 #else
 	return NULL;
@@ -375,8 +379,10 @@ const struct pci_device_id *pci_hw_disabled(const struct pci_device_id *ids,
 	if (!ret)
 		return NULL;
 
-	mark_hardware_disabled(dev_driver_string(&dev->dev), "%04X:%04X @ %s",
-			       dev->device, dev->vendor, pci_name(dev));
+	mark_hardware_disabled(dev_driver_string(&dev->dev), NULL,
+			       "%04X:%04X @ %s", dev->device, dev->vendor,
+			       pci_name(dev));
+
 	return ret;
 #else
 	return NULL;
