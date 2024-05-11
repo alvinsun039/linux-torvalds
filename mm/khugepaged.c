@@ -131,6 +131,8 @@ static struct khugepaged_scan khugepaged_scan = {
 
 /* khugepaged should scan or not, trying to be thp, default as false */
 static unsigned int khugepaged_thp_scan_state;
+/* khugepaged adopt feature default set as false */
+static unsigned int khugepaged_adapt_enable;
 static void set_recommended_min_free_kbytes(void);
 
 #ifdef CONFIG_SYSFS
@@ -2555,6 +2557,9 @@ static void khugepaged_wait_work(void)
 
 static int khugepaged_threshold_suit(void)
 {
+	/* khugepaged_adopt feature enable? */
+	if (!khugepaged_adapt_enable)
+		return false;
 	/* PAGE & THP size threshold check */
 	if (PAGE_SIZE == SZ_64K && (PAGE_SIZE << HPAGE_PMD_ORDER) >= SZ_512M)
 		return true;
@@ -2580,6 +2585,28 @@ static void khugepaged_update_wmarks(void)
 		khugepaged_thp_scan_state = false;
 	}
 }
+
+static int __init setup_khugepaged_adapt(char *str)
+{
+	int ret = 0;
+
+	if (!str)
+		goto out;
+
+	if (!strcmp(str, "enable")) {
+		khugepaged_adapt_enable = true;
+		ret = 1;
+	} else if (!strcmp(str, "disable")) {
+		khugepaged_adapt_enable = false;
+		ret = 1;
+	}
+out:
+	if (!ret)
+		pr_warn("Unable to parse khugepaged_adapt=\n");
+
+	return ret;
+}
+__setup("khugepaged_adapt=", setup_khugepaged_adapt);
 
 static int khugepaged(void *none)
 {
