@@ -28,6 +28,7 @@
 #include <linux/rwsem.h>
 #include <linux/cc_platform.h>
 #include <linux/smp.h>
+#include <linux/iommu.h>
 
 #include <asm/apic.h>
 #include <asm/perf_event.h>
@@ -3030,7 +3031,8 @@ static int svm_set_msr(struct kvm_vcpu *vcpu, struct msr_data *msr)
 		if (ret)
 			break;
 
-		if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+		/* cannot used in passthrough mode */
+		if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON && !iommu_default_passthrough()) {
 			/* Unlike Intel, AMD takes the guest's CR0.CD into count.
 			*
 			* AMD does not have IPAT. To emulate it for the case of guests
