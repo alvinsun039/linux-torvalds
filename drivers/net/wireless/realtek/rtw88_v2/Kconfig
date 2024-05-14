@@ -1,14 +1,13 @@
-# SPDX-License-Identifier: GPL-2.0-only
-menuconfig RTW88
-	tristate "Realtek 802.11ac wireless chips support"
-	depends on MAC80211 && (RTW88_V2 = n)
+menuconfig RTW88_V2
+	tristate "Realtek 802.11ac v2 wireless chips support"
+	depends on MAC80211
 	help
 	  This module adds support for mac80211-based wireless drivers that
 	  enables Realtek IEEE 802.11ac wireless chipsets.
 
-	  If you choose to build a module, it'll be called rtw88.
+	  If you choose to build a module, it'll be called rtw88_v2.
 
-if RTW88
+if RTW88_V2
 
 config RTW88_CORE
 	tristate
@@ -28,8 +27,16 @@ config RTW88_8822B
 config RTW88_8822C
 	tristate
 
+config RTW88_8723X
+	tristate
+
+config RTW88_8703B
+	tristate
+	select RTW88_8723X
+
 config RTW88_8723D
 	tristate
+	select RTW88_8723X
 
 config RTW88_8821C
 	tristate
@@ -121,6 +128,20 @@ config RTW88_8723DS
 	  Select this option will enable support for 8723DS chipset
 
 	  802.11n SDIO wireless network adapter
+
+config RTW88_8723CS
+	tristate "Realtek 8723CS SDIO wireless network adapter"
+	depends on MMC
+	select RTW88_CORE
+	select RTW88_SDIO
+	select RTW88_8703B
+	help
+	  Select this option to enable support for 8723CS chipset (EXPERIMENTAL)
+
+	  This module adds support for the 8723CS 802.11n SDIO
+	  wireless network adapter.
+
+	  If you choose to build a module, it'll be called rtw88_8723cs.
 
 config RTW88_8723DU
 	tristate "Realtek 8723DU USB wireless network adapter"
