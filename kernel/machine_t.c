@@ -84,3 +84,9 @@ bool __weak is_vendor_hisilicon(void)
 	return false;
 }
 EXPORT_SYMBOL(is_vendor_hisilicon);
+
+bool __weak is_vendor_hygon(void)
+{
+	return false;
+}
+EXPORT_SYMBOL(is_vendor_hygon);

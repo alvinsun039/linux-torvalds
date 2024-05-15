@@ -27,5 +27,6 @@ bool is_cpu_kunpeng920(void);
 /* Vendor */
 bool is_vendor_phytium(void);
 bool is_vendor_hisilicon(void);
+bool is_vendor_hygon(void);
 
 #endif // __MACHINE_TYPE_H_
