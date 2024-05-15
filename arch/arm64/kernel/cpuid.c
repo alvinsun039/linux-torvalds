@@ -252,7 +252,8 @@ static int __init arm64_init_model_name(void)
 
 	/* Use dmi information default in phytium platform. */
 	if (is_vendor_phytium() &&
-	    !dmi_walk(find_dmi_processor_version, arm64_model_name))
+	    !dmi_walk(find_dmi_processor_version, arm64_model_name) &&
+	    arm64_model_name[0])
 		return 0;
 
 	/* get desc from defined array */
