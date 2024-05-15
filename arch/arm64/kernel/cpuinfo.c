@@ -10,7 +10,6 @@
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
 #include <asm/fpsimd.h>
-#include <asm/machine_t.h>
 
 #include <linux/bitops.h>
 #include <linux/bug.h>
@@ -190,7 +189,15 @@ static int c_show(struct seq_file *m, void *v)
 		 * "processor".  Give glibc what it expects.
 		 */
 		seq_printf(m, "processor\t: %d\n", i);
+
+#ifdef CONFIG_KYLIN_DIFFERENCES
+		extern const char *get_arm64_model_name(void);
 		seq_printf(m, "model name\t: %s\n", get_arm64_model_name());
+#else
+		if (compat)
+			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
+				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
+#endif
 
 		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
 			   loops_per_jiffy / (500000UL/HZ),

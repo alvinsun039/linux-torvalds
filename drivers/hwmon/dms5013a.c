@@ -21,7 +21,7 @@
 #include <linux/sysfs.h>
 #include <linux/delay.h>
 #include <linux/io.h>
-#include <asm/machine_t.h>
+#include <linux/machine_t.h>
 
 #define DRVNAME			"dms5013a"
 #undef pr_fmt
@@ -186,7 +186,7 @@ static int dms5013a_init(void)
 	struct platform_data *pdata;
 	int ret, node_id;
 
-	if (!is_ft2000plus())
+	if (!is_cpu_ft2000plus())
 		return -ENODEV;
 
 	pdev = platform_device_alloc(DRVNAME, -1);

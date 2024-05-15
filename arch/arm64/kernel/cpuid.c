@@ -10,9 +10,11 @@
  */
 #include <linux/seq_file.h>
 #include <linux/arm-smccc.h>
-#include <asm/machine_t.h>
+#include <linux/machine_t.h>
 #include <linux/elf.h>
 #include <linux/dmi.h>
+
+#include <asm/phytium_platform.h>
 
 #define CPU_VERSION_SMC_FUNC_ID		0xC2000002
 #define DMI_PROCESSOR_VERSION_OFFSET	0x10
@@ -20,9 +22,9 @@
 #define MODEL_NAME_LEN			64
 
 static u64 phytium_cpu_version;
+
 /* CPU model name in cpuinfo */
 static char arm64_model_name[MODEL_NAME_LEN];
-
 const char *get_arm64_model_name(void)
 {
 	return arm64_model_name;
@@ -59,7 +61,7 @@ static void print_phytium_cpuid_info(struct seq_file *m)
 
 void print_cpuid_info(struct seq_file *m)
 {
-	if (is_ft_all())
+	if (is_vendor_phytium())
 		return print_phytium_cpuid_info(m);
 }
 
@@ -132,7 +134,7 @@ static u32 phytium_cpu_version_init(void)
 
 void __init cpu_version_init(void)
 {
-	if (read_cpuid_implementor() == ARM_CPU_IMP_PHYTIUM)
+	if (is_vendor_phytium())
 		phytium_cpu_version = phytium_cpu_version_init();
 }
 
@@ -198,7 +200,7 @@ static const char *arm64_get_cpu_desc_from_array(u32 midr)
 	u32 model = midr & MIDR_CPU_MODEL_MASK;
 
 	/* use phytium cpu version */
-	if (is_ft_all() && phytium_cpu_version) {
+	if (is_vendor_phytium() && phytium_cpu_version) {
 		for (i = 0; phytium_cpu_platform[i].desc; i++) {
 			if (phytium_cpu_platform[i].model == phytium_cpu_version)
 				return phytium_cpu_platform[i].desc;
@@ -249,7 +251,8 @@ static int __init arm64_init_model_name(void)
 	u32 midr = read_cpuid_id();
 
 	/* Use dmi information default in phytium platform. */
-	if (is_ft_all() && !dmi_walk(find_dmi_processor_version, arm64_model_name))
+	if (is_vendor_phytium() &&
+	    !dmi_walk(find_dmi_processor_version, arm64_model_name))
 		return 0;
 
 	/* get desc from defined array */

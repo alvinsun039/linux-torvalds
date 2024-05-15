@@ -53,7 +53,6 @@
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/mmu_context.h>
-#include <asm/machine_t.h>
 
 static int num_standard_resources;
 static struct resource *standard_resources;
@@ -357,8 +356,11 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	bootmem_init();
 
+#ifdef CONFIG_KYLIN_DIFFERENCES
 	/* Try to read cpu version. */
+	extern void cpu_version_init(void);
 	cpu_version_init();
+#endif
 
 	kasan_init();
 
