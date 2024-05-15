@@ -393,7 +393,7 @@ err_out:
 static int rnp_pci_sriov_disable(struct pci_dev *dev)
 {
 	struct rnp_adapter *adapter = pci_get_drvdata(dev);
-	int err;
+	int err = 0;
 #ifdef CONFIG_PCI_IOV
 	u32 current_flags = adapter->flags;
 #endif
@@ -406,8 +406,8 @@ static int rnp_pci_sriov_disable(struct pci_dev *dev)
 		/* rnp_disable_sriov() doesn't clear VMDQ flag */
 		adapter->flags &= ~RNP_FLAG_VMDQ_ENABLED;
 		rnp_sriov_reinit(adapter);
-#endif
 	}
+#endif
 
 	return err;
 }

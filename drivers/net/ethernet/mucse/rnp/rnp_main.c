@@ -7055,9 +7055,9 @@ static pci_ers_result_t rnp_io_error_detected(struct pci_dev *pdev,
 {
 	struct rnp_adapter *adapter = pci_get_drvdata(pdev);
 	struct net_device *netdev = adapter->netdev;
-	struct rnp_hw *hw = &adapter->hw;
 
 #ifdef CONFIG_PCI_IOV
+	struct rnp_hw *hw = &adapter->hw;
 	struct pci_dev *bdev, *vfdev;
 	u32 dw0, dw1, dw2, dw3;
 	int vf, pos;
