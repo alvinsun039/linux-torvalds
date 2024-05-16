@@ -687,6 +687,7 @@ static void __init apple_airport_reset(int bus, int slot, int func)
 	early_iounmap(mmio, BCM4331_MMIO_SIZE);
 }
 
+#if IS_BUILTIN(CONFIG_PCI) && IS_BUILTIN(CONFIG_X86_64)
 bool __ro_after_init zhaoxin_kh40000;
 
 bool is_zhaoxin_kh40000(void)
@@ -708,6 +709,15 @@ static void __init quirk_zhaoxin_dma_patch(int num, int slot, int func)
 		pr_info("zhaoxin direct dma patch enabled\n");
 	}
 }
+
+#else
+
+static inline void quirk_zhaoxin_dma_patch(int num, int slot, int func)
+{
+
+}
+
+#endif
 
 #define QFLAG_APPLY_ONCE 	0x1
 #define QFLAG_APPLIED		0x2
