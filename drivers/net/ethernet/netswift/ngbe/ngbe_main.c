@@ -5192,7 +5192,11 @@ static void ngbe_configure_isb(struct ngbe_adapter *adapter)
 
 	wr32(hw, NGBE_PX_ISB_ADDR_L,
 			adapter->isb_dma & DMA_BIT_MASK(32));
+#ifdef CONFIG_64BIT
 	wr32(hw, NGBE_PX_ISB_ADDR_H, adapter->isb_dma >> 32);
+#else
+	wr32(hw, NGBE_PX_ISB_ADDR_H, 0);
+#endif
 }
 
 static void ngbe_configure_port(struct ngbe_adapter *adapter)
