@@ -1232,6 +1232,10 @@ uapi-asm-generic:
 	$(Q)$(MAKE) $(asm-generic)=arch/$(SRCARCH)/include/generated/uapi/asm \
 	generic=include/uapi/asm-generic
 
+# Set KYLIN variables
+# Use this spot to avoid future merge conflicts
+include $(srctree)/Makefile.kylin
+
 # Generate some files
 # ---------------------------------------------------------------------------
 
@@ -1260,7 +1264,13 @@ define filechk_version.h
 	((c) > 255 ? 255 : (c)))';                                       \
 	echo \#define LINUX_VERSION_MAJOR $(VERSION);                    \
 	echo \#define LINUX_VERSION_PATCHLEVEL $(PATCHLEVEL);            \
-	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL)
+	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL);		 \
+	echo \#define KYLIN_VERSION_MAJOR $(KYLIN_VERSION_MAJOR);	 \
+	echo \#define KYLIN_VERSION_MINOR $(KYLIN_VERSION_MINOR);	 \
+	echo '#define KYLIN_RELEASE_VERSION(a,b) (((a) << 8) + (b))';	 \
+	echo \#define KYLIN_RELEASE_CODE $(shell			 \
+	expr $(KYLIN_VERSION_MAJOR) \* 256 + $(KYLIN_VERSION_MINOR)) \
+
 endef
 
 $(version_h): PATCHLEVEL := $(or $(PATCHLEVEL), 0)
