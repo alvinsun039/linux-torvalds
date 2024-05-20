@@ -1717,7 +1717,7 @@ void ne6x_dbg_meter_write(struct ne6x_pf *pf, char *cmd_buf, int count)
 		 (ret == 0) ? "write meter success!" : "write meter fail!");
 }
 
-const struct ne6x_dbg_cmd_wr deg_cmd_wr[] = {
+static const struct ne6x_dbg_cmd_wr deg_cmd_wr[] = {
 	{"queue",               ne6x_dbg_show_queue},
 	{"ring",                ne6x_dbg_show_ring},
 	{"txq",                 ne6x_dbg_show_txq},

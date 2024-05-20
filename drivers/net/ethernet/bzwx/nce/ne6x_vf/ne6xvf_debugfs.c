@@ -143,7 +143,7 @@ void ne6xvf_showring(struct ne6xvf_adapter *pf)
 	}
 }
 
-const struct ne6xvf_dbg_cmd_wr deg_cmd_wr[] = {
+static const struct ne6xvf_dbg_cmd_wr deg_cmd_wr[] = {
 	{"queue", ne6xvf_showqueue},
 	{"ring", ne6xvf_showring},
 };

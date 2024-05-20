@@ -3,12 +3,12 @@
 # Makefile for the BeiZhongWangXin network device drivers.
 #
 
-ccflags-y += -I$(srctree)/$(src)/comm
-ccflags-y += -I$(srctree)/$(src)/ne6x
-ccflags-y += -I$(srctree)/$(src)/ne6x_vf
-subdir-ccflags-y += -I$(srctree)/$(src)/comm
-subdir-ccflags-y += -I$(srctree)/$(src)/ne6x
-subdir-ccflags-y += -I$(srctree)/$(src)/ne6x_vf
+ccflags-y += -I$(srctree)/drivers/net/ethernet/bzwx/nce/comm
+ccflags-y += -I$(srctree)/drivers/net/ethernet/bzwx/nce/ne6x
+ccflags-y += -I$(srctree)/drivers/net/ethernet/bzwx/nce/ne6x_vf
+subdir-ccflags-y += -I$(src)/comm
+subdir-ccflags-y += -I$(src)/ne6x
+subdir-ccflags-y += -I$(src)/ne6x_vf
 
 obj-$(CONFIG_NE6X) += ncepf.o
 ncepf-objs := comm/txrx.o	\

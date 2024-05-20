@@ -2,7 +2,6 @@
 /* Copyright(c) 2020 - 2023, Chengdu BeiZhongWangXin Technology Co., Ltd. */
 
 #include "txrx.h"
-#include "ne6x_trace.h"
 
 int ne6x_setup_tx_descriptors(struct ne6x_ring *tx_ring)
 {
@@ -838,7 +837,6 @@ int ne6x_clean_rx_irq(struct ne6x_ring *rx_ring, int budget)
 		}
 
 		size = rx_desc->wb.pkt_len;
-		ne6x_trace(clean_rx_irq, rx_ring, rx_desc, skb);
 		rx_buffer = ne6x_get_rx_buffer(rx_ring, size);
 
 		/* retrieve a buffer from the ring */
@@ -866,15 +864,12 @@ int ne6x_clean_rx_irq(struct ne6x_ring *rx_ring, int budget)
 		}
 
 		ne6x_get_rx_head_info(skb, &rx_hdr);
-		ne6x_trace(rx_hdr, rx_ring, &rx_hdr);
 		pskb_trim(skb, skb->len - 16);
 		/* probably a little skewed due to removing CRC */
 		total_rx_bytes += skb->len;
 
 		/* populate checksum, VLAN, and protocol */
 		ne6x_process_skb_fields(rx_ring, rx_desc, skb, &rx_hdr);
-
-		ne6x_trace(clean_rx_irq_rx, rx_ring, rx_desc, skb);
 
 		ne6x_receive_skb(rx_ring, skb);
 		skb = NULL;
@@ -1314,7 +1309,6 @@ void ne6x_xmit_jumbo(struct ne6x_ring *tx_ring, struct ne6x_tx_buf *first,
 			tag_dma = tag_ring->dma + tag_ring->next_to_use * NE6X_TX_PRIV_TAG_SIZE;
 			tag_desc = NE6X_TX_TAG(tag_ring, tag_ring->next_to_use);
 			ne6x_fill_tx_priv_tag(tx_ring, tag_desc, sgl->mss, sg);
-			ne6x_trace(tx_map_jumbo_tag, tx_ring, tag_desc);
 			if (++tag_ring->next_to_use == tag_ring->count)
 				tag_ring->next_to_use = 0;
 		} else {
@@ -1323,7 +1317,6 @@ void ne6x_xmit_jumbo(struct ne6x_ring *tx_ring, struct ne6x_tx_buf *first,
 
 		tx_desc = NE6X_TX_DESC(tx_ring, i);
 		ne6x_fill_tx_desc(tx_desc, tx_ring->reg_idx, tag_dma, dma, sg);
-		ne6x_trace(tx_map_jumbo_desc, tx_ring, tx_desc);
 		if (++i == tx_ring->count)
 			i = 0;
 	}
@@ -1432,7 +1425,7 @@ void ne6x_xmit_simple(struct ne6x_ring *tx_ring, struct ne6x_tx_buf *first,
 			tx_desc->eop_valid = 1u;
 			break;
 		}
-		ne6x_trace(tx_map_desc, tx_ring, tx_desc);
+
 		if (++i == tx_ring->count)
 			i = 0;
 
@@ -1507,8 +1500,6 @@ netdev_tx_t ne6x_xmit_frame_ring(struct sk_buff *skb, struct ne6x_ring *tx_ring,
 	prefetch(tx_tagx);
 	prefetch(skb->data);
 
-	ne6x_trace(xmit_frame_ring, skb, tx_ring);
-
 	if (!jumbo_frame) {
 		count = ne6x_xmit_descriptor_count(skb);
 	} else {
@@ -1559,7 +1550,6 @@ netdev_tx_t ne6x_xmit_frame_ring(struct sk_buff *skb, struct ne6x_ring *tx_ring,
 	return NETDEV_TX_OK;
 
 out_drop:
-	ne6x_trace(xmit_frame_ring_drop, first->skb, tx_ring);
 	ne6x_unmap_and_free_tx_resource(tx_ring, first);
 
 	return NETDEV_TX_OK;

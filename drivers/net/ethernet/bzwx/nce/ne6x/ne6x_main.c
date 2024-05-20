@@ -22,9 +22,6 @@
 #include "ne6x_netlink.h"
 #include "ne6x_interrupt.h"
 
-#define CREATE_TRACE_POINTS
-#include "ne6x_trace.h"
-
 #define SUMMARY "Chengdu BeiZhongWangXin Ethernet Connection N5/N6 Series Linux Driver"
 #define COPYRIGHT "Copyright(c) 2020 - 2023 Chengdu BeiZhongWangXin Technology Co., Ltd."
 
