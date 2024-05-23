@@ -45,3 +45,10 @@ function branch2name()
 			;;
 	esac
 }
+
+function trim()
+{
+	local var="$*"
+	var="$(echo -e "$var" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+	echo "$var"
+}
