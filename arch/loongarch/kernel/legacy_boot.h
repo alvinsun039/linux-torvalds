@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef __LEGACY_BOOT_H_
 #define __LEGACY_BOOT_H_
+#include <linux/acpi.h>
 #include <linux/screen_info.h>
 #include <linux/of_address.h>
 #define ADDRESS_TYPE_SYSRAM	1
