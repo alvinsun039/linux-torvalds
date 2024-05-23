@@ -17,6 +17,7 @@
 #include <linux/property.h>
 #include <linux/time.h>
 
+#include <linux/pinctrl/consumer.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/pinctrl/pinconf.h>
