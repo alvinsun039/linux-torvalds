@@ -178,11 +178,6 @@ static void alloc_size_##allocator##_dynamic_test(struct kunit *test)	\
 	checker(expected_size,						\
 		kmalloc_array_node(alloc_size, 1, gfp, NUMA_NO_NODE),	\
 		kfree(p));						\
-	checker(expected_size, __kmalloc(alloc_size, gfp),		\
-		kfree(p));						\
-	checker(expected_size,						\
-		__kmalloc_node(alloc_size, gfp, NUMA_NO_NODE),		\
-		kfree(p));						\
 									\
 	orig = kmalloc(alloc_size, gfp);				\
 	KUNIT_EXPECT_TRUE(test, orig != NULL);				\
