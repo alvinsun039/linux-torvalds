@@ -259,6 +259,7 @@ config MODULE_SIG_SHA512
 config MODULE_SIG_SM3
 	bool "Sign modules with SM3"
 	select CRYPTO_SM3
+	select CRYPTO_SM2
 
 endchoice
 
