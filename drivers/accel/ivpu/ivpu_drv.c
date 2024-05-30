@@ -373,7 +373,6 @@ int ivpu_shutdown(struct ivpu_device *vdev)
 
 	/* Save PCI state before powering down as it sometimes gets corrupted if NPU hangs */
 	pci_save_state(to_pci_dev(vdev->drm.dev));
-	ivpu_job_done_thread_disable(vdev);
 
 	ret = ivpu_hw_power_down(vdev);
 	if (ret)
