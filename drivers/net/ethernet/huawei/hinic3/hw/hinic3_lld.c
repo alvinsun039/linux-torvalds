@@ -61,7 +61,7 @@ static const struct attribute_group hinic3_attr_group = {
 	.attrs		= hinic3_attributes,
 };
 
-struct hinic3_uld_info g_uld_info[SERVICE_T_MAX] = { {0} };
+struct hinic3_uld_info g_uld_info[SERVICE_T_MAX] = { {.probe = NULL} };
 
 #define HINIC3_EVENT_PROCESS_TIMEOUT	10000
 struct mutex		g_uld_mutex;   /* g_uld_info lock */
