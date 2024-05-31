@@ -301,12 +301,14 @@ int rnp_disable_sriov(struct rnp_adapter *adapter)
 	return 0;
 }
 
+#ifdef CONFIG_PCI_IOV
 static bool check_ari_mode(struct pci_dev *dev)
 {
 	struct pci_bus *bus = dev->bus;
 
 	return bus->self && bus->self->ari_enabled;
 }
+#endif
 
 static int rnp_pci_sriov_enable(struct pci_dev *dev, int num_vfs)
 {
