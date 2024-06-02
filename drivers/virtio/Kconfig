@@ -173,4 +173,12 @@ config VIRTIO_DMA_SHARED_BUFFER
 	 This option adds a flavor of dma buffers that are backed by
 	 virtio resources.
 
+config VIRTIO_VCPU_STALL
+	tristate "Virtio vcpu stall driver"
+	depends on VIRTIO
+	help
+	 This driver provides detection of vCPU stall conditions.
+
+	 If unsure, say M.
+
 endif # VIRTIO_MENU
