@@ -1,0 +1,6 @@
+config RTL8192FU
+	tristate "Realtek 8192F USB WiFi"
+	depends on USB
+	depends on RTL8XXXU = n
+	help
+	  Help message of RTL8192FU
