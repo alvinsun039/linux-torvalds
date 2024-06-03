@@ -91,8 +91,8 @@ struct kvm_fpu {
 #define  KVM_LOONGARCH_VCPU_PVTIME_GPA	0
 
 /* Device Control API on vm fd */
-#define KVM_LOONGARCH_VM_FEAT_CTRL	0
-#define KVM_LOONGARCH_VM_FEAT_PMU	0 
+#define KVM_LOONGARCH_VM_FEAT_CTRL	1000
+#define KVM_LOONGARCH_VM_FEAT_PMU	1000
 
 struct kvm_debug_exit_arch {
 };
@@ -118,6 +118,8 @@ struct kvm_iocsr_entry {
 #define KVM_NR_IRQCHIPS		1
 #define KVM_IRQCHIP_NUM_PINS	64
 #define KVM_MAX_CORES		256
+
+#define KVM_LOONGARCH_VM_HAVE_IRQCHIP		0x40000001
 
 #define KVM_DEV_LOONGARCH_IPI_GRP_REGS		0x40000002
 
