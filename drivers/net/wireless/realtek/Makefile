@@ -11,4 +11,5 @@ obj-$(CONFIG_RTW88)		+= rtw88/
 obj-$(CONFIG_RTW88_V2)		+= rtw88_v2/
 obj-$(CONFIG_RTW89)		+= rtw89/
 obj-$(CONFIG_RTW89_V2)		+= rtw89_v2/
+obj-$(CONFIG_RTL8822CU)		+= rtl88x2CU/
 
