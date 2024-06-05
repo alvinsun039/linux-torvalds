@@ -98,8 +98,9 @@ static const struct txgbe_info *txgbe_info_tbl[] = {
 
 /* txgbe_pci_tbl - PCI Device ID Table */
 static struct pci_device_id txgbe_pci_tbl[] = {
-	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_SP1000_VF), board_sp_vf },
-	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_WX1820_VF), board_sp_vf },
+//	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_SP1000_VF), board_sp_vf },
+//	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_WX1820_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML_VF), board_sp_vf },
 	{ .device = 0 } /* required last entry */
 };
 
@@ -3764,6 +3765,9 @@ int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	int err;
 
+	/* amlite: bme */
+//	wr32(hw, 0x4B8, 0x1);
+
 	/* PCI config space info */
 
 	hw->vendor_id = pdev->vendor;
@@ -4045,7 +4049,14 @@ void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	if (netif_carrier_ok(netdev))
 		return;
 
+/* amlite: speed updates */
 	dev_info(&adapter->pdev->dev, "NIC Link is Up %s\n",
+		 (adapter->link_speed == TXGBE_LINK_SPEED_50GB_FULL) ?
+		 "50 Gbps" :
+		 (adapter->link_speed == TXGBE_LINK_SPEED_40GB_FULL) ?
+		 "40 Gbps" :
+		 (adapter->link_speed == TXGBE_LINK_SPEED_25GB_FULL) ?
+		 "25 Gbps" :
 		 (adapter->link_speed == TXGBE_LINK_SPEED_10GB_FULL) ?
 		 "10 Gbps" :
 		 (adapter->link_speed == TXGBE_LINK_SPEED_1GB_FULL) ?

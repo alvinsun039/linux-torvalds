@@ -171,7 +171,17 @@ static int txgbe_get_settings(struct net_device *netdev,
 	if (link_up) {
 		__u32 speed = SPEED_10000;
 
+/* amlite: speed updates */
 		switch(link_speed) {
+		case TXGBE_LINK_SPEED_50GB_FULL:
+			speed = SPEED_50000;
+			break;
+		case TXGBE_LINK_SPEED_40GB_FULL:
+			speed = SPEED_40000;
+			break;
+		case TXGBE_LINK_SPEED_25GB_FULL:
+			speed = SPEED_25000;
+			break;
 		case TXGBE_LINK_SPEED_10GB_FULL:
 			speed = SPEED_10000;
 			break;

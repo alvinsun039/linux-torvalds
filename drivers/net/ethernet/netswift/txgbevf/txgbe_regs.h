@@ -41,10 +41,18 @@
 #define   TXGBE_VXRXMEMWRAP_EMPTY(g, i)  ((0x8 << 4*(i) & (g)) >> 4*(i))
 #define TXGBE_VXSTATUS              0x00004
 #define   TXGBE_VXSTATUS_UP            ((0x1) << 0)
+#if 0
 #define   TXGBE_VXSTATUS_SPEED(g)      ((0x7 & (g)) >> 1)
 #define     TXGBE_VXSTATUS_SPEED_10G   (0x1)
 #define     TXGBE_VXSTATUS_SPEED_1G    (0x2)
 #define     TXGBE_VXSTATUS_SPEED_100M  (0x4)
+#endif
+#define   TXGBE_VXSTATUS_SPEED(g)      ((0x1E & (g)) >> 1)
+#define   TXGBE_VXSTATUS_SPEED_AML_50G   (0x1)
+#define   TXGBE_VXSTATUS_SPEED_AML_40G   (0x2)
+#define   TXGBE_VXSTATUS_SPEED_AML_25G   (0x4)
+#define   TXGBE_VXSTATUS_SPEED_AML_10G   (0x8)
+
 #define   TXGBE_VXSTATUS_BUSY          ((0x1) << 4)
 #define   TXGBE_VXSTATUS_LANID         ((0x1) << 8)
 #define TXGBE_VXCTRL                0x00008

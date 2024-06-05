@@ -337,6 +337,9 @@ typedef u32 txgbe_link_speed;
 #define TXGBE_LINK_SPEED_100_FULL       0x0008
 #define TXGBE_LINK_SPEED_1GB_FULL       0x0020
 #define TXGBE_LINK_SPEED_10GB_FULL      0x0080
+#define TXGBE_LINK_SPEED_25GB_FULL      0x0100
+#define TXGBE_LINK_SPEED_40GB_FULL      0x0200
+#define TXGBE_LINK_SPEED_50GB_FULL      0x0400
 
 enum txgbe_mac_type {
 	txgbe_mac_unknown = 0,
