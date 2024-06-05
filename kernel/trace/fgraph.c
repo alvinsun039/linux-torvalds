@@ -1188,6 +1188,7 @@ void fgraph_update_pid_func(void)
 	if (!(graph_ops.flags & FTRACE_OPS_FL_INITIALIZED))
 		return;
 
+#ifdef CONFIG_DYNAMIC_FTRACE
 	list_for_each_entry(op, &graph_ops.subop_list, list) {
 		if (op->flags & FTRACE_OPS_FL_PID) {
 			gops = container_of(op, struct fgraph_ops, ops);
@@ -1197,6 +1198,7 @@ void fgraph_update_pid_func(void)
 				static_call_update(fgraph_func, gops->entryfunc);
 		}
 	}
+#endif
 }
 
 /* Allocate a return stack for each task */
