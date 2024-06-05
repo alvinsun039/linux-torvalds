@@ -554,8 +554,10 @@ unsigned long get_taint(void)
  */
 void add_taint(unsigned flag, enum lockdep_ok lockdep_ok)
 {
+#ifndef CONFIG_KYLIN_DIFFERENCES
 	if (lockdep_ok == LOCKDEP_NOW_UNRELIABLE && __debug_locks_off())
 		pr_warn("Disabling lock debugging due to kernel taint\n");
+#endif
 
 	set_bit(flag, &tainted_mask);
 
