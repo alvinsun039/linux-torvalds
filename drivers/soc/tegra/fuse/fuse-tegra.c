@@ -115,8 +115,8 @@ static void tegra_fuse_restore(void *base)
 
 static int tegra_fuse_add_lookups(struct tegra_fuse *fuse)
 {
-	fuse->lookups = kmemdup_array(fuse->soc->lookups, sizeof(*fuse->lookups),
-				      fuse->soc->num_lookups, GFP_KERNEL);
+	fuse->lookups = kmemdup_array(fuse->soc->lookups, fuse->soc->num_lookups,
+				      sizeof(*fuse->lookups), GFP_KERNEL);
 	if (!fuse->lookups)
 		return -ENOMEM;
 
