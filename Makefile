@@ -423,6 +423,11 @@ ifeq ($(ARCH),parisc64)
        SRCARCH := parisc
 endif
 
+# Additional ARCH settings for loongarch
+ifeq ($(ARCH),loong64)
+       SRCARCH := loongarch
+endif
+
 export cross_compiling :=
 ifneq ($(SRCARCH),$(SUBARCH))
 cross_compiling := 1

@@ -105,6 +105,13 @@ endif
 ifeq ($(compress_file),)
 	install -m600 -D $(builddir)/build-$*/$(kernfile) \
 		$(pkgdir_bin)/boot/$(instfile)-$(abi_release)-$*
+ifeq ($(build_arch),loongarch)
+	strip $(pkgdir_bin)/boot/$(instfile)-$(abi_release)-$*
+	install -m600 -D $(builddir)/build-$*/arch/loongarch/boot/vmlinuz.efi \
+		$(pkgdir_bin)/boot/loongarch-$(instfile)-$(abi_release)-$*.efi
+	mv $(pkgdir_bin)/boot/loongarch-$(instfile)-$(abi_release)-$*.efi \
+		$(pkgdir_bin)/boot/$(instfile)-$(abi_release)-$*
+endif
 else
 	install -d $(pkgdir_bin)/boot
 	gzip -c9v $(builddir)/build-$*/$(kernfile) > \
