@@ -2,8 +2,7 @@
 
 . $(dirname $0)/init-functions
 
-flavor="generic"
-CROSS_ARCH=$(uname -m)
+CROSS_ARCH=$ARCH
 
 function usage()
 {
@@ -46,7 +45,7 @@ done
 CROSS_SOURCE_ARCH=$(echo -e $CROSS_ARCH | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 			-e s/amd64/x86/ -e s/aarch64.*/arm64/ -e s/mips64el/mips/ \
 			-e s/loongarch64.*/loongarch/)
-if [ $(uname -m) != $CROSS_ARCH ]; then
+if [ $ARCH != $CROSS_ARCH ]; then
 	OPT="CROSS_COMPILE=${CROSS_ARCH}-linux-gnu- ARCH=${CROSS_SOURCE_ARCH}"
 
 	if [ -z "$(which ${CROSS_ARCH}-linux-gnu-gcc 2>/dev/null)" ]; then
@@ -63,7 +62,7 @@ function make_defconfig()
 function make_savedefconfig()
 {
 	make savedefconfig ${OPT} -j $(nproc)
-	mv defconfig arch/${CROSS_SOURCE_ARCH}/configs/${flavor}_defconfig
+	mv defconfig arch/${CROSS_SOURCE_ARCH}/configs/${DEFAULT_CONFIG}
 }
 
 function make_menuconfig()
