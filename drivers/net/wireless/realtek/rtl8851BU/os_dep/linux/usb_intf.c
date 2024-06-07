@@ -850,6 +850,8 @@ static int rtw_dev_probe(struct usb_interface *pusb_intf, const struct usb_devic
 	_adapter *padapter = NULL;
 	struct dvobj_priv *dvobj;
 
+	mark_partner_supported("8851BU", "Realtek Semiconductor Corp.", THIS_MODULE);
+
 	RTW_INFO("+%s\n", __func__);
 
 	/* step 0. */
