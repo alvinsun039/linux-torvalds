@@ -764,9 +764,6 @@ void __meminit reserve_bootmem_region(phys_addr_t start,
 
 			__init_deferred_page(start_pfn, nid);
 
-			/* Avoid false-positive PageTail() */
-			INIT_LIST_HEAD(&page->lru);
-
 			/*
 			 * no need for atomic set_bit because the struct
 			 * page is not visible yet so nobody should
