@@ -3829,25 +3829,6 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
 				       PRIQ_ENT_DWORDS, "priq");
 }
 
-static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
-{
-	unsigned int i;
-	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
-	void *strtab = smmu->strtab_cfg.strtab;
-
-	cfg->l1_desc = devm_kcalloc(smmu->dev, cfg->num_l1_ents,
-				    sizeof(*cfg->l1_desc), GFP_KERNEL);
-	if (!cfg->l1_desc)
-		return -ENOMEM;
-
-	for (i = 0; i < cfg->num_l1_ents; ++i) {
-		arm_smmu_write_strtab_l1_desc(strtab, &cfg->l1_desc[i]);
-		strtab += STRTAB_L1_DESC_DWORDS << 3;
-	}
-
-	return 0;
-}
-
 #ifdef CONFIG_SMMU_BYPASS_DEV
 static void arm_smmu_install_bypass_ste_for_dev(struct arm_smmu_device *smmu,
 						u32 sid)
@@ -3931,17 +3912,18 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
 	cfg->strtab_base_cfg = reg;
 
 #ifdef CONFIG_SMMU_BYPASS_DEV
-	ret = arm_smmu_init_l1_strtab(smmu);
-	if (ret)
-		return ret;
-
 	if (smmu_bypass_devices_num) {
 		ret = bus_for_each_dev(&pci_bus_type, NULL, (void *)smmu,
 				       arm_smmu_prepare_init_l2_strtab);
 }
 	return ret;
 #else
-	return arm_smmu_init_l1_strtab(smmu);
+	cfg->l1_desc = devm_kcalloc(smmu->dev, cfg->num_l1_ents,
+			sizeof(*cfg->l1_desc), GFP_KERNEL);
+	if (!cfg->l1_desc)
+		return -ENOMEM;
+
+	return 0;
 #endif
 }
 
