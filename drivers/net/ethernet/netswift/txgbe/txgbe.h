@@ -1232,6 +1232,7 @@ struct txgbe_adapter {
 
 	u64 eth_priv_flags;
 #define TXGBE_ETH_PRIV_FLAG_LLDP		BIT(0)
+#define TXGBE_ETH_PRIV_FLAG_LEGACY_RX	BIT(1)
 
 #ifdef HAVE_AF_XDP_ZC_SUPPORT
 	/* AF_XDP zero-copy */

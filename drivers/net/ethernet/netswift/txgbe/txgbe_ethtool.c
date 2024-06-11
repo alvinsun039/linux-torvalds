@@ -219,6 +219,9 @@ struct txgbe_priv_flags {
 
 static const struct txgbe_priv_flags txgbe_gstrings_priv_flags[] = {
 	TXGBE_PRIV_FLAG("lldp", TXGBE_ETH_PRIV_FLAG_LLDP, 0),
+#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
+	TXGBE_PRIV_FLAG("legacy-rx", TXGBE_ETH_PRIV_FLAG_LEGACY_RX, 1),
+#endif
 };
 
 #define TXGBE_PRIV_FLAGS_STR_LEN ARRAY_SIZE(txgbe_gstrings_priv_flags)
