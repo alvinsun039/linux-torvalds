@@ -121,6 +121,8 @@
 #include <asm/iee-token.h>
 #endif
 
+#include <kunit/visibility.h>
+
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -1380,6 +1382,7 @@ struct mm_struct *mm_alloc(void)
 	memset(mm, 0, sizeof(*mm));
 	return mm_init(mm, current, current_user_ns());
 }
+EXPORT_SYMBOL_IF_KUNIT(mm_alloc);
 
 static inline void __mmput(struct mm_struct *mm)
 {
