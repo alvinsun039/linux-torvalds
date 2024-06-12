@@ -168,8 +168,6 @@ static int virt_wifi_scan(struct wiphy *wiphy,
 {
 	struct virt_wifi_wiphy_priv *priv = wiphy_priv(wiphy);
 
-	wiphy_debug(wiphy, "scan\n");
-
 	if (priv->scan_request || priv->being_deleted)
 		return -EBUSY;
 
@@ -251,8 +249,6 @@ static int virt_wifi_connect(struct wiphy *wiphy, struct net_device *netdev,
 		eth_zero_addr(priv->connect_requested_bss);
 	}
 
-	wiphy_debug(wiphy, "connect\n");
-
 	return 0;
 }
 
@@ -307,7 +303,6 @@ static int virt_wifi_disconnect(struct wiphy *wiphy, struct net_device *netdev,
 	if (priv->being_deleted)
 		return -EBUSY;
 
-	wiphy_debug(wiphy, "disconnect\n");
 	virt_wifi_cancel_connect(netdev);
 
 	cfg80211_disconnected(netdev, reason_code, NULL, 0, true, GFP_KERNEL);
@@ -322,8 +317,6 @@ static int virt_wifi_get_station(struct wiphy *wiphy, struct net_device *dev,
 				 const u8 *mac, struct station_info *sinfo)
 {
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
-
-	wiphy_debug(wiphy, "get_station\n");
 
 	if (!priv->is_connected || !ether_addr_equal(mac, fake_router_bssid))
 		return -ENOENT;
@@ -347,8 +340,6 @@ static int virt_wifi_dump_station(struct wiphy *wiphy, struct net_device *dev,
 				  int idx, u8 *mac, struct station_info *sinfo)
 {
 	struct virt_wifi_netdev_priv *priv = netdev_priv(dev);
-
-	wiphy_debug(wiphy, "dump_station\n");
 
 	if (idx != 0 || !priv->is_connected)
 		return -ENOENT;
@@ -381,6 +372,7 @@ static struct wiphy *virt_wifi_make_wiphy(void)
 
 	wiphy->max_scan_ssids = 4;
 	wiphy->max_scan_ie_len = 1000;
+	wiphy->flags |= WIPHY_FLAG_NETNS_OK;
 	wiphy->signal_type = CFG80211_SIGNAL_TYPE_MBM;
 
 	wiphy->bands[NL80211_BAND_2GHZ] = &band_2ghz;
@@ -583,6 +575,7 @@ static int virt_wifi_newlink(struct net *src_net, struct net_device *dev,
 	priv->is_connected = false;
 	priv->is_up = false;
 	INIT_DELAYED_WORK(&priv->connect, virt_wifi_connect_complete);
+	wiphy_net_set(common_wiphy, current->nsproxy->net_ns);
 	__module_get(THIS_MODULE);
 
 	return 0;
