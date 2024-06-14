@@ -3963,7 +3963,6 @@ void slab_post_alloc_hook(struct kmem_cache *s,	struct obj_cgroup *objcg,
 			  unsigned int orig_size)
 {
 	unsigned int zero_size = s->object_size;
-	struct slabobj_ext *obj_exts;
 	bool kasan_init = init;
 	size_t i;
 	gfp_t init_flags = flags & gfp_allowed_mask;
@@ -4006,9 +4005,11 @@ void slab_post_alloc_hook(struct kmem_cache *s,	struct obj_cgroup *objcg,
 		kmemleak_alloc_recursive(p[i], s->object_size, 1,
 					 s->flags, init_flags);
 		kmsan_slab_alloc(s, p[i], init_flags);
-		if (need_slab_obj_ext()) {
-			obj_exts = prepare_slab_obj_exts_hook(s, flags, p[i]);
 #ifdef CONFIG_MEM_ALLOC_PROFILING
+		if (need_slab_obj_ext()) {
+			struct slabobj_ext *obj_exts;
+
+			obj_exts = prepare_slab_obj_exts_hook(s, flags, p[i]);
 			/*
 			 * Currently obj_exts is used only for allocation profiling.
 			 * If other users appear then mem_alloc_profiling_enabled()
@@ -4016,8 +4017,8 @@ void slab_post_alloc_hook(struct kmem_cache *s,	struct obj_cgroup *objcg,
 			 */
 			if (likely(obj_exts))
 				alloc_tag_add(&obj_exts->ref, current->alloc_tag, s->size);
-#endif
 		}
+#endif
 	}
 
 	memcg_slab_post_alloc_hook(s, objcg, flags, size, p);
