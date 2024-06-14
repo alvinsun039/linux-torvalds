@@ -141,14 +141,11 @@ static int inspur_wmi_probe(struct wmi_device *wdev, const void *context)
 	return err;
 }
 
-static int inspur_wmi_remove(struct wmi_device *wdev)
+static void inspur_wmi_remove(struct wmi_device *wdev)
 {
 	struct inspur_wmi_priv *priv = dev_get_drvdata(&wdev->dev);
-	int err = 0;
 
 	input_unregister_device(priv->idev);
-
-	return err;
 }
 
 static const struct wmi_device_id inspur_wmi_id_table[] = {
