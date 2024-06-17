@@ -7,7 +7,6 @@
 #include <linux/kobject.h>
 #include <linux/device.h>
 #include <linux/netdevice.h>
-#include <linux/hwmon.h>
 #include <linux/ctype.h>
 
 #include "rnp.h"
@@ -15,6 +14,10 @@
 #include "rnp_type.h"
 #include "rnp_mbx.h"
 #include "rnp_mbx_fw.h"
+
+#ifdef RNP_HWMON
+#include <linux/hwmon.h>
+#endif /* RNP_HWMON */
 
 #define PHY_EXT_REG_FLAG 0x80000000
 
@@ -50,6 +53,7 @@ static int print_desc(char *buf, void *data, int len)
 	return ret;
 }
 
+#ifdef RNP_HWMON
 static ssize_t rnp_hwmon_show_location(struct device __always_unused *dev,
 				       struct device_attribute *attr,
 				       char *buf)
@@ -176,6 +180,7 @@ static int rnp_add_hwmon_attr(struct rnp_adapter *adapter,
 
 	return 0;
 }
+#endif /* RNP_HWMON */
 
 #define to_net_device(n) container_of(n, struct net_device, dev)
 static ssize_t maintain_read(struct file *filp, struct kobject *kobj,
@@ -2086,9 +2091,11 @@ int rnp_sysfs_init(struct rnp_adapter *adapter)
 {
 	int rc = 0;
 	int flag;
+#ifdef RNP_HWMON
 	struct hwmon_buff *rnp_hwmon;
 	struct device *hwmon_dev;
 	unsigned int i;
+#endif /* RNP_HWMON */
 
 	flag = sysfs_create_group(&adapter->netdev->dev.kobj,
 				  &dev_attr_grp);
@@ -2097,6 +2104,7 @@ int rnp_sysfs_init(struct rnp_adapter *adapter)
 			"sysfs_create_group failed:flag:%d\n", flag);
 		return flag;
 	}
+#ifdef RNP_HWMON
 	/* If this method isn't defined we don't support thermals */
 	if (!adapter->hw.ops.init_thermal_sensor_thresh)
 		goto no_thermal;
@@ -2152,6 +2160,7 @@ int rnp_sysfs_init(struct rnp_adapter *adapter)
 		goto exit;
 	}
 no_thermal:
+#endif /* RNP_HWMON */
 	goto exit;
 
 err:
