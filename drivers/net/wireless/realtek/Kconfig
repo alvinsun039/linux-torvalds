@@ -27,5 +27,6 @@ source "drivers/net/wireless/realtek/rtl8821CU/Kconfig"
 source "drivers/net/wireless/realtek/rtl8188EU/Kconfig"
 source "drivers/net/wireless/realtek/rtl8852BU/Kconfig"
 source "drivers/net/wireless/realtek/rtl8852CU/Kconfig"
+source "drivers/net/wireless/realtek/rtl8723DU/Kconfig"
 
 endif # WLAN_VENDOR_REALTEK
