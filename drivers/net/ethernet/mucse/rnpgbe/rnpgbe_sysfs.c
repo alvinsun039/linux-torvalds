@@ -7,7 +7,6 @@
 #include <linux/kobject.h>
 #include <linux/device.h>
 #include <linux/netdevice.h>
-#include <linux/hwmon.h>
 #include <linux/ctype.h>
 
 #include "rnpgbe.h"
@@ -15,6 +14,10 @@
 #include "rnpgbe_type.h"
 #include "rnpgbe_mbx.h"
 #include "rnpgbe_mbx_fw.h"
+
+#ifdef RNPGBE_HWMON
+#include <linux/hwmon.h>
+#endif /* RNPGBE_HWMON */
 
 struct maintain_req {
 	int magic;
@@ -58,7 +61,7 @@ static int print_desc(char *buf, void *data, int len)
 	return ret;
 }
 
-#ifdef RNP_HWMON
+#ifdef RNPGBE_HWMON
 static ssize_t rnpgbe_hwmon_show_location(struct device __always_unused *dev,
 					  struct device_attribute *attr,
 					  char *buf)
@@ -140,26 +143,26 @@ static int rnpgbe_add_hwmon_attr(struct rnpgbe_adapter *adapter,
 	rnpgbe_attr = &adapter->rnpgbe_hwmon_buff->hwmon_list[n_attr];
 
 	switch (type) {
-	case RNP_HWMON_TYPE_LOC:
+	case RNPGBE_HWMON_TYPE_LOC:
 		rnpgbe_attr->dev_attr.show = rnpgbe_hwmon_show_location;
 		snprintf(rnpgbe_attr->name, sizeof(rnpgbe_attr->name),
 			 "temp%u_label", offset + 1);
 		break;
-	case RNP_HWMON_TYPE_NAME:
+	case RNPGBE_HWMON_TYPE_NAME:
 		rnpgbe_attr->dev_attr.show = rnpgbe_hwmon_show_name;
 		snprintf(rnpgbe_attr->name, sizeof(rnpgbe_attr->name), "name");
 		break;
-	case RNP_HWMON_TYPE_TEMP:
+	case RNPGBE_HWMON_TYPE_TEMP:
 		rnpgbe_attr->dev_attr.show = rnpgbe_hwmon_show_temp;
 		snprintf(rnpgbe_attr->name, sizeof(rnpgbe_attr->name),
 			 "temp%u_input", offset + 1);
 		break;
-	case RNP_HWMON_TYPE_CAUTION:
+	case RNPGBE_HWMON_TYPE_CAUTION:
 		rnpgbe_attr->dev_attr.show = rnpgbe_hwmon_show_cautionthresh;
 		snprintf(rnpgbe_attr->name, sizeof(rnpgbe_attr->name),
 			 "temp%u_max", offset + 1);
 		break;
-	case RNP_HWMON_TYPE_MAX:
+	case RNPGBE_HWMON_TYPE_MAX:
 		rnpgbe_attr->dev_attr.show = rnpgbe_hwmon_show_maxopthresh;
 		snprintf(rnpgbe_attr->name, sizeof(rnpgbe_attr->name),
 			 "temp%u_crit", offset + 1);
@@ -183,7 +186,7 @@ static int rnpgbe_add_hwmon_attr(struct rnpgbe_adapter *adapter,
 
 	return 0;
 }
-#endif /* RNP_HWMON */
+#endif /* RNPGBE_HWMON */
 
 #define to_net_device(n) container_of(n, struct net_device, dev)
 static ssize_t maintain_read(struct file *filp, struct kobject *kobj,
@@ -1147,11 +1150,11 @@ int rnpgbe_sysfs_init(struct rnpgbe_adapter *adapter)
 {
 	int rc = 0;
 	int flag;
-#ifdef RNP_HWMON
+#ifdef RNPGBE_HWMON
 	struct hwmon_buff *rnpgbe_hwmon;
 	struct device *hwmon_dev;
 	unsigned int i;
-#endif /* RNP_HWMON */
+#endif /* RNPGBE_HWMON */
 
 	flag = sysfs_create_group(&adapter->netdev->dev.kobj, &dev_attr_grp);
 	if (flag != 0) {
@@ -1159,7 +1162,7 @@ int rnpgbe_sysfs_init(struct rnpgbe_adapter *adapter)
 			"sysfs_create_group failed:flag:%d\n", flag);
 		return flag;
 	}
-#ifdef RNP_HWMON
+#ifdef RNPGBE_HWMON
 	/* If this method isn't defined we don't support thermals */
 	if (!adapter->hw.ops.init_thermal_sensor_thresh)
 		goto no_thermal;
@@ -1186,16 +1189,16 @@ int rnpgbe_sysfs_init(struct rnpgbe_adapter *adapter)
 			continue;
 
 		/* Bail if any hwmon attr struct fails to initialize */
-		rc = rnpgbe_add_hwmon_attr(adapter, i, RNP_HWMON_TYPE_CAUTION);
+		rc = rnpgbe_add_hwmon_attr(adapter, i, RNPGBE_HWMON_TYPE_CAUTION);
 		if (rc)
 			goto err;
-		rc = rnpgbe_add_hwmon_attr(adapter, i, RNP_HWMON_TYPE_LOC);
+		rc = rnpgbe_add_hwmon_attr(adapter, i, RNPGBE_HWMON_TYPE_LOC);
 		if (rc)
 			goto err;
-		rc = rnpgbe_add_hwmon_attr(adapter, i, RNP_HWMON_TYPE_TEMP);
+		rc = rnpgbe_add_hwmon_attr(adapter, i, RNPGBE_HWMON_TYPE_TEMP);
 		if (rc)
 			goto err;
-		rc = rnpgbe_add_hwmon_attr(adapter, i, RNP_HWMON_TYPE_MAX);
+		rc = rnpgbe_add_hwmon_attr(adapter, i, RNPGBE_HWMON_TYPE_MAX);
 		if (rc)
 			goto err;
 	}
@@ -1212,7 +1215,7 @@ int rnpgbe_sysfs_init(struct rnpgbe_adapter *adapter)
 	}
 
 no_thermal:
-#endif /* RNP_HWMON */
+#endif /* RNPGBE_HWMON */
 	goto exit;
 
 err:
