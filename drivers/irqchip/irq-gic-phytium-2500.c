@@ -40,7 +40,8 @@ struct gic_dist_desc {
 	unsigned long		size;
 };
 
-#define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
+static u8 dist_prio_irq __ro_after_init = GICD_INT_DEF_PRI;
+static u8 dist_prio_nmi __ro_after_init = GICD_INT_DEF_PRI & ~0x80;
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
@@ -651,7 +652,7 @@ static int gic_irq_nmi_setup(struct irq_data *d)
 		desc->handle_irq = handle_fasteoi_nmi;
 	}
 
-	gic_irq_set_prio(d, GICD_INT_NMI_PRI);
+	gic_irq_set_prio(d, dist_prio_nmi);
 
 	return 0;
 }
@@ -686,7 +687,7 @@ static void gic_irq_nmi_teardown(struct irq_data *d)
 		desc->handle_irq = handle_fasteoi_irq;
 	}
 
-	gic_irq_set_prio(d, GICD_INT_DEF_PRI);
+	gic_irq_set_prio(d, dist_prio_irq);
 }
 
 static void gic_eoi_irq(struct irq_data *d)
@@ -826,7 +827,7 @@ static bool gic_rpr_is_nmi_prio(void)
 	if (!gic_supports_nmi())
 		return false;
 
-	return unlikely(gic_read_rpr() == GICD_INT_RPR_PRI(GICD_INT_NMI_PRI));
+	return unlikely(gic_read_rpr() == GICD_INT_RPR_PRI(dist_prio_nmi));
 }
 
 static bool gic_irqnr_is_special(u32 irqnr)
@@ -978,10 +979,11 @@ static void __init gic_dist_init(void)
 			writel_relaxed(0, base + GICD_ICFGRnE + i / 4);
 
 		for (i = 0; i < GIC_ESPI_NR; i += 4)
-			writel_relaxed(GICD_INT_DEF_PRI_X4, base + GICD_IPRIORITYRnE + i);
+			writel_relaxed(REPEAT_BYTE_U32(dist_prio_irq),
+					base + GICD_IPRIORITYRnE + i);
 
 		/* Now do the common stuff, and wait for the distributor to drain */
-		gic_dist_config(base, GIC_LINE_NR);
+		gic_dist_config(base, GIC_LINE_NR, dist_prio_irq);
 		gic_do_wait_for_rwp(base, GICD_CTLR_RWP);      // do sync outside of gic_dist_config
 
 		val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
@@ -1318,7 +1320,7 @@ static void gic_cpu_init(void)
 	for (i = 0; i < gic_data.ppi_nr + 16; i += 32)
 		writel_relaxed(~0, rbase + GICR_IGROUPR0 + i / 8);
 
-	gic_cpu_config(rbase, gic_data.ppi_nr + 16);
+	gic_cpu_config(rbase, gic_data.ppi_nr + 16, dist_prio_irq);
 	gic_redist_wait_for_rwp();
 
 	mpidr = (unsigned long)cpu_logical_map(smp_processor_id());
@@ -1330,7 +1332,7 @@ static void gic_cpu_init(void)
 			/* Configure SGIs/PPIs as non-secure Group-1 */
 			writel_relaxed(~0, rbase + GICR_IGROUPR0);
 
-			gic_cpu_config(rbase, gic_data.ppi_nr + 16);
+			gic_cpu_config(rbase, gic_data.ppi_nr + 16, dist_prio_irq);
 			gic_do_wait_for_rwp(rbase - SZ_64K, GICR_CTLR_RWP);
 
 			rbase = rbase + SZ_128K;
@@ -1966,7 +1968,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
 	gic_cpu_pm_init();
 
 	if (gic_dist_supports_lpis()) {
-		phytium_its_init(handle, &gic_data.rdists, gic_data.domain);
+		phytium_its_init(handle, &gic_data.rdists, gic_data.domain, dist_prio_irq);
 		phytium_its_cpu_init();
 		phytium_its_lpi_memreserve_init();
 	} else {
