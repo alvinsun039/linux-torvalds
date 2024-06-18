@@ -25,6 +25,7 @@ snd-hda-codec-cs8409-objs :=	patch_cs8409.o patch_cs8409-tables.o
 snd-hda-codec-ca0110-objs :=	patch_ca0110.o
 snd-hda-codec-ca0132-objs :=	patch_ca0132.o
 snd-hda-codec-conexant-objs :=	patch_conexant.o
+snd-hda-codec-senarytech-y :=patch_senarytech.o
 snd-hda-codec-via-objs :=	patch_via.o
 snd-hda-codec-hdmi-objs :=	patch_hdmi.o hda_eld.o
 
@@ -53,6 +54,7 @@ obj-$(CONFIG_SND_HDA_CODEC_CS8409) += snd-hda-codec-cs8409.o
 obj-$(CONFIG_SND_HDA_CODEC_CA0110) += snd-hda-codec-ca0110.o
 obj-$(CONFIG_SND_HDA_CODEC_CA0132) += snd-hda-codec-ca0132.o
 obj-$(CONFIG_SND_HDA_CODEC_CONEXANT) += snd-hda-codec-conexant.o
+obj-$(CONFIG_SND_HDA_CODEC_SENARYTECH) += snd-hda-codec-senarytech.o
 obj-$(CONFIG_SND_HDA_CODEC_VIA) += snd-hda-codec-via.o
 obj-$(CONFIG_SND_HDA_CODEC_HDMI) += snd-hda-codec-hdmi.o
 
