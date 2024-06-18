@@ -285,3 +285,25 @@ void mark_partner_supported(const char *msg, const char *partner,
 #endif /* CONFIG_KYLIN_DIFFERENCES */
 }
 EXPORT_SYMBOL(mark_partner_supported);
+
+/**
+ * mark_partner_supported_module() - Mark module as 'Partner Supported'
+ * @partner: Partner name
+ * @mod: Module pointer, must not NULL
+ *
+ * Called to minimize the support status of a new driver. This does TAINT the
+ * kernel. Calling this function indicates that the driver or subsystem has
+ * is not supported directly by KYLIN but by a partner engineer.
+ *
+ * The module need have mod->name, Otherwise it's return direct.
+ */
+void mark_partner_supported_module(const char *partner, struct module *mod)
+{
+#if defined(CONFIG_KYLIN_DIFFERENCES) && defined(CONFIG_MODULES)
+	if (!mod || !mod->name)
+		return;
+
+	mark_partner_supported(NULL, partner, mod);
+#endif
+}
+EXPORT_SYMBOL(mark_partner_supported_module);

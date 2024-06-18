@@ -11,6 +11,7 @@
 #ifndef _LINUX_KERNEL_H
 #define _LINUX_KERNEL_H
 
+#include <linux/once_lite.h>
 #include <linux/stdarg.h>
 #include <linux/align.h>
 #include <linux/limits.h>
@@ -448,28 +449,23 @@ static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 	 (perms))
 
 struct module;
-extern void mark_hardware_unmaintained(const char *driver_name,
-				       struct module *mod, char *fmt, ...);
-extern void mark_driver_unmaintained(const char *driver_name, struct module *mod);
-extern void mark_hardware_deprecated(const char *driver_name,
-				     struct module *mod, char *fmt, ...);
-extern void mark_driver_deprecated(const char *driver_name, struct module *mod);
-extern void mark_hardware_disabled(const char *driver_name, struct module *mod,
-				   char *fmt, ...);
-extern void mark_tech_preview(const char *msg, struct module *mod);
-extern void mark_partner_supported(const char *msg, const char *partner,
-				   struct module *mod);
+void mark_hardware_unmaintained(const char *driver_name,
+				struct module *mod, char *fmt, ...);
+void mark_driver_unmaintained(const char *driver_name, struct module *mod);
+void mark_hardware_deprecated(const char *driver_name,
+			      struct module *mod, char *fmt, ...);
+void mark_driver_deprecated(const char *driver_name, struct module *mod);
+void mark_hardware_disabled(const char *driver_name, struct module *mod,
+			    char *fmt, ...);
+void mark_tech_preview(const char *msg, struct module *mod);
+void mark_partner_supported(const char *msg, const char *partner,
+			    struct module *mod);
+void mark_partner_supported_module(const char *partner, struct module *mod);
 
-static __always_inline void mark_partner_supported_once(const char *msg,
-							const char *partner,
-							struct module *mod)
-{
-	static bool __section(".data.once") __already_done;
+#define mark_partner_supported_once(msg, partner, mod)	\
+	({ DO_ONCE_LITE(mark_partner_supported, msg, partner, mod); })
 
-	if (!__already_done) {
-		mark_partner_supported(msg, partner, mod);
-		__already_done = true;
-	}
-}
+#define mark_partner_supported_module_once(partner, mod)	\
+	({ DO_ONCE_LITE(mark_partner_supported_module, partner, mod); })
 
 #endif
