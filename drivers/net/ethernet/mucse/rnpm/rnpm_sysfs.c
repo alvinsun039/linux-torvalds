@@ -8,7 +8,14 @@
 #include <linux/kobject.h>
 #include <linux/device.h>
 #include <linux/netdevice.h>
+#if IS_ENABLED(CONFIG_HWMON)
+#ifndef RNPM_HWMON
+#define RNPM_HWMON
+#endif /* RNPM_HWMON */
+#endif /* CONFIG_HWMON */
+#ifdef RNPM_HWMON
 #include <linux/hwmon.h>
+#endif /* CONFIG_HWMON */
 #include <linux/ctype.h>
 #include "rnpm.h"
 #include "rnpm_common.h"
@@ -1633,6 +1640,7 @@ static struct attribute_group dev_attr_grp = {
 #endif
 };
 
+#ifdef RNPM_HWMON
 /* hwmon callback functions */
 static ssize_t rnpm_hwmon_show_location(struct device __always_unused *dev,
 					struct device_attribute *attr,
@@ -1762,6 +1770,7 @@ static int rnpm_add_hwmon_attr(struct rnpm_adapter *adapter,
 
 	return 0;
 }
+#endif /* RNPM_HWMON */
 
 /* called from rnpm_main.c */
 void rnpm_sysfs_exit(struct rnpm_adapter *adapter)
@@ -1773,8 +1782,10 @@ void rnpm_sysfs_exit(struct rnpm_adapter *adapter)
 int rnpm_sysfs_init(struct rnpm_adapter *adapter, int port)
 {
 	int err, rc = 0;
+#ifdef RNPM_HWMON
 	struct hwmon_buff *rnpm_hwmon;
 	struct device *hwmon_dev;
+#endif /* RNPM_HWMON */
 	unsigned int i;
 
 	err = sysfs_create_group(&adapter->netdev->dev.kobj, &dev_attr_grp);
@@ -1786,7 +1797,7 @@ int rnpm_sysfs_init(struct rnpm_adapter *adapter, int port)
 	/* only  port0 and pcie devfn all both 0 register temperature hwmon */
 	if (!!port || !!adapter->pdev->devfn)
 		goto exit;
-
+#ifdef RNPM_HWMON
 	/* If this method isn't defined we don't support thermals */
 	if (adapter->hw.mac.ops.init_thermal_sensor_thresh == NULL)
 		goto no_thermal;
@@ -1835,6 +1846,7 @@ int rnpm_sysfs_init(struct rnpm_adapter *adapter, int port)
 		goto exit;
 	}
 no_thermal:
+#endif /* RNPM_HWMON */
 	goto exit;
 err:
 exit:
