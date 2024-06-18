@@ -5201,7 +5201,7 @@ int ath12k_mac_rfkill_enable_radio(struct ath12k *ar, bool enable)
 	return 0;
 }
 
-static void ath12k_mac_op_stop(struct ieee80211_hw *hw)
+static void ath12k_mac_op_stop(struct ieee80211_hw *hw, bool suspend)
 {
 	struct ath12k *ar = hw->priv;
 	struct htt_ppdu_stats_info *ppdu_stats, *tmp;
