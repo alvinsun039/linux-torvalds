@@ -9827,7 +9827,7 @@ static int __devinit ngbe_probe(struct pci_dev *pdev,
 #endif /* HAVE_NDO_SET_FEATURES */
 	u16 pvalue = 0;
 
-	mark_partner_supported_once(NULL, "WANGXUN", THIS_MODULE);
+	mark_partner_supported_module_once("NetSwift", THIS_MODULE);
 
 	err = pci_enable_device_mem(pdev);
 	if (err)

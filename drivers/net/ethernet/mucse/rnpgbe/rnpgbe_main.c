@@ -6788,7 +6788,8 @@ static int rnpgbe_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	struct rnpgbe_info *ii = rnpgbe_info_tbl[id->driver_data];
 	int err;
 
-	mark_partner_supported_once(NULL, "MUCSE", THIS_MODULE);
+	mark_partner_supported_module_once("Wuxi Micro Innovation Integrated Circuit Design Co.,Ltd",
+					   THIS_MODULE);
 
 	/* Catch broken hardware that put the wrong VF device ID in
 	 * the PCIe SR-IOV capability.

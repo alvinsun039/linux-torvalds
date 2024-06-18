@@ -5515,7 +5515,7 @@ static int __devinit ngbe_probe(struct pci_dev *pdev,
 	bool disable_dev = false;
 	u8 fea_flags = 0;
 
-	mark_partner_supported_once(NULL, "WANGXUN", THIS_MODULE);
+	mark_partner_supported_module_once("NetSwift", THIS_MODULE);
 
 	err = pci_enable_device(pdev);
 	if (err)

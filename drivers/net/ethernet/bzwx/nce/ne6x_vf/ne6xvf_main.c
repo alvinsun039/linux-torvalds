@@ -2886,7 +2886,8 @@ static int ne6xvf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	char name[IFNAMSIZ] = {0};
 	int err;
 
-	mark_partner_supported("NCEVF", "Chengdu BeiZhongWangXin Technology Co., Ltd.", THIS_MODULE);
+	mark_partner_supported_module_once("Chengdu BeiZhongWangXin Technology Co., Ltd.",
+					   THIS_MODULE);
 
 	err = pci_enable_device(pdev);
 	if (err)

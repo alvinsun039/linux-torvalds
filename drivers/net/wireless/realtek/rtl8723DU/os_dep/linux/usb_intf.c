@@ -1274,7 +1274,7 @@ static int rtw_drv_init(struct usb_interface *pusb_intf, const struct usb_device
 	int i;
 #endif
 
-	mark_partner_supported(NULL, "Realtek Semiconductor Corp.", THIS_MODULE);
+	mark_partner_supported_module("Realtek Semiconductor Corp.", THIS_MODULE);
 	/* RTW_INFO("+rtw_drv_init\n"); */
 
 	/* step 0. */

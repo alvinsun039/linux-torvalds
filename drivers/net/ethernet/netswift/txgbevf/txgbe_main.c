@@ -6170,7 +6170,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	int err;
 	static int cards_found;
 
-	mark_partner_supported_once(NULL, "WANGXUN", THIS_MODULE);
+	mark_partner_supported_module_once("NetSwift", THIS_MODULE);
 
 	err = pci_enable_device(pdev);
 	if (err)

@@ -5673,7 +5673,8 @@ static int rnpgbevf_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	const struct rnpgbevf_info *ii = rnpgbevf_info_tbl[ent->driver_data];
 	int err;
 
-	mark_partner_supported_once(NULL, "MUCSE", THIS_MODULE);
+	mark_partner_supported_module_once("Wuxi Micro Innovation Integrated Circuit Design Co.,Ltd",
+					   THIS_MODULE);
 
 	err = pci_enable_device_mem(pdev);
 	if (err)

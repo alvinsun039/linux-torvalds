@@ -5918,7 +5918,8 @@ static int rnpvf_probe(struct pci_dev *pdev,
 	const struct rnpvf_info *ii = rnpvf_info_tbl[ent->driver_data];
 	int err;
 
-	mark_partner_supported_once(NULL, "MUCSE", THIS_MODULE);
+	mark_partner_supported_module_once("Wuxi Micro Innovation Integrated Circuit Design Co.,Ltd",
+					   THIS_MODULE);
 
 	err = pci_enable_device_mem(pdev);
 	if (err)

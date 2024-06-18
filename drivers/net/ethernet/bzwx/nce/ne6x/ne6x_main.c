@@ -2717,7 +2717,8 @@ static int ne6x_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	u32 ioremap_len;
 	int err;
 
-	mark_partner_supported("NCEPF", "Chengdu BeiZhongWangXin Technology Co., Ltd.", THIS_MODULE);
+	mark_partner_supported_module_once("Chengdu BeiZhongWangXin Technology Co., Ltd.",
+					   THIS_MODULE);
 
 	if (PCI_FUNC(pdev->devfn) != 1)
 		return 0;
