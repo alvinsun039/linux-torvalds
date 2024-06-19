@@ -364,7 +364,7 @@ control its functionality at the system level.  They are located in the
 ``/sys/devices/system/cpu/amd-pstate/`` directory and affect all CPUs.
 
 ``status``
-	Operation mode of the driver: "active", "passive" or "disable".
+	Operation mode of the driver: "active", "passive", "guided" or "disable".
 
 	"active"
 		The driver is functional and in the ``active mode``
