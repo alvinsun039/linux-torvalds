@@ -1,9 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2023 3SNIC
 #
-SYS_TIME=$(shell date +%Y-%m-%d_%H:%M:%S)
-ccflags-y += -D __TIME_STR__=\"$(SYS_TIME)\"
-
 ccflags-y += -I$(srctree)/drivers/net/ethernet/3snic/sssnic/hw
 ccflags-y += -I$(srctree)/drivers/net/ethernet/3snic/sssnic/hw/tool
 ccflags-y += -I$(srctree)/drivers/net/ethernet/3snic/sssnic/include

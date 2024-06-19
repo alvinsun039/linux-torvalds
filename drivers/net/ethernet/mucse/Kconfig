@@ -21,6 +21,7 @@ config MXGBE
 	tristate "Mucse(R) 1/10/25/40GbE PCI Express adapters support"
 	default m
 	depends on PCI
+	depends on m
 	imply PTP_1588_CLOCK
 	help
 	  This driver supports Mucse(R) 1/10/25/40GbE PCI Express family of
@@ -77,6 +78,7 @@ config MXGBEM
 	tristate "Mucse(R) 1/10GbE PCI Express 4/8 ports adapters support"
 	default m
 	depends on PCI
+	depends on m
 	imply PTP_1588_CLOCK
 	help
 	  This driver supports Mucse(R) 1/10GbE 4/8 ports PCI Express family of
@@ -107,6 +109,7 @@ config MGBE
 	tristate "Mucse(R) 1GbE PCI Express adapters support"
 	default m
 	depends on PCI
+	depends on m
 	imply PTP_1588_CLOCK
 	help
 	  This driver supports Mucse(R) 1GbE PCI Express family of
@@ -134,6 +137,7 @@ config MGBE_MSIX_COUNT
 config MXGBEVF
 	tristate "Mucse(R) 1/10/25/40GbE PCI Express Virtual Function adapters support"
 	default m
+	depends on m
 	depends on PCI
 	help
 	  This driver supports Mucse(R) 1/10/25/40GbE PCI Express Virtual Function
@@ -173,6 +177,7 @@ config MGBEVF
 	tristate "Mucse(R) 1GbE PCI Express Virtual Function adapters support"
 	default m
 	depends on PCI
+	depends on m
 	imply PTP_1588_CLOCK
 	help
 	  This driver supports Mucse(R) 1GbE PCI Express family of

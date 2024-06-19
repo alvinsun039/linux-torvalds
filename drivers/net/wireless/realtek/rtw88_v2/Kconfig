@@ -47,6 +47,7 @@ config RTW88_8822BE
 	select RTW88_CORE
 	select RTW88_PCI
 	select RTW88_8822B
+	depends on m
 	help
 	  Select this option will enable support for 8822BE chipset
 
@@ -58,6 +59,7 @@ config RTW88_8822BS
 	select RTW88_CORE
 	select RTW88_SDIO
 	select RTW88_8822B
+	depends on m
 	help
 	  Select this option will enable support for 8822BS chipset
 
@@ -69,6 +71,7 @@ config RTW88_8822BU
 	select RTW88_CORE
 	select RTW88_USB
 	select RTW88_8822B
+	depends on m
 	help
 	  Select this option will enable support for 8822BU chipset
 
@@ -80,6 +83,7 @@ config RTW88_8822CE
 	select RTW88_CORE
 	select RTW88_PCI
 	select RTW88_8822C
+	depends on m
 	help
 	  Select this option will enable support for 8822CE chipset
 
@@ -91,6 +95,7 @@ config RTW88_8822CS
 	select RTW88_CORE
 	select RTW88_SDIO
 	select RTW88_8822C
+	depends on m
 	help
 	  Select this option will enable support for 8822CS chipset
 
@@ -102,6 +107,7 @@ config RTW88_8822CU
 	select RTW88_CORE
 	select RTW88_USB
 	select RTW88_8822C
+	depends on m
 	help
 	  Select this option will enable support for 8822CU chipset
 
@@ -113,6 +119,7 @@ config RTW88_8723DE
 	select RTW88_CORE
 	select RTW88_PCI
 	select RTW88_8723D
+	depends on m
 	help
 	  Select this option will enable support for 8723DE chipset
 
@@ -124,6 +131,7 @@ config RTW88_8723DS
 	select RTW88_CORE
 	select RTW88_SDIO
 	select RTW88_8723D
+	depends on m
 	help
 	  Select this option will enable support for 8723DS chipset
 
@@ -135,6 +143,7 @@ config RTW88_8723CS
 	select RTW88_CORE
 	select RTW88_SDIO
 	select RTW88_8703B
+	depends on m
 	help
 	  Select this option to enable support for 8723CS chipset (EXPERIMENTAL)
 
@@ -149,6 +158,7 @@ config RTW88_8723DU
 	select RTW88_CORE
 	select RTW88_USB
 	select RTW88_8723D
+	depends on m
 	help
 	  Select this option will enable support for 8723DU chipset
 
@@ -160,6 +170,7 @@ config RTW88_8821CE
 	select RTW88_CORE
 	select RTW88_PCI
 	select RTW88_8821C
+	depends on m
 	help
 	  Select this option will enable support for 8821CE chipset
 
@@ -171,6 +182,7 @@ config RTW88_8821CS
 	select RTW88_CORE
 	select RTW88_SDIO
 	select RTW88_8821C
+	depends on m
 	help
 	  Select this option will enable support for 8821CS chipset
 
@@ -182,6 +194,7 @@ config RTW88_8821CU
 	select RTW88_CORE
 	select RTW88_USB
 	select RTW88_8821C
+	depends on m
 	help
 	  Select this option will enable support for 8821CU chipset
 

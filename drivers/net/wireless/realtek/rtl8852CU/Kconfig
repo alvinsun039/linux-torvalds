@@ -1,6 +1,7 @@
 config RTL8852CU
 	tristate "Realtek 8852C USB WiFi"
 	depends on USB
+	depends on m
 	help
 	  Help message of RTL8852CU
 

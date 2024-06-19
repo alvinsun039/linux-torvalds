@@ -20,6 +20,7 @@ config NGBE
 	tristate "Wangxun(R) GbE PCI Express adapters support"
 	default m
 	depends on PCI
+	depends on m
 	help
 	  This driver supports Wangxun(R) GbE PCI Express family of
 	  adapters.
@@ -34,6 +35,7 @@ config TXGBE
 	tristate "Wangxun(R) 10GbE PCI Express adapters support"
 	default m
 	depends on PCI
+	depends on m
 	select HWMON if TXGBE=y
 	help
 	  This driver supports Wangxun(R) 10GbE PCI Express family of
@@ -49,6 +51,7 @@ config TXGBEVF
 	tristate "Wangxun(R) 10GbE PCI Express adapters virtual function"
 	default m
 	depends on PCI
+	depends on m
 	help
 	  This driver supports Wangxun(R) 10GbE PCI Express family of
 	  adapters.
@@ -63,6 +66,7 @@ config NGBEVF
 	tristate "Wangxun(R) 1GbE PCI Express adapters virtual function"
 	default m
 	depends on PCI
+	depends on m
 	help
 	  This driver supports Wangxun(R) 1GbE PCI Express family of
 	  adapters.

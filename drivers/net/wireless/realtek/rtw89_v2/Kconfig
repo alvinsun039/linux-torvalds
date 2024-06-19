@@ -37,6 +37,7 @@ config RTW89_8851BE
 	select RTW89_CORE
 	select RTW89_PCI
 	select RTW89_8851B
+	depends on m
 	default m
 	help
 	  Select this option will enable support for 8851BE chipset
@@ -49,6 +50,7 @@ config RTW89_8852AE
 	select RTW89_CORE
 	select RTW89_PCI
 	select RTW89_8852A
+	depends on m
 	help
 	  Select this option will enable support for 8852AE chipset
 
@@ -60,6 +62,7 @@ config RTW89_8852BE
 	select RTW89_CORE
 	select RTW89_PCI
 	select RTW89_8852B
+	depends on m
 	help
 	  Select this option will enable support for 8852BE chipset
 
@@ -71,6 +74,7 @@ config RTW89_8852CE
 	select RTW89_CORE
 	select RTW89_PCI
 	select RTW89_8852C
+	depends on m
 	help
 	  Select this option will enable support for 8852CE chipset
 
@@ -79,6 +83,7 @@ config RTW89_8852CE
 config RTW89_8922AE
 	tristate "Realtek 8922AE PCI wireless network (Wi-Fi 7) adapter"
 	depends on PCI
+	depends on m
 	select RTW89_CORE
 	select RTW89_PCI
 	select RTW89_8922A
