@@ -1,4 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
+ccflags-y += -Wno-enum-conversion
+ccflags-y += -Wno-sizeof-array-div
+ccflags-y += -Wno-cast-function-type
+ccflags-y += -Wno-implicit-fallthrough
+ccflags-y += -Wno-discarded-qualifiers
+ccflags-y += -Wno-misleading-indentation
 
 obj-$(CONFIG_RTW89_CORE) += rtw89_core.o
 rtw89_core-y += drv_ver.o
