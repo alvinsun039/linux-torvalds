@@ -127,6 +127,7 @@ static const char txgbe_underheat_msg[] =
 static const struct pci_device_id txgbe_pci_tbl[] = {
 	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_SP1000), 0},
 	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_WX1820), 0},
+	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_AML), 0},
 	/* required last entry */
 	{ .device = 0 }
 };
@@ -656,16 +657,18 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
 	ERROR_REPORT1(TXGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", pci_cmd);
 
-	value2 = rd32(&adapter->hw,0x10000);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value2);
-	value2 = rd32(&adapter->hw,0x180d0);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d0 value is 0x%08x\n", value2);
-	value2 = rd32(&adapter->hw,0x180d4);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d4 value is 0x%08x\n", value2);
-	value2 = rd32(&adapter->hw,0x180d8);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d8 value is 0x%08x\n", value2);
-	value2 = rd32(&adapter->hw,0x180dc);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180dc value is 0x%08x\n", value2);
+	if (!hw->amlite) {
+		value2 = rd32(&adapter->hw, 0x10000);
+		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value2);
+		value2 = rd32(&adapter->hw, 0x180d0);
+		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d0 value is 0x%08x\n", value2);
+		value2 = rd32(&adapter->hw, 0x180d4);
+		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d4 value is 0x%08x\n", value2);
+		value2 = rd32(&adapter->hw, 0x180d8);
+		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180d8 value is 0x%08x\n", value2);
+		value2 = rd32(&adapter->hw, 0x180dc);
+		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x180dc value is 0x%08x\n", value2);
+	}
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		head = rd32(&adapter->hw, TXGBE_PX_TR_RP(adapter->tx_ring[i]->reg_idx));
@@ -714,11 +717,14 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 			       struct txgbe_ring *tx_ring,  int napi_budget)
 {
 	struct txgbe_adapter *adapter = q_vector->adapter;
+	struct txgbe_hw *hw = &adapter->hw;
 	struct txgbe_tx_buffer *tx_buffer;
 	union txgbe_tx_desc *tx_desc;
 	unsigned int total_bytes = 0, total_packets = 0;
 	unsigned int budget = q_vector->tx.work_limit;
 	unsigned int i = tx_ring->next_to_clean;
+	u32 head = *(tx_ring->headwb_mem);
+	u32 temp = tx_ring->next_to_clean;
 	u16 vid = 0;
 	int j = 0;
 	u32 size;
@@ -740,9 +746,19 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 		/* prevent any other reads prior to eop_desc */
 		smp_rmb();
 
-		/* if DD is not set pending work has not been completed */
-		if (!(eop_desc->wb.status & cpu_to_le32(TXGBE_TXD_STAT_DD)))
-			break;
+		if (hw->amlite) {
+			/* we have caught up to head, no work left to do */
+			if (temp == head) {
+				break;
+			} else if (head > temp && !(tx_buffer->next_eop >= temp && (tx_buffer->next_eop < head))) {
+				break;
+			} else if (!(tx_buffer->next_eop >= temp || (tx_buffer->next_eop < head))) {
+				break;
+			}
+		} else
+			/* if DD is not set pending work has not been completed */
+			if (!(eop_desc->wb.status & cpu_to_le32(TXGBE_TXD_STAT_DD)))
+				break;
 
 		/* clear next_to_watch to prevent false hangs */
 		tx_buffer->next_to_watch = NULL;
@@ -3540,6 +3556,15 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		}
 	}
 #endif
+
+#if 0
+	/* amlite: add SWFW mbox int */
+	if (hw->amlite && eicr & TXGBE_PX_MISC_IC_MNG_HOST_MBOX) {
+		adapter->flags |= TXGBE_FLAG_SWFW_MBOX_NOTIFY;
+		txgbe_service_event_schedule(adapter);
+	}
+#endif
+
 	txgbe_check_sfp_event(adapter, eicr);
 	txgbe_check_overtemp_event(adapter, eicr);
 
@@ -3909,6 +3934,38 @@ static void txgbe_configure_msi_and_legacy(struct txgbe_adapter *adapter)
 	e_info(hw, "Legacy interrupt IVAR setup done\n");
 }
 
+/* amlite: tx header wb */
+int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
+{
+	struct txgbe_adapter *adapter = ring->q_vector->adapter;
+	struct txgbe_hw *hw = &adapter->hw;
+	struct device *dev = ring->dev;
+	u8 headwb_size = 0;
+
+	if (!hw->amlite)
+		return 0;
+
+	if (TXGBE_TXHEAD_WB == 1)
+		headwb_size = 16;
+	else if (TXGBE_TXHEAD_WB == 2)
+		headwb_size = 16;
+	else
+		headwb_size = 1;
+
+	ring->headwb_mem = dma_alloc_coherent(dev,
+					   sizeof(u32) * headwb_size,
+					   &ring->headwb_dma,
+					   GFP_KERNEL);
+	if (!ring->headwb_mem) {
+		e_err(drv, "txgbe_setup_headwb_resources no mem\n");
+		return -ENOMEM;
+	}
+	memset(ring->headwb_mem, 0, sizeof(u32) * headwb_size);
+
+	return 0;
+}
+
+
 /**
  * txgbe_configure_tx_ring - Configure Tx ring after Reset
  * @adapter: board private structure
@@ -3982,6 +4039,17 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 
 	clear_bit(__TXGBE_HANG_CHECK_ARMED, &ring->state);
 
+	if (hw->amlite) {
+		wr32(hw, TXGBE_PX_TR_HEAD_ADDRL(reg_idx),
+			 ring->headwb_dma & DMA_BIT_MASK(32));
+		wr32(hw, TXGBE_PX_TR_HEAD_ADDRH(reg_idx), ring->headwb_dma >> 32);
+
+		if (TXGBE_TXHEAD_WB == 1)
+			txdctl |= TXGBE_PX_TR_CFG_HEAD_WB | TXGBE_PX_TR_CFG_HEAD_WB_64BYTE;
+		else
+			txdctl |= TXGBE_PX_TR_CFG_HEAD_WB;
+	}
+
 	/* enable queue */
 	wr32(hw, TXGBE_PX_TR_CFG(reg_idx), txdctl);
 
@@ -3994,8 +4062,6 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 	if (!wait_loop)
 		e_err(drv, "Could not enable Tx Queue %d\n", reg_idx);
 }
-
-
 
 /**
  * txgbe_configure_tx - Configure Transmit Unit after Reset
@@ -4025,6 +4091,7 @@ static void txgbe_configure_tx(struct txgbe_adapter *adapter)
 	for (i = 0; i < adapter->num_xdp_queues; i++)
 		txgbe_configure_tx_ring(adapter, adapter->xdp_ring[i]);
 	wr32m(hw, TXGBE_TSC_BUF_AE, 0x3FF, 0x10);
+
 	/* enable mac transmitter */
 	wr32m(hw, TXGBE_MAC_TX_CFG,
 		TXGBE_MAC_TX_CFG_TE, TXGBE_MAC_TX_CFG_TE);
@@ -4502,6 +4569,10 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 				rxdctl &= ~TXGBE_PX_RR_CFG_VLAN;
 
 	rxdctl |= 0x1 << TXGBE_PX_RR_CFG_RR_THER_SHIFT;
+
+	if (hw->amlite)
+		rxdctl |= TXGBE_PX_RR_CFG_DESC_MERGE;
+
 	wr32(hw, TXGBE_PX_RR_CFG(reg_idx), rxdctl);
 
 	/* reset head and tail pointers */
@@ -6388,8 +6459,6 @@ static void txgbe_configure(struct txgbe_adapter *adapter)
 		txgbe_fdir_filter_restore(adapter);
 	}
 
-	TCALL(hw, mac.ops.enable_sec_rx_path);
-
 	TCALL(hw, mac.ops.setup_eee,
 		(adapter->flags2 & TXGBE_FLAG2_EEE_CAPABLE) &&
 		(adapter->flags2 & TXGBE_FLAG2_EEE_ENABLED));
@@ -6582,6 +6651,7 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 #ifndef TXGBE_NO_LLI
 	txgbe_configure_lli(adapter);
 #endif
+
 	if (txgbe_is_sfp(hw)) {
 		txgbe_sfp_link_config(adapter);
 	} else if (txgbe_is_backplane(hw)) {
@@ -6592,18 +6662,53 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 		if (err)
 			e_err(probe, "link_config FAILED %d\n", err);
 	}
-	links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
-	if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
-		if (links_reg & TXGBE_CFG_PORT_ST_LINK_10G) {
-			wr32(hw, TXGBE_MAC_TX_CFG,
-				(rd32(hw, TXGBE_MAC_TX_CFG) &
-				~TXGBE_MAC_TX_CFG_SPEED_MASK) |
-				TXGBE_MAC_TX_CFG_SPEED_10G);
-		} else if (links_reg & (TXGBE_CFG_PORT_ST_LINK_1G | TXGBE_CFG_PORT_ST_LINK_100M)) {
-			wr32(hw, TXGBE_MAC_TX_CFG,
-				(rd32(hw, TXGBE_MAC_TX_CFG) &
-				~TXGBE_MAC_TX_CFG_SPEED_MASK) |
-				TXGBE_MAC_TX_CFG_SPEED_1G);
+
+	if (hw->amlite) {
+		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
+		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
+			if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_50G) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_AML_SPEED_50G);
+			} else if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_AML_SPEED_40G);
+			} else if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_AML_SPEED_25G);
+			} else if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_10G) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_AML_SPEED_10G);
+			}
+		}
+
+		/* amlite: restart gpio */
+		wr32(hw, TXGBE_GPIO_DDR, TXGBE_GPIO_DDR_0 | TXGBE_GPIO_DDR_1);
+		wr32(hw, TXGBE_GPIO_DR, 0x0);
+		msleep(10);
+		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_0);
+
+	} else {
+		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
+		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
+			if (links_reg & TXGBE_CFG_PORT_ST_LINK_10G) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_SPEED_10G);
+			} else if (links_reg & (TXGBE_CFG_PORT_ST_LINK_1G | TXGBE_CFG_PORT_ST_LINK_100M)) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_SPEED_MASK) |
+					TXGBE_MAC_TX_CFG_SPEED_1G);
+			}
 		}
 	}
 
@@ -6618,9 +6723,9 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_XAUI) {
 		txgbe_read_mdio(&hw->phy_dev, hw->phy.addr, 0x03, 0x8011, &value);
 		/* only enable T unit int */
-		txgbe_write_mdio(&hw->phy_dev, hw->phy.addr, 31, 0xf043, 0x1); 
+		txgbe_write_mdio(&hw->phy_dev, hw->phy.addr, 31, 0xf043, 0x1);
 		/* active high */
-		txgbe_write_mdio(&hw->phy_dev, hw->phy.addr, 31, 0xf041, 0x0); 
+		txgbe_write_mdio(&hw->phy_dev, hw->phy.addr, 31, 0xf041, 0x0);
 		/* enable AN complete and link status change int */
 		txgbe_write_mdio(&hw->phy_dev, hw->phy.addr, 0x03, 0x8010, 0xc00);
 	}
@@ -6672,10 +6777,59 @@ void txgbe_reinit_locked(struct txgbe_adapter *adapter)
 #else
 	adapter->netdev->trans_start = jiffies;
 #endif
+	adapter->flags2 |= TXGBE_FLAG2_SERVICE_RUNNING;
+
 
 	while (test_and_set_bit(__TXGBE_RESETTING, &adapter->state))
 		usleep_range(1000, 2000);
 	txgbe_down(adapter);
+	/*
+	 * If SR-IOV enabled then wait a bit before bringing the adapter
+	 * back up to give the VFs time to respond to the reset.  The
+	 * two second wait is based upon the watchdog timer cycle in
+	 * the VF driver.
+	 */
+	if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED)
+		msleep(2000);
+	txgbe_up(adapter);
+	clear_bit(__TXGBE_RESETTING, &adapter->state);
+	adapter->flags2 &= ~TXGBE_FLAG2_KR_PRO_REINIT;
+}
+
+void txgbe_reinit_locked_dma_reset(struct txgbe_adapter *adapter)
+{
+#ifdef TXGBE_DMA_RESET
+	struct txgbe_hw *hw = &adapter->hw;
+#endif
+
+	if (adapter->flags2 & TXGBE_FLAG2_KR_PRO_REINIT) {
+		return;
+	}
+
+	adapter->flags2 |=  TXGBE_FLAG2_KR_PRO_REINIT;
+
+	WARN_ON(in_interrupt());
+	/* put off any impending NetWatchDogTimeout */
+#ifdef HAVE_NETIF_TRANS_UPDATE
+	netif_trans_update(adapter->netdev);
+#else
+	adapter->netdev->trans_start = jiffies;
+#endif
+
+	while (test_and_set_bit(__TXGBE_RESETTING, &adapter->state))
+		usleep_range(1000, 2000);
+	txgbe_down(adapter);
+
+#ifdef TXGBE_DMA_RESET
+	printk("dma reset\n");
+	wr32(hw, TXGBE_MIS_RST,
+		1 << 4);
+	TXGBE_WRITE_FLUSH(hw);
+	msleep(1000);
+
+	/* amlite: bme */
+	wr32(hw, 0x4B8, 0x1);
+#endif
 	/*
 	 * If SR-IOV enabled then wait a bit before bringing the adapter
 	 * back up to give the VFs time to respond to the reset.  The
@@ -7004,6 +7158,7 @@ void txgbe_disable_device(struct txgbe_adapter *adapter)
 #ifdef POLL_LINK_STATUS
 	del_timer_sync(&adapter->link_check_timer);
 #endif
+	adapter->flags2 &= ~TXGBE_FLAG2_SERVICE_RUNNING;
 
 	hw->f2c_mod_status = false;
 	cancel_work_sync(&adapter->sfp_sta_task);
@@ -7135,7 +7290,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	}
 
 	hw->oem_svid = pdev->subsystem_vendor;
-	hw->oem_ssid = pdev->subsystem_device;	
+	hw->oem_ssid = pdev->subsystem_device;
 	if (pdev->subsystem_vendor == 0x8088) {
 		hw->subsystem_vendor_id = pdev->subsystem_vendor;
 		hw->subsystem_device_id = pdev->subsystem_device;
@@ -7320,6 +7475,8 @@ int txgbe_setup_tx_resources(struct txgbe_ring *tx_ring)
 						   &tx_ring->dma, GFP_KERNEL);
 	if (!tx_ring->desc)
 		goto err;
+
+	txgbe_setup_headwb_resources(tx_ring);
 
 	return 0;
 
@@ -7517,6 +7674,29 @@ void txgbe_free_isb_resources(struct txgbe_adapter *adapter)
 	adapter->isb_mem = NULL;
 }
 
+void txgbe_free_headwb_resources(struct txgbe_ring *ring)
+{
+	u8 headwb_size = 0;
+	struct txgbe_adapter *adapter = ring->q_vector->adapter;
+	struct txgbe_hw *hw = &adapter->hw;
+
+	if (!hw->amlite)
+		return;
+
+	if (TXGBE_TXHEAD_WB == 1)
+		headwb_size = 16;
+	else if (TXGBE_TXHEAD_WB == 2)
+		headwb_size = 16;
+	else
+		headwb_size = 1;
+
+	if (ring->headwb_mem) {
+		dma_free_coherent(ring->dev, sizeof(u32) * headwb_size,
+				  ring->headwb_mem, ring->headwb_dma);
+		ring->headwb_mem = NULL;
+	}
+}
+
 /**
  * txgbe_free_tx_resources - Free Tx Resources per Queue
  * @tx_ring: Tx descriptor ring for a specific queue
@@ -7537,6 +7717,9 @@ void txgbe_free_tx_resources(struct txgbe_ring *tx_ring)
 	dma_free_coherent(tx_ring->dev, tx_ring->size,
 			  tx_ring->desc, tx_ring->dma);
 	tx_ring->desc = NULL;
+
+	txgbe_free_headwb_resources(tx_ring);
+
 }
 
 /**
@@ -8464,25 +8647,54 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 			txgbe_ptp_start_cyclecounter(adapter);
 
 #endif
-		if (link_speed & TXGBE_LINK_SPEED_10GB_FULL) {
-			wr32(hw, TXGBE_MAC_TX_CFG,
-				(rd32(hw, TXGBE_MAC_TX_CFG) &
-				~TXGBE_MAC_TX_CFG_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
-				TXGBE_MAC_TX_CFG_SPEED_10G);
-		} else if (link_speed & (TXGBE_LINK_SPEED_1GB_FULL |
-				TXGBE_LINK_SPEED_100_FULL | TXGBE_LINK_SPEED_10_FULL)) {
-			wr32(hw, TXGBE_MAC_TX_CFG,
-				(rd32(hw, TXGBE_MAC_TX_CFG) &
-				~TXGBE_MAC_TX_CFG_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
-				TXGBE_MAC_TX_CFG_SPEED_1G);
-		}
+		if (hw->amlite) {
+			if (link_speed & TXGBE_LINK_SPEED_50GB_FULL) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_50G);
+			} else if (link_speed & TXGBE_LINK_SPEED_40GB_FULL) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_40G);
+			} else if (link_speed & TXGBE_LINK_SPEED_25GB_FULL) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_25G);
+			} else if (link_speed & TXGBE_LINK_SPEED_10GB_FULL) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_10G);
+			} else {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_1G);
+			}
+		} else {
+			if (link_speed & TXGBE_LINK_SPEED_10GB_FULL) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_SPEED_10G);
+			} else if (link_speed & (TXGBE_LINK_SPEED_1GB_FULL |
+					TXGBE_LINK_SPEED_100_FULL | TXGBE_LINK_SPEED_10_FULL)) {
+				wr32(hw, TXGBE_MAC_TX_CFG,
+					(rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_SPEED_1G);
+			}
 
-		/* Re configure MAC RX */
-		reg = rd32(hw, TXGBE_MAC_RX_CFG);
-		wr32(hw, TXGBE_MAC_RX_CFG, reg);
-		wr32(hw, TXGBE_MAC_PKT_FLT, TXGBE_MAC_PKT_FLT_PR);
-		reg = rd32(hw, TXGBE_MAC_WDG_TIMEOUT);
-		wr32(hw, TXGBE_MAC_WDG_TIMEOUT, reg);
+			/* Re configure MAC RX */
+			reg = rd32(hw, TXGBE_MAC_RX_CFG);
+			wr32(hw, TXGBE_MAC_RX_CFG, reg);
+			wr32(hw, TXGBE_MAC_PKT_FLT, TXGBE_MAC_PKT_FLT_PR);
+			reg = rd32(hw, TXGBE_MAC_WDG_TIMEOUT);
+			wr32(hw, TXGBE_MAC_WDG_TIMEOUT, reg);
+		}
 	}
 
 	if (hw->mac.ops.dmac_config && hw->mac.dmac_config.watchdog_timer) {
@@ -8787,6 +8999,7 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	txgbe_spoof_check(adapter);
 #endif /* CONFIG_PCI_IOV */
 
+
 	txgbe_update_stats(adapter);
 
 	txgbe_watchdog_flush_tx(adapter);
@@ -8895,23 +9108,26 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 		}
 	}
 
-    if(device_type == TXGBE_ID_MAC_XAUI ||
-		(txgbe_get_media_type(hw) == txgbe_media_type_copper &&
-		device_type == TXGBE_ID_SFI_XAUI)) {
-        speed = TXGBE_LINK_SPEED_10GB_FULL;
-    } else if (device_type == TXGBE_ID_MAC_SGMII) {
-    	speed = TXGBE_LINK_SPEED_1GB_FULL;
-    }else {
-        speed = hw->phy.autoneg_advertised;
-        if ((!speed) && (hw->mac.ops.get_link_capabilities)) {
-                TCALL(hw, mac.ops.get_link_capabilities, &speed, &autoneg);
-                /* setup the highest link when no autoneg */
-                if (!autoneg) {
-                        if (speed & TXGBE_LINK_SPEED_10GB_FULL)
-                                speed = TXGBE_LINK_SPEED_10GB_FULL;
-                }
-        }
-    }
+	if (device_type == TXGBE_ID_MAC_XAUI ||
+	   (txgbe_get_media_type(hw) == txgbe_media_type_copper &&
+	   device_type == TXGBE_ID_SFI_XAUI)) {
+		speed = TXGBE_LINK_SPEED_10GB_FULL;
+	} else if (device_type == TXGBE_ID_MAC_SGMII) {
+		speed = TXGBE_LINK_SPEED_1GB_FULL;
+	} else {
+		speed = hw->phy.autoneg_advertised;
+		if ((!speed) && (hw->mac.ops.get_link_capabilities)) {
+			TCALL(hw, mac.ops.get_link_capabilities, &speed, &autoneg);
+			/* setup the highest link when no autoneg */
+			if (!autoneg) {
+				if (speed & TXGBE_LINK_SPEED_25GB_FULL)
+					speed = TXGBE_LINK_SPEED_25GB_FULL;
+				else if (speed & TXGBE_LINK_SPEED_10GB_FULL)
+					speed = TXGBE_LINK_SPEED_10GB_FULL;
+			}
+		}
+	}
+
 
 	TCALL(hw, mac.ops.setup_link, speed, false);
 
@@ -8931,6 +9147,9 @@ static void txgbe_sfp_reset_eth_phy_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	adapter->flags2 &= ~TXGBE_FLAG_NEED_ETH_PHY_RESET;
+
+	if (hw->amlite)
+		return;
 
 	TCALL(hw, mac.ops.check_link, &speed, &linkup, false);
 	if (!linkup) {
@@ -9102,7 +9321,8 @@ static void txgbe_reset_subtask(struct txgbe_adapter *adapter)
 	if (!(adapter->flags2 & (TXGBE_FLAG2_PF_RESET_REQUESTED |
 		TXGBE_FLAG2_DEV_RESET_REQUESTED |
 		TXGBE_FLAG2_GLOBAL_RESET_REQUESTED |
-		TXGBE_FLAG2_RESET_INTR_RECEIVED)))
+		TXGBE_FLAG2_RESET_INTR_RECEIVED |
+		TXGBE_FLAG2_DMA_RESET_REQUESTED)))
 		return;
 
 	/* If we're already down, just bail */
@@ -9178,6 +9398,10 @@ static void txgbe_reset_subtask(struct txgbe_adapter *adapter)
 		reset_flag |= TXGBE_FLAG2_PF_RESET_REQUESTED;
 		adapter->flags2 &= ~TXGBE_FLAG2_PF_RESET_REQUESTED;
 	}
+	if (adapter->flags2 & TXGBE_FLAG2_DMA_RESET_REQUESTED) {
+		reset_flag |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+		adapter->flags2 &= ~TXGBE_FLAG2_DMA_RESET_REQUESTED;
+	}
 
 	if (adapter->flags2 & TXGBE_FLAG2_RESET_INTR_RECEIVED) {
 		/* If there's a recovery already waiting, it takes
@@ -9223,6 +9447,8 @@ static void txgbe_reset_subtask(struct txgbe_adapter *adapter)
 		/*debug to up*/
 		/*txgbe_dump(adapter);*/
 		txgbe_reinit_locked(adapter);
+	} else if (reset_flag & TXGBE_FLAG2_DMA_RESET_REQUESTED) {
+		txgbe_reinit_locked_dma_reset(adapter);
 	} else if (reset_flag & TXGBE_FLAG2_GLOBAL_RESET_REQUESTED) {
 		/* Request a Global Reset
 		 *
@@ -9335,7 +9561,53 @@ static void txgbe_tx_queue_clear_error_task(struct txgbe_adapter *adapter)
 		}
 	}
 }
+#if 0
+static void txgbe_swfw_mbox_subtask(struct txgbe_adapter *adapter)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 bi;
+	u32 hdr_size = sizeof(struct txgbe_hic_hdr);
+	u16 buf_len;
+	u32 dword_len;
 
+	if (!(adapter->flags & TXGBE_FLAG_SWFW_MBOX_NOTIFY))
+		return;
+
+	printk("recv a mbox notify\n");
+
+	/* Calculate length in DWORDs */
+	dword_len = hdr_size >> 2;
+
+	/* first pull in the header so we know the buffer length */
+	for (bi = 0; bi < dword_len; bi++) {
+		adapter->swfw_mbox_buf[bi] = rd32a(hw, TXGBE_AML_MNG_MBOX_FW2SW, bi);
+		TXGBE_LE32_TO_CPUS(&adapter->swfw_mbox_buf[bi]);
+	}
+
+	/* If there is any thing in data position pull it in */
+	buf_len = ((struct txgbe_hic_hdr *)adapter->swfw_mbox_buf)->buf_len;
+	if (buf_len == 0)
+		return;
+
+	/* Calculate length in DWORDs, add 3 for odd lengths */
+	dword_len = (buf_len + 3) >> 2;
+
+	/* Pull in the rest of the buffer (bi is where we left off) */
+	for (; bi <= dword_len; bi++) {
+		adapter->swfw_mbox_buf[bi] = rd32a(hw, TXGBE_AML_MNG_MBOX_FW2SW,
+						bi);
+		TXGBE_LE32_TO_CPUS(&adapter->swfw_mbox_buf[bi]);
+	}
+
+	printk("recv mbox data, store in swfw_mbox_buf\n");
+
+
+	/* amlite: check if it is a reply, then inform */
+	adapter->flags2 |= TXGBE_FLAG2_SWFW_MBOX_REPLY;
+
+	adapter->flags &= ~TXGBE_FLAG_SWFW_MBOX_NOTIFY;
+}
+#endif
 /**
  * txgbe_service_task - manages and runs subtasks
  * @work: pointer to work_struct containing our data
@@ -9370,6 +9642,7 @@ static void txgbe_service_task(struct work_struct *work)
 #endif /* HAVE_UDP_ENC_RX_OFFLOAD || HAVE_VXLAN_RX_OFFLOAD */
 
 	txgbe_check_pcie_subtask(adapter);
+/*	txgbe_swfw_mbox_subtask(adapter); */
 	txgbe_reset_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
@@ -10146,6 +10419,9 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 
 	/* set next_to_watch value indicating a packet is present */
 	first->next_to_watch = tx_desc;
+
+	/* set next_eop for amlite tx head wb*/
+	first->next_eop = i;
 
 	i++;
 	if (i == tx_ring->count)
@@ -12262,7 +12538,6 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		goto err_pci_reg;
 	}
 
-
 	hw = vmalloc(sizeof(struct txgbe_hw));
 	if (!hw) {
 		pr_info("Unable to allocate memory for early mac "
@@ -12304,11 +12579,17 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	adapter->indices = indices;
 #endif
 #endif /* HAVE_TX_MQ */
+
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
 	hw = &adapter->hw;
 	hw->back = adapter;
 	adapter->msg_enable = (1 << DEFAULT_DEBUG_LEVEL_SHIFT) - 1;
+
+	if (pdev->device == TXGBE_DEV_ID_AML)
+		hw->amlite = true;
+	else
+		hw->amlite = false;
 
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
@@ -12351,6 +12632,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	/* reset_hw fills in the perm_addr as well */
 	hw->phy.reset_if_overtemp = true;
 	err = TCALL(hw, mac.ops.reset_hw);
+
 	/* Store the permanent mac address */
 	TCALL(hw, mac.ops.get_mac_addr, hw->mac.perm_addr);
 	hw->phy.reset_if_overtemp = false;
@@ -12608,12 +12890,15 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 
 	TCALL(hw, eeprom.ops.init_params);
 	/* make sure the EEPROM is good */
-	if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
-		e_dev_err("The EEPROM Checksum Is Not Valid\n");
-		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);
-		err = -EIO;
-		goto err_sw_init;
-	}
+
+	if (!hw->amlite)
+		if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
+			e_dev_err("The EEPROM Checksum Is Not Valid\n");
+			wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);
+			err = -EIO;
+			goto err_sw_init;
+		}
+
 	eth_hw_addr_set(netdev, hw->mac.perm_addr);
 
 	if (!is_valid_ether_addr(netdev->dev_addr)) {
@@ -12874,12 +13159,11 @@ no_info_string:
 	txgbe_dbg_adapter_init(adapter);
 #endif /* HAVE_TXGBE_DEBUG_FS */
 
-	/* setup link for SFP devices with MNG FW, else wait for TXGBE_UP */
 	if (txgbe_mng_present(hw) && txgbe_is_sfp(hw) &&
 		((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP))
 		TCALL(hw, mac.ops.setup_link,
-			TXGBE_LINK_SPEED_10GB_FULL | TXGBE_LINK_SPEED_1GB_FULL,
-			true);
+			TXGBE_LINK_SPEED_25GB_FULL | TXGBE_LINK_SPEED_10GB_FULL |
+			TXGBE_LINK_SPEED_1GB_FULL, true);
 
 	TCALL(hw, mac.ops.setup_eee,
 		(adapter->flags2 & TXGBE_FLAG2_EEE_CAPABLE) &&
@@ -12893,6 +13177,11 @@ no_info_string:
 		e_info(probe, "disable completion timeout\n");
 	}
 
+	if (hw->amlite) {
+		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_10GB_FULL, false);
+		if (err)
+			goto err_register;
+	}
 	return 0;
 
 err_register:

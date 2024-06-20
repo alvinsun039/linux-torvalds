@@ -71,12 +71,14 @@
 #define TXGBE_INCVAL_100  0xA00000
 #define TXGBE_INCVAL_10   0xC7F380
 #define TXGBE_INCVAL_FPGA 0x800000
+#define TXGBE_INCVAL_FPGA_AML 0xA00000
 
 #define TXGBE_INCVAL_SHIFT_10GB  20
 #define TXGBE_INCVAL_SHIFT_1GB   18
 #define TXGBE_INCVAL_SHIFT_100   15
 #define TXGBE_INCVAL_SHIFT_10    12
 #define TXGBE_INCVAL_SHIFT_FPGA  17
+#define TXGBE_INCVAL_SHIFT_FPGA_AML  17
 
 #define TXGBE_OVERFLOW_PERIOD    (HZ * 30)
 #define TXGBE_PTP_TX_TIMEOUT     (HZ)
@@ -658,6 +660,7 @@ int txgbe_ptp_set_ts_config(struct txgbe_adapter *adapter, struct ifreq *ifr)
 static void txgbe_ptp_link_speed_adjust(struct txgbe_adapter *adapter,
 					u32 *shift, u32 *incval)
 {
+	struct txgbe_hw *hw = &adapter->hw;
 	/**
 	 * Scale the NIC cycle counter by a large factor so that
 	 * relatively small corrections to the frequency can be added
@@ -672,26 +675,32 @@ static void txgbe_ptp_link_speed_adjust(struct txgbe_adapter *adapter,
 	 * link speed is 10Gb. Set the registers correctly even when link is
 	 * down to preserve the clock setting
 	 */
-	switch (adapter->link_speed) {
-	case TXGBE_LINK_SPEED_10_FULL:
-		*shift = TXGBE_INCVAL_SHIFT_10;
-		*incval = TXGBE_INCVAL_10;
-		break;
-	case TXGBE_LINK_SPEED_100_FULL:
-		*shift = TXGBE_INCVAL_SHIFT_100;
-		*incval = TXGBE_INCVAL_100;
-		break;
-	case TXGBE_LINK_SPEED_1GB_FULL:
-		*shift = TXGBE_INCVAL_SHIFT_1GB;
-		*incval = TXGBE_INCVAL_1GB;
-		break;
-	case TXGBE_LINK_SPEED_10GB_FULL:
-	default: /* TXGBE_LINK_SPEED_10GB_FULL */
-		*shift = TXGBE_INCVAL_SHIFT_10GB;
-		*incval = TXGBE_INCVAL_10GB;
-		break;
-	}
 
+	/*amlite TODO*/
+	if (hw->amlite) {
+		*shift = TXGBE_INCVAL_SHIFT_FPGA_AML;
+	*incval = TXGBE_INCVAL_FPGA_AML;
+	} else {
+		switch (adapter->link_speed) {
+		case TXGBE_LINK_SPEED_10_FULL:
+			*shift = TXGBE_INCVAL_SHIFT_10;
+			*incval = TXGBE_INCVAL_10;
+			break;
+		case TXGBE_LINK_SPEED_100_FULL:
+			*shift = TXGBE_INCVAL_SHIFT_100;
+			*incval = TXGBE_INCVAL_100;
+			break;
+		case TXGBE_LINK_SPEED_1GB_FULL:
+			*shift = TXGBE_INCVAL_SHIFT_1GB;
+			*incval = TXGBE_INCVAL_1GB;
+			break;
+		case TXGBE_LINK_SPEED_10GB_FULL:
+		default: /* TXGBE_LINK_SPEED_10GB_FULL */
+			*shift = TXGBE_INCVAL_SHIFT_10GB;
+			*incval = TXGBE_INCVAL_10GB;
+			break;
+		}
+	}
 	return;
 }
 

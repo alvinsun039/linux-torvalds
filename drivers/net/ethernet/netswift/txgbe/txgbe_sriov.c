@@ -1584,13 +1584,6 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	/* determine how many queues per pool based on VMDq mask */
 	queues_per_pool = __ALIGN_MASK(1, ~vmdq->mask);
 
-	max_tx_rate /= queues_per_pool;
-	bcnrc_val = TXGBE_TDM_RP_RATE_MAX(max_tx_rate);
-#ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
-	min_tx_rate /= queues_per_pool;
-	bcnrc_val |= TXGBE_TDM_RP_RATE_MIN(min_tx_rate);
-#endif
-
 	/*
 	 * Set global transmit compensation time to the MMW_SIZE in RTTBCNRM
 	 * register. Typically MMW_SIZE=0x014 if 9728-byte jumbo is supported
@@ -1598,18 +1591,36 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	 */
 	wr32(hw, TXGBE_TDM_MMW, 0x14);
 
-	/* write value for all Tx queues belonging to VF */
-	for (queue = 0; queue < queues_per_pool; queue++) {
-		unsigned int reg_idx = (vf * queues_per_pool) + queue;
-
-		wr32(hw, TXGBE_TDM_RP_IDX, reg_idx);
-		wr32(hw, TXGBE_TDM_RP_RATE, bcnrc_val);
+	if (hw->amlite) {
+		bcnrc_val = 1000 / max_tx_rate;
+		wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
+		wr32(hw, TXGBE_TDM_RL_VM_CFG, bcnrc_val << 16);
 		if (max_tx_rate)
-			wr32m(hw, TXGBE_TDM_RP_CTL,
-				TXGBE_TDM_RP_CTL_RLEN, TXGBE_TDM_RP_CTL_RLEN);
+			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
+				TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
 		else
-			wr32m(hw, TXGBE_TDM_RP_CTL,
-				TXGBE_TDM_RP_CTL_RLEN, 0);
+			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
+				TXGBE_TDM_RL_EN, 0);
+	} else  {
+		max_tx_rate /= queues_per_pool;
+		bcnrc_val = TXGBE_TDM_RP_RATE_MAX(max_tx_rate);
+#ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
+		min_tx_rate /= queues_per_pool;
+		bcnrc_val |= TXGBE_TDM_RP_RATE_MIN(min_tx_rate);
+#endif
+		/* write value for all Tx queues belonging to VF */
+		for (queue = 0; queue < queues_per_pool; queue++) {
+			unsigned int reg_idx = (vf * queues_per_pool) + queue;
+
+			wr32(hw, TXGBE_TDM_RP_IDX, reg_idx);
+			wr32(hw, TXGBE_TDM_RP_RATE, bcnrc_val);
+			if (max_tx_rate)
+				wr32m(hw, TXGBE_TDM_RP_CTL,
+					TXGBE_TDM_RP_CTL_RLEN, TXGBE_TDM_RP_CTL_RLEN);
+			else
+				wr32m(hw, TXGBE_TDM_RP_CTL,
+					TXGBE_TDM_RP_CTL_RLEN, 0);
+		}
 	}
 }
 

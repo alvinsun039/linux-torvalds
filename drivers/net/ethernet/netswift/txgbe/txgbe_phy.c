@@ -57,6 +57,42 @@ s32 txgbe_get_phy_id(struct txgbe_hw *hw)
 	u16 phy_id_high = 0;
 	u16 phy_id_low = 0;
 	u8 numport, thisport;
+	u32 i = 0;
+
+	if (hw->amlite) {
+		hw->phy.addr = 0;
+
+		for (i = 0; i < 32; i++) {
+			hw->phy.addr = i;
+			status = txgbe_read_phy_reg_mdi(hw, TXGBE_MDIO_PHY_ID_HIGH, 0, &phy_id_high);
+			if (status) {
+				printk("txgbe_read_phy_reg_mdi failed 1\n");
+				return status;
+			}
+			printk("%d: phy_id_high 0x%x\n", i, phy_id_high);
+			if ((phy_id_high & 0xFFFF) == 0x0141) {
+				break;
+			}
+		}
+
+		if (i == 32) {
+			printk("txgbe_read_phy_reg_mdi failed\n");
+			return TXGBE_ERR_PHY;
+		}
+
+		status = txgbe_read_phy_reg_mdi(hw, TXGBE_MDIO_PHY_ID_LOW, 0, &phy_id_low);
+		if (status) {
+			printk("txgbe_read_phy_reg_mdi failed 2\n");
+			return status;
+		}
+		hw->phy.id = (u32)(phy_id_high & 0xFFFF) << 6;
+		hw->phy.id |= (u32)((phy_id_low & 0xFC00) >> 10);
+
+		printk("txgbe_get_phy_id: phy_id 0x%x", hw->phy.id);
+
+		return status;
+
+	}
 
 	status = mtdHwXmdioRead(&hw->phy_dev, hw->phy.addr,
 				TXGBE_MDIO_PMA_PMD_DEV_TYPE,
@@ -308,6 +344,34 @@ MTD_SEM txgbe_sem_create(MTD_SEM_BEGIN_STATE state)
 }
 */
 
+void
+txgbe_amlfpga_phy_reset(struct txgbe_hw *hw)
+{
+	u32 loop = TXGBE_PHY_RST_WAIT_PERIOD;
+	u16 value;
+
+	txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
+	value |= MV1119_C_RESET;
+	printk("MV1119_C_RESET = 0x%X\n", MV1119_C_RESET);
+	printk("Control Reg 0 = 0x%X\n", value);
+	txgbe_write_phy_reg_mdi(hw, MV1119_CTRL, 0, value);
+	txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
+	printk("Control Reg = 0x%X\n", value);
+
+	do {
+		loop--;
+		txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
+		if (!(value & MV1119_C_RESET))
+			break;
+		msleep(1);
+	} while (loop > 0);
+
+	if (loop == 0) {
+		printk("MV88E1119 Copper Reset Fail\n");
+	}
+
+	return;
+}
 /**
  *  txgbe_setup_phy_link - Set and restart auto-neg
  *  @hw: pointer to hardware structure
@@ -490,6 +554,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u8 identifier = 0;
 	u8 comp_codes_1g = 0;
 	u8 comp_codes_10g = 0;
+	u8 comp_codes_25g = 0;
 	u8 oui_bytes[3] = {0, 0, 0};
 	u8 cable_tech = 0;
 	u8 cable_spec = 0;
@@ -528,6 +593,12 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 		status = TCALL(hw, phy.ops.read_i2c_eeprom,
 						     TXGBE_SFF_10GBE_COMP_CODES,
 						     &comp_codes_10g);
+		if (status != 0)
+			goto err_read_i2c_eeprom;
+
+		status = TCALL(hw, phy.ops.read_i2c_eeprom,
+						     TXGBE_SFF_10GBE_COMP_CODES,
+						     &comp_codes_25g);
 		if (status != 0)
 			goto err_read_i2c_eeprom;
 
@@ -577,6 +648,11 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type =
 							txgbe_sfp_type_unknown;
 				}
+			} else if (hw->amlite && comp_codes_25g & TXGBE_SFF_25GBASESR_CAPABLE) {
+				if (hw->bus.lan_id == 0)
+					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
+				else
+					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core1;
 			} else if (comp_codes_10g &
 				   (TXGBE_SFF_10GBASESR_CAPABLE |
 				    TXGBE_SFF_10GBASELR_CAPABLE)) {
@@ -617,11 +693,12 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 
 		/* Determine if the SFP+ PHY is dual speed or not. */
 		hw->phy.multispeed_fiber = false;
-		if (((comp_codes_1g & TXGBE_SFF_1GBASESX_CAPABLE) &&
-		   (comp_codes_10g & TXGBE_SFF_10GBASESR_CAPABLE)) ||
-		   ((comp_codes_1g & TXGBE_SFF_1GBASELX_CAPABLE) &&
-		   (comp_codes_10g & TXGBE_SFF_10GBASELR_CAPABLE)))
-			hw->phy.multispeed_fiber = true;
+		if (!hw->amlite)
+			if (((comp_codes_1g & TXGBE_SFF_1GBASESX_CAPABLE) &&
+			   (comp_codes_10g & TXGBE_SFF_10GBASESR_CAPABLE)) ||
+			   ((comp_codes_1g & TXGBE_SFF_1GBASELX_CAPABLE) &&
+			   (comp_codes_10g & TXGBE_SFF_10GBASELR_CAPABLE)))
+				hw->phy.multispeed_fiber = true;
 
 		/* Determine PHY vendor */
 		if (hw->phy.type != txgbe_phy_nl) {
@@ -725,7 +802,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 		}
 
 		/* Verify supported 1G SFP modules */
-		if (comp_codes_10g == 0 &&
+		if (comp_codes_10g == 0 && comp_codes_25g == 0 &&
 		    !(hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1 ||
 		      hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
 		      hw->phy.sfp_type == txgbe_sfp_type_1g_lx_core0 ||
@@ -1288,3 +1365,4 @@ s32 txgbe_external_phy_resume(struct txgbe_hw *hw)
 out:
 	return status;
 }
+

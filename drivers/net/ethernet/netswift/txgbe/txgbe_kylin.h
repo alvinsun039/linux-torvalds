@@ -117,12 +117,20 @@
 #define TXGBE_DIS_COMP_TIMEOUT 1 /* dis completion timeout, default 1 to dis */
 #endif
 
+#ifndef TXGBE_TXHEAD_WB
+#define TXGBE_TXHEAD_WB 0 // default 1 to 64BYTE, 0 to 4BYTE, 2 to 64BYTE allign(for test)
+#endif
+
 #ifndef AN73_TRAINNING_MODE
 #define AN73_TRAINNING_MODE 1	/* 0 : kd5886 1: centc 2: wx2wx */
 #endif
 
 #ifndef CL72_KRTR_PRBS31_EN
 #define CL72_KRTR_PRBS31_EN 0
+#endif
+
+#ifndef TXGBE_SWFW_MBOX_AML
+#define TXGBE_SWFW_MBOX_AML
 #endif
 
 /**************************performance************************************/

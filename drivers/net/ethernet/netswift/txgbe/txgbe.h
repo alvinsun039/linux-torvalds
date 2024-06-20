@@ -292,6 +292,7 @@ struct txgbe_lro_list {
  * so a DMA handle can be stored along with the buffer */
 struct txgbe_tx_buffer {
 	union txgbe_tx_desc *next_to_watch;
+	u32 next_eop;
 	unsigned long time_stamp;
 	union {
 		struct sk_buff *skb;
@@ -501,6 +502,8 @@ struct txgbe_ring {
 #endif
 #endif
 #endif
+	dma_addr_t headwb_dma;
+	u32 *headwb_mem;
 } ____cacheline_internodealigned_in_smp;
 
 enum txgbe_ring_f_enum {
@@ -911,6 +914,9 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG_LINKSEC_ENABLED              (u32)(1 << 31)
 #define TXGBE_FLAG_IPSEC_ENABLED                (u32)(1 << 5)
 
+/* amlite: new SW-FW mbox */
+//#define TXGBE_FLAG_SWFW_MBOX_NOTIFY             (u32)(1 << 29)
+
 /* preset defaults */
 #define TXGBE_FLAGS_SP_INIT (TXGBE_FLAG_MSI_CAPABLE \
 			   | TXGBE_FLAG_MSIX_CAPABLE \
@@ -955,6 +961,12 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_ECC_ERR_RESET               (1U << 29)
 #define TXGBE_FLAG2_PCIE_NEED_RECOVER           (1U << 31)
 #define TXGBE_FLAG2_PCIE_NEED_Q_RESET           (1U << 30)
+/* amlite: new SW-FW mbox */
+//#define TXGBE_FLAG2_SWFW_MBOX_REPLY             (1U << 30)
+#define TXGBE_FLAG2_SERVICE_RUNNING             (1U << 13)
+
+/* amlite: dma reset */
+#define TXGBE_FLAG2_DMA_RESET_REQUESTED          (1U << 2)
 
 
 
@@ -1124,7 +1136,6 @@ struct txgbe_adapter {
 	u32 wol;
 
 	u16 bd_number;
-
 #ifdef HAVE_BRIDGE_ATTRIBS
 	u16 bridge_mode;
 #endif
@@ -1228,6 +1239,10 @@ struct txgbe_adapter {
 	u16 num_xsk_pools;
 #endif
 	bool cmplt_to_dis;
+
+	/* amlite: new SW-FW mbox */
+/*	u32 swfw_mbox_buf[64]; */
+	u8 swfw_index;
 };
 
 static inline u32 txgbe_misc_isb(struct txgbe_adapter *adapter,
@@ -1272,6 +1287,7 @@ enum txgbe_state_t {
 	__TXGBE_PTP_RUNNING,
 	__TXGBE_PTP_TX_IN_PROGRESS,
 #endif
+	__TXGBE_SWFW_BUSY,
 };
 
 struct txgbe_cb {
@@ -1477,6 +1493,7 @@ void txgbe_configure_isb(struct txgbe_adapter *adapter);
 void txgbe_clean_tx_ring(struct txgbe_ring *tx_ring);
 void txgbe_clean_rx_ring(struct txgbe_ring *rx_ring);
 u32 txgbe_tx_cmd_type(u32 tx_flags);
+void txgbe_free_headwb_resources(struct txgbe_ring *ring);
 
 /**
  * interrupt masking operations. each bit in PX_ICn correspond to a interrupt.
