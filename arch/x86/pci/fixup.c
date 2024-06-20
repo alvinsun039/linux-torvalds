@@ -955,6 +955,24 @@ static void asus_disable_nvme_d3cold(struct pci_dev *pdev)
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x9a09, asus_disable_nvme_d3cold);
 
+/* HYGON DCU device not support vfio pci reset, fixup it. */
+static void quirk_hydcu_fixup_header(struct pci_dev *dev)
+{
+	dev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
+	dev->pm_cap = 0;
+}
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x51b7, quirk_hydcu_fixup_header); /* Z100SM */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x52b7, quirk_hydcu_fixup_header); /* C878182 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x53b7, quirk_hydcu_fixup_header); /* C878186 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x54b7, quirk_hydcu_fixup_header); /* Z100 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x55b7, quirk_hydcu_fixup_header); /* Z100L */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x56b7, quirk_hydcu_fixup_header); /* C878181 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x57b7, quirk_hydcu_fixup_header); /* C878185 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x58b7, quirk_hydcu_fixup_header); /* C878188 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x59b7, quirk_hydcu_fixup_header); /* C878174 */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x61b7, quirk_hydcu_fixup_header); /* KONGMING */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_HYGON, 0x6210, quirk_hydcu_fixup_header); /* KONGMING_E */
+
 #ifdef CONFIG_SUSPEND
 /*
  * Root Ports on some AMD SoCs advertise PME_Support for D3hot and D3cold, but
