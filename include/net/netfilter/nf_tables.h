@@ -1654,6 +1654,7 @@ struct nft_trans_binding {
 struct nft_trans_rule {
 	struct nft_trans		nft_trans;
 	struct nft_rule			*rule;
+	struct nft_chain		*chain;
 	struct nft_flow_rule		*flow;
 	u32				rule_id;
 	bool				bound;
@@ -1669,6 +1670,8 @@ struct nft_trans_rule {
 	nft_trans_container_rule(trans)->rule_id
 #define nft_trans_rule_bound(trans)			\
 	nft_trans_container_rule(trans)->bound
+#define nft_trans_rule_chain(trans)	\
+	nft_trans_container_rule(trans)->chain
 
 struct nft_trans_set {
 	struct nft_trans_binding	nft_trans_binding;
