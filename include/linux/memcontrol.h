@@ -1877,7 +1877,7 @@ static inline bool mem_cgroup_zswap_writeback_enabled(struct mem_cgroup *memcg)
 
 /* Cgroup v1-related declarations */
 
-#ifdef CONFIG_MEMCG
+#ifdef CONFIG_MEMCG_V1
 unsigned long memcg1_soft_limit_reclaim(pg_data_t *pgdat, int order,
 					gfp_t gfp_mask,
 					unsigned long *total_scanned);
@@ -1909,7 +1909,7 @@ static inline void mem_cgroup_unlock_pages(void)
 	rcu_read_unlock();
 }
 
-#else /* CONFIG_MEMCG */
+#else /* CONFIG_MEMCG_V1 */
 static inline
 unsigned long memcg1_soft_limit_reclaim(pg_data_t *pgdat, int order,
 					gfp_t gfp_mask,
@@ -1948,6 +1948,6 @@ static inline bool mem_cgroup_oom_synchronize(bool wait)
 	return false;
 }
 
-#endif /* CONFIG_MEMCG */
+#endif /* CONFIG_MEMCG_V1 */
 
 #endif /* _LINUX_MEMCONTROL_H */
