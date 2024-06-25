@@ -179,7 +179,7 @@ static int sev_asid_new(struct kvm_sev_info *sev)
 
 #ifdef CONFIG_KVM_SUPPORTS_CSV_REUSE_ASID
 	/* For Hygon CPU, check whether the userid exists */
-	if (is_x86_vendor_hygon() && userid && userid_len &&
+	if (is_vendor_hygon() && userid && userid_len &&
 	    !WARN_ON_ONCE(!csv_asid_userid_array)) {
 		int i = !min_sev_asid ? 1 : min_sev_asid;
 
@@ -228,7 +228,7 @@ again:
 
 #ifdef CONFIG_KVM_SUPPORTS_CSV_REUSE_ASID
 	/* For Hygon CPU, initialize the new userid */
-	if (is_x86_vendor_hygon() && userid && userid_len &&
+	if (is_vendor_hygon() && userid && userid_len &&
 	    !WARN_ON_ONCE(!csv_asid_userid_array)) {
 		memcpy(csv_asid_userid_array[asid].userid, userid, userid_len);
 		csv_asid_userid_array[asid].userid_len = userid_len;
@@ -262,7 +262,7 @@ static void sev_asid_free(struct kvm_sev_info *sev)
 
 #ifdef CONFIG_KVM_SUPPORTS_CSV_REUSE_ASID
 	/* For Hygon CPU, decrease the reference count if userid exist */
-	if (!is_x86_vendor_hygon() || !csv_asid_userid_array ||
+	if (!is_vendor_hygon() || !csv_asid_userid_array ||
 	    !csv_asid_userid_array[sev->asid].userid_len) {
 		__set_bit(sev->asid, sev_reclaim_asid_bitmap);
 	} else {
@@ -337,7 +337,7 @@ static int sev_guest_init(struct kvm *kvm, struct kvm_sev_cmd *argp)
 
 #ifdef CONFIG_KVM_SUPPORTS_CSV_REUSE_ASID
 	/* Try reuse ASID iff userid array is available for HYGON CSV guests */
-	if (is_x86_vendor_hygon() && csv_asid_userid_array) {
+	if (is_vendor_hygon() && csv_asid_userid_array) {
 		struct kvm_csv_init params;
 		void *csv_blob = NULL;
 
@@ -2825,7 +2825,7 @@ void pre_sev_run(struct vcpu_svm *svm, int cpu)
 
 #ifdef CONFIG_KVM_SUPPORTS_CSV_REUSE_ASID
 	/* If ASID is shared with other guests, then flush TLB before VMRUN */
-	if (is_x86_vendor_hygon() && csv_asid_userid_array &&
+	if (is_vendor_hygon() && csv_asid_userid_array &&
 	    csv_asid_userid_array[asid].userid_len)
 		svm->vmcb->control.tlb_ctl = TLB_CONTROL_FLUSH_ASID;
 #endif
