@@ -163,6 +163,13 @@ static int sev_asid_new(struct kvm_sev_info *sev)
 	bool retry = true;
 	int ret;
 
+	/*
+	 * No matter what the min_sev_asid is, all asids in range
+	 * [1, max_sev_asid] can be used for CSV2 guest on Hygon CPUs.
+	 */
+	if (is_vendor_hygon())
+		max_asid = max_sev_asid;
+
 	if (min_asid > max_asid)
 		return -ENOTTY;
 
@@ -204,13 +211,6 @@ static int sev_asid_new(struct kvm_sev_info *sev)
 		}
 	}
 #endif
-
-	/*
-	 * No matter what the min_sev_asid is, all asids in range
-	 * [1, max_sev_asid] can be used for CSV2 guest on Hygon CPUs.
-	 */
-	if (is_vendor_hygon())
-		max_asid = max_sev_asid;
 
 again:
 	asid = find_next_zero_bit(sev_asid_bitmap, max_asid + 1, min_asid);
