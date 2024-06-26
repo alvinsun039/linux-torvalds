@@ -7,8 +7,6 @@
 #include <bpf/bpf_helpers.h>
 #include "bpf_misc.h"
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
-
 int vals[] SEC(".data.vals") = {1, 2, 3, 4};
 
 __naked __noinline __used
