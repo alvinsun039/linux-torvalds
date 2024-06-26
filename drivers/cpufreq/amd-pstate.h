@@ -96,6 +96,7 @@ struct amd_cpudata {
 	u32	policy;
 	bool	suspended;
 	s16	epp_default;
+	bool    boost_state;
 };
 
 /*
