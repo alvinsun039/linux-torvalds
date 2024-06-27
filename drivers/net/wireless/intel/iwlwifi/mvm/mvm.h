@@ -376,6 +376,9 @@ struct iwl_mvm_vif_link_info {
  * @link: link data for each link in MLO
  * @esr_active: indicates eSR mode is active
  * @pm_enabled: indicates powersave is enabled
+ * @session_prot_connection_loss: the connection was lost due to session
+ *	protection ending without receiving a beacon, so we need to now
+ *	protect the deauth separately
  */
 struct iwl_mvm_vif {
 	struct iwl_mvm *mvm;
@@ -389,6 +392,7 @@ struct iwl_mvm_vif {
 	bool pm_enabled;
 	bool monitor_active;
 	bool esr_active;
+	bool session_prot_connection_loss;
 
 	u8 low_latency: 6;
 	u8 low_latency_actual: 1;
