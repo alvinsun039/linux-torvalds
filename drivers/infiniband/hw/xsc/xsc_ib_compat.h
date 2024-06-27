@@ -23,7 +23,7 @@ int xsc_ib_destroy_ah(struct ib_ah *ibah, u32 destroy_flags);
 int xsc_ib_destroy_qp(struct ib_qp *qp, struct ib_udata *udata);
 int xsc_ib_create_cq(struct ib_cq *ibcq,
 		     const struct ib_cq_init_attr *attr,
-		     struct ib_udata *udata);
+		     struct uverbs_attr_bundle *attrs);
 int xsc_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata);
 
 // from main.c static functions
@@ -39,7 +39,7 @@ struct ib_mr *xsc_ib_alloc_mr(struct ib_pd *pd, enum ib_mr_type mr_type, u32 max
 
 #define xsc_ib_destroy_qp_def() int xsc_ib_destroy_qp(struct ib_qp *qp, struct ib_udata *udata)
 #define xsc_ib_create_cq_def() int xsc_ib_create_cq(struct ib_cq *ibcq,\
-	const struct ib_cq_init_attr *attr, struct ib_udata *udata)
+	const struct ib_cq_init_attr *attr, struct uverbs_attr_bundle *attrs)
 #define xsc_ib_destroy_cq_def() int xsc_ib_destroy_cq(struct ib_cq *cq, struct ib_udata *udata)
 #define xsc_ib_dereg_mr_def() int xsc_ib_dereg_mr(struct ib_mr *ibmr, struct ib_udata *udata)
 #define xsc_ib_alloc_ucontext_def() int xsc_ib_alloc_ucontext(\

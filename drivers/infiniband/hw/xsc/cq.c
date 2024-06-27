@@ -6,6 +6,7 @@
 
 #include <linux/kref.h>
 #include <rdma/ib_umem.h>
+#include <rdma/uverbs_ioctl.h>
 #include "xsc_ib.h"
 #include "user.h"
 #include "common/xsc_hsi.h"
@@ -546,6 +547,7 @@ static void destroy_cq_kernel(struct xsc_ib_dev *dev, struct xsc_ib_cq *cq)
 
 xsc_ib_create_cq_def()
 {
+	struct ib_udata *udata = &attrs->driver_udata;
 	struct ib_device *ibdev = ibcq->device;
 	int entries = attr->cqe;
 	int vector = attr->comp_vector;
