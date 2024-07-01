@@ -983,11 +983,6 @@ config MEMCG_V1
 
 	  Say N if unsure.
 
-config MEMCG_KMEM
-	bool
-	depends on MEMCG
-	default y
-
 config BLK_CGROUP
 	bool "IO controller"
 	depends on BLOCK
