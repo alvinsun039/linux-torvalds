@@ -78,7 +78,6 @@ X:	kylin/zxgb/
 ACPI SUBSYSTEM
 M:	Wang Qi <wangqi@kylinos.cn>
 M:	Xiong Xin <xiongxin@kylinos.cn>
-R:	wubin <wubin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
 R:	Lu Riwen <luriwen@kylinos.cn>
 R:	Ai Chao <aichao@kylinos.cn>
@@ -112,7 +111,6 @@ M:	Zhao Dongdong <zhaodongdong@kylinos.cn>
 R:	Song Xiebing <songxiebing@kylinos.cn>
 R:	Yu jun <yujun@kylinos.cn>
 R:	Wang Dicheng <wangdicheng@kylinos.cn>
-R:	tianyu <tianyu@kylinos.cn>
 R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 R:	Ai Chao <aichao@kylinos.cn>
 R:	shitao <shitao@kylinos.cn>
@@ -276,10 +274,8 @@ ARM64 PORT (AARCH64 ARCHITECTURE)
 M:	Sun Liming <sunliming@kylinos.cn>
 M:	Zhang Duo <zhangduo@kylinos.cn>
 R:	Jackie Liu <liuyun01@kylinos.cn>
-R:	Enze Li <lienze@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangqi <wangqi@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 S:	Supported
 F:	arch/arm64/
 F:	arch/arm64/include/asm/arch_timer.h
@@ -635,7 +631,6 @@ KEXEC/KDUMP
 M:	Liu Yun <liuyun01@kylinos.cn>
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Hu Hai <huhai@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 R:	George Guo <guodongtai@kylinos.cn>
 S:	Supported
 F:	Documentation/admin-guide/kdump/
@@ -652,9 +647,9 @@ F:	arch/x86/kernel/crash*.c
 F:	arch/x86/kernel/kexec-bzimage64.c
 
 LIVE PATCHING / KPATCH
-M:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 M:	Jiang Haoran <jianghaoran@kylinos.cn>
 R:	George Guo <guodongtai@kylinos.cn>
+R:	Zhang xi <zhangxi@kylinos.cn>
 S:	Supported
 F:	Documentation/ABI/testing/sysfs-kernel-livepatch
 F:	Documentation/livepatch/
@@ -692,9 +687,11 @@ R:	liyouhong <liyouhong@kylinos.cn>
 R:	pengcan <pengcan@kylinos.cn>
 R:	liujinlong <liujinlong@kylinos.cn>
 R:	huangbing <huangbing@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 R:	Jiang Yunshui <jiangyunshui@kylinos.cn>
 R:	limiao <limiao@kylinos.cn>
+R:	Hu Song <husong@kylinos.cn>
+R:	Li ZhiGang <lizhigang@kylinos.cn>
+R:	wangxuewen <wangxuewen@kylinos.cn>
 S:	Supported
 F:	arch/arm64/mm/
 F:	arch/powerpc/mm/
@@ -829,7 +826,6 @@ M:	Sun Ke <sunke@kylinos.cn>
 M:	Huang Bing <huangbing@kylinos.cn>
 R:	mengfanhui <mengfanhui@kylinos.cn>
 R:	wangqi <wangqi@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 R:	liwanwu <liwanwu@kylinos.cn>
 S:	Supported
 F:	kernel/sched/
@@ -1046,7 +1042,6 @@ F:	arch/sw_64/
 LOONGSON ARCHITECTURE
 M:	Jiang Haoran <jianghaoran@kylinos.cn>
 R:	Hu Song <husong@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 R:	Enze Li <lienze@kylinos.cn>
 R:	Zhang xi <zhangxi@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
@@ -1055,7 +1050,6 @@ R:	wangxuewen <wangxuewen@kylinos.cn>
 R:	wudandan <wudandan@kylinos.cn>
 R:	mengfanhui <mengfanhui@kylinos.cn>
 R:	lifangxu <lifangxu@kylinos.cn>
-R:	tianyu <tianyu@kylinos.cn>
 R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 S:	Supported
 F:	arch/loongarch/
@@ -1064,7 +1058,6 @@ MIPS ARCHITECTURE
 M:	Jiang Haoran <jianghaoran@kylinos.cn>
 M:	Huang Wei <huangwei@kylinos.cn>
 R:	Hu Song <husong@kylinos.cn>
-R:	Jiang Xiujie <jiangxiujie@kylinos.cn>
 R:	Chen Zhang <chenzhang@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
