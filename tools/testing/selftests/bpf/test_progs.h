@@ -176,6 +176,20 @@ void test__skip(void);
 void test__fail(void);
 int test__join_cgroup(const char *path);
 
+#ifndef ENOTSUPP
+#define ENOTSUPP 524
+#endif
+
+static inline bool check_test_support(int error)
+{
+	if (error == -ENOTSUP || (error && errno == ENOTSUP) ||
+	    error == -ENOTSUPP || (error && errno == ENOTSUPP)) {
+		test__skip();
+		return false;
+	}
+	return true;
+}
+
 #define PRINT_FAIL(format...)                                                  \
 	({                                                                     \
 		test__fail();                                                  \

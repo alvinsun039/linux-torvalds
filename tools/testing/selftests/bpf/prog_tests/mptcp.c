@@ -163,7 +163,8 @@ static int run_test(int cgroup_fd, int server_fd, bool is_mptcp)
 		return libbpf_get_error(sock_skel);
 
 	err = mptcp_sock__attach(sock_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
+	if (!check_test_support(err) ||
+	    !ASSERT_OK(err, "skel_attach"))
 		goto out;
 
 	prog_fd = bpf_program__fd(sock_skel->progs._sockops);
@@ -206,7 +207,8 @@ static void test_base(void)
 	if (!ASSERT_GE(server_fd, 0, "start_server"))
 		goto with_mptcp;
 
-	ASSERT_OK(run_test(cgroup_fd, server_fd, false), "run_test tcp");
+	if (run_test(cgroup_fd, server_fd, false))
+		goto fail;
 
 	close(server_fd);
 
@@ -276,7 +278,8 @@ static int run_mptcpify(int cgroup_fd)
 	mptcpify_skel->bss->pid = getpid();
 
 	err = mptcpify__attach(mptcpify_skel);
-	if (!ASSERT_OK(err, "skel_attach"))
+	if (!check_test_support(err) ||
+	    !ASSERT_OK(err, "skel_attach"))
 		goto out;
 
 	/* without MPTCP */
@@ -317,7 +320,7 @@ static void test_mptcpify(void)
 	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		goto fail;
 
-	ASSERT_OK(run_mptcpify(cgroup_fd), "run_mptcpify");
+	run_mptcpify(cgroup_fd);
 
 fail:
 	cleanup_netns(nstoken);
