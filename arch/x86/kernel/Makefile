@@ -164,4 +164,4 @@ endif
 
 obj-$(CONFIG_HYGON_CSV)			+= csv.o
 
-obj-$(CONFIG_KYLIN_DIFFERENCES)		+= machine_t.o
+obj-y					+= machine_t.o
