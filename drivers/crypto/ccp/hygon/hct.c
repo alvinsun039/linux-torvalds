@@ -27,6 +27,7 @@
 #include <linux/kfifo.h>
 #include <linux/eventfd.h>
 #include <linux/mem_encrypt.h>
+#include <linux/vmalloc.h>
 #include <asm/pgtable_types.h>
 
 #if IS_ENABLED(CONFIG_VFIO_MDEV)

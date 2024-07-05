@@ -18,6 +18,7 @@
 #include <linux/tcp.h>
 #include <linux/ip.h>
 #include <linux/debugfs.h>
+#include <linux/vmalloc.h>
 
 #include "sss_kernel.h"
 #include "sss_hw.h"

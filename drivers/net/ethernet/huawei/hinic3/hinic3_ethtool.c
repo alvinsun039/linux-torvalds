@@ -14,6 +14,7 @@
 #include <linux/netdevice.h>
 #include <linux/if_vlan.h>
 #include <linux/ethtool.h>
+#include <linux/vmalloc.h>
 
 #include "ossl_knl.h"
 #include "hinic3_hw.h"
