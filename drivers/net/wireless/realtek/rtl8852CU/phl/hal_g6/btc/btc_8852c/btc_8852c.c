@@ -31,15 +31,15 @@ static const u8 btc_8852c_wl_rssi_thres[BTC_WL_RSSI_THMAX] = {60, 50, 40, 30};
 static const u8 btc_8852c_bt_rssi_thres[BTC_BT_RSSI_THMAX] = {40, 36, 31, 28};
 
 static struct btc_chip_ops btc_8852c_ops = {
-	_8852c_rfe_type,
-	_8852c_init_cfg,
-	_8852c_wl_pri,
-	_8852c_wl_tx_power,
-	_8852c_wl_rx_gain,
-	_8852c_wl_s1_standby,
-	_8852c_wl_req_mac,
-	_8852c_update_bt_cnt,
-	_8852c_bt_rssi
+	.set_rfe = _8852c_rfe_type,
+	.init_cfg = _8852c_init_cfg,
+	.wl_pri = _8852c_wl_pri,
+	.wl_tx_power = _8852c_wl_tx_power,
+	.wl_rx_gain = _8852c_wl_rx_gain,
+	.wl_s1_standby = _8852c_wl_s1_standby,
+	.wl_req_mac = _8852c_wl_req_mac,
+	.update_bt_cnt = _8852c_update_bt_cnt,
+	.bt_rssi = _8852c_bt_rssi
 };
 
 /* Set  WL/BT periodical moniter reg, Max size: CXMREG_MAX*/
@@ -151,7 +151,7 @@ void _8852c_wl_tx_power(struct btc_t *btc, u32 level)
 {
 	/*
 	* =========== All-Time WL Tx power control ===========
-    	* (ex: all-time fix WL Tx 10dBm , don¡¦t care GNT _BT and GNT _LTE)
+    	* (ex: all-time fix WL Tx 10dBm , donï¿½ï¿½t care GNT _BT and GNT _LTE)
 	* Turn off per-packet power control
 	* 0xD220[1] = 0, 0xD220[2] = 0;
 	*

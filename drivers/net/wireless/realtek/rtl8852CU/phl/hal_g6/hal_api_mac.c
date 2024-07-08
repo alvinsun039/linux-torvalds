@@ -1093,7 +1093,7 @@ void hal_mac_msg_print(void *p, u8 dbg_level, s8 *fmt, ...)
 #endif
 }
 
-struct mac_ax_pltfm_cb rtw_plt_cb = {0};
+struct mac_ax_pltfm_cb rtw_plt_cb;
 void rtw_plt_cb_init(void)
 {
 	/* R/W register */

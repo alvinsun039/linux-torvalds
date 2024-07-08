@@ -1288,7 +1288,7 @@ static void hal_mac_diagnostic_event(struct rtw_hal_com_t *hal, u8 type,
 }
 #endif
 
-struct mac_ax_pltfm_cb rtw_plt_cb = {0};
+struct mac_ax_pltfm_cb rtw_plt_cb;
 void rtw_plt_cb_init(void)
 {
 	/* R/W register */

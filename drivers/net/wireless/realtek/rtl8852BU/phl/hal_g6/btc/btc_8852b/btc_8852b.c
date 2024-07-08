@@ -83,14 +83,14 @@ static const struct btc_rf_cfg btc_8852bpt_rf_1[] = {
 	{0x33, 0x2},	{0x3f, 0x2},  {0xee, 0x0}};
 
 static struct btc_chip_ops btc_8852b_ops = {
-	_8852b_rfe_type,
-	_8852b_init_cfg,
-	_8852b_wl_tx_power,
-	_8852b_wl_rx_gain,
-	_8852b_wl_btg_standby,
-	_8852b_wl_req_mac,
-	_8852b_get_reg_status,
-	_8852b_bt_rssi
+	.set_rfe = _8852b_rfe_type,
+	.init_cfg = _8852b_init_cfg,
+	.wl_tx_power = _8852b_wl_tx_power,
+	.wl_rx_gain = _8852b_wl_rx_gain,
+	.wl_btg_standby = _8852b_wl_btg_standby,
+	.wl_req_mac = _8852b_wl_req_mac,
+	.get_reg_status = _8852b_get_reg_status,
+	.bt_rssi = _8852b_bt_rssi
 };
 
 /* Set  WL/BT periodical moniter reg, Max size: CXMREG_MAX*/
