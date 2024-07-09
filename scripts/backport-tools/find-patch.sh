@@ -71,7 +71,7 @@ if [ "$STABLE_ONLY" = "true" ]; then
 		if [ "$(git merge-base $CID v$BRANCH)" = "$CID" ]; then
 			echo -e "stable-${BRANCH}:\t primitive included"
 		else
-			STABLE_LATEST_TAG=$(git tag --list "v${BRANCH}*" --sort="-taggerdate" | head -n1)
+			STABLE_LATEST_TAG=$(git tag --list "v${BRANCH}.*" --sort="-taggerdate" | head -n1)
 			STABLE_HEAD=$(git log --oneline v${BRANCH}..${STABLE_LATEST_TAG} | grep "${CTITLE}$" | awk '{print $1}')
 			if [ -z $STABLE_HEAD ]; then
 				echo -e "stable-${BRANCH}:\t not included"
