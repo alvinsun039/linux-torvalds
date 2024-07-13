@@ -26,6 +26,7 @@
 #include "txgbe_hw.h"
 #include "txgbe_phy.h"
 #include "txgbe_dcb.h"
+#include "txgbe_e56.h"
 #include "txgbe.h"
 
 #define TXGBE_SP_MAX_TX_QUEUES  128
@@ -132,7 +133,7 @@ void txgbe_wr32_epcsm(struct txgbe_hw *hw, u32 addr, u32 mask, u32 field)
 	txgbe_wr32_epcs(hw, addr, val);
 }
 
-s32 txgbe_set_link_to_amlite(struct txgbe_hw *hw,
+s32 txgbe_set_link_to_amlite_back(struct txgbe_hw *hw,
 		  u32 speed)
 {
 	u32 value = 0;
@@ -6208,12 +6209,21 @@ STATIC s32 txgbe_setup_copper_link(struct txgbe_hw *hw,
 
 int txgbe_reset_misc(struct txgbe_hw *hw)
 {
-	int i;
+	struct txgbe_adapter *adapter = hw->back;
 	u32 value;
+	u32 err;
+	int i;
 
-	value = txgbe_rd32_epcs(hw, TXGBE_SR_PCS_CTL2);
-	if ((value & 0x3) != TXGBE_SR_PCS_CTL2_PCS_TYPE_SEL_X) {
-		hw->link_status = TXGBE_LINK_STATUS_NONE;
+	if (hw->amlite) {
+		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_10GB_FULL, false);
+		if (err) {
+			e_dev_info("txgbe_reset_misc setup phy failed\n");
+			return err;
+		}
+	} else {
+		value = txgbe_rd32_epcs(hw, TXGBE_SR_PCS_CTL2);
+		if ((value & 0x3) != TXGBE_SR_PCS_CTL2_PCS_TYPE_SEL_X)
+			hw->link_status = TXGBE_LINK_STATUS_NONE;
 	}
 
 	/* receive packets that size > 2048 */
@@ -6369,6 +6379,10 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 	if (status != 0)
 		goto reset_hw_out;
 
+	status = txgbe_reset_misc(hw);
+	if (status != 0)
+		goto reset_hw_out;
+
 	/* amlite TODO*/
 	if (hw->amlite) {
 		/* amlite: bme */
@@ -6377,9 +6391,6 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 		wr32m(hw, TXGBE_RDM_RSC_CTL, TXGBE_RDM_RSC_CTL_FREE_CTL,
 			  TXGBE_RDM_RSC_CTL_FREE_CTL);
 	} else {
-		status = txgbe_reset_misc(hw);
-		if (status != 0)
-			goto reset_hw_out;
 		/*
 		 * Store the original AUTOC/AUTOC2 values if they have not been
 		 * stored off yet.  Otherwise restore the stored original

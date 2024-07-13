@@ -12892,6 +12892,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	TCALL(hw, eeprom.ops.init_params);
 	/* make sure the EEPROM is good */
 
+	/*amlite TODO*/
 	if (!hw->amlite)
 		if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
 			e_dev_err("The EEPROM Checksum Is Not Valid\n");
@@ -13178,11 +13179,6 @@ no_info_string:
 		e_info(probe, "disable completion timeout\n");
 	}
 
-	if (hw->amlite) {
-		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_10GB_FULL, false);
-		if (err)
-			goto err_register;
-	}
 	return 0;
 
 err_register:

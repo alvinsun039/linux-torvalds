@@ -1,0 +1,689 @@
+#ifndef _TXGBE_E56_H_
+#define _TXGBE_E56_H_
+
+#include "txgbe_type.h"
+
+typedef struct TPHYTXEQ {
+	bool bHasEqOpt; //Has --eq option flag
+	unsigned int main; //TX EQ main (bit[5:0])
+	unsigned int pre1; //TX EQ pre1 (bit[5:0])
+	unsigned int pre2; //TX EQ pre2 (bit[5:0])
+	unsigned int post; //TX EQ post (bit[5:0])
+	unsigned int vboost; //TX Vboost level (bit[8:6])
+} PHYTXEQ;
+
+#define FORMAT_NOPARENTHERSES(...) __VA_ARGS__
+//--------------------------------
+//LAN GPIO define for SFP+ module
+//--------------------------------
+//-- Fields
+#define SFP1_RS0 FORMAT_NOPARENTHERSES(5, 5)
+#define SFP1_RS1 FORMAT_NOPARENTHERSES(4, 4)
+#define SFP1_RX_LOS FORMAT_NOPARENTHERSES(3, 3)
+#define SFP1_MOD_ABS FORMAT_NOPARENTHERSES(2, 2)
+#define SFP1_TX_DISABLE FORMAT_NOPARENTHERSES(1, 1)
+#define SFP1_TX_FAULT FORMAT_NOPARENTHERSES(0, 0)
+#define EPHY_XFLD(REG, FLD) (((REG *)&rdata)->FLD)
+#define EPCS_XFLD(REG, FLD) (((REG *)&rdata)->FLD)
+
+typedef union {
+	struct {
+		u32 ana_refclk_buf_daisy_en_i : 1;
+		u32 ana_refclk_buf_pad_en_i : 1;
+		u32 ana_vddinoff_dcore_dig_o : 1;
+		u32 ana_lcpll_en_clkout_hf_left_top_i : 1;
+		u32 ana_lcpll_en_clkout_hf_right_top_i : 1;
+		u32 ana_lcpll_en_clkout_hf_left_bot_i : 1;
+		u32 ana_lcpll_en_clkout_hf_right_bot_i : 1;
+		u32 ana_lcpll_en_clkout_lf_left_top_i : 1;
+		u32 ana_lcpll_en_clkout_lf_right_top_i : 1;
+		u32 ana_lcpll_en_clkout_lf_left_bot_i : 1;
+		u32 ana_lcpll_en_clkout_lf_right_bot_i : 1;
+		u32 ana_bg_en_i : 1;
+		u32 ana_en_rescal_i : 1;
+		u32 ana_rescal_comp_o : 1;
+		u32 ana_en_ldo_core_i : 1;
+		u32 ana_lcpll_hf_en_bias_i : 1;
+		u32 ana_lcpll_hf_en_loop_i : 1;
+		u32 ana_lcpll_hf_en_cp_i : 1;
+		u32 ana_lcpll_hf_set_lpf_i : 1;
+		u32 ana_lcpll_hf_en_vco_i : 1;
+		u32 ana_lcpll_hf_vco_amp_status_o : 1;
+		u32 ana_lcpll_hf_en_odiv_i : 1;
+		u32 ana_lcpll_lf_en_bias_i : 1;
+		u32 ana_lcpll_lf_en_loop_i : 1;
+		u32 ana_lcpll_lf_en_cp_i : 1;
+		u32 ana_lcpll_lf_set_lpf_i : 1;
+		u32 ana_lcpll_lf_en_vco_i : 1;
+		u32 ana_lcpll_lf_vco_amp_status_o : 1;
+		u32 ana_lcpll_lf_en_odiv_i : 1;
+		u32 ana_lcpll_hf_refclk_select_i : 1;
+		u32 ana_lcpll_lf_refclk_select_i : 1;
+		u32 rsvd0 : 1;
+	};
+	u32 reg;
+} E56G_CMS_ANA_OVRDVAL_0;
+
+#define E56G_CMS_ANA_OVRDVAL_0_ADDR 0xcb0
+/* AMLITE ETH PHY Registers */
+#define SR_AN_CTRL 0x70000
+#define VR_PCS_DIG_CTRL1 0x38000
+#define SR_PCS_CTRL1 0x30000
+#define SR_PCS_CTRL2 0x30007
+#define SR_PMA_CTRL2 0x10007
+#define VR_PCS_DIG_CTRL3 0x38003
+#define VR_PMA_CTRL3 0x180a8
+#define VR_PMA_CTRL4 0x180a9
+#define SR_PMA_RS_FEC_CTRL 0x100c8
+#define CMS_ANA_OVRDEN0 0xca4
+#define ANA_OVRDEN1 0xca8
+#define ANA_OVRDVAL0 0xcb0
+#define ANA_OVRDVAL5 0xcc4
+#define OSC_CAL_N_CDR4 0x14
+#define PLL0_CFG0 0xc10
+#define PLL0_CFG2 0xc18
+#define PLL0_DIV_CFG0 0xc1c
+#define PLL1_CFG0 0xc48
+#define PLL1_CFG2 0xc50
+#define CMS_PIN_OVRDEN0 0xc8c
+#define CMS_PIN_OVRDVAL0 0xc94
+#define DATAPATH_CFG0 0x142c
+#define DATAPATH_CFG1 0x1430
+#define AN_CFG1 0x1438
+#define SPARE52 0x16fc
+#define RXS_CFG0 0x000
+#define PMD_CFG0 0x1400
+#define SR_PCS_STS1 0x30001
+#define PMD_CTRL_FSM_TX_STAT0 0x14dc
+#define CMS_ANA_OVRDEN0 0xca4
+#define CMS_ANA_OVRDEN1 0xca8
+#define CMS_ANA_OVRDVAL2 0xcb8
+#define CMS_ANA_OVRDVAL4 0xcc0
+#define CMS_ANA_OVRDVAL5 0xcc4
+#define CMS_ANA_OVRDVAL7 0xccc
+#define CMS_ANA_OVRDVAL9 0xcd4
+#define CMS_ANA_OVRDVAL10 0xcd8
+
+#define TXS_TXS_CFG1 0x804
+#define TXS_WKUP_CNT 0x808
+#define TXS_PIN_OVRDEN0 0x80c
+#define TXS_PIN_OVRDVAL6 0x82c
+#define TXS_ANA_OVRDVAL1 0x854
+
+#define E56PHY_CMS_BASE_ADDR 0x0C00
+
+#define E56PHY_CMS_PIN_OVRDEN_0_ADDR (E56PHY_CMS_BASE_ADDR + 0x8C)
+#define E56PHY_CMS_PIN_OVRDEN_0_OVRD_EN_PLL0_TX_SIGNAL_TYPE_I \
+	FORMAT_NOPARENTHERSES(12, 12)
+
+#define E56PHY_CMS_PIN_OVRDVAL_0_ADDR (E56PHY_CMS_BASE_ADDR + 0x94)
+#define E56PHY_CMS_PIN_OVRDVAL_0_INT_PLL0_TX_SIGNAL_TYPE_I \
+	FORMAT_NOPARENTHERSES(10, 10)
+
+#define E56PHY_CMS_ANA_OVRDEN_0_ADDR (E56PHY_CMS_BASE_ADDR + 0xA4)
+
+#define E56PHY_CMS_ANA_OVRDEN_0_OVRD_EN_ANA_LCPLL_HF_VCO_SWING_CTRL_I \
+	FORMAT_NOPARENTHERSES(29, 29)
+
+#define E56PHY_CMS_ANA_OVRDEN_1_ADDR (E56PHY_CMS_BASE_ADDR + 0xA8)
+#define E56PHY_CMS_ANA_OVRDEN_1_OVRD_EN_ANA_LCPLL_HF_TEST_IN_I \
+	FORMAT_NOPARENTHERSES(4, 4)
+
+#define E56PHY_CMS_ANA_OVRDVAL_2_ADDR (E56PHY_CMS_BASE_ADDR + 0xB8)
+
+#define E56PHY_CMS_ANA_OVRDVAL_2_ANA_LCPLL_HF_VCO_SWING_CTRL_I \
+	FORMAT_NOPARENTHERSES(31, 28)
+
+#define E56PHY_CMS_ANA_OVRDVAL_4_ADDR (E56PHY_CMS_BASE_ADDR + 0xC0)
+
+#define E56PHY_TXS_BASE_ADDR 0x0800
+
+#define E56PHY_TXS_TXS_CFG_1_ADDR (E56PHY_TXS_BASE_ADDR + 0x04)
+#define E56PHY_TXS_TXS_CFG_1_ADAPTATION_WAIT_CNT_X256 \
+	FORMAT_NOPARENTHERSES(7, 4)
+#define E56PHY_TXS_WKUP_CNT_ADDR (E56PHY_TXS_BASE_ADDR + 0x08)
+#define E56PHY_TXS_WKUP_CNTLDO_WKUP_CNT_X32 FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_TXS_WKUP_CNTDCC_WKUP_CNT_X32 FORMAT_NOPARENTHERSES(15, 8)
+
+#define E56PHY_TXS_PIN_OVRDEN_0_ADDR (E56PHY_TXS_BASE_ADDR + 0x0C)
+#define E56PHY_TXS_PIN_OVRDEN_0_OVRD_EN_TX0_EFUSE_BITS_I \
+	FORMAT_NOPARENTHERSES(28, 28)
+
+#define E56PHY_TXS_PIN_OVRDVAL_6_ADDR (E56PHY_TXS_BASE_ADDR + 0x2C)
+
+#define E56PHY_TXS_ANA_OVRDVAL_1_ADDR (E56PHY_TXS_BASE_ADDR + 0x54)
+#define E56PHY_TXS_ANA_OVRDVAL_1_ANA_TEST_DAC_I FORMAT_NOPARENTHERSES(23, 8)
+
+#define E56PHY_TXS_ANA_OVRDEN_0_ADDR (E56PHY_TXS_BASE_ADDR + 0x44)
+#define E56PHY_TXS_ANA_OVRDEN_0_OVRD_EN_ANA_TEST_DAC_I \
+	FORMAT_NOPARENTHERSES(13, 13)
+
+#define E56PHY_RXS_BASE_ADDR 0x0000
+
+#define E56PHY_RXS_RXS_CFG_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x000)
+#define E56PHY_RXS_RXS_CFG_0_DSER_DATA_SEL FORMAT_NOPARENTHERSES(1, 1)
+#define E56PHY_RXS_RXS_CFG_0_TRAIN_CLK_GATE_BYPASS_EN \
+	FORMAT_NOPARENTHERSES(17, 4)
+
+#define E56PHY_RXS_OSC_CAL_N_CDR_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x008)
+#define E56PHY_RXS_OSC_CAL_N_CDR_1_PREDIV1 FORMAT_NOPARENTHERSES(15, 0)
+#define E56PHY_RXS_OSC_CAL_N_CDR_1_PREDIV1_LSB 0
+#define E56PHY_RXS_OSC_CAL_N_CDR_1_TARGET_CNT1 FORMAT_NOPARENTHERSES(31, 16)
+#define E56PHY_RXS_OSC_CAL_N_CDR_1_TARGET_CNT1_LSB 16
+
+#define E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR (E56PHY_RXS_BASE_ADDR + 0x014)
+#define E56PHY_RXS_OSC_CAL_N_CDR_4_OSC_RANGE_SEL1 FORMAT_NOPARENTHERSES(3, 2)
+#define E56PHY_RXS_OSC_CAL_N_CDR_4_VCO_CODE_INIT FORMAT_NOPARENTHERSES(18, 8)
+#define E56PHY_RXS_OSC_CAL_N_CDR_4_OSC_CURRENT_BOOST_EN1 \
+	FORMAT_NOPARENTHERSES(21, 21)
+#define E56PHY_RXS_OSC_CAL_N_CDR_4_BBCDR_CURRENT_BOOST1 \
+	FORMAT_NOPARENTHERSES(27, 26)
+
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_ADDR (E56PHY_RXS_BASE_ADDR + 0x018)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_SDM_WIDTH FORMAT_NOPARENTHERSES(3, 2)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_BB_CDR_PROP_STEP_PRELOCK \
+	FORMAT_NOPARENTHERSES(15, 12)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_BB_CDR_PROP_STEP_POSTLOCK \
+	FORMAT_NOPARENTHERSES(19, 16)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_BB_CDR_GAIN_CTRL_POSTLOCK \
+	FORMAT_NOPARENTHERSES(23, 20)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_BB_CDR_GAIN_CTRL_PRELOCK \
+	FORMAT_NOPARENTHERSES(27, 24)
+#define E56PHY_RXS_OSC_CAL_N_CDR_5_BBCDR_RDY_CNT FORMAT_NOPARENTHERSES(30, 28)
+
+#define E56PHY_RXS_OSC_CAL_N_CDR_6_ADDR (E56PHY_RXS_BASE_ADDR + 0x01C)
+#define E56PHY_RXS_OSC_CAL_N_CDR_6_PI_GAIN_CTRL_PRELOCK \
+	FORMAT_NOPARENTHERSES(3, 0)
+#define E56PHY_RXS_OSC_CAL_N_CDR_6_PI_GAIN_CTRL_POSTLOCK \
+	FORMAT_NOPARENTHERSES(7, 4)
+
+#define E56PHY_RXS_INTL_CONFIG_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x020)
+#define E56PHY_RXS_INTL_CONFIG_0_ADC_INTL2SLICE_DELAY1 \
+	FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_RXS_INTL_CONFIG_2_ADDR (E56PHY_RXS_BASE_ADDR + 0x028)
+#define E56PHY_RXS_INTL_CONFIG_2_INTERLEAVER_HBW_DISABLE1 \
+	FORMAT_NOPARENTHERSES(1, 1)
+
+#define E56PHY_RXS_TXFFE_TRAINING_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x02C)
+#define E56PHY_RXS_TXFFE_TRAINING_0_ADC_DATA_PEAK_LTH \
+	FORMAT_NOPARENTHERSES(18, 12)
+#define E56PHY_RXS_TXFFE_TRAINING_0_ADC_DATA_PEAK_UTH \
+	FORMAT_NOPARENTHERSES(26, 20)
+
+#define E56PHY_RXS_TXFFE_TRAINING_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x030)
+#define E56PHY_RXS_TXFFE_TRAINING_1_C1_LTH FORMAT_NOPARENTHERSES(8, 0)
+#define E56PHY_RXS_TXFFE_TRAINING_1_C1_UTH FORMAT_NOPARENTHERSES(20, 12)
+
+#define E56PHY_RXS_TXFFE_TRAINING_2_ADDR (E56PHY_RXS_BASE_ADDR + 0x034)
+#define E56PHY_RXS_TXFFE_TRAINING_2_CM1_LTH FORMAT_NOPARENTHERSES(8, 0)
+#define E56PHY_RXS_TXFFE_TRAINING_2_CM1_UTH FORMAT_NOPARENTHERSES(20, 12)
+
+#define E56PHY_RXS_TXFFE_TRAINING_3_ADDR (E56PHY_RXS_BASE_ADDR + 0x038)
+#define E56PHY_RXS_TXFFE_TRAINING_3_CM2_LTH FORMAT_NOPARENTHERSES(8, 0)
+#define E56PHY_RXS_TXFFE_TRAINING_3_CM2_UTH FORMAT_NOPARENTHERSES(20, 12)
+#define E56PHY_RXS_TXFFE_TRAINING_3_TXFFE_TRAIN_MOD_TYPE \
+	FORMAT_NOPARENTHERSES(26, 21)
+
+#define E56PHY_RXS_VGA_TRAINING_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x04C)
+#define E56PHY_RXS_VGA_TRAINING_0_VGA_TARGET FORMAT_NOPARENTHERSES(18, 12)
+
+#define E56PHY_RXS_VGA_TRAINING_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x050)
+#define E56PHY_RXS_VGA_TRAINING_1_VGA1_CODE_INIT0 FORMAT_NOPARENTHERSES(4, 0)
+#define E56PHY_RXS_VGA_TRAINING_1_VGA2_CODE_INIT0 FORMAT_NOPARENTHERSES(12, 8)
+#define E56PHY_RXS_VGA_TRAINING_1_VGA1_CODE_INIT123 \
+	FORMAT_NOPARENTHERSES(20, 16)
+#define E56PHY_RXS_VGA_TRAINING_1_VGA2_CODE_INIT123 \
+	FORMAT_NOPARENTHERSES(28, 24)
+
+#define E56PHY_RXS_CTLE_TRAINING_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x054)
+#define E56PHY_RXS_CTLE_TRAINING_0_CTLE_CODE_INIT0 FORMAT_NOPARENTHERSES(24, 20)
+#define E56PHY_RXS_CTLE_TRAINING_0_CTLE_CODE_INIT123 \
+	FORMAT_NOPARENTHERSES(31, 27)
+
+#define E56PHY_RXS_CTLE_TRAINING_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x058)
+#define E56PHY_RXS_CTLE_TRAINING_1_LFEQ_LUT FORMAT_NOPARENTHERSES(24, 0)
+
+#define E56PHY_RXS_CTLE_TRAINING_2_ADDR (E56PHY_RXS_BASE_ADDR + 0x05C)
+#define E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P1 FORMAT_NOPARENTHERSES(5, 0)
+#define E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P2 FORMAT_NOPARENTHERSES(13, 8)
+#define E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P3 FORMAT_NOPARENTHERSES(21, 16)
+
+#define E56PHY_RXS_CTLE_TRAINING_3_ADDR (E56PHY_RXS_BASE_ADDR + 0x060)
+#define E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P1 FORMAT_NOPARENTHERSES(9, 8)
+#define E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P2 FORMAT_NOPARENTHERSES(11, 10)
+#define E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P3 FORMAT_NOPARENTHERSES(13, 12)
+
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x064)
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_0_ADC_SLICE_DATA_AVG_CNT \
+	FORMAT_NOPARENTHERSES(5, 4)
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_0_ADC_DATA_AVG_CNT \
+	FORMAT_NOPARENTHERSES(9, 8)
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_0_FE_OFFSET_DAC_CLK_CNT_X8 \
+	FORMAT_NOPARENTHERSES(31, 28)
+
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x068)
+#define E56PHY_RXS_OFFSET_N_GAIN_CAL_1_SAMP_ADAPT_CFG \
+	FORMAT_NOPARENTHERSES(31, 28)
+
+#define E56PHY_RXS_FFE_TRAINING_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x070)
+#define E56PHY_RXS_FFE_TRAINING_0_FFE_TAP_EN FORMAT_NOPARENTHERSES(23, 8)
+
+#define E56PHY_RXS_IDLE_DETECT_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x088)
+#define E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX \
+	FORMAT_NOPARENTHERSES(22, 16)
+#define E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN \
+	FORMAT_NOPARENTHERSES(30, 24)
+
+#define E56PHY_RXS_ANA_OVRDEN_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x08C)
+#define E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_TRIM_RTERM_I \
+	FORMAT_NOPARENTHERSES(1, 1)
+#define E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_BBCDR_OSC_RANGE_SEL_I \
+	FORMAT_NOPARENTHERSES(29, 29)
+
+#define E56PHY_RXS_ANA_OVRDEN_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x090)
+#define E56PHY_RXS_ANA_OVRDEN_1_OVRD_EN_ANA_BBCDR_VCOFILT_BYP_I \
+	FORMAT_NOPARENTHERSES(0, 0)
+#define E56PHY_RXS_ANA_OVRDEN_1_OVRD_EN_ANA_TEST_BBCDR_I \
+	FORMAT_NOPARENTHERSES(9, 9)
+
+#define E56PHY_RXS_ANA_OVRDEN_3_ADDR (E56PHY_RXS_BASE_ADDR + 0x098)
+#define E56PHY_RXS_ANA_OVRDEN_3_OVRD_EN_ANA_ANABS_CONFIG_I \
+	FORMAT_NOPARENTHERSES(15, 15)
+#define E56PHY_RXS_ANA_OVRDEN_3_OVRD_EN_ANA_VGA2_BOOST_CSTM_I \
+	FORMAT_NOPARENTHERSES(25, 25)
+
+#define E56PHY_RXS_ANA_OVRDEN_4_ADDR (E56PHY_RXS_BASE_ADDR + 0x09C)
+#define E56PHY_RXS_ANA_OVRDVAL_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x0A0)
+#define E56PHY_RXS_ANA_OVRDVAL_0_ANA_EN_RTERM_I FORMAT_NOPARENTHERSES(0, 0)
+
+#define E56PHY_RXS_ANA_OVRDVAL_6_ADDR (E56PHY_RXS_BASE_ADDR + 0x0B8)
+#define E56PHY_RXS_ANA_OVRDVAL_14_ADDR (E56PHY_RXS_BASE_ADDR + 0x0D8)
+#define E56PHY_RXS_ANA_OVRDVAL_15_ADDR (E56PHY_RXS_BASE_ADDR + 0x0DC)
+#define E56PHY_RXS_ANA_OVRDVAL_17_ADDR (E56PHY_RXS_BASE_ADDR + 0x0E4)
+#define E56PHY_RXS_ANA_OVRDVAL_17_ANA_VGA2_BOOST_CSTM_I \
+	FORMAT_NOPARENTHERSES(18, 16)
+
+#define E56PHY_RXS_EYE_SCAN_1_ADDR (E56PHY_RXS_BASE_ADDR + 0x1A4)
+#define E56PHY_RXS_EYE_SCAN_1_EYE_SCAN_REF_TIMER FORMAT_NOPARENTHERSES(31, 0)
+
+#define E56PHY_RXS_ANA_OVRDVAL_5_ADDR (E56PHY_RXS_BASE_ADDR + 0x0B4)
+#define E56PHY_RXS_ANA_OVRDVAL_5_ANA_BBCDR_OSC_RANGE_SEL_I \
+	FORMAT_NOPARENTHERSES(1, 0)
+
+#define E56PHY_RXS_RINGO_0_ADDR (E56PHY_RXS_BASE_ADDR + 0x1FC)
+
+#define E56PHY_PMD_BASE_ADDR 0x1400
+#define E56PHY_PMD_CFG_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x000)
+#define E56PHY_PMD_CFG_0_RX_EN_CFG FORMAT_NOPARENTHERSES(19, 16)
+
+#define E56PHY_PMD_CFG_3_ADDR (E56PHY_PMD_BASE_ADDR + 0x00C)
+#define E56PHY_PMD_CFG_3_CTRL_FSM_TIMEOUT_X64K FORMAT_NOPARENTHERSES(31, 24)
+#define E56PHY_PMD_CFG_4_ADDR (E56PHY_PMD_BASE_ADDR + 0x010)
+#define E56PHY_PMD_CFG_4_TRAIN_DC_ON_PERIOD_X64K FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_PMD_CFG_4_TRAIN_DC_PERIOD_X512K FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_PMD_CFG_5_ADDR (E56PHY_PMD_BASE_ADDR + 0x014)
+#define E56PHY_PMD_CFG_5_USE_RECENT_MARKER_OFFSET FORMAT_NOPARENTHERSES(12, 12)
+#define E56PHY_CTRL_FSM_CFG_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x040)
+#define E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR \
+	FORMAT_NOPARENTHERSES(4, 4)
+#define E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL FORMAT_NOPARENTHERSES(9, 8)
+#define E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN FORMAT_NOPARENTHERSES(31, 24)
+
+#define E56PHY_CTRL_FSM_CFG_1_ADDR (E56PHY_PMD_BASE_ADDR + 0x044)
+#define E56PHY_CTRL_FSM_CFG_1_TRAIN_ST0_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_CTRL_FSM_CFG_1_TRAIN_ST1_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_CTRL_FSM_CFG_1_TRAIN_ST2_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(23, 16)
+#define E56PHY_CTRL_FSM_CFG_1_TRAIN_ST3_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(31, 24)
+
+#define E56PHY_CTRL_FSM_CFG_2_ADDR (E56PHY_PMD_BASE_ADDR + 0x048)
+#define E56PHY_CTRL_FSM_CFG_2_TRAIN_ST4_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_CTRL_FSM_CFG_2_TRAIN_ST5_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_CTRL_FSM_CFG_2_TRAIN_ST6_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(23, 16)
+#define E56PHY_CTRL_FSM_CFG_2_TRAIN_ST7_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(31, 24)
+
+#define E56PHY_CTRL_FSM_CFG_3_ADDR (E56PHY_PMD_BASE_ADDR + 0x04C)
+#define E56PHY_CTRL_FSM_CFG_3_TRAIN_ST8_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(7, 0)
+
+#define E56PHY_CTRL_FSM_CFG_3_TRAIN_ST9_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_CTRL_FSM_CFG_3_TRAIN_ST10_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(23, 16)
+#define E56PHY_CTRL_FSM_CFG_3_TRAIN_ST11_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(31, 24)
+
+#define E56PHY_CTRL_FSM_CFG_4_ADDR (E56PHY_PMD_BASE_ADDR + 0x050)
+#define E56PHY_CTRL_FSM_CFG_4_TRAIN_ST12_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_CTRL_FSM_CFG_4_TRAIN_ST13_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_CTRL_FSM_CFG_4_TRAIN_ST14_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(23, 16)
+#define E56PHY_CTRL_FSM_CFG_4_TRAIN_ST15_WAIT_CNT_X4096 \
+	FORMAT_NOPARENTHERSES(31, 24)
+
+#define E56PHY_CTRL_FSM_CFG_7_ADDR (E56PHY_PMD_BASE_ADDR + 0x05C)
+#define E56PHY_CTRL_FSM_CFG_7_TRAIN_ST4_EN FORMAT_NOPARENTHERSES(15, 0)
+#define E56PHY_CTRL_FSM_CFG_7_TRAIN_ST5_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_8_ADDR (E56PHY_PMD_BASE_ADDR + 0x060)
+#define E56PHY_CTRL_FSM_CFG_8_TRAIN_ST7_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_12_ADDR (E56PHY_PMD_BASE_ADDR + 0x070)
+#define E56PHY_CTRL_FSM_CFG_12_TRAIN_ST15_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_13_ADDR (E56PHY_PMD_BASE_ADDR + 0x074)
+#define E56PHY_CTRL_FSM_CFG_13_TRAIN_ST0_DONE_EN FORMAT_NOPARENTHERSES(15, 0)
+#define E56PHY_CTRL_FSM_CFG_13_TRAIN_ST1_DONE_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_14_ADDR (E56PHY_PMD_BASE_ADDR + 0x078)
+#define E56PHY_CTRL_FSM_CFG_14_TRAIN_ST3_DONE_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_15_ADDR (E56PHY_PMD_BASE_ADDR + 0x07C)
+#define E56PHY_CTRL_FSM_CFG_15_TRAIN_ST4_DONE_EN FORMAT_NOPARENTHERSES(15, 0)
+
+#define E56PHY_CTRL_FSM_CFG_17_ADDR (E56PHY_PMD_BASE_ADDR + 0x084)
+#define E56PHY_CTRL_FSM_CFG_17_TRAIN_ST8_DONE_EN FORMAT_NOPARENTHERSES(15, 0)
+
+#define E56PHY_CTRL_FSM_CFG_18_ADDR (E56PHY_PMD_BASE_ADDR + 0x088)
+#define E56PHY_CTRL_FSM_CFG_18_TRAIN_ST10_DONE_EN FORMAT_NOPARENTHERSES(15, 0)
+
+#define E56PHY_CTRL_FSM_CFG_29_ADDR (E56PHY_PMD_BASE_ADDR + 0x0B4)
+#define E56PHY_CTRL_FSM_CFG_29_TRAIN_ST15_DC_EN FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_33_ADDR (E56PHY_PMD_BASE_ADDR + 0x0C4)
+#define E56PHY_CTRL_FSM_CFG_33_TRAIN0_RATE_SEL FORMAT_NOPARENTHERSES(15, 0)
+#define E56PHY_CTRL_FSM_CFG_33_TRAIN1_RATE_SEL FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_CFG_34_ADDR (E56PHY_PMD_BASE_ADDR + 0x0C8)
+#define E56PHY_CTRL_FSM_CFG_34_TRAIN2_RATE_SEL FORMAT_NOPARENTHERSES(15, 0)
+#define E56PHY_CTRL_FSM_CFG_34_TRAIN3_RATE_SEL FORMAT_NOPARENTHERSES(31, 16)
+
+#define E56PHY_CTRL_FSM_RX_STAT_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x0FC)
+#define E56PHY_RXS0_OVRDEN_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x130)
+#define E56PHY_RXS0_OVRDEN_0_OVRD_EN_RXS0_RX0_SAMP_CAL_DONE_O \
+	FORMAT_NOPARENTHERSES(27, 27)
+
+#define E56PHY_RXS0_OVRDEN_1_ADDR (E56PHY_PMD_BASE_ADDR + 0x134)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_VGA_TRAIN_EN_I \
+	FORMAT_NOPARENTHERSES(14, 14)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CTLE_TRAIN_EN_I \
+	FORMAT_NOPARENTHERSES(16, 16)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CDR_EN_I \
+	FORMAT_NOPARENTHERSES(18, 18)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_ADC_INTL_CAL_EN_I \
+	FORMAT_NOPARENTHERSES(23, 23)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_ADC_INTL_CAL_DONE_O \
+	FORMAT_NOPARENTHERSES(24, 24)
+#define E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_ADC_INTL_CAL_DONE_O_LSB 24
+
+#define E56PHY_RXS0_OVRDEN_2_ADDR (E56PHY_PMD_BASE_ADDR + 0x138)
+#define E56PHY_RXS0_OVRDEN_2_OVRD_EN_RXS0_RX0_ADC_OFST_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(0, 0)
+#define E56PHY_RXS0_OVRDEN_2_OVRD_EN_RXS0_RX0_ADC_GAIN_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(3, 3)
+#define E56PHY_RXS0_OVRDEN_2_OVRD_EN_RXS0_RX0_ADC_INTL_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(6, 6)
+
+#define E56PHY_RXS0_OVRDVAL_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x140)
+#define E56PHY_RXS0_OVRDVAL_0_RXS0_RX0_SAMP_CAL_DONE_O \
+	FORMAT_NOPARENTHERSES(22, 22)
+
+#define E56PHY_RXS0_OVRDVAL_1_ADDR (E56PHY_PMD_BASE_ADDR + 0x144)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_VGA_TRAIN_EN_I \
+	FORMAT_NOPARENTHERSES(7, 7)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CTLE_TRAIN_EN_I \
+	FORMAT_NOPARENTHERSES(9, 9)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I FORMAT_NOPARENTHERSES(11, 11)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_CAL_EN_I \
+	FORMAT_NOPARENTHERSES(16, 16)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_CAL_DONE_O \
+	FORMAT_NOPARENTHERSES(17, 17)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_CAL_DONE_O_LSB 17
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_OFST_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(25, 25)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_GAIN_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(28, 28)
+#define E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_ADAPT_EN_I \
+	FORMAT_NOPARENTHERSES(31, 31)
+
+#define E56PHY_INTR_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x1EC)
+
+#define E56PHY_KRT_TFSM_CFG_ADDR (E56PHY_PMD_BASE_ADDR + 0x2B8)
+#define E56PHY_KRT_TFSM_CFGKRT_TFSM_MAX_WAIT_TIMER_X1000K \
+	FORMAT_NOPARENTHERSES(7, 0)
+#define E56PHY_KRT_TFSM_CFGKRT_TFSM_MAX_WAIT_TIMER_X8000K \
+	FORMAT_NOPARENTHERSES(15, 8)
+#define E56PHY_KRT_TFSM_CFGKRT_TFSM_HOLDOFF_TIMER_X256K \
+	FORMAT_NOPARENTHERSES(23, 16)
+
+#define E56PHY_FETX_FFE_TRAIN_CFG_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x2BC)
+#define E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_3 \
+	FORMAT_NOPARENTHERSES(13, 12)
+
+#define PHYINIT_TIMEOUT 2000 //PHY initialization timeout value in 0.5ms unit
+
+#define E56G__BASEADDR 0x0
+
+typedef union {
+	struct {
+		u32 ana_lcpll_lf_vco_swing_ctrl_i : 4;
+		u32 ana_lcpll_lf_lpf_setcode_calib_i : 5;
+		u32 rsvd0 : 3;
+		u32 ana_lcpll_lf_vco_coarse_bin_i : 5;
+		u32 rsvd1 : 3;
+		u32 ana_lcpll_lf_vco_fine_therm_i : 8;
+		u32 ana_lcpll_lf_clkout_fb_ctrl_i : 2;
+		u32 rsvd2 : 2;
+	};
+	u32 reg;
+} E56G_CMS_ANA_OVRDVAL_7;
+#define E56G_CMS_ANA_OVRDVAL_7_ADDR (E56G__BASEADDR + 0xccc)
+
+typedef union {
+	struct {
+		u32 ovrd_en_ana_lcpll_hf_vco_amp_status_o : 1;
+		u32 ovrd_en_ana_lcpll_hf_clkout_fb_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_hf_clkdiv_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_hf_en_odiv_i : 1;
+		u32 ovrd_en_ana_lcpll_hf_test_in_i : 1;
+		u32 ovrd_en_ana_lcpll_hf_test_out_o : 1;
+		u32 ovrd_en_ana_lcpll_lf_en_bias_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_en_loop_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_en_cp_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_icp_base_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_icp_fine_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_lpf_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_lpf_setcode_calib_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_set_lpf_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_en_vco_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_vco_sel_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_vco_swing_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_vco_coarse_bin_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_vco_fine_therm_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_vco_amp_status_o : 1;
+		u32 ovrd_en_ana_lcpll_lf_clkout_fb_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_clkdiv_ctrl_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_en_odiv_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_test_in_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_test_out_o : 1;
+		u32 ovrd_en_ana_lcpll_hf_refclk_select_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_refclk_select_i : 1;
+		u32 ovrd_en_ana_lcpll_hf_clk_ref_sel_i : 1;
+		u32 ovrd_en_ana_lcpll_lf_clk_ref_sel_i : 1;
+		u32 ovrd_en_ana_test_bias_i : 1;
+		u32 ovrd_en_ana_test_slicer_i : 1;
+		u32 ovrd_en_ana_test_sampler_i : 1;
+	};
+	u32 reg;
+} E56G_CMS_ANA_OVRDEN_1;
+
+#define E56G_CMS_ANA_OVRDEN_1_ADDR (E56G__BASEADDR + 0xca8)
+
+typedef union {
+	struct {
+		u32 ana_lcpll_lf_test_in_i : 32;
+	};
+	u32 reg;
+} E56G_CMS_ANA_OVRDVAL_9;
+
+#define E56G_CMS_ANA_OVRDVAL_9_ADDR (E56G__BASEADDR + 0xcd4)
+
+typedef union {
+	struct {
+		u32 ovrd_en_ana_bbcdr_vcofilt_byp_i : 1;
+		u32 ovrd_en_ana_bbcdr_coarse_i : 1;
+		u32 ovrd_en_ana_bbcdr_fine_i : 1;
+		u32 ovrd_en_ana_bbcdr_ultrafine_i : 1;
+		u32 ovrd_en_ana_en_bbcdr_i : 1;
+		u32 ovrd_en_ana_bbcdr_divctrl_i : 1;
+		u32 ovrd_en_ana_bbcdr_int_cstm_i : 1;
+		u32 ovrd_en_ana_bbcdr_prop_step_i : 1;
+		u32 ovrd_en_ana_en_bbcdr_clk_i : 1;
+		u32 ovrd_en_ana_test_bbcdr_i : 1;
+		u32 ovrd_en_ana_bbcdr_en_elv_cnt_ping0_pong1_i : 1;
+		u32 ovrd_en_ana_bbcdr_clrz_elv_cnt_ping_i : 1;
+		u32 ovrd_en_ana_bbcdr_clrz_elv_cnt_pong_i : 1;
+		u32 ovrd_en_ana_bbcdr_clrz_cnt_sync_i : 1;
+		u32 ovrd_en_ana_bbcdr_en_elv_cnt_rd_i : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_rdout_0_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_rdout_90_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_rdout_180_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_rdout_270_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_ping_0_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_ping_90_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_ping_180_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_ping_270_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_pong_0_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_pong_90_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_pong_180_o : 1;
+		u32 ovrd_en_ana_bbcdr_elv_cnt_pong_270_o : 1;
+		u32 ovrd_en_ana_en_bbcdr_samp_dac_i : 1;
+		u32 ovrd_en_ana_bbcdr_dac0_i : 1;
+		u32 ovrd_en_ana_bbcdr_dac90_i : 1;
+		u32 ovrd_en_ana_vga2_cload_in_cstm_i : 1;
+		u32 ovrd_en_ana_intlvr_cut_bw_i : 1;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDEN_1;
+
+#define E56G_RXS0_ANA_OVRDEN_1_ADDR (E56G__BASEADDR + 0x90)
+
+//-----Access structure typedef for Register:E56G__RXS0_OSC_CAL_N_CDR_0
+typedef union {
+	struct {
+		u32 prediv0 : 16;
+		u32 target_cnt0 : 16;
+	};
+	u32 reg;
+} E56G_RXS0_OSC_CAL_N_CDR_0;
+//-----MACRO defines for Register:E56G__RXS0_OSC_CAL_N_CDR_0
+#define E56G_RXS0_OSC_CAL_N_CDR_0_ADDR (E56G__BASEADDR + 0x4)
+
+typedef union {
+	struct {
+		u32 osc_range_sel0 : 2;
+		u32 osc_range_sel1 : 2;
+		u32 osc_range_sel2 : 2;
+		u32 osc_range_sel3 : 2;
+		u32 vco_code_init : 11;
+		u32 calibrate_range_sel : 1;
+		u32 osc_current_boost_en0 : 1;
+		u32 osc_current_boost_en1 : 1;
+		u32 osc_current_boost_en2 : 1;
+		u32 osc_current_boost_en3 : 1;
+		u32 bbcdr_current_boost0 : 2;
+		u32 bbcdr_current_boost1 : 2;
+		u32 bbcdr_current_boost2 : 2;
+		u32 bbcdr_current_boost3 : 2;
+	};
+	u32 reg;
+} E56G_RXS0_OSC_CAL_N_CDR_4;
+//-----MACRO defines for Register:E56G__RXS0_OSC_CAL_N_CDR_4
+#define E56G_RXS0_OSC_CAL_N_CDR_4_ADDR (E56G__BASEADDR + 0x14)
+
+//-----Access structure typedef for Register:E56G__RXS0_INTL_CONFIG_0
+typedef union {
+	struct {
+		u32 adc_intl2slice_delay0 : 16;
+		u32 adc_intl2slice_delay1 : 16;
+	};
+	u32 reg;
+} E56G_RXS0_INTL_CONFIG_0;
+//-----MACRO defines for Register:E56G__RXS0_INTL_CONFIG_0
+#define E56G_RXS0_INTL_CONFIG_0_ADDR (E56G__BASEADDR + 0x20)
+
+//-----Access structure typedef for Register:E56G__RXS0_INTL_CONFIG_2
+typedef union {
+	struct {
+		u32 interleaver_hbw_disable0 : 1;
+		u32 interleaver_hbw_disable1 : 1;
+		u32 interleaver_hbw_disable2 : 1;
+		u32 interleaver_hbw_disable3 : 1;
+		u32 rsvd0 : 28;
+	};
+	u32 reg;
+} E56G_RXS0_INTL_CONFIG_2;
+//-----MACRO defines for Register:E56G__RXS0_INTL_CONFIG_2
+#define E56G_RXS0_INTL_CONFIG_2_ADDR (E56G__BASEADDR + 0x28)
+typedef union {
+	struct {
+		u32 rxs0_rx0_fe_ofst_cal_error_o : 1;
+		u32 rxs0_rx0_fom_en_i : 1;
+		u32 rxs0_rx0_idle_detect_en_i : 1;
+		u32 rxs0_rx0_idle_o : 1;
+		u32 rxs0_rx0_txffe_train_en_i : 1;
+		u32 rxs0_rx0_txffe_train_enack_o : 1;
+		u32 rxs0_rx0_txffe_train_done_o : 1;
+		u32 rxs0_rx0_vga_train_en_i : 1;
+		u32 rxs0_rx0_vga_train_done_o : 1;
+		u32 rxs0_rx0_ctle_train_en_i : 1;
+		u32 rxs0_rx0_ctle_train_done_o : 1;
+		u32 rxs0_rx0_cdr_en_i : 1;
+		u32 rxs0_rx0_cdr_rdy_o : 1;
+		u32 rxs0_rx0_ffe_train_en_i : 1;
+		u32 rxs0_rx0_ffe_train_done_o : 1;
+		u32 rxs0_rx0_mmpd_en_i : 1;
+		u32 rxs0_rx0_adc_intl_cal_en_i : 1;
+		u32 rxs0_rx0_adc_intl_cal_done_o : 1;
+		u32 rxs0_rx0_adc_intl_cal_error_o : 1;
+		u32 rxs0_rx0_dfe_train_en_i : 1;
+		u32 rxs0_rx0_dfe_train_done_o : 1;
+		u32 rxs0_rx0_vga_adapt_en_i : 1;
+		u32 rxs0_rx0_vga_adapt_done_o : 1;
+		u32 rxs0_rx0_ctle_adapt_en_i : 1;
+		u32 rxs0_rx0_ctle_adapt_done_o : 1;
+		u32 rxs0_rx0_adc_ofst_adapt_en_i : 1;
+		u32 rxs0_rx0_adc_ofst_adapt_done_o : 1;
+		u32 rxs0_rx0_adc_ofst_adapt_error_o : 1;
+		u32 rxs0_rx0_adc_gain_adapt_en_i : 1;
+		u32 rxs0_rx0_adc_gain_adapt_done_o : 1;
+		u32 rxs0_rx0_adc_gain_adapt_error_o : 1;
+		u32 rxs0_rx0_adc_intl_adapt_en_i : 1;
+	};
+	u32 reg;
+} E56G__PMD_RXS0_OVRDVAL_1;
+#define E56G__PMD_RXS0_OVRDVAL_1_ADDR (E56G__BASEADDR + 0x1544)
+
+#define DEFAULT_TEMP 40
+#define HIGH_TEMP 70
+
+#define E56PHY_RX_RDY_ST 0x1B
+
+#define S10G_CMVAR_RANGE_H 0x3
+#define S10G_CMVAR_RANGE_L 0x2
+#define S25G_CMVAR_RANGE_H 0x1
+#define S25G_CMVAR_RANGE_L 0x0
+
+int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
+
+#endif /* _TXGBE_E56_H_ */

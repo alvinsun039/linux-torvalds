@@ -128,6 +128,10 @@ struct txgbe_dec_ptype {
 };
 typedef struct txgbe_dec_ptype txgbe_dptype;
 
+u32 rd32_ephy(struct txgbe_hw *hw, u32 addr);
+u32 txgbe_rd32_epcs(struct txgbe_hw *hw, u32 addr);
+void txgbe_wr32_ephy(struct txgbe_hw *hw, u32 addr, u32 data);
+void txgbe_wr32_epcs(struct txgbe_hw *hw, u32 addr, u32 data);
 
 void txgbe_dcb_get_rtrup2tc(struct txgbe_hw *hw, u8 *map);
 u16 txgbe_get_pcie_msix_count(struct txgbe_hw *hw);

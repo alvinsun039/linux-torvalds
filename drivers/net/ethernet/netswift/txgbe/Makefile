@@ -17,6 +17,7 @@ txgbe-objs := txgbe_main.o \
 			  txgbe_fcoe.o \
 			  txgbe_mbx.o \
 			  txgbe_mtd.o \
+			  txgbe_e56.o \
 			  txgbe_param.o \
 			  txgbe_ptp.o \
 			  txgbe_procfs.o \
