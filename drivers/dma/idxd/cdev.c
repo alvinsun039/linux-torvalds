@@ -14,6 +14,7 @@
 #include <linux/highmem.h>
 #include <uapi/linux/idxd.h>
 #include <linux/xarray.h>
+#include <linux/cleanup.h>
 #include "registers.h"
 #include "idxd.h"
 
@@ -193,12 +194,11 @@ static void idxd_xa_pasid_remove(struct idxd_user_context *ctx)
 	struct idxd_wq *wq = ctx->wq;
 	void *ptr;
 
-	mutex_lock(&wq->uc_lock);
+	guard(mutex)(&wq->uc_lock);
 	ptr = xa_cmpxchg(&wq->upasid_xa, ctx->pasid, ctx, NULL, GFP_KERNEL);
 	if (ptr != (void *)ctx)
 		dev_warn(&wq->idxd->pdev->dev, "xarray cmpxchg failed for pasid %u\n",
 			 ctx->pasid);
-	mutex_unlock(&wq->uc_lock);
 }
 
 void idxd_user_counter_increment(struct idxd_wq *wq, u32 pasid, int index)
@@ -208,14 +208,12 @@ void idxd_user_counter_increment(struct idxd_wq *wq, u32 pasid, int index)
 	if (index >= COUNTER_MAX)
 		return;
 
-	mutex_lock(&wq->uc_lock);
+	guard(mutex)(&wq->uc_lock);
 	ctx = xa_load(&wq->upasid_xa, pasid);
-	if (!ctx) {
-		mutex_unlock(&wq->uc_lock);
+	if (!ctx)
 		return;
-	}
+
 	ctx->counters[index]++;
-	mutex_unlock(&wq->uc_lock);
 }
 
 static int idxd_cdev_open(struct inode *inode, struct file *filp)
@@ -239,7 +237,7 @@ static int idxd_cdev_open(struct inode *inode, struct file *filp)
 	if (!ctx)
 		return -ENOMEM;
 
-	mutex_lock(&wq->wq_lock);
+	guard(mutex)(&wq->wq_lock);
 
 	if (idxd_wq_refcount(wq) > 0 && wq_dedicated(wq)) {
 		rc = -EBUSY;
@@ -311,7 +309,6 @@ static int idxd_cdev_open(struct inode *inode, struct file *filp)
 	}
 
 	idxd_wq_get(wq);
-	mutex_unlock(&wq->wq_lock);
 	return 0;
 
 failed_dev_add:
@@ -325,7 +322,6 @@ failed_get_pasid:
 	if (device_user_pasid_enabled(idxd))
 		iommu_sva_unbind_device(sva);
 failed:
-	mutex_unlock(&wq->wq_lock);
 	kfree(ctx);
 	return rc;
 }
@@ -342,7 +338,8 @@ static void idxd_cdev_evl_drain_pasid(struct idxd_wq *wq, u32 pasid)
 	if (!evl)
 		return;
 
-	mutex_lock(&evl->lock);
+	guard(mutex)(&evl->lock);
+
 	status.bits = ioread64(idxd->reg_base + IDXD_EVLSTATUS_OFFSET);
 	t = status.tail;
 	h = status.head;
@@ -355,7 +352,6 @@ static void idxd_cdev_evl_drain_pasid(struct idxd_wq *wq, u32 pasid)
 		h = (h + 1) % size;
 	}
 	drain_workqueue(wq->wq);
-	mutex_unlock(&evl->lock);
 }
 
 static int idxd_cdev_release(struct inode *node, struct file *filep)
@@ -592,12 +588,11 @@ static int idxd_user_drv_probe(struct idxd_dev *idxd_dev)
 	if (idxd->state != IDXD_DEV_ENABLED)
 		return -ENXIO;
 
-	mutex_lock(&wq->wq_lock);
+	guard(mutex)(&wq->wq_lock);
 
 	if (!idxd_wq_driver_name_match(wq, dev)) {
 		idxd->cmd_status = IDXD_SCMD_WQ_NO_DRV_NAME;
-		rc = -ENODEV;
-		goto wq_err;
+		return -ENODEV;
 	}
 
 	/*
@@ -615,15 +610,12 @@ static int idxd_user_drv_probe(struct idxd_dev *idxd_dev)
 		dev_dbg(&idxd->pdev->dev,
 			"User type WQ cannot be enabled without SVA.\n");
 
-		rc = -EOPNOTSUPP;
-		goto wq_err;
+		return -EOPNOTSUPP;
 	}
 
 	wq->wq = create_workqueue(dev_name(wq_confdev(wq)));
-	if (!wq->wq) {
-		rc = -ENOMEM;
-		goto wq_err;
-	}
+	if (!wq->wq)
+		return -ENOMEM;
 
 	wq->type = IDXD_WQT_USER;
 	rc = idxd_drv_enable_wq(wq);
@@ -637,7 +629,6 @@ static int idxd_user_drv_probe(struct idxd_dev *idxd_dev)
 	}
 
 	idxd->cmd_status = 0;
-	mutex_unlock(&wq->wq_lock);
 	return 0;
 
 err_cdev:
@@ -645,8 +636,7 @@ err_cdev:
 err:
 	destroy_workqueue(wq->wq);
 	wq->type = IDXD_WQT_NONE;
-wq_err:
-	mutex_unlock(&wq->wq_lock);
+
 	return rc;
 }
 
@@ -654,13 +644,12 @@ static void idxd_user_drv_remove(struct idxd_dev *idxd_dev)
 {
 	struct idxd_wq *wq = idxd_dev_to_wq(idxd_dev);
 
-	mutex_lock(&wq->wq_lock);
+	guard(mutex)(&wq->wq_lock);
 	idxd_wq_del_cdev(wq);
 	idxd_drv_disable_wq(wq);
 	wq->type = IDXD_WQT_NONE;
 	destroy_workqueue(wq->wq);
 	wq->wq = NULL;
-	mutex_unlock(&wq->wq_lock);
 }
 
 static enum idxd_dev_type dev_types[] = {
@@ -728,7 +717,7 @@ int idxd_copy_cr(struct idxd_wq *wq, ioasid_t pasid, unsigned long addr,
 	struct idxd_user_context *ctx;
 	struct mm_struct *mm;
 
-	mutex_lock(&wq->uc_lock);
+	guard(mutex)(&wq->uc_lock);
 
 	ctx = xa_load(&wq->upasid_xa, pasid);
 	if (!ctx) {
@@ -769,7 +758,5 @@ int idxd_copy_cr(struct idxd_wq *wq, ioasid_t pasid, unsigned long addr,
 	kthread_unuse_mm(mm);
 
 out:
-	mutex_unlock(&wq->uc_lock);
-
 	return len - left;
 }

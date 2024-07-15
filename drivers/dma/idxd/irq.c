@@ -8,6 +8,7 @@
 #include <linux/dmaengine.h>
 #include <linux/delay.h>
 #include <linux/iommu.h>
+#include <linux/cleanup.h>
 #include <linux/sched/mm.h>
 #include <uapi/linux/idxd.h>
 #include "../dmaengine.h"
@@ -186,21 +187,21 @@ static void idxd_int_handle_revoke(struct work_struct *work)
 			continue;
 		}
 
-		mutex_lock(&wq->wq_lock);
-		reinit_completion(&wq->wq_resurrect);
+		scoped_guard(mutex, &wq->wq_lock) {
+			reinit_completion(&wq->wq_resurrect);
 
-		/* Kill percpu_ref to pause additional descriptor submissions */
-		percpu_ref_kill(&wq->wq_active);
+			/* Kill percpu_ref to pause additional descriptor submissions */
+			percpu_ref_kill(&wq->wq_active);
 
-		/* Wait for all submitters quiesce before we change interrupt handle */
-		wait_for_completion(&wq->wq_dead);
+			/* Wait for all submitters quiesce before we change interrupt handle */
+			wait_for_completion(&wq->wq_dead);
 
-		ie->int_handle = new_handle;
+			ie->int_handle = new_handle;
 
-		/* Revive percpu ref and wake up all the waiting submitters */
-		percpu_ref_reinit(&wq->wq_active);
-		complete_all(&wq->wq_resurrect);
-		mutex_unlock(&wq->wq_lock);
+			/* Revive percpu ref and wake up all the waiting submitters */
+			percpu_ref_reinit(&wq->wq_active);
+			complete_all(&wq->wq_resurrect);
+		}
 
 		/*
 		 * The delay here is to wait for all possible MOVDIR64B that
@@ -363,7 +364,8 @@ static void process_evl_entries(struct idxd_device *idxd)
 	evl_status.bits = 0;
 	evl_status.int_pending = 1;
 
-	mutex_lock(&evl->lock);
+	guard(mutex)(&evl->lock);
+
 	/* Clear interrupt pending bit */
 	iowrite32(evl_status.bits_upper32,
 		  idxd->reg_base + IDXD_EVLSTATUS_OFFSET + sizeof(u32));
@@ -380,7 +382,6 @@ static void process_evl_entries(struct idxd_device *idxd)
 
 	evl_status.head = h;
 	iowrite32(evl_status.bits_lower32, idxd->reg_base + IDXD_EVLSTATUS_OFFSET);
-	mutex_unlock(&evl->lock);
 }
 
 irqreturn_t idxd_misc_thread(int vec, void *data)

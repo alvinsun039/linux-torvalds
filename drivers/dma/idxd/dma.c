@@ -5,6 +5,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/device.h>
+#include <linux/cleanup.h>
 #include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/dmaengine.h>
 #include <uapi/linux/idxd.h>
@@ -305,7 +306,8 @@ static int idxd_dmaengine_drv_probe(struct idxd_dev *idxd_dev)
 	if (idxd->state != IDXD_DEV_ENABLED)
 		return -ENXIO;
 
-	mutex_lock(&wq->wq_lock);
+	guard(mutex)(&wq->wq_lock);
+
 	if (!idxd_wq_driver_name_match(wq, dev)) {
 		idxd->cmd_status = IDXD_SCMD_WQ_NO_DRV_NAME;
 		rc = -ENODEV;
@@ -329,14 +331,12 @@ static int idxd_dmaengine_drv_probe(struct idxd_dev *idxd_dev)
 	}
 
 	idxd->cmd_status = 0;
-	mutex_unlock(&wq->wq_lock);
 	return 0;
 
 err_dma:
 	idxd_drv_disable_wq(wq);
 err:
 	wq->type = IDXD_WQT_NONE;
-	mutex_unlock(&wq->wq_lock);
 	return rc;
 }
 
@@ -344,11 +344,10 @@ static void idxd_dmaengine_drv_remove(struct idxd_dev *idxd_dev)
 {
 	struct idxd_wq *wq = idxd_dev_to_wq(idxd_dev);
 
-	mutex_lock(&wq->wq_lock);
+	guard(mutex)(&wq->wq_lock);
 	__idxd_wq_quiesce(wq);
 	idxd_unregister_dma_channel(wq);
 	idxd_drv_disable_wq(wq);
-	mutex_unlock(&wq->wq_lock);
 }
 
 static enum idxd_dev_type dev_types[] = {
