@@ -4875,15 +4875,13 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		*autoneg = true;
-	}
-
-	/* Check if 1G SFP module. */
-	if (hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
+	} else if (hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_lx_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_lx_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_sx_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_sx_core1) {
+	    /* Check if 1G SFP module. */
 		*speed = TXGBE_LINK_SPEED_1GB_FULL;
 		*autoneg = true;
 	} else if (hw->phy.multispeed_fiber) {
@@ -6215,7 +6213,7 @@ int txgbe_reset_misc(struct txgbe_hw *hw)
 	int i;
 
 	if (hw->amlite) {
-		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_10GB_FULL, false);
+		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_AMLITE_AUTONEG, false);
 		if (err) {
 			e_dev_info("txgbe_reset_misc setup phy failed\n");
 			return err;

@@ -4047,6 +4047,10 @@ static void txgbe_configure_tx(struct txgbe_adapter *adapter)
 	wr32m(hw, TXGBE_TSC_BUF_AE, 0x3FF, 0x10);
 
 	/* enable mac transmitter */
+	if (hw->amlite)
+		wr32(hw, TXGBE_TSC_CTL, 0);
+
+	/* enable mac transmitter */
 	wr32m(hw, TXGBE_MAC_TX_CFG,
 		TXGBE_MAC_TX_CFG_TE, TXGBE_MAC_TX_CFG_TE);
 }
@@ -6432,6 +6436,8 @@ static void txgbe_configure(struct txgbe_adapter *adapter)
 		txgbe_fdir_filter_restore(adapter);
 	}
 
+	TCALL(hw, mac.ops.enable_sec_rx_path);
+
 	TCALL(hw, mac.ops.setup_eee,
 		(adapter->flags2 & TXGBE_FLAG2_EEE_CAPABLE) &&
 		(adapter->flags2 & TXGBE_FLAG2_EEE_ENABLED));
@@ -8769,6 +8775,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	flow_tx = !!(TXGBE_RDB_RFCC_RFCE_802_3X &
 		     rd32(hw, TXGBE_RDB_RFCC));
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s\n",
+	       (link_speed == TXGBE_LINK_SPEED_25GB_FULL ?
+	       "25 Gbps" :
 	       (link_speed == TXGBE_LINK_SPEED_10GB_FULL ?
 	       "10 Gbps" :
 	       (link_speed == TXGBE_LINK_SPEED_1GB_FULL ?
@@ -8777,7 +8785,7 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	       "100 Mbps" :
 	       (link_speed == TXGBE_LINK_SPEED_10_FULL ?
 	       "10 Mbps" :
-	       "unknown speed")))),
+	       "unknown speed"))))),
 	       ((flow_rx && flow_tx) ? "RX/TX" :
 	       (flow_rx ? "RX" :
 	       (flow_tx ? "TX" : "None"))));

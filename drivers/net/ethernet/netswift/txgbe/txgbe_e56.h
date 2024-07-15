@@ -635,6 +635,65 @@ typedef union {
 } E56G_RXS0_INTL_CONFIG_2;
 //-----MACRO defines for Register:E56G__RXS0_INTL_CONFIG_2
 #define E56G_RXS0_INTL_CONFIG_2_ADDR (E56G__BASEADDR + 0x28)
+
+typedef union {
+	struct {
+		u32 ovrd_en_ana_bbcdr_dac180_i : 1;
+		u32 ovrd_en_ana_bbcdr_dac270_i : 1;
+		u32 ovrd_en_ana_bbcdr_en_samp_cal_cnt_i : 1;
+		u32 ovrd_en_ana_bbcdr_clrz_samp_cal_cnt_i : 1;
+		u32 ovrd_en_ana_bbcdr_samp_cnt_0_o : 1;
+		u32 ovrd_en_ana_bbcdr_samp_cnt_90_o : 1;
+		u32 ovrd_en_ana_bbcdr_samp_cnt_180_o : 1;
+		u32 ovrd_en_ana_bbcdr_samp_cnt_270_o : 1;
+		u32 ovrd_en_ana_en_adcbuf1_i : 1;
+		u32 ovrd_en_ana_test_adcbuf1_i : 1;
+		u32 ovrd_en_ana_en_adc_clk4ui_i : 1;
+		u32 ovrd_en_ana_adc_clk_skew0_i : 1;
+		u32 ovrd_en_ana_adc_clk_skew90_i : 1;
+		u32 ovrd_en_ana_adc_clk_skew180_i : 1;
+		u32 ovrd_en_ana_adc_clk_skew270_i : 1;
+		u32 ovrd_en_ana_adc_update_skew_i : 1;
+		u32 ovrd_en_ana_en_adc_pi_i : 1;
+		u32 ovrd_en_ana_adc_pictrl_quad_i : 1;
+		u32 ovrd_en_ana_adc_pctrl_code_i : 1;
+		u32 ovrd_en_ana_adc_clkdiv_i : 1;
+		u32 ovrd_en_ana_test_adc_clkgen_i : 1;
+		u32 ovrd_en_ana_en_adc_i : 1;
+		u32 ovrd_en_ana_en_adc_vref_i : 1;
+		u32 ovrd_en_ana_vref_cnfg_i : 1;
+		u32 ovrd_en_ana_adc_data_cstm_o : 1;
+		u32 ovrd_en_ana_en_adccal_lpbk_i : 1;
+		u32 ovrd_en_ana_sel_adcoffset_cal_i : 1;
+		u32 ovrd_en_ana_sel_adcgain_cal_i : 1;
+		u32 ovrd_en_ana_adcgain_cal_swing_ctrl_i : 1;
+		u32 ovrd_en_ana_adc_gain_i : 1;
+		u32 ovrd_en_ana_vga_cload_out_cstm_i : 1;
+		u32 ovrd_en_ana_vga2_cload_out_cstm_i : 1;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDEN_2;
+//-----MACRO defines for Register:E56G__RXS0_ANA_OVRDEN_2
+#define E56G__RXS0_ANA_OVRDEN_2_ADDR (E56G__BASEADDR + 0x94)
+
+typedef union {
+	struct {
+		u32 ana_adc_pictrl_quad_i : 2;
+		u32 rsvd0 : 2;
+		u32 ana_adc_clkdiv_i : 2;
+		u32 rsvd1 : 2;
+		u32 ana_test_adc_clkgen_i : 4;
+		u32 ana_vref_cnfg_i : 4;
+		u32 ana_adcgain_cal_swing_ctrl_i : 4;
+		u32 ana_adc_gain_i : 4;
+		u32 ana_adc_offset_i : 4;
+		u32 ana_ana_debug_sel_i : 4;
+	};
+	u32 reg;
+} E56G__RXS3_ANA_OVRDVAL_11;
+//-----MACRO defines for Register:E56G__RXS3_ANA_OVRDVAL_11
+#define E56G__RXS3_ANA_OVRDVAL_11_ADDR (E56G__BASEADDR + 0x6cc)
+
 typedef union {
 	struct {
 		u32 rxs0_rx0_fe_ofst_cal_error_o : 1;
@@ -673,6 +732,19 @@ typedef union {
 	u32 reg;
 } E56G__PMD_RXS0_OVRDVAL_1;
 #define E56G__PMD_RXS0_OVRDVAL_1_ADDR (E56G__BASEADDR + 0x1544)
+
+#define E56G__RXS0_FOM_18__ADDR (E56G__BASEADDR + 0x1f8)
+#define E56G__RXS0_FOM_18__DFE_COEFFL_HINT__MSB 11
+#define E56G__RXS0_FOM_18__DFE_COEFFL_HINT__LSB 0
+#define E56G__RXS0_FOM_18__DFE_COEFFH_HINT__MSB 23
+#define E56G__RXS0_FOM_18__DFE_COEFFH_HINT__LSB 12
+#define E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__MSB 25
+#define E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__LSB 25
+
+#define DEFAULT_TEMP 40
+#define HIGH_TEMP 70
+
+#define E56PHY_RX_RDY_ST 0x1B
 
 #define DEFAULT_TEMP 40
 #define HIGH_TEMP 70

@@ -2687,6 +2687,8 @@ typedef u32 txgbe_autoneg_advertised;
 #define TXGBE_LINK_SPEED_40GB_FULL      0x20
 #define TXGBE_LINK_SPEED_50GB_FULL      0x40
 
+#define TXGBE_LINK_SPEED_AMLITE_AUTONEG  (TXGBE_LINK_SPEED_10GB_FULL | \
+				TXGBE_LINK_SPEED_25GB_FULL)
 /* Amlite eth mode */
 enum amlite_eth_mode {
 	ETH_RATE_10G = 0,

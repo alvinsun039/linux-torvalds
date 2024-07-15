@@ -7,10 +7,10 @@
 		rdata = rd32_ephy(hw, REG##_ADDR); \
 	} while (0)
 
-#define EPHY_WREG(REG)                                                         \
-	do {                                                                   \
-		txgbe_wr32_ephy(hw, rdata) printk("Write A: 0x%x,  D: 0x%x\n", \
-						  REG##_ADDR, rdata);          \
+#define EPHY_WREG(REG)                                                  \
+	do {                                                            \
+		txgbe_wr32_ephy(hw, REG##_ADDR, rdata);                 \
+		printk("Write A: 0x%x,  D: 0x%x\n", REG##_ADDR, rdata); \
 	} while (0)
 
 #define EPCS_RREG(REG)                                   \
@@ -19,10 +19,10 @@
 		rdata = txgbe_rd32_epcs(hw, REG##_ADDR); \
 	} while (0)
 
-#define EPCS_WREG(REG)                                                         \
-	do {                                                                   \
-		txgbe_wr32_epcs(hw, rdata) printk("Write A: 0x%x,  D: 0x%x\n", \
-						  REG##_ADDR, rdata);          \
+#define EPCS_WREG(REG)                                                  \
+	do {                                                            \
+		txgbe_wr32_epcs(hw, REG##_ADDR, rdata);                 \
+		printk("Write A: 0x%x,  D: 0x%x\n", REG##_ADDR, rdata); \
 	} while (0)
 
 #define txgbe_e56_ephy_config(reg, field, val) \
@@ -64,6 +64,20 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 
 u32 E56phyTxFfeCfg(struct txgbe_hw *hw)
 {
+	u32 addr;
+	u32 wdata;
+	addr = 0x141c;
+	wdata = 0x3f3f3f3f;
+	txgbe_wr32_ephy(hw, addr, wdata);
+	addr = 0x1420;
+	wdata = 00;
+	txgbe_wr32_ephy(hw, addr, wdata);
+	addr = 0x1424;
+	wdata = 00;
+	txgbe_wr32_ephy(hw, addr, wdata);
+	addr = 0x1428;
+	wdata = 0;
+	txgbe_wr32_ephy(hw, addr, wdata);
 	return 0;
 }
 
@@ -82,6 +96,7 @@ u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 		if ((rdata >> 12) != 0)
 			break;
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait 0x1033c Timeout!!!\n");
 			return -1;
 		}
 	}
@@ -189,8 +204,8 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_4_VCO_CODE_INIT, 0x7fb);
 	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_4_OSC_RANGE_SEL1, 0x1);
+	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_4_VCO_CODE_INIT, 0x7fb);
 	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_4_OSC_CURRENT_BOOST_EN1,
 		  0x0);
 	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_4_BBCDR_CURRENT_BOOST1, 0x0);
@@ -253,6 +268,16 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 	SetFields(&rdata, E56PHY_RXS_TXFFE_TRAINING_3_CM2_UTH, 0x37);
 	SetFields(&rdata, E56PHY_RXS_TXFFE_TRAINING_3_TXFFE_TRAIN_MOD_TYPE,
 		  0x38);
+	txgbe_wr32_ephy(hw, addr, rdata);
+
+	addr = E56G__RXS0_FOM_18__ADDR;
+	rdata = rd32_ephy(hw, addr);
+	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFFL_HINT__MSB,
+		  E56G__RXS0_FOM_18__DFE_COEFFL_HINT__LSB, 0x0);
+	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFFH_HINT__MSB,
+		  E56G__RXS0_FOM_18__DFE_COEFFH_HINT__LSB, 0x90);
+	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__MSB,
+		  E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__LSB, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_VGA_TRAINING_0_ADDR;
@@ -318,6 +343,11 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0x5);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	txgbe_e56_ephy_config(E56G__RXS3_ANA_OVRDVAL_11, ana_test_adc_clkgen_i,
+			      0x0);
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_2,
+			      ovrd_en_ana_test_adc_clkgen_i, 0x0);
+
 	addr = E56PHY_RXS_ANA_OVRDVAL_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS_ANA_OVRDVAL_0_ANA_EN_RTERM_I, 0x1);
@@ -379,7 +409,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_RINGO_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, 9, 4, 0x366);
+	SetFields(&rdata, 21, 12, 0x366);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_PMD_CFG_3_ADDR;
@@ -591,8 +621,8 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	((E56G_RXS0_OSC_CAL_N_CDR_4 *)&rdata)->vco_code_init = 0x7ff;
 	((E56G_RXS0_OSC_CAL_N_CDR_4 *)&rdata)->osc_range_sel0 = 0x2;
+	((E56G_RXS0_OSC_CAL_N_CDR_4 *)&rdata)->vco_code_init = 0x7ff;
 	((E56G_RXS0_OSC_CAL_N_CDR_4 *)&rdata)->osc_current_boost_en0 = 0x1;
 	((E56G_RXS0_OSC_CAL_N_CDR_4 *)&rdata)->bbcdr_current_boost0 = 0x0;
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -722,6 +752,11 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0xa);
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0x5);
 	txgbe_wr32_ephy(hw, addr, rdata);
+
+	txgbe_e56_ephy_config(E56G__RXS3_ANA_OVRDVAL_11, ana_test_adc_clkgen_i,
+			      0x0);
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_2,
+			      ovrd_en_ana_test_adc_clkgen_i, 0x0);
 
 	addr = E56PHY_RXS_ANA_OVRDVAL_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1018,6 +1053,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		rdata = rd32_ephy(hw, addr);
 
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
 			return -1;
 		}
@@ -1052,6 +1088,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 			break;
 		}
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
 			return -1;
 		}
@@ -1134,6 +1171,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
 		rdata = rd32_ephy(hw, addr);
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
 			return -1;
 		} //if (timer++ > PHYINIT_TIMEOUT) {
@@ -1184,6 +1222,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 			break;
 		}
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
 			return -1;
 		} //if (timer++ > PHYINIT_TIMEOUT) {
@@ -1387,6 +1426,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(1000);
 
 		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait  E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_CAL_DONE_O_LSB Timeout!!!\n");
 			break;
 		}
 	}
@@ -1408,7 +1448,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 				 rxs0_rx0_adc_ofst_adapt_done_o) != 1) {
 			EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
 			udelay(500);
-
 			if (timer++ > PHYINIT_TIMEOUT) {
 				printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_adc_ofst_adapt_done_o =1 Timeout!!!\n");
 				break;
@@ -1442,6 +1481,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			udelay(500);
 
 			if (timer++ > PHYINIT_TIMEOUT) {
+				printk("ERROR: Wait E56G__PMD_RXS0_OVRDVAL_1[1]::rxs0_rx0_adc_gain_adapt_done_o =1 Timeout!!!\n");
 				break;
 			}
 		}
@@ -1521,7 +1561,7 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 	} else {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
 		SetFields(&value, 4, 4, 0x1);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN0, value);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
 
 		value = rd32_ephy(hw, CMS_ANA_OVRDVAL4);
 		SetFields(&value, 24, 24, 0x1);
@@ -1549,7 +1589,7 @@ u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw)
 	if (temp < DEFAULT_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
 		SetFields(&value, 12, 12, 0x1);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN0, value);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
 
 		value = rd32_ephy(hw, CMS_ANA_OVRDVAL7);
 		SetFields(&value, 8, 4, 0x1);
