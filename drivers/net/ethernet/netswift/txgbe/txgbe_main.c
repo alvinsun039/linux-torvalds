@@ -3321,6 +3321,8 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 	/* enable misc interrupt */
 	mask = TXGBE_PX_MISC_IEN_MASK;
 
+	mask &= ~TXGBE_PX_MISC_IEN_ETH_EVENT;
+
 	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE)
 		mask |= TXGBE_PX_MISC_IEN_OVER_HEAT;
 
