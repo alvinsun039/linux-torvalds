@@ -576,7 +576,7 @@ typedef union {
 	u32 reg;
 } E56G__RXS0_ANA_OVRDEN_1;
 
-#define E56G_RXS0_ANA_OVRDEN_1_ADDR (E56G__BASEADDR + 0x90)
+#define E56G__RXS0_ANA_OVRDEN_1_ADDR (E56G__BASEADDR + 0x90)
 
 //-----Access structure typedef for Register:E56G__RXS0_OSC_CAL_N_CDR_0
 typedef union {
@@ -678,6 +678,26 @@ typedef union {
 
 typedef union {
 	struct {
+		u32 ana_bbcdr_osc_range_sel_i : 2;
+		u32 rsvd0 : 2;
+		u32 ana_bbcdr_coarse_i : 4;
+		u32 ana_bbcdr_fine_i : 3;
+		u32 rsvd1 : 1;
+		u32 ana_bbcdr_ultrafine_i : 3;
+		u32 rsvd2 : 1;
+		u32 ana_bbcdr_divctrl_i : 2;
+		u32 rsvd3 : 2;
+		u32 ana_bbcdr_int_cstm_i : 5;
+		u32 rsvd4 : 3;
+		u32 ana_bbcdr_prop_step_i : 4;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDVAL_5;
+//-----MACRO defines for Register:E56G__RXS0_ANA_OVRDVAL_5
+#define E56G__RXS0_ANA_OVRDVAL_5_ADDR (E56G__BASEADDR + 0xb4)
+
+typedef union {
+	struct {
 		u32 ana_adc_pictrl_quad_i : 2;
 		u32 rsvd0 : 2;
 		u32 ana_adc_clkdiv_i : 2;
@@ -749,7 +769,62 @@ typedef union {
 #define DEFAULT_TEMP 40
 #define HIGH_TEMP 70
 
-#define E56PHY_RX_RDY_ST 0x1B
+#define S25G_CMVAR_RANGE_H 0x1
+#define S25G_CMVAR_RANGE_L 0x0
+#define S25G_CMVAR_SEC_LOW_TH 0x1A
+#define S25G_CMVAR_SEC_HIGH_TH 0x1D
+#define S25G_CMVAR_UFINE_MAX 0x2
+#define S25G_CMVAR_FINE_MAX 0x7
+#define S25G_CMVAR_COARSE_MAX 0xF
+#define S25G_CMVAR_UFINE_UMAX_WRAP 0x0
+#define S25G_CMVAR_UFINE_FMAX_WRAP 0x0
+#define S25G_CMVAR_FINE_FMAX_WRAP 0x2
+#define S25G_CMVAR_UFINE_MIN 0x0
+#define S25G_CMVAR_FINE_MIN 0x0
+#define S25G_CMVAR_COARSE_MIN 0x1
+#define S25G_CMVAR_UFINE_UMIN_WRAP 0x2
+#define S25G_CMVAR_UFINE_FMIN_WRAP 0x2
+#define S25G_CMVAR_FINE_FMIN_WRAP 0x5
+
+#define S10G_CMVAR_RANGE_H 0x3
+#define S10G_CMVAR_RANGE_L 0x2
+#define S10G_CMVAR_SEC_LOW_TH 0x1A
+#define S10G_CMVAR_SEC_HIGH_TH 0x1D
+#define S10G_CMVAR_UFINE_MAX 0x7
+#define S10G_CMVAR_FINE_MAX 0x7
+#define S10G_CMVAR_COARSE_MAX 0xF
+#define S10G_CMVAR_UFINE_UMAX_WRAP 0x6
+#define S10G_CMVAR_UFINE_FMAX_WRAP 0x7
+#define S10G_CMVAR_FINE_FMAX_WRAP 0x1
+#define S10G_CMVAR_UFINE_MIN 0x0
+#define S10G_CMVAR_FINE_MIN 0x0
+#define S10G_CMVAR_COARSE_MIN 0x1
+#define S10G_CMVAR_UFINE_UMIN_WRAP 0x2
+#define S10G_CMVAR_UFINE_FMIN_WRAP 0x2
+#define S10G_CMVAR_FINE_FMIN_WRAP 0x5
+
+#define S10G_TX_FFE_CFG_MAIN 0x3f3f3f3f
+#define S10G_TX_FFE_CFG_PRE1 0x0
+#define S10G_TX_FFE_CFG_PRE2 0x0
+#define S10G_TX_FFE_CFG_POST 0x0
+#define S25G_TX_FFE_CFG_MAIN 0x24242424
+#define S25G_TX_FFE_CFG_PRE1 0x0
+#define S25G_TX_FFE_CFG_PRE2 0x0
+#define S25G_TX_FFE_CFG_POST 0x0
+
+#define S10G_PHY_RX_CTLE_TAPWT_WEIGHT1 0x1
+#define S10G_PHY_RX_CTLE_TAPWT_WEIGHT2 0x0
+#define S10G_PHY_RX_CTLE_TAPWT_WEIGHT3 0x0
+#define S10G_PHY_RX_CTLE_TAP_FRACP1 0x18
+#define S10G_PHY_RX_CTLE_TAP_FRACP2 0x0
+#define S10G_PHY_RX_CTLE_TAP_FRACP3 0x0
+
+#define S25G_PHY_RX_CTLE_TAPWT_WEIGHT1 0x1
+#define S25G_PHY_RX_CTLE_TAPWT_WEIGHT2 0x0
+#define S25G_PHY_RX_CTLE_TAPWT_WEIGHT3 0x0
+#define S25G_PHY_RX_CTLE_TAP_FRACP1 0x18
+#define S25G_PHY_RX_CTLE_TAP_FRACP2 0x0
+#define S25G_PHY_RX_CTLE_TAP_FRACP3 0x0
 
 #define S10G_CMVAR_RANGE_H 0x3
 #define S10G_CMVAR_RANGE_L 0x2

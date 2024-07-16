@@ -1,6 +1,8 @@
 #include "txgbe_e56.h"
 #include "txgbe_hw.h"
 
+#include <linux/sort.h>
+
 #define EPHY_RREG(REG)                             \
 	do {                                       \
 		rdata = 0;                         \
@@ -62,22 +64,36 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 	}
 }
 
-u32 E56phyTxFfeCfg(struct txgbe_hw *hw)
+u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 {
 	u32 addr;
-	u32 wdata;
-	addr = 0x141c;
-	wdata = 0x3f3f3f3f;
-	txgbe_wr32_ephy(hw, addr, wdata);
-	addr = 0x1420;
-	wdata = 00;
-	txgbe_wr32_ephy(hw, addr, wdata);
-	addr = 0x1424;
-	wdata = 00;
-	txgbe_wr32_ephy(hw, addr, wdata);
-	addr = 0x1428;
-	wdata = 0;
-	txgbe_wr32_ephy(hw, addr, wdata);
+
+	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
+		addr = 0x141c;
+		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_MAIN);
+
+		addr = 0x1420;
+		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_PRE1);
+
+		addr = 0x1424;
+		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_PRE2);
+
+		addr = 0x1428;
+		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_POST);
+	} else if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
+		addr = 0x141c;
+		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_MAIN);
+
+		addr = 0x1420;
+		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_PRE1);
+
+		addr = 0x1424;
+		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_PRE2);
+
+		addr = 0x1428;
+		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_POST);
+	}
+
 	return 0;
 }
 
@@ -187,7 +203,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 	SetFields(&rdata, E56PHY_TXS_ANA_OVRDEN_0_OVRD_EN_ANA_TEST_DAC_I, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	E56phyTxFfeCfg(hw);
+	E56phyTxFfeCfg(hw, TXGBE_LINK_SPEED_25GB_FULL);
 
 	addr = E56PHY_RXS_RXS_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -306,16 +322,22 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_CTLE_TRAINING_2_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P1, 0x18);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P2, 0x0);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P3, 0x0);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P1,
+		  S25G_PHY_RX_CTLE_TAP_FRACP1);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P2,
+		  S25G_PHY_RX_CTLE_TAP_FRACP2);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P3,
+		  S25G_PHY_RX_CTLE_TAP_FRACP3);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_CTLE_TRAINING_3_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P1, 0x1);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P2, 0x0);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P3, 0x0);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P1,
+		  S25G_PHY_RX_CTLE_TAPWT_WEIGHT1);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P2,
+		  S25G_PHY_RX_CTLE_TAPWT_WEIGHT2);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P3,
+		  S25G_PHY_RX_CTLE_TAPWT_WEIGHT3);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_OFFSET_N_GAIN_CAL_0_ADDR;
@@ -566,7 +588,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 	SetFields(&rdata, 23, 0, 0x260000);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	addr = E56G_RXS0_ANA_OVRDEN_1_ADDR;
+	addr = E56G__RXS0_ANA_OVRDEN_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	((E56G_CMS_ANA_OVRDEN_1 *)&rdata)->ovrd_en_ana_lcpll_lf_test_in_i = 0x1;
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -604,7 +626,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	//Setting TX FFE
-	E56phyTxFfeCfg(hw);
+	E56phyTxFfeCfg(hw, TXGBE_LINK_SPEED_10GB_FULL);
 
 	addr = E56PHY_RXS_RXS_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -716,16 +738,22 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_CTLE_TRAINING_2_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P1, 0x18);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P2, 0x0);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P3, 0x0);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P1,
+		  S10G_PHY_RX_CTLE_TAP_FRACP1);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P2,
+		  S10G_PHY_RX_CTLE_TAP_FRACP2);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_2_ISI_TH_FRAC_P3,
+		  S10G_PHY_RX_CTLE_TAP_FRACP3);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_CTLE_TRAINING_3_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P1, 0x1);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P2, 0x0);
-	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P3, 0x0);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P1,
+		  S10G_PHY_RX_CTLE_TAPWT_WEIGHT1);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P2,
+		  S10G_PHY_RX_CTLE_TAPWT_WEIGHT2);
+	SetFields(&rdata, E56PHY_RXS_CTLE_TRAINING_3_TAP_WEIGHT_P3,
+		  S10G_PHY_RX_CTLE_TAPWT_WEIGHT3);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_OFFSET_N_GAIN_CAL_0_ADDR;
@@ -1265,6 +1293,269 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	return status;
 }
 
+int E56phySetRxsUfineLeMax(struct txgbe_hw *hw, u32 speed)
+{
+	int status = 0;
+	unsigned int rdata;
+	unsigned int ULTRAFINE_CODE;
+
+	unsigned int CMVAR_UFINE_MAX = 0;
+
+	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
+		CMVAR_UFINE_MAX = S10G_CMVAR_UFINE_MAX;
+	} else if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
+		CMVAR_UFINE_MAX = S25G_CMVAR_UFINE_MAX;
+	}
+
+	//a. Assign software defined variables as below �C
+	//ii. ULTRAFINE_CODE = ALIAS::RXS::ULTRAFINE
+	EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+	ULTRAFINE_CODE =
+		EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_ultrafine_i);
+	//Set ovrd_en=1 to overide ASIC value
+	EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+	EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1, ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+	EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+
+	//b. Perform the below logic sequence �C
+	while (ULTRAFINE_CODE > CMVAR_UFINE_MAX) {
+		ULTRAFINE_CODE = ULTRAFINE_CODE - 1;
+		txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_5,
+				      ana_bbcdr_ultrafine_i, ULTRAFINE_CODE);
+		// Wait until 1milliseconds or greater
+		msleep(10);
+	}
+
+	return status;
+}
+
+//--------------------------------------------------------------
+//compare function for qsort()
+//--------------------------------------------------------------
+int compare(const void *a, const void *b)
+{
+	const int *num1 = (const int *)a;
+	const int *num2 = (const int *)b;
+
+	if (*num1 < *num2) {
+		return -1;
+	} else if (*num1 > *num2) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE)
+{
+	int status = 0, i, N, median;
+	unsigned int rdata;
+	int arraySize, RXS_BBCDR_SECOND_ORDER_ST[5];
+
+	//Set ovrd_en=0 to read ASIC value
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_1,
+			      ovrd_en_ana_bbcdr_int_cstm_i, 0);
+
+	//As status update from RXS hardware is asynchronous to read status of SECOND_ORDER, follow sequence mentioned below.
+	N = 5;
+	for (i = 0; i < N; i = i + 1) {
+		//set RXS_BBCDR_SECOND_ORDER_ST[i] = RXS::ANA_OVRDVAL[5]::ana_bbcdr_int_cstm_i[4:0]
+		EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+		RXS_BBCDR_SECOND_ORDER_ST[i] = EPHY_XFLD(
+			E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_int_cstm_i);
+		udelay(100);
+	}
+
+	//sort array RXS_BBCDR_SECOND_ORDER_ST[i]
+	arraySize = sizeof(RXS_BBCDR_SECOND_ORDER_ST) /
+		    sizeof(RXS_BBCDR_SECOND_ORDER_ST[0]);
+	sort(RXS_BBCDR_SECOND_ORDER_ST, arraySize, sizeof(int), compare, NULL);
+
+	median = ((N + 1) / 2) - 1;
+	*SECOND_CODE = RXS_BBCDR_SECOND_ORDER_ST[median];
+
+	return status;
+}
+
+//--------------------------------------------------------------
+//2.3.4 RXS post CDR lock temperature tracking sequence
+//
+//Below sequence must be run before the temperature drifts by >5degC after the CDR locks for the first time or after the
+//ious time this sequence was run. It is recommended to call this sequence periodically (eg: once every 100ms) or trigger
+// sequence if the temperature drifts by >=5degC. Temperature must be read from an on-die temperature sensor.
+//--------------------------------------------------------------
+int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
+{
+	int status = 0;
+	unsigned int rdata;
+	int SECOND_CODE;
+	int COARSE_CODE;
+	int FINE_CODE;
+	int ULTRAFINE_CODE;
+
+	int CMVAR_SEC_LOW_TH;
+	int CMVAR_UFINE_MAX = 0;
+	int CMVAR_FINE_MAX;
+	int CMVAR_UFINE_UMAX_WRAP = 0;
+	int CMVAR_COARSE_MAX;
+	int CMVAR_UFINE_FMAX_WRAP = 0;
+	int CMVAR_FINE_FMAX_WRAP = 0;
+	int CMVAR_SEC_HIGH_TH;
+	int CMVAR_UFINE_MIN;
+	int CMVAR_FINE_MIN;
+	int CMVAR_UFINE_UMIN_WRAP;
+	int CMVAR_COARSE_MIN;
+	int CMVAR_UFINE_FMIN_WRAP;
+	int CMVAR_FINE_FMIN_WRAP;
+
+	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
+		CMVAR_SEC_LOW_TH = S10G_CMVAR_SEC_LOW_TH;
+		CMVAR_UFINE_MAX = S10G_CMVAR_UFINE_MAX;
+		CMVAR_FINE_MAX = S10G_CMVAR_FINE_MAX;
+		CMVAR_UFINE_UMAX_WRAP = S10G_CMVAR_UFINE_UMAX_WRAP;
+		CMVAR_COARSE_MAX = S10G_CMVAR_COARSE_MAX;
+		CMVAR_UFINE_FMAX_WRAP = S10G_CMVAR_UFINE_FMAX_WRAP;
+		CMVAR_FINE_FMAX_WRAP = S10G_CMVAR_FINE_FMAX_WRAP;
+		CMVAR_SEC_HIGH_TH = S10G_CMVAR_SEC_HIGH_TH;
+		CMVAR_UFINE_MIN = S10G_CMVAR_UFINE_MIN;
+		CMVAR_FINE_MIN = S10G_CMVAR_FINE_MIN;
+		CMVAR_UFINE_UMIN_WRAP = S10G_CMVAR_UFINE_UMIN_WRAP;
+		CMVAR_COARSE_MIN = S10G_CMVAR_COARSE_MIN;
+		CMVAR_UFINE_FMIN_WRAP = S10G_CMVAR_UFINE_FMIN_WRAP;
+		CMVAR_FINE_FMIN_WRAP = S10G_CMVAR_FINE_FMIN_WRAP;
+	} else if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
+		CMVAR_SEC_LOW_TH = S25G_CMVAR_SEC_LOW_TH;
+		CMVAR_UFINE_MAX = S25G_CMVAR_UFINE_MAX;
+		CMVAR_FINE_MAX = S25G_CMVAR_FINE_MAX;
+		CMVAR_UFINE_UMAX_WRAP = S25G_CMVAR_UFINE_UMAX_WRAP;
+		CMVAR_COARSE_MAX = S25G_CMVAR_COARSE_MAX;
+		CMVAR_UFINE_FMAX_WRAP = S25G_CMVAR_UFINE_FMAX_WRAP;
+		CMVAR_FINE_FMAX_WRAP = S25G_CMVAR_FINE_FMAX_WRAP;
+		CMVAR_SEC_HIGH_TH = S25G_CMVAR_SEC_HIGH_TH;
+		CMVAR_UFINE_MIN = S25G_CMVAR_UFINE_MIN;
+		CMVAR_FINE_MIN = S25G_CMVAR_FINE_MIN;
+		CMVAR_UFINE_UMIN_WRAP = S25G_CMVAR_UFINE_UMIN_WRAP;
+		CMVAR_COARSE_MIN = S25G_CMVAR_COARSE_MIN;
+		CMVAR_UFINE_FMIN_WRAP = S25G_CMVAR_UFINE_FMIN_WRAP;
+		CMVAR_FINE_FMIN_WRAP = S25G_CMVAR_FINE_FMIN_WRAP;
+	}
+
+	//Assign software defined variables as below �C
+	//a. SECOND_CODE = ALIAS::RXS::SECOND_ORDER
+	status |= E56phyRxRdSecondCode(hw, &SECOND_CODE);
+
+	//b. COARSE_CODE = ALIAS::RXS::COARSE
+	//c. FINE_CODE = ALIAS::RXS::FINE
+	//d. ULTRAFINE_CODE = ALIAS::RXS::ULTRAFINE
+	EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+	COARSE_CODE = EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_coarse_i);
+	FINE_CODE = EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_fine_i);
+	ULTRAFINE_CODE =
+		EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_ultrafine_i);
+
+	if (SECOND_CODE <= CMVAR_SEC_LOW_TH) {
+		if (ULTRAFINE_CODE < CMVAR_UFINE_MAX) {
+			txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_5,
+					      ana_bbcdr_ultrafine_i,
+					      ULTRAFINE_CODE + 1);
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else if (FINE_CODE < CMVAR_FINE_MAX) {
+			EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_ultrafine_i) =
+				CMVAR_UFINE_UMAX_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_fine_i) =
+				FINE_CODE + 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDVAL_5);
+			//Note: All two of above code updates should be written in a single register write
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_fine_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else if (COARSE_CODE < CMVAR_COARSE_MAX) {
+			EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_ultrafine_i) =
+				CMVAR_UFINE_FMAX_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_fine_i) =
+				CMVAR_FINE_FMAX_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_coarse_i) = COARSE_CODE + 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDVAL_5);
+			//Note: All three of above code updates should be written in a single register write
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_coarse_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_fine_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else {
+			printk("ERROR: (SECOND_CODE <= CMVAR_SEC_LOW_TH) temperature tracking occurs Error condition\n");
+		}
+	} else if (SECOND_CODE >= CMVAR_SEC_HIGH_TH) {
+		if (ULTRAFINE_CODE > CMVAR_UFINE_MIN) {
+			txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_5,
+					      ana_bbcdr_ultrafine_i,
+					      ULTRAFINE_CODE - 1);
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else if (FINE_CODE > CMVAR_FINE_MIN) {
+			EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_ultrafine_i) =
+				CMVAR_UFINE_UMIN_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_fine_i) =
+				FINE_CODE - 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDVAL_5);
+			//Note: All two of above code updates should be written in a single register write
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_fine_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else if (COARSE_CODE > CMVAR_COARSE_MIN) {
+			EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_ultrafine_i) =
+				CMVAR_UFINE_FMIN_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_fine_i) =
+				CMVAR_FINE_FMIN_WRAP;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5,
+				  ana_bbcdr_coarse_i) = COARSE_CODE - 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDVAL_5);
+			//Note: All three of above code updates should be written in a single register write
+			//Set ovrd_en=1 to overide ASIC value
+			EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_coarse_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_fine_i) = 1;
+			EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1,
+				  ovrd_en_ana_bbcdr_ultrafine_i) = 1;
+			EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
+		} else {
+			printk("ERROR: (SECOND_CODE >= CMVAR_SEC_HIGH_TH) temperature tracking occurs Error condition\n");
+		}
+	}
+
+	return status;
+}
+
 int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0, i;
@@ -1734,8 +2025,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		SetFields(&value, 8, 8, 0x0);
 		SetFields(&value, 1, 1, 0x1);
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
-
-		E56phyRxsCalibAdaptSeq(hw, speed);
 	}
 
 	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
@@ -1820,9 +2109,15 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		SetFields(&value, 8, 8, 0x0);
 		SetFields(&value, 1, 1, 0x1);
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
-
-		E56phyRxsCalibAdaptSeq(hw, speed);
 	}
+
+	E56phyRxsCalibAdaptSeq(hw, speed);
+
+	//Step 2 of 2.3.4
+	E56phySetRxsUfineLeMax(hw, speed);
+
+	//2.3.4 RXS post CDR lock temperature tracking sequence
+	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
 
 	return 0;
 }
