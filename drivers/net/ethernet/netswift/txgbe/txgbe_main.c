@@ -81,6 +81,7 @@
 #include "txgbe_phy.h"
 #include "txgbe_pcierr.h"
 #include "txgbe_bp.h"
+#include "txgbe_e56.h"
 
 char txgbe_driver_name[32] = TXGBE_NAME;
 static const char txgbe_driver_string[] =
@@ -9453,6 +9454,9 @@ static void txgbe_service_timer(struct timer_list *t)
 		next_event_offset = HZ/10;
 		queue_work(txgbe_wq, &adapter->sfp_sta_task);
 	}
+
+	if (hw->amlite)
+		queue_work(txgbe_wq, &adapter->temp_task);
 }
 
 static void txgbe_sfp_phy_status_work(struct work_struct *work)
@@ -9512,6 +9516,38 @@ RELEASE_SEM:
 	if (hw->f2c_mod_status != status) {
 		hw->f2c_mod_status = status;
 		adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+	}
+}
+
+static void txgbe_amlit_temp_work(struct work_struct *work)
+{
+	struct txgbe_adapter *adapter = container_of(work,
+						     struct txgbe_adapter,
+						     temp_task);
+	struct txgbe_hw *hw = &adapter->hw;
+	int temp;
+	bool autoneg = false;
+	s32 status = 0;
+	u32 link_capabilities = TXGBE_LINK_SPEED_UNKNOWN;
+
+	status = txgbe_e56_get_temp(hw, &temp);
+	if (status)
+		temp = DEFAULT_TEMP;
+
+	if (!(temp - adapter->amlite_temp > 5 ||
+		adapter->amlite_temp - temp > 5))
+		return;
+
+	/* Check to see if speed passed in is supported. */
+	status = TCALL(hw, mac.ops.get_link_capabilities,
+			       &link_capabilities, &autoneg);
+	if (status)
+		return;
+
+	if (link_capabilities == TXGBE_LINK_SPEED_25GB_FULL) {
+		txgbe_e56_cfg_25g_temp(hw);
+	} else if (link_capabilities == TXGBE_LINK_SPEED_10GB_FULL) {
+		txgbe_e56_cfg_10g_temp(hw);
 	}
 }
 
@@ -13160,6 +13196,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	}
 	INIT_WORK(&adapter->service_task, txgbe_service_task);
 	INIT_WORK(&adapter->sfp_sta_task, txgbe_sfp_phy_status_work);
+	INIT_WORK(&adapter->temp_task, txgbe_amlit_temp_work);
 	set_bit(__TXGBE_SERVICE_INITED, &adapter->state);
 	clear_bit(__TXGBE_SERVICE_SCHED, &adapter->state);
 

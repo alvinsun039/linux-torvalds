@@ -2,6 +2,7 @@
 #define _TXGBE_E56_H_
 
 #include "txgbe_type.h"
+#include "txgbe.h"
 
 typedef struct TPHYTXEQ {
 	bool bHasEqOpt; //Has --eq option flag
@@ -832,5 +833,10 @@ typedef union {
 #define S25G_CMVAR_RANGE_L 0x0
 
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
+u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw);
+u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw);
+u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
+
+
 
 #endif /* _TXGBE_E56_H_ */

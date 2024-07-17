@@ -1130,6 +1130,7 @@ struct txgbe_adapter {
 	struct timer_list service_timer;
 	struct work_struct service_task;
 	struct work_struct sfp_sta_task;
+	struct work_struct temp_task;
 #ifdef POLL_LINK_STATUS
 	struct timer_list link_check_timer;
 #endif
@@ -1258,6 +1259,8 @@ struct txgbe_adapter {
 	/* amlite: new SW-FW mbox */
 /*	u32 swfw_mbox_buf[64]; */
 	u8 swfw_index;
+
+	int amlite_temp;
 };
 
 static inline u32 txgbe_misc_isb(struct txgbe_adapter *adapter,

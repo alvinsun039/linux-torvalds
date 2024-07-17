@@ -1823,6 +1823,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 
 u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 status;
 	u32 value;
 	int temp;
@@ -1830,6 +1831,8 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 	status = txgbe_e56_get_temp(hw, &temp);
 	if (status)
 		temp = DEFAULT_TEMP;
+
+	adapter->amlite_temp = temp;
 
 	if (temp < DEFAULT_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN0);
@@ -1867,6 +1870,7 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 
 u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 status;
 	u32 value;
 	int temp;
@@ -1875,6 +1879,7 @@ u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw)
 	if (status)
 		temp = DEFAULT_TEMP;
 
+	adapter->amlite_temp = temp;
 	if (temp < DEFAULT_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
 		SetFields(&value, 12, 12, 0x1);
