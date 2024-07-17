@@ -604,10 +604,14 @@ static inline bool txgbe_check_tx_hang(struct txgbe_ring *tx_ring)
 
 static void txgbe_tx_timeout_dorecovery(struct txgbe_adapter *adapter)
 {
+	struct txgbe_hw *hw = &adapter->hw;
 	/* schedule immediate reset if we believe we hung */
-	if (adapter->hw.bus.lan_id == 0)
-		adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
-	else
+	if (adapter->hw.bus.lan_id == 0) {
+		if (hw->amlite)
+			adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+		else
+			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+	} else
 		wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
 	txgbe_service_event_schedule(adapter);
 }
@@ -3685,7 +3689,10 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"lan id %d, PCIe request error founded.\n", hw->bus.lan_id);
 		if (hw->bus.lan_id == 0) {
-			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+			if (hw->amlite)
+				adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+			else
+				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 			txgbe_service_event_schedule(adapter);
 		} else
 			wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
@@ -9432,12 +9439,18 @@ static void txgbe_service_timer(struct timer_list *t)
 												   TXGBE_MIS_PRB_CTL_LAN1_UP);
 		if (val & TXGBE_MIS_PRB_CTL_LAN0_UP) {
 			if (hw->bus.lan_id == 0) {
-				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+				if (hw->amlite)
+					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+				else
+					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 				e_info(probe, "txgbe_service_timer: set recover on Lan0\n");
 				}
 		} else if (val & TXGBE_MIS_PRB_CTL_LAN1_UP) {
 			if (hw->bus.lan_id == 1) {
-				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+				if (hw->amlite)
+					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+				else
+					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 				e_info(probe, "txgbe_service_timer: set recover on Lan1\n");
 			}
 		}
