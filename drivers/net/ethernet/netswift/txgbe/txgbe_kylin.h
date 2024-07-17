@@ -118,7 +118,8 @@
 #endif
 
 #ifndef TXGBE_TXHEAD_WB
-#define TXGBE_TXHEAD_WB 0 // default 1 to 64BYTE, 0 to 4BYTE, 2 to 64BYTE allign(for test)
+// default 1 to 64BYTE, 0 to 4BYTE, 2 to 64BYTE allign(for test), 3 to no use
+#define TXGBE_TXHEAD_WB 0
 #endif
 
 #ifndef AN73_TRAINNING_MODE

@@ -728,9 +728,11 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 	unsigned int total_bytes = 0, total_packets = 0;
 	unsigned int budget = q_vector->tx.work_limit;
 	unsigned int i = tx_ring->next_to_clean;
+	u16 vid = 0;
+#ifdef TXGBE_TXHEAD_WB
 	u32 head = *(tx_ring->headwb_mem);
 	u32 temp = tx_ring->next_to_clean;
-	u16 vid = 0;
+#endif
 	int j = 0;
 	u32 size;
 
@@ -751,6 +753,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 		/* prevent any other reads prior to eop_desc */
 		smp_rmb();
 
+#ifdef TXGBE_TXHEAD_WB
 		if (hw->amlite) {
 			/* we have caught up to head, no work left to do */
 			if (temp == head) {
@@ -761,10 +764,11 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 				break;
 			}
 		} else
+#else
 			/* if DD is not set pending work has not been completed */
 			if (!(eop_desc->wb.status & cpu_to_le32(TXGBE_TXD_STAT_DD)))
 				break;
-
+#endif
 		/* clear next_to_watch to prevent false hangs */
 		tx_buffer->next_to_watch = NULL;
 
@@ -4124,6 +4128,7 @@ static void txgbe_configure_msi_and_legacy(struct txgbe_adapter *adapter)
 }
 
 /* amlite: tx header wb */
+#ifdef TXGBE_TXHEAD_WB
 int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
 {
 	struct txgbe_adapter *adapter = ring->q_vector->adapter;
@@ -4153,7 +4158,7 @@ int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
 
 	return 0;
 }
-
+#endif
 
 /**
  * txgbe_configure_tx_ring - Configure Tx ring after Reset
@@ -4228,6 +4233,7 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 
 	clear_bit(__TXGBE_HANG_CHECK_ARMED, &ring->state);
 
+#ifdef TXGBE_TXHEAD_WB
 	if (hw->amlite) {
 		wr32(hw, TXGBE_PX_TR_HEAD_ADDRL(reg_idx),
 			 ring->headwb_dma & DMA_BIT_MASK(32));
@@ -4238,6 +4244,7 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 		else
 			txdctl |= TXGBE_PX_TR_CFG_HEAD_WB;
 	}
+#endif
 
 	/* enable queue */
 	wr32(hw, TXGBE_PX_TR_CFG(reg_idx), txdctl);
@@ -4768,8 +4775,10 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 
 	rxdctl |= 0x1 << TXGBE_PX_RR_CFG_RR_THER_SHIFT;
 
+#ifdef TXGBE_TXHEAD_WB
 	if (hw->amlite)
 		rxdctl |= TXGBE_PX_RR_CFG_DESC_MERGE;
+#endif
 
 	wr32(hw, TXGBE_PX_RR_CFG(reg_idx), rxdctl);
 
@@ -7718,7 +7727,9 @@ int txgbe_setup_tx_resources(struct txgbe_ring *tx_ring)
 	if (!tx_ring->desc)
 		goto err;
 
+#ifdef TXGBE_TXHEAD_WB
 	txgbe_setup_headwb_resources(tx_ring);
+#endif
 
 	return 0;
 
@@ -7916,6 +7927,7 @@ void txgbe_free_isb_resources(struct txgbe_adapter *adapter)
 	adapter->isb_mem = NULL;
 }
 
+#ifdef TXGBE_TXHEAD_WB
 void txgbe_free_headwb_resources(struct txgbe_ring *ring)
 {
 	u8 headwb_size = 0;
@@ -7938,6 +7950,7 @@ void txgbe_free_headwb_resources(struct txgbe_ring *ring)
 		ring->headwb_mem = NULL;
 	}
 }
+#endif
 
 /**
  * txgbe_free_tx_resources - Free Tx Resources per Queue
@@ -7960,8 +7973,9 @@ void txgbe_free_tx_resources(struct txgbe_ring *tx_ring)
 			  tx_ring->desc, tx_ring->dma);
 	tx_ring->desc = NULL;
 
+#ifdef TXGBE_TXHEAD_WB
 	txgbe_free_headwb_resources(tx_ring);
-
+#endif
 }
 
 /**
@@ -10706,7 +10720,9 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 	first->next_to_watch = tx_desc;
 
 	/* set next_eop for amlite tx head wb*/
+#ifdef TXGBE_TXHEAD_WB
 	first->next_eop = i;
+#endif
 
 	i++;
 	if (i == tx_ring->count)
