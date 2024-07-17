@@ -271,6 +271,21 @@ static int hid_add_field(struct hid_parser *parser, unsigned report_type, unsign
 		return -1;
 	}
 
+	/*
+	 * Lenovo ThinkBook16 G6+ IMH:
+	 * Touchpad FXTP5100 parsing error
+	 * 0018:27C6:01E9.0004: item 0 1 0 11 parsing failed
+	 */
+	if (parser->device->vendor == 0x27c6 &&
+	    parser->device->product == 0x01e9 &&
+	    (parser->global.logical_minimum >= 0 &&
+	    (__u32)parser->global.logical_maximum <
+	    (__u32)parser->global.logical_minimum)) {
+		usages = parser->global.logical_minimum;
+		parser->global.logical_minimum = parser->global.logical_maximum;
+		parser->global.logical_maximum = usages;
+	}
+
 	/* Handle both signed and unsigned cases properly */
 	if ((parser->global.logical_minimum < 0 &&
 		parser->global.logical_maximum <
