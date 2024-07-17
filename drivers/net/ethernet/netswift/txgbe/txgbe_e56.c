@@ -9,10 +9,9 @@
 		rdata = rd32_ephy(hw, REG##_ADDR); \
 	} while (0)
 
-#define EPHY_WREG(REG)                                                  \
-	do {                                                            \
-		txgbe_wr32_ephy(hw, REG##_ADDR, rdata);                 \
-		printk("Write A: 0x%x,  D: 0x%x\n", REG##_ADDR, rdata); \
+#define EPHY_WREG(REG)                                  \
+	do {                                            \
+		txgbe_wr32_ephy(hw, REG##_ADDR, rdata); \
 	} while (0)
 
 #define EPCS_RREG(REG)                                   \
@@ -21,10 +20,9 @@
 		rdata = txgbe_rd32_epcs(hw, REG##_ADDR); \
 	} while (0)
 
-#define EPCS_WREG(REG)                                                  \
-	do {                                                            \
-		txgbe_wr32_epcs(hw, REG##_ADDR, rdata);                 \
-		printk("Write A: 0x%x,  D: 0x%x\n", REG##_ADDR, rdata); \
+#define EPCS_WREG(REG)                                  \
+	do {                                            \
+		txgbe_wr32_epcs(hw, REG##_ADDR, rdata); \
 	} while (0)
 
 #define txgbe_e56_ephy_config(reg, field, val) \

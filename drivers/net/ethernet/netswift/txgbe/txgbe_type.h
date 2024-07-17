@@ -1757,6 +1757,7 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_MAX_INT_RATE              500000
 #define TXGBE_MIN_INT_RATE              980
 #define TXGBE_MAX_EITR                  0x00000FF8U
+#define TXGBE_AMLITE_MAX_EITR           0x00000FFFU
 #define TXGBE_MIN_EITR                  8
 #define TXGBE_PX_ITR_ITR_INT_MASK       0x00000FF8U
 #define TXGBE_PX_ITR_LLI_CREDIT         0x001f0000U

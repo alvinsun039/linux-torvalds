@@ -3316,6 +3316,10 @@ void txgbe_write_eitr(struct txgbe_q_vector *q_vector)
 	int v_idx = q_vector->v_idx;
 	u32 itr_reg = q_vector->itr & TXGBE_MAX_EITR;
 
+	if (hw->amlite)
+		itr_reg = (q_vector->itr >> 3) & TXGBE_AMLITE_MAX_EITR;
+	else
+		itr_reg = q_vector->itr & TXGBE_MAX_EITR;
 	itr_reg |= TXGBE_PX_ITR_CNT_WDIS;
 
 	wr32(hw, TXGBE_PX_ITR(v_idx), itr_reg);
