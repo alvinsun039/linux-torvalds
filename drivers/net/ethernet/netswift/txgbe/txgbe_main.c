@@ -607,7 +607,7 @@ static void txgbe_tx_timeout_dorecovery(struct txgbe_adapter *adapter)
 	struct txgbe_hw *hw = &adapter->hw;
 	/* schedule immediate reset if we believe we hung */
 	if (adapter->hw.bus.lan_id == 0) {
-		if (hw->amlite)
+		if (hw->mac.type == txgbe_mac_aml)
 			adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
 		else
 			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
@@ -662,7 +662,7 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
 	ERROR_REPORT1(TXGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", pci_cmd);
 
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		value2 = rd32(&adapter->hw, 0x10000);
 		ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value2);
 		value2 = rd32(&adapter->hw, 0x180d0);
@@ -754,7 +754,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 		smp_rmb();
 
 #ifdef TXGBE_TXHEAD_WB
-		if (hw->amlite) {
+		if (hw->mac.type == txgbe_mac_aml) {
 			/* we have caught up to head, no work left to do */
 			if (temp == head) {
 				break;
@@ -859,7 +859,6 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 
 	if (check_for_tx_hang(tx_ring) && txgbe_check_tx_hang(tx_ring)) {
 	/* schedule immediate reset if we believe we hung */
-		struct txgbe_hw *hw = &adapter->hw;
 
 		e_err(drv, "Detected Tx Unit Hang%s\n"
 			"  Tx Queue             <%d>\n"
@@ -3325,7 +3324,7 @@ void txgbe_write_eitr(struct txgbe_q_vector *q_vector)
 	int v_idx = q_vector->v_idx;
 	u32 itr_reg = q_vector->itr & TXGBE_MAX_EITR;
 
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		itr_reg = (q_vector->itr >> 3) & TXGBE_AMLITE_MAX_EITR;
 	else
 		itr_reg = q_vector->itr & TXGBE_MAX_EITR;
@@ -3693,7 +3692,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"lan id %d, PCIe request error founded.\n", hw->bus.lan_id);
 		if (hw->bus.lan_id == 0) {
-			if (hw->amlite)
+			if (hw->mac.type == txgbe_mac_aml)
 				adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
 			else
 				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
@@ -3752,7 +3751,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 
 #if 0
 	/* amlite: add SWFW mbox int */
-	if (hw->amlite && eicr & TXGBE_PX_MISC_IC_MNG_HOST_MBOX) {
+	if (hw->mac.type == txgbe_mac_aml && eicr & TXGBE_PX_MISC_IC_MNG_HOST_MBOX) {
 		adapter->flags |= TXGBE_FLAG_SWFW_MBOX_NOTIFY;
 		txgbe_service_event_schedule(adapter);
 	}
@@ -4136,7 +4135,7 @@ int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
 	struct device *dev = ring->dev;
 	u8 headwb_size = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		return 0;
 
 	if (TXGBE_TXHEAD_WB == 1)
@@ -4234,7 +4233,7 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 	clear_bit(__TXGBE_HANG_CHECK_ARMED, &ring->state);
 
 #ifdef TXGBE_TXHEAD_WB
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		wr32(hw, TXGBE_PX_TR_HEAD_ADDRL(reg_idx),
 			 ring->headwb_dma & DMA_BIT_MASK(32));
 		wr32(hw, TXGBE_PX_TR_HEAD_ADDRH(reg_idx), ring->headwb_dma >> 32);
@@ -4289,7 +4288,7 @@ static void txgbe_configure_tx(struct txgbe_adapter *adapter)
 	wr32m(hw, TXGBE_TSC_BUF_AE, 0x3FF, 0x10);
 
 	/* enable mac transmitter */
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		wr32(hw, TXGBE_TSC_CTL, 0);
 
 	/* enable mac transmitter */
@@ -4776,7 +4775,7 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 	rxdctl |= 0x1 << TXGBE_PX_RR_CFG_RR_THER_SHIFT;
 
 #ifdef TXGBE_TXHEAD_WB
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		rxdctl |= TXGBE_PX_RR_CFG_DESC_MERGE;
 #endif
 
@@ -6886,7 +6885,7 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 			e_err(probe, "link_config FAILED %d\n", err);
 	}
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
 			if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_50G) {
@@ -7516,6 +7515,22 @@ static const u32 def_rss_key[10] = {
 	0x6A3E67EA, 0x14364D17, 0x3BED200D
 };
 
+static void txgbe_init_type_code(struct txgbe_hw *hw)
+{
+	switch (hw->device_id) {
+	case TXGBE_DEV_ID_SP1000:
+	case TXGBE_DEV_ID_WX1820:
+		hw->mac.type = txgbe_mac_sp;
+		break;
+	case TXGBE_DEV_ID_AML:
+		hw->mac.type = txgbe_mac_aml;
+		break;
+	default:
+		hw->mac.type = txgbe_mac_unknown;
+		break;
+	}
+}
+
 static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 {
 	struct pci_dev *pdev = adapter->pdev;
@@ -7620,6 +7635,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->dcb_cfg.num_tcs.pg_tcs = 8;
 	adapter->dcb_cfg.num_tcs.pfc_tcs = 8;
 
+	txgbe_init_type_code(hw);
 
 	/* Configure DCB traffic classes */
 	bwg_pct = 100 / adapter->dcb_cfg.num_tcs.pg_tcs;
@@ -7934,7 +7950,7 @@ void txgbe_free_headwb_resources(struct txgbe_ring *ring)
 	struct txgbe_adapter *adapter = ring->q_vector->adapter;
 	struct txgbe_hw *hw = &adapter->hw;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		return;
 
 	if (TXGBE_TXHEAD_WB == 1)
@@ -8903,7 +8919,7 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 			txgbe_ptp_start_cyclecounter(adapter);
 
 #endif
-		if (hw->amlite) {
+		if (hw->mac.type == txgbe_mac_aml) {
 			if (link_speed & TXGBE_LINK_SPEED_50GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
 					(rd32(hw, TXGBE_MAC_TX_CFG) &
@@ -9406,7 +9422,7 @@ static void txgbe_sfp_reset_eth_phy_subtask(struct txgbe_adapter *adapter)
 
 	adapter->flags2 &= ~TXGBE_FLAG_NEED_ETH_PHY_RESET;
 
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		return;
 
 	TCALL(hw, mac.ops.check_link, &speed, &linkup, false);
@@ -9453,7 +9469,7 @@ static void txgbe_service_timer(struct timer_list *t)
 												   TXGBE_MIS_PRB_CTL_LAN1_UP);
 		if (val & TXGBE_MIS_PRB_CTL_LAN0_UP) {
 			if (hw->bus.lan_id == 0) {
-				if (hw->amlite)
+				if (hw->mac.type == txgbe_mac_aml)
 					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
 				else
 					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
@@ -9461,7 +9477,7 @@ static void txgbe_service_timer(struct timer_list *t)
 				}
 		} else if (val & TXGBE_MIS_PRB_CTL_LAN1_UP) {
 			if (hw->bus.lan_id == 1) {
-				if (hw->amlite)
+				if (hw->mac.type == txgbe_mac_aml)
 					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
 				else
 					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
@@ -9482,7 +9498,7 @@ static void txgbe_service_timer(struct timer_list *t)
 		queue_work(txgbe_wq, &adapter->sfp_sta_task);
 	}
 
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		queue_work(txgbe_wq, &adapter->temp_task);
 }
 
@@ -12887,11 +12903,6 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	hw->back = adapter;
 	adapter->msg_enable = (1 << DEFAULT_DEBUG_LEVEL_SHIFT) - 1;
 
-	if (pdev->device == TXGBE_DEV_ID_AML)
-		hw->amlite = true;
-	else
-		hw->amlite = false;
-
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
 	adapter->io_addr = hw->hw_addr;
@@ -13193,7 +13204,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	/* make sure the EEPROM is good */
 
 	/*amlite TODO*/
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
 			e_dev_err("The EEPROM Checksum Is Not Valid\n");
 			wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);

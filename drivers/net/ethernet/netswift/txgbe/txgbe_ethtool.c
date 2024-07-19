@@ -386,7 +386,7 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		if ((supported_link & TXGBE_LINK_SPEED_10GB_FULL) ||
 			(supported_link & TXGBE_LINK_SPEED_1GB_FULL))
 			txgbe_set_supported_1g_10gtypes(hw, cmd);
-		if (hw->phy.multispeed_fiber && !hw->amlite)
+		if (hw->phy.multispeed_fiber && hw->mac.type == txgbe_mac_sp)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 1000baseX_Full);
 	} else {
@@ -723,7 +723,7 @@ int txgbe_get_settings(struct net_device *netdev,
 
 	/* set the supported link speeds */
 	if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
-		ecmd->advertising |= SUPPORTED_25000baseSR_Full;
+		ecmd->supported |= SUPPORTED_25000baseSR_Full;
 	if (supported_link & TXGBE_LINK_SPEED_10GB_FULL)
 		ecmd->supported |= (txgbe_isbackplane(hw->phy.media_type)) ?
 			txgbe_backplane_type(hw) : SUPPORTED_10000baseT_Full;
@@ -1016,7 +1016,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		if ((advertised & TXGBE_LINK_SPEED_1GB_FULL) && hw->phy.multispeed_fiber)
 			adapter->an37 = cmd->base.autoneg ? 1 : 0;
 
-		if (hw->amlite) {
+		if (hw->mac.type == txgbe_mac_aml) {
 			curr_autoneg = txgbe_rd32_epcs(hw, SR_AN_CTRL);
 			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
 			if (old == advertised && (curr_autoneg == adapter->an37))
@@ -1080,7 +1080,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 	} else {
 		/* in this case we currently only support 10Gb/FULL */
 		u32 speed = cmd->base.speed;
-		if (hw->amlite) {
+		if (hw->mac.type == txgbe_mac_aml) {
 			return -EINVAL;
 		} else if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
 							   10000baseT_Full) ||
@@ -1130,7 +1130,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			adapter->an37 = cmd->base.autoneg?1:0;
 
 #if 0
-			if (hw->amlite) {
+			if (hw->mac.type == txgbe_mac_aml) {
 				curr_autoneg = txgbe_rd32_epcs(hw, SR_AN_CTRL);
 				curr_autoneg = !!(curr_autoneg & (0x1 << 12));
 			}
@@ -1276,7 +1276,7 @@ static int txgbe_set_settings(struct net_device *netdev,
 	} else {
 		/* in this case we currently only support 10Gb/FULL and 1Gb/FULL*/
 		u32 speed = ethtool_cmd_speed(ecmd);
-		if (hw->amlite) {
+		if (hw->mac.type == txgbe_mac_aml) {
 				return -EINVAL;
 		} else if (ecmd->advertising & ADVERTISED_10000baseT_Full) {
 			if ((ecmd->autoneg == AUTONEG_ENABLE) ||

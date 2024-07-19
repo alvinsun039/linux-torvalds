@@ -59,7 +59,7 @@ s32 txgbe_get_phy_id(struct txgbe_hw *hw)
 	u8 numport, thisport;
 	u32 i = 0;
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		hw->phy.addr = 0;
 
 		for (i = 0; i < 32; i++) {
@@ -648,7 +648,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type =
 							txgbe_sfp_type_unknown;
 				}
-			} else if (hw->amlite && comp_codes_25g & TXGBE_SFF_25GBASESR_CAPABLE) {
+			} else if (hw->mac.type == txgbe_mac_aml && comp_codes_25g & TXGBE_SFF_25GBASESR_CAPABLE) {
 				if (hw->bus.lan_id == 0)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
 				else
@@ -693,7 +693,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 
 		/* Determine if the SFP+ PHY is dual speed or not. */
 		hw->phy.multispeed_fiber = false;
-		if (!hw->amlite)
+		if (hw->mac.type == txgbe_mac_sp)
 			if (((comp_codes_1g & TXGBE_SFF_1GBASESX_CAPABLE) &&
 			   (comp_codes_10g & TXGBE_SFF_10GBASESR_CAPABLE)) ||
 			   ((comp_codes_1g & TXGBE_SFF_1GBASELX_CAPABLE) &&

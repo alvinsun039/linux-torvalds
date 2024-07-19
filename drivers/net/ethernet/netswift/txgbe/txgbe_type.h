@@ -3180,6 +3180,12 @@ struct txgbe_eeprom_info {
 	u16 sw_region_offset;
 };
 
+enum txgbe_mac_type {
+	txgbe_mac_unknown = 0,
+	txgbe_mac_sp,
+	txgbe_mac_aml
+};
+
 struct txgbe_flash_info {
 	struct txgbe_flash_operations ops;
 	u32 semaphore_delay;
@@ -3190,6 +3196,8 @@ struct txgbe_flash_info {
 
 #define TXGBE_FLAGS_DOUBLE_RESET_REQUIRED       0x01
 struct txgbe_mac_info {
+	enum txgbe_mac_type type;
+
 	struct txgbe_mac_operations ops;
 	u8 addr[TXGBE_ETH_LENGTH_OF_ADDRESS];
 	u8 perm_addr[TXGBE_ETH_LENGTH_OF_ADDRESS];
@@ -3319,7 +3327,6 @@ struct txgbe_hw {
 	u16 tpid[8];
 	u16 oem_ssid;
 	u16 oem_svid;
-	bool amlite;
 	bool f2c_mod_status;         /* fiber to copper modules internal phy link status */
 	bool dac_sfp;         /* force dac sfp to kr mode */
 	u32 q_tx_regs[512];

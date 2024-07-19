@@ -677,7 +677,7 @@ static void txgbe_ptp_link_speed_adjust(struct txgbe_adapter *adapter,
 	 */
 
 	/*amlite TODO*/
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		*shift = TXGBE_INCVAL_SHIFT_FPGA_AML;
 	*incval = TXGBE_INCVAL_FPGA_AML;
 	} else {

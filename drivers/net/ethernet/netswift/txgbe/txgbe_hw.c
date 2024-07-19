@@ -506,9 +506,6 @@ s32 txgbe_clear_hw_cntrs(struct txgbe_hw *hw)
 {
 	u16 i = 0;
 
-	if (hw->amlite)
-		return 0;
-
 	rd32(hw, TXGBE_RX_CRC_ERROR_FRAMES_LOW);
 	for (i = 0; i < 8; i++)
 		rd32(hw, TXGBE_RDB_MPCNT(i));
@@ -605,6 +602,10 @@ s32 txgbe_setup_fc(struct txgbe_hw *hw)
 	u32 pcap = 0;
 	u32 value = 0;
 	u32 pcap_backplane = 0;
+
+	/*amlite TODO*/
+	if (hw->mac.type == txgbe_mac_aml)
+		return 0;
 
 	/* Validate the requested mode */
 	if (hw->fc.strict_ieee && hw->fc.requested_mode == txgbe_fc_rx_pause) {
@@ -2913,7 +2914,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 			"Buffer length failure buffersize=%d.\n", length);
 		return TXGBE_ERR_HOST_INTERFACE_COMMAND;
 	}
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		if (TCALL(hw, mac.ops.acquire_swfw_sync, TXGBE_MNG_SWFW_SYNC_SW_MB)
 			!= 0)
 			return TXGBE_ERR_SWFW_SYNC;
@@ -2928,7 +2929,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 
 	dword_len = length >> 2;
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		/* try to get lock and lock */
 		/* wait max to 50ms to get lock */
 		WARN_ON(in_interrupt());
@@ -3012,7 +3013,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 			buffer[bi] = rd32a(hw, TXGBE_AML_MNG_MBOX_FW2SW, bi);
 			TXGBE_LE32_TO_CPUS(&buffer[bi]);
 		}
-	} else {
+	} else if (hw->mac.type == txgbe_mac_sp) {
 		/* legacy sw-fw mbox  */
 		/* The device driver writes the relevant command block
 		 * into the ram area.
@@ -3123,7 +3124,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 
 rel_out:
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		/* index++, index replace txgbe_hic_hdr.checksum */
 		adapter->swfw_index = send_hdr->cksum_or_index.index == TXGBE_HIC_HDR_INDEX_MAX ?
 						  0 : send_hdr->cksum_or_index.index + 1;
@@ -3167,7 +3168,7 @@ s32 txgbe_set_fw_drv_ver(struct txgbe_hw *hw, u8 maj, u8 min,
 	fw_cmd.pad = 0;
 	fw_cmd.pad2 = 0;
 
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		fw_cmd.hdr.cksum_or_index.checksum = 0;
 		fw_cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&fw_cmd,
 					(FW_CEM_HDR_LEN + fw_cmd.hdr.buf_len));
@@ -3213,7 +3214,7 @@ s32 txgbe_reset_hostif(struct txgbe_hw *hw)
 	reset_cmd.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 	reset_cmd.lan_id = hw->bus.lan_id;
 	reset_cmd.reset_type = (u16)hw->reset_type;
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		reset_cmd.hdr.cksum_or_index.checksum = 0;
 		reset_cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&reset_cmd,
 					(FW_CEM_HDR_LEN + reset_cmd.hdr.buf_len));
@@ -3255,7 +3256,7 @@ s32 txgbe_setup_mac_link_hostif(struct txgbe_hw *hw, u32 speed)
 	cmd.phy_mode = 0;
 	cmd.phy_speed = (u16)speed;
 
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		cmd.hdr.cksum_or_index.checksum = 0;
 		cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&cmd,
 					(FW_CEM_HDR_LEN + cmd.hdr.buf_len));
@@ -3311,7 +3312,7 @@ s32 txgbe_upgrade_flash_hostif(struct txgbe_hw *hw, u32 region,
 	start_cmd.hdr.buf_len = FW_FLASH_UPGRADE_START_LEN;
 	start_cmd.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 	start_cmd.module_id = (u8)region;
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		start_cmd.hdr.cksum_or_index.checksum = 0;
 		start_cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&start_cmd,
 				(FW_CEM_HDR_LEN + start_cmd.hdr.buf_len));
@@ -3377,7 +3378,7 @@ s32 txgbe_upgrade_flash_hostif(struct txgbe_hw *hw, u32 region,
 		return status;
 	}
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		verify_cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&verify_cmd,
 					(FW_CEM_HDR_LEN + verify_cmd.hdr.buf_len));
 	status = txgbe_host_interface_command(hw, (u32 *)&verify_cmd,
@@ -3475,7 +3476,7 @@ int txgbe_flash_write_cab(struct txgbe_hw *hw,u32 addr, u32 value,u16 lan_id)
 	buffer.hdr.req.buf_lenh = 0x6;
 	buffer.hdr.req.buf_lenl = 0x0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
 
 
@@ -3504,7 +3505,7 @@ int txgbe_flash_read_cab(struct txgbe_hw *hw, u32 addr ,u16 lan_id )
 	buffer.hdr.req.buf_lenh = 0xaa;
 	buffer.hdr.req.buf_lenl = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
 
 	/* convert offset from words to bytes */
@@ -3538,7 +3539,7 @@ int txgbe_flash_write_unlock(struct txgbe_hw *hw)
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 	buffer.hdr.req.cksum_or_index.checksum = 0xFF;
 
 	/* convert offset from words to bytes */
@@ -3561,7 +3562,7 @@ int txgbe_flash_write_lock(struct txgbe_hw *hw)
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
 
 	/* convert offset from words to bytes */
@@ -4692,7 +4693,7 @@ s32 txgbe_init_phy_ops(struct txgbe_hw *hw)
 
 	/* amlite TODO*/
 	txgbe_init_i2c(hw);
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		wr32(hw, 0x11220, 0xF);
 
 	/* Identify the PHY or SFP module */
@@ -5004,7 +5005,7 @@ enum txgbe_media_type txgbe_get_media_type(struct txgbe_hw *hw)
 	enum txgbe_media_type media_type;
 	u8 device_type = hw->subsystem_device_id & 0xF0;
 
-	if (hw->amlite)
+	if (hw->mac.type == txgbe_mac_aml)
 		return txgbe_media_type_fiber;
 
 	/* Detect if there is a copper PHY attached. */
@@ -5080,7 +5081,7 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 
 	if (txgbe_close_notify(hw)) {
 		/* over write led when ifconfig down */
-		if (hw->amlite)
+		if (hw->mac.type == txgbe_mac_aml)
 			TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_AMLITE_LED_LINK_25G |
 					TXGBE_AMLITE_LED_LINK_10G | TXGBE_AMLITE_LED_LINK_ACTIVE);
 		else
@@ -6102,7 +6103,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		goto out;
 	}
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		status = txgbe_set_link_to_amlite(hw, speed);
 		goto out;
 	}
@@ -6212,7 +6213,7 @@ int txgbe_reset_misc(struct txgbe_hw *hw)
 	u32 err;
 	int i;
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_AMLITE_AUTONEG, false);
 		if (err) {
 			e_dev_info("txgbe_reset_misc setup phy failed\n");
@@ -6291,7 +6292,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 	if (status == TXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto reset_hw_out;
 
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		/* remember internel phy regs from before we reset */
 		curr_sr_pcs_ctl = txgbe_rd32_epcs(hw, TXGBE_SR_PCS_CTL2);
 		curr_sr_pma_mmd_ctl1 = txgbe_rd32_epcs(hw, TXGBE_SR_PMA_MMD_CTL1);
@@ -6382,7 +6383,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 		goto reset_hw_out;
 
 	/* amlite TODO*/
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		/* amlite: bme */
 		wr32(hw, 0x4B8, 0x1);
 		/* amlite: rdm_rsc_ctl_free_ctl set to 1 */
@@ -6428,7 +6429,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 
 	/*make sure phy power is up*/
 	msleep(100);
-	if (!hw->amlite) {
+	if (hw->mac.type == txgbe_mac_sp) {
 		/*A temporary solution for set to sfi*/
 		if (SFI_SET == 1 || adapter->ffe_set == TXGBE_BP_M_SFI) {
 			e_dev_info("Set SFI TX_EQ MAIN:%d PRE:%d POST:%d\n",
@@ -7511,7 +7512,7 @@ s32 txgbe_read_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = FW_READ_SHADOW_RAM_LEN;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	/* convert offset from words to bytes */
@@ -7598,7 +7599,7 @@ s32 txgbe_read_ee_hostif_buffer(struct txgbe_hw *hw,
 		buffer.hdr.req.buf_lenh = 0;
 		buffer.hdr.req.buf_lenl = FW_READ_SHADOW_RAM_LEN;
 
-		if (!hw->amlite)
+		if (hw->mac.type == txgbe_mac_sp)
 			buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 		/* convert offset from words to bytes */
@@ -7659,7 +7660,7 @@ s32 txgbe_write_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 	buffer.hdr.req.cmd = FW_WRITE_SHADOW_RAM_CMD;
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = FW_WRITE_SHADOW_RAM_LEN;
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	/* one word */
@@ -7684,7 +7685,7 @@ s32 txgbe_close_notify(struct txgbe_hw *hw)
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	/* one word */
@@ -7721,7 +7722,7 @@ s32 txgbe_open_notify(struct txgbe_hw *hw)
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = 0;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	/* one word */
@@ -7969,7 +7970,7 @@ s32 txgbe_update_flash(struct txgbe_hw *hw)
 	buffer.req.buf_lenh = 0;
 	buffer.req.buf_lenl = FW_SHADOW_RAM_DUMP_LEN;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
@@ -8060,7 +8061,7 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 			wr32(hw, TXGBE_CFG_LED_CTL, 0);
 		} else {			
 			/* over write led when link down */
-			if (hw->amlite)
+			if (hw->mac.type == txgbe_mac_aml)
 				TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_AMLITE_LED_LINK_25G |
 					TXGBE_AMLITE_LED_LINK_10G | TXGBE_AMLITE_LED_LINK_ACTIVE);
 			else
@@ -8082,7 +8083,7 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				*speed = TXGBE_LINK_SPEED_10_FULL;
 			}
 		} else {
-			if (hw->amlite) {
+			if (hw->mac.type == txgbe_mac_aml) {
 				if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_50G) ==
 						TXGBE_CFG_PORT_ST_AML_LINK_50G) {
 					*speed = TXGBE_LINK_SPEED_50GB_FULL;
@@ -8143,7 +8144,7 @@ s32 txgbe_hic_write_lldp(struct txgbe_hw *hw,u32 open)
 	buffer.hdr.buf_len = 0x1;
 	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	buffer.func = PCI_FUNC(pdev->devfn);
@@ -8162,7 +8163,7 @@ int txgbe_hic_get_lldp(struct txgbe_hw *hw)
 	buffer.hdr.buf_len = 0x1;
 	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	buffer.func = hw->bus.lan_id;
@@ -8214,7 +8215,7 @@ s32 txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg)
 	buffer.hdr.buf_len = FW_AN_STA_LEN;
 	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 
-	if (!hw->amlite)
+	if (hw->mac.type == txgbe_mac_sp)
 		buffer.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
 
 	buffer.lan_id = hw->bus.lan_id;

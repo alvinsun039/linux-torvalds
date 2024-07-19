@@ -1591,7 +1591,7 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	 */
 	wr32(hw, TXGBE_TDM_MMW, 0x14);
 
-	if (hw->amlite) {
+	if (hw->mac.type == txgbe_mac_aml) {
 		bcnrc_val = 1000 / max_tx_rate;
 		wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
 		wr32(hw, TXGBE_TDM_RL_VM_CFG, bcnrc_val << 16);

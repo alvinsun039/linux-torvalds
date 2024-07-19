@@ -1629,7 +1629,8 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	//2. Follow sequence described in 2.3.2 RXS Osc Initialization for temperature tracking range here. RXS would be enabled at the end of this sequence. For the case when PAM4 KR training is not enabled (including PAM4 mode without KR training), wait until ALIAS::PDIG::CTRL_FSM_RX_ST would return RX_TRAIN_15_ST (RX_RDY_ST).
 	E56phyRxsOscInitForTempTrackRange(hw, speed);
 
-	addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
+#if 0
+	addr  = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
 	timer = 0;
 	while ((rdata & 0x1F) != E56PHY_RX_RDY_ST) {
 		rdata = rd32_ephy(hw, addr);
@@ -1641,7 +1642,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			return -1;
 		}
 	}
-
+#endif
 	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I, 0x0);
