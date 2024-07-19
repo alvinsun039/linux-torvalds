@@ -134,6 +134,14 @@
 #define TXGBE_SWFW_MBOX_AML
 #endif
 
+#ifndef TXGBE_1588_PPS_LEVEL
+#define TXGBE_1588_PPS_LEVEL 0
+#endif
+
+#ifndef TXGBE_1588_PPS_WIDTH
+#define TXGBE_1588_PPS_WIDTH 120
+#endif
+
 /**************************performance************************************/
 
 /**************************sfi************************************/

@@ -1182,6 +1182,10 @@ struct txgbe_adapter {
 	u32 tx_hwtstamp_skipped;
 	u32 rx_hwtstamp_cleared;
 	void (*ptp_setup_sdp) (struct txgbe_adapter *);
+	u64 pps_edge_start;
+	u64 pps_edge_end;
+	u64 sec_to_cc;
+	u8 pps_enabled;
 #endif /* HAVE_PTP_1588_CLOCK */
 
 	DECLARE_BITMAP(active_vfs, TXGBE_MAX_VF_FUNCTIONS);

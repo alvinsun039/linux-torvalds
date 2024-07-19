@@ -1449,9 +1449,43 @@ enum txgbe_fdir_pballoc_type {
 
 #define TXGBE_TSC_1588_ADJL         0x1D418 /* Time Adjustment Offset reg Low */
 #define TXGBE_TSC_1588_ADJH         0x1D41C /* Time Adjustment Offset reg High*/
+
 /* 1588 fields */
 #define TXGBE_TSC_1588_CTL_VALID    0x00000001U /* Tx timestamp valid */
 #define TXGBE_TSC_1588_CTL_ENABLED  0x00000010U /* Tx timestamping enabled */
+
+#define TXGBE_TSEC_1588_AUX_CTL          0x1D428
+#define TXGBE_TSEC_1588_TRGT_L(i)        (0x1D42C + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_TRGT_H(i)        (0x1D430 + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_FREQ_CLK_L(i)    (0x1D43C + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_FREQ_CLK_H(i)    (0x1D440 + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_AUX_STMP_L(i)    (0x1D44C + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_AUX_STMP_H(i)    (0x1D450 + ((i) * 8)) /* [0,1] */
+#define TXGBE_TSEC_1588_SDP(n)           (0x1D45C + ((n) * 4)) /* [0,3] */
+
+#define TXGBE_TSEC_1588_INT_ST           0x1D420
+#define TXGBE_TSEC_1588_INT_EN           0x1D424
+
+#define TXGBE_TSEC_1588_INT_ST_TT0         0x10
+#define TXGBE_TSEC_1588_INT_ST_TT1         0x20
+#define TXGBE_TSEC_1588_INT_EN_TT0         0x10
+#define TXGBE_TSEC_1588_INT_EN_TT1         0x20
+
+#define TXGBE_TSEC_1588_AUX_CTL_EN_TT0     0x1
+#define TXGBE_TSEC_1588_AUX_CTL_PLSG       0x2
+#define TXGBE_TSEC_1588_AUX_CTL_EN_TT1     0x4
+#define TXGBE_TSEC_1588_AUX_CTL_EN_TS0     0x100
+#define TXGBE_TSEC_1588_AUX_CTL_EN_TS1     0x400
+
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_TT0    0x1
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_TT1    0x2
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_CL0    0x3
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_CL1    0x4
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_TS0    0x5
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_TS1    0x6
+#define TXGBE_TSEC_1588_SDP_FUN_SEL_MASK   0x7
+#define TXGBE_TSEC_1588_SDP_OUT_LEVEL_LOW  0x10
+#define TXGBE_TSEC_1588_SDP_OUT_LEVEL_HIGH 0x0
 
 
 /********************************* RSEC **************************************/
@@ -2503,6 +2537,8 @@ struct txgbe_etype_filter_info {
 #define FW_DW_CLOSE_NOTIFY              0xEA
 #define FW_AN_STA_CMD                   0xF3
 #define FW_AN_STA_LEN                   0x1
+#define FW_PPS_SET_CMD                  0xF6
+#define FW_PPS_SET_LEN                  0x14
 
 #define TXGBE_CHECKSUM_CAP_ST_PASS      0x80658383
 #define TXGBE_CHECKSUM_CAP_ST_FAIL      0x70657376
@@ -2644,6 +2680,15 @@ struct txgbe_hic_write_autoneg {
 	u8 lan_id;
 	bool autoneg;
 	u16 pad;
+};
+
+struct txgbe_hic_set_pps {
+	struct txgbe_hic_hdr hdr;
+	u8 lan_id;
+	u8 enable;
+	u16 pad2;
+	u64 nsec;
+	u64 cycles;
 };
 
 /* Number of 100 microseconds we wait for PCI Express master disable */

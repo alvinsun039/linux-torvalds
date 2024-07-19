@@ -7315,6 +7315,42 @@ s32 txgbe_identify_phy(struct txgbe_hw *hw)
 	return status;
 }
 
+int txgbe_set_pps(struct txgbe_hw *hw, bool enable, u64 nsec, u64 cycles)
+{
+	int status;
+	struct txgbe_hic_set_pps pps_cmd;
+	int i;
+
+	pps_cmd.hdr.cmd = FW_PPS_SET_CMD;
+	pps_cmd.hdr.buf_len = FW_PPS_SET_LEN;
+	pps_cmd.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
+	pps_cmd.lan_id = hw->bus.lan_id;
+	pps_cmd.enable = enable;
+	pps_cmd.nsec = nsec;
+	pps_cmd.cycles = cycles;
+	pps_cmd.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
+
+	/* send reset request to FW and wait for response */
+	for (i = 0; i <= FW_CEM_MAX_RETRIES; i++) {
+		status = txgbe_host_interface_command(hw, (u32 *)&pps_cmd,
+						       sizeof(pps_cmd),
+						       TXGBE_HI_COMMAND_TIMEOUT,
+						       true);
+		msleep(1);
+		if (status != 0)
+			continue;
+
+		if (pps_cmd.hdr.cmd_or_resp.ret_status ==
+			FW_CEM_RESP_STATUS_SUCCESS)
+			status = 0;
+		else
+			status = TXGBE_ERR_HOST_INTERFACE_COMMAND;
+		break;
+	}
+
+	return status;
+
+}
 
 /**
  *  txgbe_enable_rx_dma - Enable the Rx DMA unit on sapphire
