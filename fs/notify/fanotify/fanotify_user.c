@@ -1811,7 +1811,6 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 {
 	struct inode *inode = NULL;
 	struct fsnotify_group *group;
-	struct fd f;
 	struct path path;
 	struct fan_fsid __fsid, *fsid = NULL;
 	u32 valid_mask = FANOTIFY_EVENTS | FANOTIFY_EVENT_FLAGS;
@@ -1884,14 +1883,13 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 		umask = FANOTIFY_EVENT_FLAGS;
 	}
 
-	f = fdget(fanotify_fd);
-	if (unlikely(!fd_file(f)))
+	CLASS(fd, f)(fanotify_fd);
+	if (fd_empty(f))
 		return -EBADF;
 
 	/* verify that this is indeed an fanotify instance */
-	ret = -EINVAL;
 	if (unlikely(fd_file(f)->f_op != &fanotify_fops))
-		goto fput_and_out;
+		return -EINVAL;
 	group = fd_file(f)->private_data;
 
 	/* Only report mount events on mnt namespace */
@@ -1912,27 +1910,25 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	 * marks.  This also includes setting up such marks by a group that
 	 * was initialized by an unprivileged user.
 	 */
-	ret = -EPERM;
 	if ((!capable(CAP_SYS_ADMIN) ||
 	     FAN_GROUP_FLAG(group, FANOTIFY_UNPRIV)) &&
 	    mark_type != FAN_MARK_INODE)
-		goto fput_and_out;
+		return -EPERM;
 
 	/*
 	 * Permission events are not allowed for FAN_CLASS_NOTIF.
 	 * Pre-content permission events are not allowed for FAN_CLASS_CONTENT.
 	 */
-	ret = -EINVAL;
 	if (mask & FANOTIFY_PERM_EVENTS &&
 	    group->priority == FSNOTIFY_PRIO_NORMAL)
-		goto fput_and_out;
+		return -EINVAL;
 	else if (mask & FANOTIFY_PRE_CONTENT_EVENTS &&
 		 group->priority == FSNOTIFY_PRIO_CONTENT)
-		goto fput_and_out;
+		return -EINVAL;
 
 	if (mask & FAN_FS_ERROR &&
 	    mark_type != FAN_MARK_FILESYSTEM)
-		goto fput_and_out;
+		return -EINVAL;
 
 	/*
 	 * Evictable is only relevant for inode marks, because only inode object
@@ -1940,7 +1936,7 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	 */
 	if (flags & FAN_MARK_EVICTABLE &&
 	     mark_type != FAN_MARK_INODE)
-		goto fput_and_out;
+		return -EINVAL;
 
 	/*
 	 * Events that do not carry enough information to report
@@ -1952,7 +1948,7 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	fid_mode = FAN_GROUP_FLAG(group, FANOTIFY_FID_BITS);
 	if (mask & ~(FANOTIFY_FD_EVENTS|FANOTIFY_MOUNT_EVENTS|FANOTIFY_EVENT_FLAGS) &&
 	    (!fid_mode || mark_type == FAN_MARK_MOUNT))
-		goto fput_and_out;
+		return -EINVAL;
 
 	/*
 	 * FAN_RENAME uses special info type records to report the old and
@@ -1960,22 +1956,21 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 	 * useful and was not implemented.
 	 */
 	if (mask & FAN_RENAME && !(fid_mode & FAN_REPORT_NAME))
-		goto fput_and_out;
+		return -EINVAL;
 
 	/* Pre-content events are not currently generated for directories. */
 	if (mask & FANOTIFY_PRE_CONTENT_EVENTS && mask & FAN_ONDIR)
-		goto fput_and_out;
+		return -EINVAL;
 
 	if (mark_cmd == FAN_MARK_FLUSH) {
-		ret = 0;
 		fsnotify_clear_marks_by_group(group, obj_type);
-		goto fput_and_out;
+		return 0;
 	}
 
 	ret = fanotify_find_path(dfd, pathname, &path, flags,
 			(mask & ALL_FSNOTIFY_EVENTS), obj_type);
 	if (ret)
-		goto fput_and_out;
+		return ret;
 
 	if (mark_cmd == FAN_MARK_ADD) {
 		ret = fanotify_events_supported(group, &path, mask, flags);
@@ -2058,8 +2053,6 @@ static int do_fanotify_mark(int fanotify_fd, unsigned int flags, __u64 mask,
 
 path_put_and_out:
 	path_put(&path);
-fput_and_out:
-	fdput(f);
 	return ret;
 }
 
