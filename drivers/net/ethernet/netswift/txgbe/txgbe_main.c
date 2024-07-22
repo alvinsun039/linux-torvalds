@@ -9568,10 +9568,8 @@ static void txgbe_amlit_temp_work(struct work_struct *work)
 						     struct txgbe_adapter,
 						     temp_task);
 	struct txgbe_hw *hw = &adapter->hw;
-	int temp;
-	bool autoneg = false;
 	s32 status = 0;
-	u32 link_capabilities = TXGBE_LINK_SPEED_UNKNOWN;
+	int temp;
 
 	status = txgbe_e56_get_temp(hw, &temp);
 	if (status)
@@ -9581,17 +9579,8 @@ static void txgbe_amlit_temp_work(struct work_struct *work)
 		adapter->amlite_temp - temp > 5))
 		return;
 
-	/* Check to see if speed passed in is supported. */
-	status = TCALL(hw, mac.ops.get_link_capabilities,
-			       &link_capabilities, &autoneg);
-	if (status)
-		return;
+	txgbe_e56_cfg_temp(hw);
 
-	if (link_capabilities == TXGBE_LINK_SPEED_25GB_FULL) {
-		txgbe_e56_cfg_25g_temp(hw);
-	} else if (link_capabilities == TXGBE_LINK_SPEED_10GB_FULL) {
-		txgbe_e56_cfg_10g_temp(hw);
-	}
 }
 
 #ifdef POLL_LINK_STATUS

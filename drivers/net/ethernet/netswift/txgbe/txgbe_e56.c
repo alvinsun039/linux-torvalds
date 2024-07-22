@@ -986,11 +986,13 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	unsigned int addr, rdata, timer;
 	int T = 40;
 	int RX_COARSE_MID_TD, CMVAR_RANGE_H = 0, CMVAR_RANGE_L = 0;
-	int OFFSET_CENTRE_RANGE_H, OFFSET_CENTRE_RANGE_L;
+	int OFFSET_CENTRE_RANGE_H, OFFSET_CENTRE_RANGE_L, RANGE_FINAL;
 	int osc_freq_err_occur;
 
+	//1. Read the temperature T just before RXS is enabled.
 	txgbe_e56_get_temp(hw, &T);
 
+	//2. Define software variable RX_COARSE_MID_TD (RX Coarse Code mid value dependent upon temperature)
 	if (T < -5) {
 		RX_COARSE_MID_TD = 10;
 	} else if (T < 30) {
@@ -1013,6 +1015,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	}
 
 	// TBD select all lane
+	//3. Program ALIAS::RXS::RANGE_SEL = CMVAR::RANGE_H
 	// RXS0_ANA_OVRDVAL[5]
 	// ana_bbcdr_osc_range_sel_i[1:0]
 	rdata = 0x0000;
@@ -1032,9 +1035,14 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		  0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	//4. Do SEQ::RX_ENABLE to enable RXS, and let it stop after oscillator calibration.
+	//This needs to be done by blocking the RX power-up fsm at the state following the oscillator calibration state.
+	//Follow below steps to do the same before SEQ::RX_ENABLE.
+	//a. ALIAS::PDIG::CTRL_FSM_RX_ST can be stopped at RX_SAMP_CAL_ST which is the state
+	//after RX_OSC_CAL_ST by configuring ALIAS::RXS::SAMP_CAL_DONE=0b0
+
 	// RXS0_OVRDVAL[0]
 	// [22] rxs0_rx0_samp_cal_done_o
-
 	rdata = 0x0000;
 	addr = E56PHY_RXS0_OVRDVAL_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1043,7 +1051,6 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 
 	// RXS0_OVRDEN[0]
 	// [27] ovrd_en_rxs0_rx0_samp_cal_done_o
-
 	rdata = 0x0000;
 	addr = E56PHY_RXS0_OVRDEN_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1051,6 +1058,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		  0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	//Do SEQ::RX_ENABLE to enable RXS
 	rdata = 0;
 	addr = E56PHY_PMD_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1058,6 +1066,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	//b. Poll ALIAS::PDIG::CTRL_FSM_RX_ST and confirm its value is RX_SAMP_CAL_ST
 	// poll CTRL_FSM_RX_ST
 	rdata = 0;
 	timer = 0;
@@ -1085,6 +1094,8 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		}
 	}
 
+	//5/6.Define software variable as OFFSET_CENTRE_RANGE_H = ALIAS::RXS::COARSE
+	//- RX_COARSE_MID_TD. Clear the INTR.
 	rdata = 0;
 	addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1097,11 +1108,13 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 			RX_COARSE_MID_TD - OFFSET_CENTRE_RANGE_H;
 	}
 
+	//7. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST and confirm
+	//its value is POWERDN_ST
+
 	rdata = 0;
 	addr = E56PHY_PMD_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-
-	rdata &= 0xfff0ffff;
+	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	timer = 0;
@@ -1120,6 +1133,9 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		}
 	}
 
+	//8. Since RX power-up fsm is stopped in RX_SAMP_CAL_ST, it is possible the timeout interrupt is set.
+	//Clear the same by clearing ALIAS::PDIG::INTR_CTRL_FSM_RX_ERR.
+	//Also clear ALIAS::PDIG::INTR_RX_OSC_FREQ_ERR which could also be set.
 	udelay(500);
 	rdata = 0;
 	addr = E56PHY_INTR_0_ADDR;
@@ -1135,6 +1151,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	rdata = rd32_ephy(hw, addr);
 	// next round
 
+	//9. Program ALIAS::RXS::RANGE_SEL = CMVAR::RANGE_L
 	// RXS0_ANA_OVRDVAL[5]
 	// ana_bbcdr_osc_range_sel_i[1:0]
 	rdata = 0x0000;
@@ -1154,6 +1171,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		  0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	//10. Do SEQ::RX_ENABLE to enable RXS, and let it stop after oscillator calibration.
 	// RXS0_OVRDVAL[0]
 	// [22] rxs0_rx0_samp_cal_done_o
 	rdata = 0x0000;
@@ -1203,11 +1221,12 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		} //if (timer++ > PHYINIT_TIMEOUT) {
 	}
 
+	//11/12.Define software variable as OFFSET_CENTRE_RANGE_L = ALIAS::RXS::COARSE -
+	//RX_COARSE_MID_TD. Clear the INTR.
 	rdata = 0;
 	addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	OFFSET_CENTRE_RANGE_L = (rdata >> 4) & 0xf;
-	//if(osc_freq_err_occur) {
 	if (OFFSET_CENTRE_RANGE_L > RX_COARSE_MID_TD) {
 		OFFSET_CENTRE_RANGE_L =
 			OFFSET_CENTRE_RANGE_L - RX_COARSE_MID_TD;
@@ -1216,24 +1235,18 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 			RX_COARSE_MID_TD - OFFSET_CENTRE_RANGE_L;
 	}
 
-	udelay(500);
-	rdata = 0;
-	addr = E56PHY_INTR_0_ADDR;
-	rdata = rd32_ephy(hw, addr);
+	//13. Perform below calculation in software. Goal is to pick range value which is closer to RX_COARSE_MID_TD
+	if (OFFSET_CENTRE_RANGE_L < OFFSET_CENTRE_RANGE_H) {
+		RANGE_FINAL = CMVAR_RANGE_L;
+	} else {
+		RANGE_FINAL = CMVAR_RANGE_H;
+	}
 
-	udelay(500);
-	addr = E56PHY_INTR_0_ADDR;
-	txgbe_wr32_ephy(hw, addr, rdata);
-
-	udelay(500);
-	rdata = 0;
-	addr = E56PHY_INTR_0_ADDR;
-	rdata = rd32_ephy(hw, addr);
-
+	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
+	//and confirm its value is POWERDN_ST
 	rdata = 0;
 	addr = E56PHY_PMD_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-
 	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
 	addr = E56PHY_PMD_CFG_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -1254,14 +1267,10 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		} //if (timer++ > PHYINIT_TIMEOUT) {
 	}
 
-	if (OFFSET_CENTRE_RANGE_L > OFFSET_CENTRE_RANGE_H) {
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata, 1, 0, CMVAR_RANGE_H);
-		txgbe_wr32_ephy(hw, addr, rdata);
-	}
-
+	//15. Since RX power-up fsm is stopped in RX_SAMP_CAL_ST,
+	//it is possible the timeout interrupt is set. Clear the same by clearing
+	//ALIAS::PDIG::INTR_CTRL_FSM_RX_ERR. Also clear ALIAS::PDIG::INTR_RX_OSC_FREQ_ERR
+	//which could also be set.
 	udelay(500);
 	rdata = 0;
 	addr = E56PHY_INTR_0_ADDR;
@@ -1273,6 +1282,20 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	rdata = 0;
 	addr = E56PHY_INTR_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
+
+	//16. Program ALIAS::RXS::RANGE_SEL = RANGE_FINAL
+	rdata = 0x0000;
+	addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR;
+	rdata = rd32_ephy(hw, addr);
+	SetFields(&rdata, E56PHY_RXS_ANA_OVRDVAL_5_ANA_BBCDR_OSC_RANGE_SEL_I,
+		  RANGE_FINAL);
+	txgbe_wr32_ephy(hw, addr, rdata);
+
+	//17. Program following before enabling RXS. Purpose is to disable power-up FSM control on ADC offset adaptation
+	//Note: this step will be done in 2.3.3 RXS calibration and adaptation sequence
+
+	//18. After this SEQ::RX_ENABLE can be done at any time. Note to ensure that ALIAS::RXS::RANGE_SEL = RANGE_FINAL configuration is retained.
+	//Rmove the OVRDEN on rxs0_rx0_samp_cal_done_o
 
 	rdata = 0x0000;
 	addr = E56PHY_RXS0_OVRDEN_0_ADDR;
@@ -1281,6 +1304,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 		  0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	//Do SEQ::RX_ENABLE
 	rdata = 0;
 	addr = E56PHY_PMD_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
@@ -1629,20 +1653,21 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	//2. Follow sequence described in 2.3.2 RXS Osc Initialization for temperature tracking range here. RXS would be enabled at the end of this sequence. For the case when PAM4 KR training is not enabled (including PAM4 mode without KR training), wait until ALIAS::PDIG::CTRL_FSM_RX_ST would return RX_TRAIN_15_ST (RX_RDY_ST).
 	E56phyRxsOscInitForTempTrackRange(hw, speed);
 
-#if 0
-	addr  = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
+	addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
 	timer = 0;
-	while ((rdata & 0x1F) != E56PHY_RX_RDY_ST) {
+	rdata = 0;
+	while (EPHY_XFLD(E56G__PMD_CTRL_FSM_RX_STAT_0, ctrl_fsm_rx0_st) !=
+	       E56PHY_RX_RDY_ST) {
 		rdata = rd32_ephy(hw, addr);
 		udelay(500);
-
+		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st[5:0] = RX_RDY_ST Timeout!!!\n");
 			break;
-			return -1;
 		}
 	}
-#endif
+
+	//RXS ADC adaptation sequence
 	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I, 0x0);
@@ -1666,9 +1691,20 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	SetFields(&rdata, E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CDR_EN_I, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	rdata = 0;
+	timer = 0;
+	while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_cdr_rdy_o) != 1) {
+		EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
+		udelay(500);
+
+		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_cdr_rdy_o =1 Timeout!!!\n");
+			break;
+		}
+	}
+
 	//4. Disable VGA and CTLE training so that they don't interfere with ADC calibration
 	//a. Set ALIAS::RXS::VGA_TRAIN_EN = 0b0
-
 	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_VGA_TRAIN_EN_I, 0x0);
@@ -1822,7 +1858,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	return status;
 }
 
-u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
+u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	u32 status;
@@ -1834,7 +1870,6 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 		temp = DEFAULT_TEMP;
 
 	adapter->amlite_temp = temp;
-
 	if (temp < DEFAULT_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN0);
 		SetFields(&value, 25, 25, 0x1);
@@ -1843,6 +1878,14 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 		value = rd32_ephy(hw, CMS_ANA_OVRDVAL2);
 		SetFields(&value, 20, 16, 0x1);
 		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL2, value);
+
+		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
+		SetFields(&value, 12, 12, 0x1);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
+
+		value = rd32_ephy(hw, CMS_ANA_OVRDVAL7);
+		SetFields(&value, 8, 4, 0x1);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL7, value);
 	} else if (temp > HIGH_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN0);
 		SetFields(&value, 25, 25, 0x1);
@@ -1851,6 +1894,14 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 		value = rd32_ephy(hw, CMS_ANA_OVRDVAL2);
 		SetFields(&value, 20, 16, 0x3);
 		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL2, value);
+
+		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
+		SetFields(&value, 12, 12, 0x1);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
+
+		value = rd32_ephy(hw, CMS_ANA_OVRDVAL7);
+		SetFields(&value, 8, 4, 0x3);
+		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL7, value);
 	} else {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
 		SetFields(&value, 4, 4, 0x1);
@@ -1864,40 +1915,7 @@ u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw)
 		value = rd32_ephy(hw, CMS_ANA_OVRDVAL5);
 		SetFields(&value, 1, 0, 0x0);
 		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL5, value);
-	}
 
-	return 0;
-}
-
-u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw)
-{
-	struct txgbe_adapter *adapter = hw->back;
-	u32 status;
-	u32 value;
-	int temp;
-
-	status = txgbe_e56_get_temp(hw, &temp);
-	if (status)
-		temp = DEFAULT_TEMP;
-
-	adapter->amlite_temp = temp;
-	if (temp < DEFAULT_TEMP) {
-		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
-		SetFields(&value, 12, 12, 0x1);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
-
-		value = rd32_ephy(hw, CMS_ANA_OVRDVAL7);
-		SetFields(&value, 8, 4, 0x1);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL7, value);
-	} else if (temp > HIGH_TEMP) {
-		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
-		SetFields(&value, 12, 12, 0x1);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
-
-		value = rd32_ephy(hw, CMS_ANA_OVRDVAL7);
-		SetFields(&value, 8, 4, 0x3);
-		txgbe_wr32_ephy(hw, CMS_ANA_OVRDVAL7, value);
-	} else {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN1);
 		SetFields(&value, 23, 23, 0x1);
 		txgbe_wr32_ephy(hw, CMS_ANA_OVRDEN1, value);
@@ -2020,7 +2038,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		SetFields(&value, 4, 0, 0x9);
 		txgbe_wr32_ephy(hw, AN_CFG1, value);
 
-		txgbe_e56_cfg_25g_temp(hw);
+		txgbe_e56_cfg_temp(hw);
 		txgbe_e56_cfg_25g(hw);
 
 		value = rd32_ephy(hw, PMD_CFG0);
@@ -2104,7 +2122,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		SetFields(&value, 4, 0, 0x2);
 		txgbe_wr32_ephy(hw, AN_CFG1, value);
 
-		txgbe_e56_cfg_10g_temp(hw);
+		txgbe_e56_cfg_temp(hw);
 		txgbe_e56_cfg_10g(hw);
 
 		value = rd32_ephy(hw, PMD_CFG0);

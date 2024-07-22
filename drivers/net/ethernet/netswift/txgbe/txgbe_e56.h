@@ -754,6 +754,23 @@ typedef union {
 } E56G__PMD_RXS0_OVRDVAL_1;
 #define E56G__PMD_RXS0_OVRDVAL_1_ADDR (E56G__BASEADDR + 0x1544)
 
+//-----Access structure typedef for Register:E56G__PMD_CTRL_FSM_RX_STAT_0
+typedef union {
+	struct {
+		u32 ctrl_fsm_rx0_st : 6;
+		u32 rsvd0 : 2;
+		u32 ctrl_fsm_rx1_st : 6;
+		u32 rsvd1 : 2;
+		u32 ctrl_fsm_rx2_st : 6;
+		u32 rsvd2 : 2;
+		u32 ctrl_fsm_rx3_st : 6;
+		u32 rsvd3 : 2;
+	};
+	u32 reg;
+} E56G__PMD_CTRL_FSM_RX_STAT_0;
+//-----MACRO defines for Register:E56G__PMD_CTRL_FSM_RX_STAT_0
+#define E56G__PMD_CTRL_FSM_RX_STAT_0_ADDR (E56G__BASEADDR + 0x14fc)
+
 #define E56G__RXS0_FOM_18__ADDR (E56G__BASEADDR + 0x1f8)
 #define E56G__RXS0_FOM_18__DFE_COEFFL_HINT__MSB 11
 #define E56G__RXS0_FOM_18__DFE_COEFFL_HINT__LSB 0
@@ -767,8 +784,10 @@ typedef union {
 
 #define E56PHY_RX_RDY_ST 0x1B
 
-#define DEFAULT_TEMP 40
-#define HIGH_TEMP 70
+#define S10G_CMVAR_RANGE_H 0x3
+#define S10G_CMVAR_RANGE_L 0x2
+#define S25G_CMVAR_RANGE_H 0x1
+#define S25G_CMVAR_RANGE_L 0x0
 
 #define S25G_CMVAR_RANGE_H 0x1
 #define S25G_CMVAR_RANGE_L 0x0
@@ -804,7 +823,7 @@ typedef union {
 #define S10G_CMVAR_UFINE_FMIN_WRAP 0x2
 #define S10G_CMVAR_FINE_FMIN_WRAP 0x5
 
-#define S10G_TX_FFE_CFG_MAIN 0x3f3f3f3f
+#define S10G_TX_FFE_CFG_MAIN 0x24242424
 #define S10G_TX_FFE_CFG_PRE1 0x0
 #define S10G_TX_FFE_CFG_PRE2 0x0
 #define S10G_TX_FFE_CFG_POST 0x0
@@ -827,16 +846,8 @@ typedef union {
 #define S25G_PHY_RX_CTLE_TAP_FRACP2 0x0
 #define S25G_PHY_RX_CTLE_TAP_FRACP3 0x0
 
-#define S10G_CMVAR_RANGE_H 0x3
-#define S10G_CMVAR_RANGE_L 0x2
-#define S25G_CMVAR_RANGE_H 0x1
-#define S25G_CMVAR_RANGE_L 0x0
-
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
-u32 txgbe_e56_cfg_10g_temp(struct txgbe_hw *hw);
-u32 txgbe_e56_cfg_25g_temp(struct txgbe_hw *hw);
+u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw);
 u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
-
-
 
 #endif /* _TXGBE_E56_H_ */
