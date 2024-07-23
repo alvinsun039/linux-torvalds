@@ -1,3 +1,11 @@
+ccflags-y += -Wno-enum-conversion
+ccflags-y += -Wno-sizeof-array-div
+ccflags-y += -Wno-cast-function-type
+ccflags-y += -Wno-implicit-fallthrough
+ccflags-y += -Wno-discarded-qualifiers
+ccflags-y += -Wno-misleading-indentation
+ccflags-y += -Wno-address
+
 EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
 EXTRA_CFLAGS += -O1
 #EXTRA_CFLAGS += -O3

@@ -5,6 +5,7 @@ ccflags-y += -Wno-cast-function-type
 ccflags-y += -Wno-implicit-fallthrough
 ccflags-y += -Wno-discarded-qualifiers
 ccflags-y += -Wno-misleading-indentation
+ccflags-y += -Wno-address
 
 obj-$(CONFIG_RTW89_CORE) += rtw89_core.o
 rtw89_core-y += drv_ver.o
