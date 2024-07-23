@@ -14,6 +14,7 @@
 #include <linux/completion.h>
 #include <linux/list.h>
 #include <linux/livepatch_sched.h>
+#include <linux/livepatch_shadow.h>
 
 #if IS_ENABLED(CONFIG_LIVEPATCH)
 
@@ -232,21 +233,6 @@ static inline bool klp_have_reliable_stack(void)
 	return IS_ENABLED(CONFIG_STACKTRACE) &&
 	       IS_ENABLED(CONFIG_HAVE_RELIABLE_STACKTRACE);
 }
-
-typedef int (*klp_shadow_ctor_t)(void *obj,
-				 void *shadow_data,
-				 void *ctor_data);
-typedef void (*klp_shadow_dtor_t)(void *obj, void *shadow_data);
-
-void *klp_shadow_get(void *obj, unsigned long id);
-void *klp_shadow_alloc(void *obj, unsigned long id,
-		       size_t size, gfp_t gfp_flags,
-		       klp_shadow_ctor_t ctor, void *ctor_data);
-void *klp_shadow_get_or_alloc(void *obj, unsigned long id,
-			      size_t size, gfp_t gfp_flags,
-			      klp_shadow_ctor_t ctor, void *ctor_data);
-void klp_shadow_free(void *obj, unsigned long id, klp_shadow_dtor_t dtor);
-void klp_shadow_free_all(unsigned long id, klp_shadow_dtor_t dtor);
 
 struct klp_state *klp_get_state(struct klp_patch *patch, unsigned long id);
 struct klp_state *klp_get_prev_state(unsigned long id);

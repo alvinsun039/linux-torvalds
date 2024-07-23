@@ -509,4 +509,11 @@
 	(_ptr)->_struct##_size_ky > __off ? true : false;		\
 })
 
+#include <linux/livepatch_shadow.h>
+
+#define kabi_aux_get			klp_shadow_get
+#define kabi_aux_alloc			klp_shadow_alloc
+#define kabi_aux_get_or_alloc		klp_shadow_get_or_alloc
+#define kabi_aux_free			klp_shadow_free
+
 #endif /* __LINUX_KY_KABI_H */
