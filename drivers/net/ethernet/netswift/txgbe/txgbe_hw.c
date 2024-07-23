@@ -2958,11 +2958,6 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 		wr32m(hw, TXGBE_AML_MNG_MBOX_CTL_SW2FW,
 				  TXGBE_AML_MNG_MBOX_NOTIFY, TXGBE_AML_MNG_MBOX_NOTIFY);
 
-		/* expect no reply from FW then return */
-		/* release lock if return */
-		if (!return_data)
-			goto rel_out;
-
 		/* Calculate length in DWORDs */
 		dword_len = hdr_size >> 2;
 
@@ -2994,6 +2989,11 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 			status = TXGBE_ERR_TIMEOUT;
 			goto rel_out;
 		}
+
+		/* expect no reply from FW then return */
+		/* release lock if return */
+		if (!return_data)
+			goto rel_out;
 
 		/* If there is any thing in data position pull it in */
 		buf_len = recv_hdr->buf_len;
@@ -7562,10 +7562,14 @@ s32 txgbe_read_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 
 	if (status)
 		return status;
-	if (txgbe_check_mng_access(hw))
-		*data = (u16)rd32a(hw, TXGBE_MNG_MBOX,
-							FW_NVM_DATA_OFFSET);
-	else {
+	if (txgbe_check_mng_access(hw)) {
+		if (hw->mac.type == txgbe_mac_aml)
+			*data = (u16)rd32a(hw, TXGBE_AML_MNG_MBOX_FW2SW,
+						FW_NVM_DATA_OFFSET);
+		else if (hw->mac.type == txgbe_mac_sp)
+			*data = (u16)rd32a(hw, TXGBE_MNG_MBOX,
+						FW_NVM_DATA_OFFSET);
+	} else {
 		status = TXGBE_ERR_MNG_ACCESS_FAILED;
 		return status;
 	}
@@ -7615,6 +7619,7 @@ s32 txgbe_read_ee_hostif_buffer(struct txgbe_hw *hw,
 	u32 current_word = 0;
 	u16 words_to_read;
 	s32 status;
+	u32 reg;
 	u32 i;
 	u32 value = 0;
 
@@ -7652,11 +7657,14 @@ s32 txgbe_read_ee_hostif_buffer(struct txgbe_hw *hw,
 			goto out;
 		}
 
+		if (hw->mac.type == txgbe_mac_aml)
+			reg = TXGBE_AML_MNG_MBOX_FW2SW;
+		else
+			reg = TXGBE_MNG_MBOX;
+
 		for (i = 0; i < words_to_read; i++) {
-			u32 reg = TXGBE_MNG_MBOX + (FW_NVM_DATA_OFFSET << 2) +
-				  2 * i;
 			if (txgbe_check_mng_access(hw))
-				value = rd32(hw, reg);
+				value = rd32(hw, reg + (FW_NVM_DATA_OFFSET << 2) + 2 * i);
 			else {
 				status = TXGBE_ERR_MNG_ACCESS_FAILED;
 				return status;

@@ -13192,14 +13192,12 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	TCALL(hw, eeprom.ops.init_params);
 	/* make sure the EEPROM is good */
 
-	/*amlite TODO*/
-	if (hw->mac.type == txgbe_mac_sp)
-		if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
-			e_dev_err("The EEPROM Checksum Is Not Valid\n");
-			wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);
-			err = -EIO;
-			goto err_sw_init;
-		}
+	if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
+		e_dev_err("The EEPROM Checksum Is Not Valid\n");
+		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);
+		err = -EIO;
+		goto err_sw_init;
+	}
 
 	eth_hw_addr_set(netdev, hw->mac.perm_addr);
 

@@ -848,8 +848,13 @@ s32 txgbe_init_i2c(struct txgbe_hw *hw)
 	 * SCL_Low_time = [(LCNT + 1) * ic_clk] - SCL_Fall_time + SCL_Rise_time
 	 * set I2C Frequency to Standard Speed Mode 100KHz
 	 */
-	wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 780);      
-	wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 780);
+	if (hw->mac.type == txgbe_mac_aml) {
+		wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 2000);
+		wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 2000);
+	} else if (hw->mac.type == txgbe_mac_sp) {
+		wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 780);
+		wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 780);
+	}
 	
 	wr32(hw, TXGBE_I2C_RX_TL, 0); /* 1byte for rx full signal */
 	wr32(hw, TXGBE_I2C_TX_TL, 4);
