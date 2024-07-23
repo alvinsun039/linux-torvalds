@@ -21,6 +21,7 @@
 #include <linux/sysfs.h>
 #include <linux/delay.h>
 #include <linux/io.h>
+#include <linux/cleanup.h>
 #include <linux/machine_t.h>
 
 #define DRVNAME			"dms5013a"
@@ -89,13 +90,12 @@ static ssize_t show_temp(struct device *dev,
 	struct platform_data *pdata = dev_get_drvdata(dev);
 	struct temp_data *tdata = pdata->core_data[attr->index];
 
-	mutex_lock(&tdata->update_lock);
+	guard(mutex)(&tdata->update_lock);
 	if (!tdata->valid || time_after(jiffies, tdata->last_updated + HZ)) {
 		tdata->temp = get_temperature(tdata);
 		tdata->valid = 1;
 		tdata->last_updated = jiffies;
 	}
-	mutex_unlock(&tdata->update_lock);
 	return sprintf(buf, "%d\n", tdata->temp);
 }
 
