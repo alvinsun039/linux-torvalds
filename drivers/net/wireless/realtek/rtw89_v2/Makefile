@@ -6,6 +6,8 @@ ccflags-y += -Wno-implicit-fallthrough
 ccflags-y += -Wno-discarded-qualifiers
 ccflags-y += -Wno-misleading-indentation
 ccflags-y += -Wno-address
+ccflags-y += -Wno-stringop-overread
+ccflags-y += -Wno-enum-int-mismatch
 
 obj-$(CONFIG_RTW89_CORE) += rtw89_core.o
 rtw89_core-y += drv_ver.o
