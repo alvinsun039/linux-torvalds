@@ -73,15 +73,12 @@ static struct vcpu_stall *vcpu_stall;
 
 static struct vcpu_stall_priv __percpu *vcpu_stall_detectors;
 
-static enum hrtimer_restart
-vcpu_stall_detect_timer_fn(struct hrtimer *hrtimer)
+static enum hrtimer_restart vcpu_stall_detect_timer_fn(struct hrtimer *hrtimer)
 {
 	u32 ticks, ping_timeout_ms;
 	struct scatterlist sg;
 	int unused, err = 0;
-
-	struct vcpu_stall_priv *vcpu_stall_detector =
-		this_cpu_ptr(vcpu_stall->priv);
+	struct vcpu_stall_priv *vcpu_stall_detector = this_cpu_ptr(vcpu_stall->priv);
 
 	/* Reload the stall detector counter register every
 	 * `ping_timeout_ms` to prevent the virtual device
@@ -91,24 +88,26 @@ vcpu_stall_detect_timer_fn(struct hrtimer *hrtimer)
 	ticks = vcpu_stall_config.clock_freq_hz *
 				vcpu_stall_config.stall_timeout_sec;
 
-	spin_lock(&vcpu_stall->lock);
-	while (virtqueue_get_buf(vcpu_stall->vq, &unused))
-		;
-	vcpu_stall->pet_event.ticks = cpu_to_virtio32(vcpu_stall_detector->vdev, ticks);
-	vcpu_stall->pet_event.is_initialized = true;
-	vcpu_stall->pet_event.cpu_id = vcpu_stall_detector->cpu_id;
+	scoped_guard(spin_lock, &vcpu_stall->lock) {
+		while (virtqueue_get_buf(vcpu_stall->vq, &unused))
+			;
+		vcpu_stall->pet_event.ticks = cpu_to_virtio32(vcpu_stall_detector->vdev,
+							      ticks);
+		vcpu_stall->pet_event.is_initialized = true;
+		vcpu_stall->pet_event.cpu_id = vcpu_stall_detector->cpu_id;
 
-	sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
-	err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall, GFP_ATOMIC);
-	if (!err)
-		virtqueue_kick(vcpu_stall->vq);
-	else
-		pr_err("cpu:%d failed to add outbuf, err:%d\n", vcpu_stall_detector->cpu_id, err);
+		sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
+		err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall,
+					   GFP_ATOMIC);
+		if (!err)
+			virtqueue_kick(vcpu_stall->vq);
+		else
+			pr_err("cpu:%d failed to add outbuf, err:%d\n",
+			       vcpu_stall_detector->cpu_id, err);
+	}
 
-	spin_unlock(&vcpu_stall->lock);
-
-	ping_timeout_ms = vcpu_stall_config.stall_timeout_sec *
-			  MSEC_PER_SEC / 2;
+	ping_timeout_ms =
+		vcpu_stall_config.stall_timeout_sec * MSEC_PER_SEC / 2;
 	hrtimer_forward_now(hrtimer,
 			    ms_to_ktime(ping_timeout_ms));
 	return HRTIMER_RESTART;
@@ -147,14 +146,12 @@ static int start_stall_detector_cpu(unsigned int cpu)
 
 	vcpu_stall->pet_event.is_initialized = true;
 
-	spin_lock(&vcpu_stall->lock);
+	guard(spin_lock)(&vcpu_stall->lock);
 	vcpu_stall->pet_event.cpu_id = cpu;
 	sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
 	err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall, GFP_ATOMIC);
 	if (!err)
 		virtqueue_kick(vcpu_stall->vq);
-
-	spin_unlock(&vcpu_stall->lock);
 
 	hrtimer_start(vcpu_hrtimer, ms_to_ktime(ping_timeout_ms),
 		      HRTIMER_MODE_REL_PINNED);
@@ -174,13 +171,11 @@ static int stop_stall_detector_cpu(unsigned int cpu)
 	vcpu_stall->pet_event.is_initialized = false;
 	vcpu_stall->pet_event.cpu_id = cpu;
 
-	spin_lock(&vcpu_stall->lock);
+	guard(spin_lock)(&vcpu_stall->lock);
 	sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
 	err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall, GFP_ATOMIC);
 	if (!err)
 		virtqueue_kick(vcpu_stall->vq);
-
-	spin_unlock(&vcpu_stall->lock);
 
 	return err;
 }
