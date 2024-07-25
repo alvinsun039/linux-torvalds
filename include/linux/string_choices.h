@@ -46,6 +46,11 @@ static inline const char *str_yes_no(bool v)
 }
 #define str_no_yes(v)		str_yes_no(!(v))
 
+static inline const char *str_up_down(bool v)
+{
+	return v ? "up" : "down";
+}
+
 /**
  * str_plural - Return the simple pluralization based on English counts
  * @num: Number used for deciding pluralization
