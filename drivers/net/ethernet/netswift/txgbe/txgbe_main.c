@@ -3274,6 +3274,11 @@ adjust_for_speed:
 	 * for the ITR value.
 	 */
 	switch (q_vector->adapter->link_speed) {
+	case TXGBE_LINK_SPEED_25GB_FULL:
+		itr += DIV_ROUND_UP(avg_wire_size,
+				    TXGBE_ITR_ADAPTIVE_MIN_INC * 512) *
+		       TXGBE_ITR_ADAPTIVE_MIN_INC;
+		break;
 	case TXGBE_LINK_SPEED_10GB_FULL:
 	case TXGBE_LINK_SPEED_100_FULL:
 	default:
