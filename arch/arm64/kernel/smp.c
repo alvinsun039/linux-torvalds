@@ -553,9 +553,11 @@ static bool __init is_kump_bypass_cpu(u64 hwid)
 	 */
 	if (is_kdump_kernel() &&
 	    (hwid & 0xffff) != (cpu_logical_map(0) & 0xffff)) {
-		pr_info("2500 kdump hwid = 0x%x\n", hwid);
+		pr_info("2500 kdump hwid = 0x%llx\n", hwid);
+
 		return true;
 	}
+
 	return false;
 }
 
