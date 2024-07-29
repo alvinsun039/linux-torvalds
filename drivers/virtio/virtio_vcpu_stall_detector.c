@@ -88,7 +88,7 @@ static enum hrtimer_restart vcpu_stall_detect_timer_fn(struct hrtimer *hrtimer)
 	ticks = vcpu_stall_config.clock_freq_hz *
 				vcpu_stall_config.stall_timeout_sec;
 
-	scoped_guard(spin_lock, &vcpu_stall->lock) {
+	scoped_guard(spinlock, &vcpu_stall->lock) {
 		while (virtqueue_get_buf(vcpu_stall->vq, &unused))
 			;
 		vcpu_stall->pet_event.ticks = cpu_to_virtio32(vcpu_stall_detector->vdev,
@@ -146,7 +146,7 @@ static int start_stall_detector_cpu(unsigned int cpu)
 
 	vcpu_stall->pet_event.is_initialized = true;
 
-	guard(spin_lock)(&vcpu_stall->lock);
+	guard(spinlock)(&vcpu_stall->lock);
 	vcpu_stall->pet_event.cpu_id = cpu;
 	sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
 	err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall, GFP_ATOMIC);
@@ -171,7 +171,7 @@ static int stop_stall_detector_cpu(unsigned int cpu)
 	vcpu_stall->pet_event.is_initialized = false;
 	vcpu_stall->pet_event.cpu_id = cpu;
 
-	guard(spin_lock)(&vcpu_stall->lock);
+	guard(spinlock)(&vcpu_stall->lock);
 	sg_init_one(&sg, &vcpu_stall->pet_event, sizeof(vcpu_stall->pet_event));
 	err = virtqueue_add_outbuf(vcpu_stall->vq, &sg, 1, vcpu_stall, GFP_ATOMIC);
 	if (!err)
