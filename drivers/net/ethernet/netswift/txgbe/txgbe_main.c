@@ -13197,13 +13197,14 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	TCALL(hw, eeprom.ops.init_params);
 	/* make sure the EEPROM is good */
 
+#if 0
 	if (TCALL(hw, eeprom.ops.validate_checksum, NULL)) {
 		e_dev_err("The EEPROM Checksum Is Not Valid\n");
 		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_SW_RST);
 		err = -EIO;
 		goto err_sw_init;
 	}
-
+#endif
 	eth_hw_addr_set(netdev, hw->mac.perm_addr);
 
 	if (!is_valid_ether_addr(netdev->dev_addr)) {
