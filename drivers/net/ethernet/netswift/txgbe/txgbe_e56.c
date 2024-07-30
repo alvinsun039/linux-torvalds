@@ -495,7 +495,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_CTRL_FSM_CFG_8_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_8_TRAIN_ST7_EN, 0x47bf);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_8_TRAIN_ST7_EN, 0x47ff);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_CTRL_FSM_CFG_12_ADDR;
@@ -558,8 +558,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_FETX_FFE_TRAIN_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_3,
-		  0x2);
+	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2, 0x2);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	return 0;
@@ -910,7 +909,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_CTRL_FSM_CFG_8_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_8_TRAIN_ST7_EN, 0x47bf);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_8_TRAIN_ST7_EN, 0x47ff);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_CTRL_FSM_CFG_12_ADDR;
@@ -973,8 +972,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_FETX_FFE_TRAIN_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_3,
-		  0x2);
+	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2, 0x2);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	return 0;
