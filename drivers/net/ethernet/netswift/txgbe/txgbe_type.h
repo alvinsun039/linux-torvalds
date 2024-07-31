@@ -488,6 +488,10 @@
 #define TXGBE_MIS_SWSM                  0x1002C
 #define TXGBE_MIS_RST_ST                0x10030
 
+#define PX_PF_PEND                      0x4C0
+#define PX_VF_PEND(i)                  (0x4D0 + 4 * (i)) /* i = [0,3]*/
+#define PX_PF_BME                       0x4B8
+
 #define TXGBE_MIS_RST_SW_RST            0x00000001U
 #define TXGBE_MIS_RST_LAN0_RST          0x00000002U
 #define TXGBE_MIS_RST_LAN1_RST          0x00000004U

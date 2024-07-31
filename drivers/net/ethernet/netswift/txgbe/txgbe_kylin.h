@@ -134,6 +134,10 @@
 #define TXGBE_SWFW_MBOX_AML
 #endif
 
+#ifndef TXGBE_DMA_RESET
+#define TXGBE_DMA_RESET 1
+#endif
+
 #ifndef TXGBE_1588_PPS_LEVEL
 #define TXGBE_1588_PPS_LEVEL 0
 #endif

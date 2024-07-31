@@ -604,13 +604,10 @@ static inline bool txgbe_check_tx_hang(struct txgbe_ring *tx_ring)
 
 static void txgbe_tx_timeout_dorecovery(struct txgbe_adapter *adapter)
 {
-	struct txgbe_hw *hw = &adapter->hw;
 	/* schedule immediate reset if we believe we hung */
+
 	if (adapter->hw.bus.lan_id == 0) {
-		if (hw->mac.type == txgbe_mac_aml)
-			adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
-		else
-			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+		adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 	} else
 		wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
 	txgbe_service_event_schedule(adapter);
@@ -622,9 +619,16 @@ static void txgbe_tx_timeout_dorecovery(struct txgbe_adapter *adapter)
  **/
 static void txgbe_tx_timeout_reset(struct txgbe_adapter *adapter)
 {
+	struct txgbe_hw *hw = &adapter->hw;
+
 	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
-		adapter->flags2 |= TXGBE_FLAG2_PF_RESET_REQUESTED;
-		e_warn(drv, "initiating reset due to tx timeout\n");
+		if (hw->mac.type == txgbe_mac_aml) {
+			adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+			e_warn(drv, "initiating dma reset due to tx timeout\n");
+		} else {
+			adapter->flags2 |= TXGBE_FLAG2_PF_RESET_REQUESTED;
+			e_warn(drv, "initiating reset due to tx timeout\n");
+		}
 		txgbe_service_event_schedule(adapter);
 	}
 }
@@ -3697,10 +3701,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"lan id %d, PCIe request error founded.\n", hw->bus.lan_id);
 		if (hw->bus.lan_id == 0) {
-			if (hw->mac.type == txgbe_mac_aml)
-				adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
-			else
-				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 			txgbe_service_event_schedule(adapter);
 		} else
 			wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
@@ -7027,6 +7028,7 @@ void txgbe_reinit_locked_dma_reset(struct txgbe_adapter *adapter)
 {
 #ifdef TXGBE_DMA_RESET
 	struct txgbe_hw *hw = &adapter->hw;
+	int i;
 #endif
 
 	if (adapter->flags2 & TXGBE_FLAG2_KR_PRO_REINIT) {
@@ -7048,14 +7050,29 @@ void txgbe_reinit_locked_dma_reset(struct txgbe_adapter *adapter)
 	txgbe_down(adapter);
 
 #ifdef TXGBE_DMA_RESET
-	printk("dma reset\n");
-	wr32(hw, TXGBE_MIS_RST,
-		1 << 4);
-	TXGBE_WRITE_FLUSH(hw);
-	msleep(1000);
+	if (TXGBE_DMA_RESET == 1) {
+		e_info(probe, "dma reset\n");
 
-	/* amlite: bme */
-	wr32(hw, 0x4B8, 0x1);
+		if (rd32(hw, PX_PF_PEND) & 0x3) {
+			e_dev_err("PX_PF_PEND case dma reset exit\n");
+			goto skip_dma_rst;
+		}
+
+		for (i = 0; i < 4; i++) {
+			if (rd32(hw, PX_VF_PEND(i))) {
+				e_dev_err("PX_VF_PEND case dma reset exit\n");
+				goto skip_dma_rst;
+			}
+		}
+		wr32(hw, TXGBE_MIS_RST,
+			1 << 4);
+		TXGBE_WRITE_FLUSH(hw);
+		msleep(1000);
+
+		/* amlite: bme */
+		wr32(hw, PX_PF_BME, 0x1);
+	}
+skip_dma_rst:
 #endif
 	/*
 	 * If SR-IOV enabled then wait a bit before bringing the adapter
@@ -9474,17 +9491,11 @@ static void txgbe_service_timer(struct timer_list *t)
 												   TXGBE_MIS_PRB_CTL_LAN1_UP);
 		if (val & TXGBE_MIS_PRB_CTL_LAN0_UP) {
 			if (hw->bus.lan_id == 0) {
-				if (hw->mac.type == txgbe_mac_aml)
-					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
-				else
 					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 				e_info(probe, "txgbe_service_timer: set recover on Lan0\n");
 				}
 		} else if (val & TXGBE_MIS_PRB_CTL_LAN1_UP) {
 			if (hw->bus.lan_id == 1) {
-				if (hw->mac.type == txgbe_mac_aml)
-					adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
-				else
 					adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
 				e_info(probe, "txgbe_service_timer: set recover on Lan1\n");
 			}
