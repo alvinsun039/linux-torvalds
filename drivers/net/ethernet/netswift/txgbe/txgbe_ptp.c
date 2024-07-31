@@ -56,7 +56,7 @@
  * 100  Mbps    6.25  MHz   160*10^-9    0xA00000(0xFFFF/ns)
  * 10   Mbps    0.625 MHz   1600*10^-9   0xC7F380(0xFFF/ns)
  * FPGA         31.25 MHz   32 *10^-9    0x800000(0x3FFFF/ns)
- *
+ * AMLITE       400MHZ      2.5*10^-9    0x0A0000
  * These diagrams are only for the 10Gb link period
  *
  *       +--------------+  +--------------+
@@ -72,14 +72,14 @@
 #define TXGBE_INCVAL_100  0xA00000
 #define TXGBE_INCVAL_10   0xC7F380
 #define TXGBE_INCVAL_FPGA 0x800000
-#define TXGBE_INCVAL_FPGA_AML 0xA00000
+#define TXGBE_INCVAL_AML  0x0A0000
 
 #define TXGBE_INCVAL_SHIFT_10GB  20
 #define TXGBE_INCVAL_SHIFT_1GB   18
 #define TXGBE_INCVAL_SHIFT_100   15
 #define TXGBE_INCVAL_SHIFT_10    12
 #define TXGBE_INCVAL_SHIFT_FPGA  17
-#define TXGBE_INCVAL_SHIFT_FPGA_AML  17
+#define TXGBE_INCVAL_SHIFT_AML   17
 
 #define TXGBE_OVERFLOW_PERIOD    (HZ * 30)
 #define TXGBE_PTP_TX_TIMEOUT     (HZ)
@@ -817,8 +817,8 @@ static void txgbe_ptp_link_speed_adjust(struct txgbe_adapter *adapter,
 
 	/*amlite TODO*/
 	if (hw->mac.type == txgbe_mac_aml) {
-		*shift = TXGBE_INCVAL_SHIFT_FPGA_AML;
-	*incval = TXGBE_INCVAL_FPGA_AML;
+		*shift = TXGBE_INCVAL_SHIFT_AML;
+		*incval = TXGBE_INCVAL_AML;
 	} else {
 		switch (adapter->link_speed) {
 		case TXGBE_LINK_SPEED_10_FULL:
