@@ -1192,6 +1192,7 @@ struct txgbe_adapter {
 	unsigned int num_vfs;
 	unsigned int max_vfs;
 	struct vf_data_storage *vfinfo;
+	int vf_rate_link_speed;
 	struct vf_macvlans vf_mvs;
 	struct vf_macvlans *mv_list;
 #ifdef CONFIG_PCI_IOV

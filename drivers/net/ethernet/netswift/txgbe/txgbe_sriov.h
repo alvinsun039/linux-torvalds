@@ -66,6 +66,7 @@ int txgbe_vf_configuration(struct pci_dev *pdev, unsigned int event_mask);
 void txgbe_enable_sriov(struct txgbe_adapter *adapter);
 #endif
 int txgbe_pci_sriov_configure(struct pci_dev *dev, int num_vfs);
+void txgbe_check_vf_rate_limit(struct txgbe_adapter *adapter);
 void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state);
 
 /*

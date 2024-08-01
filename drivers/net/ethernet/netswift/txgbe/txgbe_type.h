@@ -841,7 +841,15 @@ struct txgbe_thermal_sensor_data {
 
 #define TXGBE_TDM_RL_VM_IDX        0x18218
 #define TXGBE_TDM_RL_VM_CFG        0x1821C
-#define TXGBE_TDM_RL_CFG        0x18400
+#define TXGBE_TDM_RL_CFG           0x18400
+#define TXGBE_TDM_RL_EN            0x00000001U
+#define TXGBE_TDM_FACTOR_INT       0x00000001U
+#define TXGBE_TDM_FACTOR_FRA       0x00000001U
+#define TXGBE_TDM_FACTOR_INT_SHIFT 16
+#define TXGBE_TDM_FACTOR_FRA_SHIFT 2
+#define TXGBE_TDM_FACTOR_INT_MASK  0xffff0000
+#define TXGBE_TDM_FACTOR_FRA_MASK  0xfffc
+
 #define TXGBE_TDM_RL_EN        0x00000001U
 
 /* qos */

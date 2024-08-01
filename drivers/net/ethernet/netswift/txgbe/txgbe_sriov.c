@@ -1570,11 +1570,30 @@ out:
 }
 #endif /* IFLA_VF_MAX */
 
+int txgbe_link_mbps(struct txgbe_adapter *adapter)
+{
+	switch (adapter->link_speed) {
+	case TXGBE_LINK_SPEED_40GB_FULL:
+		return 40000;
+	case TXGBE_LINK_SPEED_25GB_FULL:
+		return 25000;
+	case TXGBE_LINK_SPEED_10GB_FULL:
+		return 10000;
+	case TXGBE_LINK_SPEED_1GB_FULL:
+		return 1000;
+	default:
+		return 0;
+	}
+}
+
 static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 {
 	struct txgbe_ring_feature *vmdq = &adapter->ring_feature[RING_F_VMDQ];
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 bcnrc_val;
+	int factor_int;
+	int factor_fra;
+	int link_speed;
 	u16 queue, queues_per_pool;
 	u16 max_tx_rate = adapter->vfinfo[vf].max_tx_rate;
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
@@ -1592,16 +1611,24 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	wr32(hw, TXGBE_TDM_MMW, 0x14);
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		bcnrc_val = 1000 / max_tx_rate;
-		wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
-		wr32(hw, TXGBE_TDM_RL_VM_CFG, bcnrc_val << 16);
-		if (max_tx_rate)
+		if (max_tx_rate) {
+			link_speed = adapter->vf_rate_link_speed;
+
+			/* Calculate the rate factor values to set */
+			factor_int = link_speed / max_tx_rate;
+			factor_fra = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
+
+			wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
+			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
+				TXGBE_TDM_FACTOR_INT_MASK, factor_int << TXGBE_TDM_FACTOR_INT_SHIFT);
+			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
+				TXGBE_TDM_FACTOR_FRA_MASK, factor_fra << TXGBE_TDM_FACTOR_FRA_SHIFT);
 			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
 				TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
-		else
+		} else
 			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
 				TXGBE_TDM_RL_EN, 0);
-	} else  {
+	} else {
 		max_tx_rate /= queues_per_pool;
 		bcnrc_val = TXGBE_TDM_RP_RATE_MAX(max_tx_rate);
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
@@ -1624,6 +1651,28 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	}
 }
 
+void txgbe_check_vf_rate_limit(struct txgbe_adapter *adapter)
+{
+	int i;
+
+	/* VF Tx rate limit was not set */
+	if (!adapter->vf_rate_link_speed)
+		return;
+
+	if (txgbe_link_mbps(adapter) != adapter->vf_rate_link_speed) {
+		adapter->vf_rate_link_speed = 0;
+		dev_info(pci_dev_to_dev(adapter->pdev),
+			 "Link speed has been changed. VF Transmit rate is disabled\n");
+	}
+
+	for (i = 0; i < adapter->num_vfs; i++) {
+		if (!adapter->vf_rate_link_speed)
+			adapter->vfinfo[i].max_tx_rate = 0;
+
+		txgbe_set_vf_rate_limit(adapter, i);
+	}
+}
+
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
 int txgbe_ndo_set_vf_bw(struct net_device *netdev,
 			int vf,
@@ -1634,6 +1683,7 @@ int txgbe_ndo_set_vf_bw(struct net_device *netdev, int vf, int max_tx_rate)
 #endif /* HAVE_NDO_SET_VF_MIN_MAX_TX_RATE */
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	int link_speed;
 
 	/* verify VF is active */
 	if (vf >= adapter->num_vfs)
@@ -1647,10 +1697,16 @@ int txgbe_ndo_set_vf_bw(struct net_device *netdev, int vf, int max_tx_rate)
 	if (adapter->link_speed < TXGBE_LINK_SPEED_1GB_FULL)
 		return -EINVAL;
 
+	link_speed = txgbe_link_mbps(adapter);
+	/* rate limit cannot be less than 10Mbs or greater than link speed */
+	if (max_tx_rate && ((max_tx_rate <= 10) || (max_tx_rate > link_speed)))
+		return -EINVAL;
+
 	/* store values */
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
 	adapter->vfinfo[vf].min_tx_rate = min_tx_rate;
 #endif
+	adapter->vf_rate_link_speed = link_speed;
 	adapter->vfinfo[vf].max_tx_rate = max_tx_rate;
 
 	/* update hardware configuration */

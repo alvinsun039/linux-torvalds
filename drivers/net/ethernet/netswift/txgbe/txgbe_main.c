@@ -9078,6 +9078,7 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	       (flow_tx ? "TX" : "None"))));
 
 	netif_carrier_on(netdev);
+	txgbe_check_vf_rate_limit(adapter);
 
 	netif_tx_wake_all_queues(netdev);
 #ifdef HAVE_VIRTUAL_STATION
