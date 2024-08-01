@@ -8055,7 +8055,16 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 			} else {
 				*link_up = true;
 			}
+
 			if (*link_up) {
+				if (hw->mac.type == txgbe_mac_aml) {
+					value = rd32(hw, TXGBE_GPIO_EXT);
+					if (value & TXGBE_SFP1_MOD_ABS_LS) {
+						*link_up = false;
+						continue;
+					}
+				}
+
 				links_reg = rd32(hw,
 							TXGBE_CFG_PORT_ST);
 				if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
@@ -8086,6 +8095,13 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				*link_up = true;
 			} else {
 				*link_up = false;
+			}
+
+			if (hw->mac.type == txgbe_mac_aml) {
+				value = rd32(hw, TXGBE_GPIO_EXT);
+				if (value & TXGBE_SFP1_MOD_ABS_LS) {
+					*link_up = false;
+				}
 			}
 		}
 	}
