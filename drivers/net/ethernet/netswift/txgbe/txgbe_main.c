@@ -9309,6 +9309,7 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	struct txgbe_mac_info *mac = &hw->mac;
+	u32 value = 0;
 	s32 err;
 
 	/* not searching for SFP so there is nothing to do here */
@@ -9325,6 +9326,15 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	adapter->sfp_poll_time = jiffies + TXGBE_SFP_POLL_JIFFIES - 1;
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_ABS_LS) {
+			err = TXGBE_ERR_SFP_NOT_PRESENT;
+			adapter->flags2 &= ~TXGBE_FLAG2_SFP_NEEDS_RESET;
+			goto sfp_out;
+		}
+	}
 
 	err = TCALL(hw, phy.ops.identify_sfp);
 	if (err == TXGBE_ERR_SFP_NOT_SUPPORTED)

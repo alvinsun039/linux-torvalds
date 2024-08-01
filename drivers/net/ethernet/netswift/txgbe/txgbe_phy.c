@@ -561,6 +561,15 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u8 vendor_name[3] = {0, 0, 0};
 	u16 phy_data = 0;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+	u32 value;
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_ABS_LS) {
+			status = TXGBE_ERR_SFP_NOT_PRESENT;
+			goto out;
+		}
+	}
 
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 	   return TXGBE_ERR_SWFW_SYNC;

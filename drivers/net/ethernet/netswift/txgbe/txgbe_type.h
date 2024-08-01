@@ -738,6 +738,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTTYPE_LEVEL        0x14838
 #define TXGBE_GPIO_INTSTATUS            0x14844
 #define TXGBE_GPIO_EOI                  0x1484C
+#define TXGBE_GPIO_EXT                  0x14850
+
 /*GPIO bit */
 #define TXGBE_GPIO_DR_0         0x00000001U /* SDP0 Data Value */
 #define TXGBE_GPIO_DR_1         0x00000002U /* SDP1 Data Value */
@@ -774,6 +776,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_EOI_3        0x00000008U /* SDP3 interrupt clear */
 #define TXGBE_GPIO_EOI_5        0x00000020U /* SDP5 interrupt clear */
 #define TXGBE_GPIO_EOI_6        0x00000040U /* SDP6 interrupt clear */
+#define TXGBE_SFP1_MOD_ABS_LS   0x00000004U /* GPIO_EXT SFP ABSENT*/
+#define TXGBE_SFP1_RX_LOS_LS    0x00000008U /* GPIO_EXT RX LOSS */
 
 /* TPH registers */
 #define TXGBE_CFG_TPH_TDESC     0x14F00 /* TPH conf for Tx desc write back */

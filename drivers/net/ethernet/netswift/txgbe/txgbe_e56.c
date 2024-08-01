@@ -119,7 +119,7 @@ u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 	temp_data = 419400 + 2205 * (data_code * 1000 / 4094 - 500);
 
 	//Change double Temperature to int
-	*pTempData = temp_data/10000;
+	*pTempData = temp_data / 10000;
 	temp_fraction = temp_data - (*pTempData * 10000);
 	if (temp_fraction >= 5000) {
 		*pTempData += 1;
@@ -558,7 +558,8 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_FETX_FFE_TRAIN_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2, 0x2);
+	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2,
+		  0x2);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	return 0;
@@ -972,7 +973,8 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_FETX_FFE_TRAIN_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2, 0x2);
+	SetFields(&rdata, E56PHY_FETX_FFE_TRAIN_CFG_0_KRT_FETX_INIT_FFE_CFG_2,
+		  0x2);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	return 0;
@@ -1579,8 +1581,20 @@ int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
 int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0, i;
+	struct txgbe_adapter *adapter = hw->back;
 	u32 addr, timer;
 	u32 rdata = 0x0;
+
+	rdata = rd32(hw, TXGBE_GPIO_EXT);
+	if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {
+		if (rdata & TXGBE_SFP1_MOD_ABS_LS)
+			e_info(probe,
+			       "E56phyRxsCalibAdaptSeq TXGBE_SFP1_MOD_ABS_LS\n");
+		else if (rdata & TXGBE_SFP1_RX_LOS_LS)
+			e_info(probe,
+			       "E56phyRxsCalibAdaptSeq TXGBE_SFP1_RX_LOS_LS\n");
+		return 1;
+	}
 
 	rdata = 0x0000;
 	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
@@ -2131,7 +2145,8 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
 	}
 
-	E56phyRxsCalibAdaptSeq(hw, speed);
+	if (E56phyRxsCalibAdaptSeq(hw, speed))
+		return 0;
 
 	//Step 2 of 2.3.4
 	E56phySetRxsUfineLeMax(hw, speed);
