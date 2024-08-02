@@ -100,6 +100,8 @@
 #define TXGBE_DEV_ID_SP1000                     0x1001
 #define TXGBE_DEV_ID_WX1820                     0x2001
 #define TXGBE_DEV_ID_AML                        0x5000
+#define TXGBE_DEV_ID_AML5025                    0x5025
+#define TXGBE_DEV_ID_AML5125                    0x5125
 
 /* Subsystem IDs */
 /* SFP */

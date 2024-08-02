@@ -129,6 +129,8 @@ static const struct pci_device_id txgbe_pci_tbl[] = {
 	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_SP1000), 0},
 	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_WX1820), 0},
 	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_AML), 0},
+	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_AML5025), 0},
+	{ PCI_VDEVICE(TRUSTNETIC, TXGBE_DEV_ID_AML5125), 0},
 	/* required last entry */
 	{ .device = 0 }
 };
@@ -7545,6 +7547,8 @@ static void txgbe_init_type_code(struct txgbe_hw *hw)
 		hw->mac.type = txgbe_mac_sp;
 		break;
 	case TXGBE_DEV_ID_AML:
+	case TXGBE_DEV_ID_AML5025:
+	case TXGBE_DEV_ID_AML5125:
 		hw->mac.type = txgbe_mac_aml;
 		break;
 	default:
