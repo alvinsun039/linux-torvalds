@@ -3422,20 +3422,23 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 		return;
 	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE))
 		return;
-	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_EVENT))
-		return;
 
-	adapter->flags2 &= ~TXGBE_FLAG2_TEMP_SENSOR_EVENT;
+	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS)) {
+		if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_EVENT))
+			return;
 
-	/*
-	 * Since the warning interrupt is for both ports
-	 * we don't have to check if:
-	 *  - This interrupt wasn't for our port.
-	 *  - We may have missed the interrupt so always have to
-	 *    check if we  got a LSC
-	 */
-	if (!(eicr & TXGBE_PX_MISC_IC_OVER_HEAT))
-		return;
+		adapter->flags2 &= ~TXGBE_FLAG2_TEMP_SENSOR_EVENT;
+
+		/*
+		 * Since the warning interrupt is for both ports
+		 * we don't have to check if:
+		 *  - This interrupt wasn't for our port.
+		 *  - We may have missed the interrupt so always have to
+		 *    check if we  got a LSC
+		 */
+		if (!(eicr & TXGBE_PX_MISC_IC_OVER_HEAT))
+			return;
+	}
 
 	temp_state = TCALL(hw, phy.ops.check_overtemp);
 	if (!temp_state || temp_state == TXGBE_NOT_IMPLEMENTED)
@@ -3443,6 +3446,9 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 
 	if (temp_state == TXGBE_ERR_UNDERTEMP &&
 		test_bit(__TXGBE_HANGING, &adapter->state)) {
+		if (hw->mac.type == txgbe_mac_aml)
+			adapter->flags2 &= ~TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS;
+
 		e_crit(drv, "%s\n", txgbe_underheat_msg);
 		wr32m(&adapter->hw, TXGBE_RDB_PB_CTL,
 				TXGBE_RDB_PB_CTL_RXEN, TXGBE_RDB_PB_CTL_RXEN);
@@ -3458,6 +3464,8 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 		clear_bit(__TXGBE_HANGING, &adapter->state);
 	} else if (temp_state == TXGBE_ERR_OVERTEMP &&
 		!test_and_set_bit(__TXGBE_HANGING, &adapter->state)) {
+		if (hw->mac.type == txgbe_mac_aml)
+			adapter->flags2 |= TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS;
 		e_crit(drv, "%s\n", txgbe_overheat_msg);
 		netif_carrier_off(adapter->netdev);
 #ifdef HAVE_VIRTUAL_STATION
@@ -3569,6 +3577,9 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 
 	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE)
 		mask |= TXGBE_PX_MISC_IEN_OVER_HEAT;
+
+	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS)
+		mask &= ~TXGBE_PX_MISC_IEN_OVER_HEAT;
 
 	if ((adapter->flags & TXGBE_FLAG_FDIR_HASH_CAPABLE) &&
 	    !(adapter->flags2 & TXGBE_FLAG2_FDIR_REQUIRES_REINIT))

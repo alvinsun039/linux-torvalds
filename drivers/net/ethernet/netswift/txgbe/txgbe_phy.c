@@ -1263,14 +1263,27 @@ s32 txgbe_tn_check_overtemp(struct txgbe_hw *hw)
 	s32 status = 0;
 	u32 ts_state;
 
-	/* Check that the LASI temp alarm status was triggered */
-	ts_state = rd32(hw, TXGBE_TS_ALARM_ST);
+	if (hw->mac.type == txgbe_mac_aml) {
+		ts_state = rd32(hw, TXGBE_AML_INTR_HIGH_STS);
+		if (ts_state) {
+			wr32(hw, TXGBE_AML_INTR_RAW_HI, TXGBE_AML_INTR_CL_HI);
+			status = TXGBE_ERR_OVERTEMP;
+		} else {
+			ts_state = rd32(hw, TXGBE_AML_INTR_LOW_STS);
+			if (ts_state) {
+				wr32(hw, TXGBE_AML_INTR_RAW_LO, TXGBE_AML_INTR_CL_LO);
+				status = TXGBE_ERR_UNDERTEMP;
+			}
+		}
+	} else {
+		/* Check that the LASI temp alarm status was triggered */
+		ts_state = rd32(hw, TXGBE_TS_ALARM_ST);
 
-	if (ts_state & TXGBE_TS_ALARM_ST_DALARM)
-		status = TXGBE_ERR_UNDERTEMP;
-	else if (ts_state & TXGBE_TS_ALARM_ST_ALARM)
-		status = TXGBE_ERR_OVERTEMP;
-
+		if (ts_state & TXGBE_TS_ALARM_ST_DALARM)
+			status = TXGBE_ERR_UNDERTEMP;
+		else if (ts_state & TXGBE_TS_ALARM_ST_ALARM)
+			status = TXGBE_ERR_OVERTEMP;
+	}
 	return status;
 }
 
