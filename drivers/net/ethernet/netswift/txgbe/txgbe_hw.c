@@ -8059,7 +8059,7 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 			if (*link_up) {
 				if (hw->mac.type == txgbe_mac_aml) {
 					value = rd32(hw, TXGBE_GPIO_EXT);
-					if (value & TXGBE_SFP1_MOD_ABS_LS) {
+					if (value & TXGBE_SFP1_RX_LOS_LS) {
 						*link_up = false;
 						continue;
 					}
@@ -8099,7 +8099,7 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 
 			if (hw->mac.type == txgbe_mac_aml) {
 				value = rd32(hw, TXGBE_GPIO_EXT);
-				if (value & TXGBE_SFP1_MOD_ABS_LS) {
+				if (value & TXGBE_SFP1_RX_LOS_LS) {
 					*link_up = false;
 				}
 			}
