@@ -4019,6 +4019,9 @@ s32 txgbe_init_thermal_sensor_thresh(struct txgbe_hw *hw)
 
 	if (hw->mac.type == txgbe_mac_aml) {
 		wr32(hw, TXGBE_AML_TS_ENA, 0x0);
+		wr32(hw, TXGBE_AML_INTR_RAW_LO, TXGBE_AML_INTR_CL_LO);
+		wr32(hw, TXGBE_AML_INTR_RAW_HI, TXGBE_AML_INTR_CL_HI);
+
 		wr32(hw, TXGBE_AML_INTR_HIGH_EN, TXGBE_AML_INTR_EN_HI);
 		wr32(hw, TXGBE_AML_INTR_LOW_EN, TXGBE_AML_INTR_EN_LO);
 

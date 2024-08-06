@@ -2260,5 +2260,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	//2.3.4 RXS post CDR lock temperature tracking sequence
 	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
 
+	//wait phy config complete
+	msleep(10);
 	return 0;
 }
