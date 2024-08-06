@@ -2717,16 +2717,20 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 
 	txgbe_configure_tx_ring(adapter, tx_ring);
 	/* enable mac transmitter */
-	if (txgbe_check_reset_blocked(hw) &&
-	    (hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL ||
-	    adapter->link_speed == TXGBE_LINK_SPEED_1GB_FULL))
-		wr32m(hw, TXGBE_MAC_TX_CFG,
-			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
-			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_1G);
+	if (hw->mac.type == txgbe_mac_aml)
+		wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_25G);
 	else
-		wr32m(hw, TXGBE_MAC_TX_CFG,
-			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
-			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
+		if (txgbe_check_reset_blocked(hw) && (hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL ||
+						     adapter->link_speed == TXGBE_LINK_SPEED_1GB_FULL))
+			wr32m(hw, TXGBE_MAC_TX_CFG,
+				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
+				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_1G);
+		else
+			wr32m(hw, TXGBE_MAC_TX_CFG,
+				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
+				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
 
 	/* Setup Rx Descriptor ring and Rx buffers */
 	rx_ring->count = TXGBE_DEFAULT_RXD;
@@ -2783,11 +2787,35 @@ static int txgbe_setup_config(struct txgbe_adapter *adapter)
 	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
 		TXGBE_CFG_PORT_CTL_FORCE_LKUP, ~TXGBE_CFG_PORT_CTL_FORCE_LKUP);
 
+	/* enable mac transmitter */
+	if (hw->mac.type == txgbe_mac_aml) {
+		wr32(hw, TXGBE_TSC_CTL, 0);
+		wr32m(hw, TXGBE_RSC_CTL,
+			TXGBE_RSC_CTL_RX_DIS, 0);
+	}
 
 	TXGBE_WRITE_FLUSH(hw);
 	usleep_range(10000, 20000);
 
 	return 0;
+}
+
+static int txgbe_setup_mac_loopback_test(struct txgbe_adapter *adapter)
+{
+	wr32m(&adapter->hw, TXGBE_MAC_RX_CFG,
+		TXGBE_MAC_RX_CFG_LM, TXGBE_MAC_RX_CFG_LM);
+	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
+		TXGBE_CFG_PORT_CTL_FORCE_LKUP, TXGBE_CFG_PORT_CTL_FORCE_LKUP);
+
+	return 0;
+}
+
+static void txgbe_mac_loopback_cleanup(struct txgbe_adapter *adapter)
+{
+	wr32m(&adapter->hw, TXGBE_MAC_RX_CFG,
+		TXGBE_MAC_RX_CFG_LM, ~TXGBE_MAC_RX_CFG_LM);
+	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
+		TXGBE_CFG_PORT_CTL_FORCE_LKUP, ~TXGBE_CFG_PORT_CTL_FORCE_LKUP);
 }
 
 static int txgbe_setup_phy_loopback_test(struct txgbe_adapter *adapter)
@@ -3004,6 +3032,7 @@ static int txgbe_run_loopback_test(struct txgbe_adapter *adapter)
 
 static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 {
+	struct txgbe_hw *hw = &adapter->hw;
 	/* Let firmware know the driver has taken over */
 	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
 			TXGBE_CFG_PORT_CTL_DRV_LOAD, TXGBE_CFG_PORT_CTL_DRV_LOAD);
@@ -3011,16 +3040,23 @@ static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 	if (*data)
 		goto err_loopback;
 
-	*data = txgbe_setup_phy_loopback_test(adapter);
+	if (hw->mac.type == txgbe_mac_aml)
+		*data = txgbe_setup_mac_loopback_test(adapter);
+	else
+		*data = txgbe_setup_phy_loopback_test(adapter);
 	if (*data)
 			goto err_loopback;
+
 	*data = txgbe_setup_desc_rings(adapter);
 	if (*data)
 		goto out;
 	*data = txgbe_run_loopback_test(adapter);
 	if (*data)
 			e_info(hw, "phy loopback testing failed\n");
-	txgbe_phy_loopback_cleanup(adapter);
+	if (hw->mac.type == txgbe_mac_aml)
+		txgbe_mac_loopback_cleanup(adapter);
+	else
+		txgbe_phy_loopback_cleanup(adapter);
 
 err_loopback:
 	txgbe_free_desc_rings(adapter);

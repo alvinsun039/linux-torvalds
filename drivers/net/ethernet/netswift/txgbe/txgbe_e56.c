@@ -116,7 +116,7 @@ u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 
 	while (1) {
 		rdata = rd32(hw, 0x1033c);
-		if ((rdata >> 12) != 0)
+		if (((rdata >> 12) & 0x1) != 0)
 			break;
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait 0x1033c Timeout!!!\n");

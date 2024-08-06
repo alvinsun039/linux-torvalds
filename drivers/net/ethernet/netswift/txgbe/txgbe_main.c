@@ -4149,13 +4149,19 @@ static void txgbe_configure_msi_and_legacy(struct txgbe_adapter *adapter)
 #ifdef TXGBE_TXHEAD_WB
 int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
 {
-	struct txgbe_adapter *adapter = ring->q_vector->adapter;
-	struct txgbe_hw *hw = &adapter->hw;
+	struct txgbe_adapter *adapter;
+	struct txgbe_hw *hw;
 	struct device *dev = ring->dev;
 	u8 headwb_size = 0;
 
-	if (hw->mac.type == txgbe_mac_sp)
+	if (ring->q_vector) {
+		adapter = ring->q_vector->adapter;
+		hw = &adapter->hw;
+		if (hw->mac.type == txgbe_mac_sp)
+			return 0;
+	} else {
 		return 0;
+	}
 
 	if (TXGBE_TXHEAD_WB == 1)
 		headwb_size = 16;
@@ -7984,11 +7990,17 @@ void txgbe_free_isb_resources(struct txgbe_adapter *adapter)
 void txgbe_free_headwb_resources(struct txgbe_ring *ring)
 {
 	u8 headwb_size = 0;
-	struct txgbe_adapter *adapter = ring->q_vector->adapter;
-	struct txgbe_hw *hw = &adapter->hw;
+	struct txgbe_adapter *adapter;
+	struct txgbe_hw *hw;
 
-	if (hw->mac.type == txgbe_mac_sp)
+	if (ring->q_vector) {
+		adapter = ring->q_vector->adapter;
+		hw = &adapter->hw;
+		if (hw->mac.type == txgbe_mac_sp)
+			return;
+	} else {
 		return;
+	}
 
 	if (TXGBE_TXHEAD_WB == 1)
 		headwb_size = 16;
