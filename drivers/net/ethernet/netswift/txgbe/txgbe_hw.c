@@ -7919,6 +7919,7 @@ s32 txgbe_calc_eeprom_checksum(struct txgbe_hw *hw)
 	u32 buffer_size = 0;
 
 	u16 *eeprom_ptrs = NULL;
+	u32 eeprom_size = 0;
 	u16 *local_buffer;
 	s32 status;
 	u16 checksum = 0;
@@ -7926,14 +7927,18 @@ s32 txgbe_calc_eeprom_checksum(struct txgbe_hw *hw)
 
 	TCALL(hw, eeprom.ops.init_params);
 
+	if (hw->mac.type == txgbe_mac_aml)
+		eeprom_size = TXGBE_EEPROM_AML_LAST_WORD;
+	else
+		eeprom_size = TXGBE_EEPROM_LAST_WORD;
 	if (!buffer) {
-		eeprom_ptrs = (u16 *)vmalloc(TXGBE_EEPROM_LAST_WORD *
+		eeprom_ptrs = (u16 *)vmalloc(eeprom_size *
 				sizeof(u16));
 		if (!eeprom_ptrs)
 			return TXGBE_ERR_NO_SPACE;
 		/* Read pointer area */
 		status = txgbe_read_ee_hostif_buffer(hw, 0,
-						     TXGBE_EEPROM_LAST_WORD,
+						     eeprom_size,
 						     eeprom_ptrs);
 		if (status) {
 			DEBUGOUT("Failed to read EEPROM image\n");
@@ -7941,12 +7946,12 @@ s32 txgbe_calc_eeprom_checksum(struct txgbe_hw *hw)
 		}
 		local_buffer = eeprom_ptrs;
 	} else {
-		if (buffer_size < TXGBE_EEPROM_LAST_WORD)
+		if (buffer_size < eeprom_size)
 			return TXGBE_ERR_PARAM;
 		local_buffer = buffer;
 	}
 
-	for (i = 0; i < TXGBE_EEPROM_LAST_WORD; i++)
+	for (i = 0; i < eeprom_size; i++)
 		if (i != hw->eeprom.sw_region_offset + TXGBE_EEPROM_CHECKSUM)
 			checksum += local_buffer[i];
 
