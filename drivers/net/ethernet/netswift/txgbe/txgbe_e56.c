@@ -1578,12 +1578,52 @@ int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
 	return status;
 }
 
+int E56phyCtleBypassSeq(struct txgbe_hw *hw)
+{
+	int status = 0;
+	unsigned int rdata;
+
+	//1. Program the following RXS registers as mentioned below.
+	//RXS::ANA_OVRDVAL[0]::ana_ctle_bypass_i = 1��b1
+	//RXS::ANA_OVRDEN[0]::ovrd_en_ana_ctle_bypass_i = 1��b1
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_0, ana_ctle_bypass_i, 1);
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_0,
+			      ovrd_en_ana_ctle_bypass_i, 1);
+
+	//RXS::ANA_OVRDVAL[3]::ana_ctle_cz_cstm_i[4:0] = 0
+	//RXS::ANA_OVRDEN[0]::ovrd_en_ana_ctle_cz_cstm_i = 1��b1
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_3, ana_ctle_cz_cstm_i, 0);
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_0,
+			      ovrd_en_ana_ctle_cz_cstm_i, 1);
+
+	//2. Program the following PDIG registers as mentioned below.
+	//PDIG::RXS<n>_OVRDVAL[1]::rxs<n>_rx0_ctle_train_en_i = 1��b0
+	//PDIG::RXS<n>_OVRDEN[1]::ovrd_en_rxs<n>_rx0_ctle_train_en_i = 1��b1
+	//
+	//PDIG::RXS<n>_OVRDVAL[1]::rxs<n>_rx0_ctle_train_done_o = 1��b1
+	//PDIG::RXS<n>_OVRDEN[1]::ovrd_en_rxs<n>_rx0_ctle_train_done_o = 1��b1
+	EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_ctle_train_en_i) = 0;
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_ctle_train_done_o) = 1;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDVAL_1);
+
+	EPHY_RREG(E56G__PMD_RXS0_OVRDEN_1);
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_ctle_train_en_i) =
+		1;
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_ctle_train_done_o) =
+		1;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDEN_1);
+
+	return status;
+}
+
 int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0, i;
 	struct txgbe_adapter *adapter = hw->back;
 	u32 addr, timer;
 	u32 rdata = 0x0;
+	u32 bypassCtle = 1;
 
 	rdata = rd32(hw, TXGBE_GPIO_EXT);
 	if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {
@@ -1662,6 +1702,9 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		  0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	if (bypassCtle == 1)
+		E56phyCtleBypassSeq(hw);
+
 	//2. Follow sequence described in 2.3.2 RXS Osc Initialization for temperature tracking range here. RXS would be enabled at the end of this sequence. For the case when PAM4 KR training is not enabled (including PAM4 mode without KR training), wait until ALIAS::PDIG::CTRL_FSM_RX_ST would return RX_TRAIN_15_ST (RX_RDY_ST).
 	E56phyRxsOscInitForTempTrackRange(hw, speed);
 
@@ -1680,6 +1723,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	}
 
 	//RXS ADC adaptation sequence
+	//E56phyRxsAdcAdaptSeq
 	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I, 0x0);
@@ -1845,11 +1889,8 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	msleep(10);
 
 	//c. ALIAS::RXS::ADC_INTL_ADAPT_EN = 0b0
-	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_ADAPT_EN_I,
-		  0x0);
-	txgbe_wr32_ephy(hw, addr, rdata);
+	txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_2,
+			      ovrd_en_rxs0_rx0_adc_intl_adapt_en_i, 0);
 
 	//8. Now re-enable VGA and CTLE trainings, so that it continues to adapt tracking changes in temperature or voltage
 	//a. Remove the OVERRIDE on ALIAS::RXS::VGA_TRAIN_EN
@@ -1858,14 +1899,79 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	SetFields(&rdata, E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_VGA_TRAIN_EN_I,
 		  0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
+	//8. Now re-enable VGA and CTLE trainings, so that it continues to adapt tracking changes in temperature or voltage
+	//<1>Set ALIAS::RXS::VGA_TRAIN_EN = 0b1
+	//   Set ALIAS::RXS::CTLE_TRAIN_EN = 0b1
+	EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_vga_train_en_i) = 1;
+	if (bypassCtle == 0) {
+		EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_ctle_train_en_i) =
+			1;
+	}
+	//printf("Setting RXS0_OVRDVAL[1]::rxs0_rx0_ffe_train_en_i to 1\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_ffe_train_en_i) = 1;
+	//printf("Setting RXS0_OVRDVAL[1]::rxs0_rx0_dfe_train_en_i to 1\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_dfe_train_en_i) = 1;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDVAL_1);
+	//
+	//EPHY_RREG(E56G__PMD_RXS0_OVRDEN_1);
+	//printf("Setting RXS0_OVRDEN[1]::ovrd_en_rxs0_rx0_ffe_train_en_i to 1\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_ffe_train_en_i) = 1;
+	//printf("Setting RXS0_OVRDEN[1]::ovrd_en_rxs0_rx0_dfe_train_en_i to 1\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_dfe_train_en_i) = 1;
+	//EPHY_WREG(E56G__PMD_RXS0_OVRDEN_1);
 
+	//<2>wait for ALIAS::RXS::VGA_TRAIN_DONE = 1
+	//   wait for ALIAS::RXS::CTLE_TRAIN_DONE = 1
+	txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_1,
+			      ovrd_en_rxs0_rx0_vga_train_done_o, 0);
+	rdata = 0;
+	timer = 0;
+	while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_vga_train_done_o) !=
+	       1) {
+		EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
+		udelay(500);
+
+		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_vga_train_done_o =1 Timeout!!!\n");
+			break;
+			//return -1;
+		} //if (timer++ > PHYINIT_TIMEOUT) {
+	} //while
+
+	if (bypassCtle == 0) {
+		txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_1,
+				      ovrd_en_rxs0_rx0_ctle_train_done_o, 0);
+		rdata = 0;
+		timer = 0;
+		while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1,
+				 rxs0_rx0_ctle_train_done_o) != 1) {
+			EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
+			udelay(500);
+
+			if (timer++ > PHYINIT_TIMEOUT) {
+				printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_ctle_train_done_o =1 Timeout!!!\n");
+				break;
+				//return -1;
+			} //if (timer++ > PHYINIT_TIMEOUT) {
+		} //while
+	}
+
+	//a. Remove the OVERRIDE on ALIAS::RXS::VGA_TRAIN_EN
+	EPHY_RREG(E56G__PMD_RXS0_OVRDEN_1);
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_vga_train_en_i) = 0;
 	//b. Remove the OVERRIDE on ALIAS::RXS::CTLE_TRAIN_EN
-	rdata = 0x0000;
-	addr = E56PHY_RXS0_OVRDEN_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CTLE_TRAIN_EN_I,
-		  0x0);
-	txgbe_wr32_ephy(hw, addr, rdata);
+	if (bypassCtle == 0) {
+		EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1,
+			  ovrd_en_rxs0_rx0_ctle_train_en_i) = 0;
+	}
+	////Remove the OVERRIDE on ALIAS::RXS::FFE_TRAIN_EN
+	//printf("Setting RXS0_OVRDEN[1]::ovrd_en_rxs0_rx0_ffe_train_en_i to 0\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_ffe_train_en_i) = 0;
+	////Remove the OVERRIDE on ALIAS::RXS::DFE_TRAIN_EN
+	//printf("Setting RXS0_OVRDEN[1]::ovrd_en_rxs0_rx0_dfe_train_en_i to 0\n");
+	//EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_dfe_train_en_i) = 0;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDEN_1);
 
 	return status;
 }

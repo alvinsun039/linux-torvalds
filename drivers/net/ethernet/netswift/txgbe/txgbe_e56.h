@@ -679,6 +679,33 @@ typedef union {
 //-----MACRO defines for Register:E56G__RXS0_ANA_OVRDEN_2
 #define E56G__RXS0_ANA_OVRDEN_2_ADDR (E56G__BASEADDR + 0x94)
 
+//-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_2
+typedef union {
+	struct {
+		u32 ovrd_en_rxs0_rx0_adc_ofst_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_ofst_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_ofst_adapt_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_gain_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_gain_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_gain_adapt_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_adapt_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_adapt_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_samp_th_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_samp_th_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_efuse_bits_i : 1;
+		u32 ovrd_en_rxs0_rx0_wp_pmt_in_i : 1;
+		u32 ovrd_en_rxs0_rx0_wp_pmt_out_o : 1;
+		u32 rsvd0 : 15;
+	};
+	u32 reg;
+} E56G__PMD_RXS0_OVRDEN_2;
+//-----MACRO defines for Register:E56G__PMD_RXS0_OVRDEN_2
+#define E56G__PMD_RXS0_OVRDEN_2_ADDR (E56G__BASEADDR + 0x1538)
+
 typedef union {
 	struct {
 		u32 ana_bbcdr_osc_range_sel_i : 2;
@@ -772,6 +799,150 @@ typedef union {
 } E56G__PMD_CTRL_FSM_RX_STAT_0;
 //-----MACRO defines for Register:E56G__PMD_CTRL_FSM_RX_STAT_0
 #define E56G__PMD_CTRL_FSM_RX_STAT_0_ADDR (E56G__BASEADDR + 0x14fc)
+
+typedef union {
+	struct {
+		u32 ana_en_rterm_i : 1;
+		u32 ana_en_bias_i : 1;
+		u32 ana_en_ldo_i : 1;
+		u32 ana_rstn_i : 1;
+		u32 ana_en_blwc_i : 1;
+		u32 ana_en_acc_amp_i : 1;
+		u32 ana_en_acc_dac_i : 1;
+		u32 ana_en_afe_offset_cal_i : 1;
+		u32 ana_clk_offsetcal_i : 1;
+		u32 ana_acc_os_comp_o : 1;
+		u32 ana_en_ctle_i : 1;
+		u32 ana_ctle_bypass_i : 1;
+		u32 ana_en_ctlecdr_i : 1;
+		u32 ana_cdr_ctle_boost_i : 1;
+		u32 ana_en_vga_i : 1;
+		u32 ana_en_bbcdr_vco_i : 1;
+		u32 ana_bbcdr_vcofilt_byp_i : 1;
+		u32 ana_en_bbcdr_i : 1;
+		u32 ana_en_bbcdr_clk_i : 1;
+		u32 ana_bbcdr_en_elv_cnt_ping0_pong1_i : 1;
+		u32 ana_bbcdr_clrz_elv_cnt_ping_i : 1;
+		u32 ana_bbcdr_clrz_elv_cnt_pong_i : 1;
+		u32 ana_bbcdr_clrz_cnt_sync_i : 1;
+		u32 ana_bbcdr_en_elv_cnt_rd_i : 1;
+		u32 ana_bbcdr_elv_cnt_ping_0_o : 1;
+		u32 ana_bbcdr_elv_cnt_ping_90_o : 1;
+		u32 ana_bbcdr_elv_cnt_ping_180_o : 1;
+		u32 ana_bbcdr_elv_cnt_ping_270_o : 1;
+		u32 ana_bbcdr_elv_cnt_pong_0_o : 1;
+		u32 ana_bbcdr_elv_cnt_pong_90_o : 1;
+		u32 ana_bbcdr_elv_cnt_pong_180_o : 1;
+		u32 ana_bbcdr_elv_cnt_pong_270_o : 1;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDVAL_0;
+#define E56G__RXS0_ANA_OVRDVAL_0_ADDR (E56G__BASEADDR + 0xa0)
+
+//-----Access structure typedef for Register:E56G__RXS0_ANA_OVRDEN_0
+typedef union {
+	struct {
+		u32 ovrd_en_ana_en_rterm_i : 1;
+		u32 ovrd_en_ana_trim_rterm_i : 1;
+		u32 ovrd_en_ana_en_bias_i : 1;
+		u32 ovrd_en_ana_test_bias_i : 1;
+		u32 ovrd_en_ana_en_ldo_i : 1;
+		u32 ovrd_en_ana_test_ldo_i : 1;
+		u32 ovrd_en_ana_rstn_i : 1;
+		u32 ovrd_en_ana_en_blwc_i : 1;
+		u32 ovrd_en_ana_en_acc_amp_i : 1;
+		u32 ovrd_en_ana_en_acc_dac_i : 1;
+		u32 ovrd_en_ana_en_afe_offset_cal_i : 1;
+		u32 ovrd_en_ana_clk_offsetcal_i : 1;
+		u32 ovrd_en_ana_acc_os_code_i : 1;
+		u32 ovrd_en_ana_acc_os_comp_o : 1;
+		u32 ovrd_en_ana_test_acc_i : 1;
+		u32 ovrd_en_ana_en_ctle_i : 1;
+		u32 ovrd_en_ana_ctle_bypass_i : 1;
+		u32 ovrd_en_ana_ctle_cz_cstm_i : 1;
+		u32 ovrd_en_ana_ctle_cload_cstm_i : 1;
+		u32 ovrd_en_ana_test_ctle_i : 1;
+		u32 ovrd_en_ana_lfeq_ctrl_cstm_i : 1;
+		u32 ovrd_en_ana_en_ctlecdr_i : 1;
+		u32 ovrd_en_ana_cdr_ctle_boost_i : 1;
+		u32 ovrd_en_ana_test_ctlecdr_i : 1;
+		u32 ovrd_en_ana_en_vga_i : 1;
+		u32 ovrd_en_ana_vga_gain_cstm_i : 1;
+		u32 ovrd_en_ana_vga_cload_in_cstm_i : 1;
+		u32 ovrd_en_ana_test_vga_i : 1;
+		u32 ovrd_en_ana_en_bbcdr_vco_i : 1;
+		u32 ovrd_en_ana_bbcdr_osc_range_sel_i : 1;
+		u32 ovrd_en_ana_sel_vga_gain_byp_i : 1;
+		u32 ovrd_en_ana_vga2_gain_cstm_i : 1;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDEN_0;
+//-----MACRO defines for Register:E56G__RXS0_ANA_OVRDEN_0
+#define E56G__RXS0_ANA_OVRDEN_0_NUM 1
+#define E56G__RXS0_ANA_OVRDEN_0_ADDR (E56G__BASEADDR + 0x8c)
+
+//-----Access structure typedef for Register:E56G__RXS0_ANA_OVRDVAL_3
+typedef union {
+	struct {
+		u32 ana_ctle_cz_cstm_i : 5;
+		u32 rsvd0 : 3;
+		u32 ana_ctle_cload_cstm_i : 5;
+		u32 rsvd1 : 3;
+		u32 ana_test_ctle_i : 2;
+		u32 rsvd2 : 2;
+		u32 ana_lfeq_ctrl_cstm_i : 4;
+		u32 ana_test_ctlecdr_i : 2;
+		u32 rsvd3 : 2;
+		u32 ana_vga_cload_in_cstm_i : 3;
+		u32 rsvd4 : 1;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDVAL_3;
+//-----MACRO defines for Register:E56G__RXS0_ANA_OVRDVAL_3
+#define E56G__RXS0_ANA_OVRDVAL_3_NUM 1
+#define E56G__RXS0_ANA_OVRDVAL_3_ADDR (E56G__BASEADDR + 0xac)
+
+//-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_1
+typedef union {
+	struct {
+		u32 ovrd_en_rxs0_rx0_adc_gain_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_gain_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_gain_cal_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_fe_ofst_cal_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_fom_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_idle_detect_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_idle_o : 1;
+		u32 ovrd_en_rxs0_rx0_txffe_train_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_txffe_coeff_rst_i : 1;
+		u32 ovrd_en_rxs0_rx0_txffe_train_enack_o : 1;
+		u32 ovrd_en_rxs0_rx0_txffe_train_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_txffe_coeff_change_o : 1;
+		u32 ovrd_en_rxs0_rx0_vga_train_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_vga_train_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_ctle_train_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ctle_train_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_cdr_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_cdr_rdy_o : 1;
+		u32 ovrd_en_rxs0_rx0_ffe_train_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ffe_train_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_mmpd_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_intl_cal_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_dfe_train_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_dfe_train_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_vga_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_vga_adapt_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_ctle_adapt_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ctle_adapt_done_o : 1;
+	};
+	u32 reg;
+} E56G__PMD_RXS0_OVRDEN_1;
+//-----MACRO defines for Register:E56G__PMD_RXS0_OVRDEN_1
+#define E56G__PMD_RXS0_OVRDEN_1_NUM 1
+#define E56G__PMD_RXS0_OVRDEN_1_ADDR (E56G__BASEADDR + 0x1534)
 
 #define E56G__RXS0_FOM_18__ADDR (E56G__BASEADDR + 0x1f8)
 #define E56G__RXS0_FOM_18__DFE_COEFFL_HINT__MSB 11
