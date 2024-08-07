@@ -1654,6 +1654,9 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_MAC_WDG_TIMEOUT_WTO_MASK  0x0000000FU
 #define TXGBE_MAC_WDG_TIMEOUT_WTO_DELTA 2
 
+#define TXGBE_EPHY_STAT                 0x13404
+#define TXGBE_EPHY_STAT_PPL_LOCK        0x3
+
 /* amlite: new MAC_TX_CONFIG */
 /*
 {SS_3, SS_2, SS}

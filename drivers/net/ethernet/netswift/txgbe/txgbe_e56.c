@@ -1334,16 +1334,15 @@ int E56phySetRxsUfineLeMax(struct txgbe_hw *hw, u32 speed)
 	EPHY_RREG(E56G__RXS0_ANA_OVRDVAL_5);
 	ULTRAFINE_CODE =
 		EPHY_XFLD(E56G__RXS0_ANA_OVRDVAL_5, ana_bbcdr_ultrafine_i);
-	//Set ovrd_en=1 to overide ASIC value
-	EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
-	EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1, ovrd_en_ana_bbcdr_ultrafine_i) = 1;
-	EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
 
 	//b. Perform the below logic sequence �C
 	while (ULTRAFINE_CODE > CMVAR_UFINE_MAX) {
 		ULTRAFINE_CODE = ULTRAFINE_CODE - 1;
 		txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDVAL_5,
 				      ana_bbcdr_ultrafine_i, ULTRAFINE_CODE);
+		//Set ovrd_en=1 to overide ASIC value
+		txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_1,
+				      ovrd_en_ana_bbcdr_ultrafine_i, 1);
 		// Wait until 1milliseconds or greater
 		msleep(10);
 	}
@@ -1724,28 +1723,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 
 	//RXS ADC adaptation sequence
 	//E56phyRxsAdcAdaptSeq
-	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I, 0x0);
-	txgbe_wr32_ephy(hw, addr, rdata);
-
-	addr = E56PHY_RXS0_OVRDEN_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CDR_EN_I, 0x1);
-	txgbe_wr32_ephy(hw, addr, rdata);
-
-	//b. Wait for 0.5us or greater
-	udelay(100);
-
-	addr = E56PHY_RXS0_OVRDVAL_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_CDR_EN_I, 0x1);
-	txgbe_wr32_ephy(hw, addr, rdata);
-
-	addr = E56PHY_RXS0_OVRDEN_1_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS0_OVRDEN_1_OVRD_EN_RXS0_RX0_CDR_EN_I, 0x0);
-	txgbe_wr32_ephy(hw, addr, rdata);
 
 	rdata = 0;
 	timer = 0;
@@ -1824,6 +1801,9 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, addr, rdata);
 
 		//b. Wait for 1ms or greater
+		txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_2,
+				      ovrd_en_rxs0_rx0_adc_ofst_adapt_done_o,
+				      0);
 		rdata = 0;
 		timer = 0;
 		while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1,
@@ -1855,6 +1835,9 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, addr, rdata);
 
 		//e. Wait for 1ms or greater
+		txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_2,
+				      ovrd_en_rxs0_rx0_adc_ofst_adapt_done_o,
+				      0);
 		rdata = 0;
 		timer = 0;
 		while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1,
@@ -2055,6 +2038,18 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
 	u32 value = 0;
+	u32 ppl_lock = true;
+
+	if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK) ==
+	    TXGBE_EPHY_STAT_PPL_LOCK) {
+		ppl_lock = false;
+		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
+		      ~TXGBE_MAC_TX_CFG_TE);
+		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+		      ~TXGBE_MAC_RX_CFG_RE);
+
+		TCALL(hw, mac.ops.disable_sec_tx_path);
+	}
 
 	SetFields(&value, SFP1_TX_FAULT, 1);
 	SetFields(&value, SFP1_TX_DISABLE, 1);
@@ -2253,7 +2248,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	}
 
 	if (E56phyRxsCalibAdaptSeq(hw, speed))
-		return 0;
+		goto out;
 
 	//Step 2 of 2.3.4
 	E56phySetRxsUfineLeMax(hw, speed);
@@ -2263,5 +2258,12 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	//wait phy config complete
 	msleep(10);
+
+out:
+	if (ppl_lock) {
+		TCALL(hw, mac.ops.enable_sec_tx_path);
+		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+		      TXGBE_MAC_RX_CFG_RE);
+	}
 	return 0;
 }
