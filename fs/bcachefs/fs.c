@@ -1200,7 +1200,7 @@ static const struct inode_operations bch_file_inode_operations = {
 	.fiemap		= bch2_fiemap,
 	.listxattr	= bch2_xattr_list,
 #ifdef CONFIG_BCACHEFS_POSIX_ACL
-	.get_acl	= bch2_get_acl,
+	.get_inode_acl	= bch2_get_acl,
 	.set_acl	= bch2_set_acl,
 #endif
 };
@@ -1220,7 +1220,7 @@ static const struct inode_operations bch_dir_inode_operations = {
 	.tmpfile	= bch2_tmpfile,
 	.listxattr	= bch2_xattr_list,
 #ifdef CONFIG_BCACHEFS_POSIX_ACL
-	.get_acl	= bch2_get_acl,
+	.get_inode_acl	= bch2_get_acl,
 	.set_acl	= bch2_set_acl,
 #endif
 };
@@ -1242,7 +1242,7 @@ static const struct inode_operations bch_symlink_inode_operations = {
 	.setattr	= bch2_setattr,
 	.listxattr	= bch2_xattr_list,
 #ifdef CONFIG_BCACHEFS_POSIX_ACL
-	.get_acl	= bch2_get_acl,
+	.get_inode_acl	= bch2_get_acl,
 	.set_acl	= bch2_set_acl,
 #endif
 };
@@ -1252,7 +1252,7 @@ static const struct inode_operations bch_special_inode_operations = {
 	.setattr	= bch2_setattr,
 	.listxattr	= bch2_xattr_list,
 #ifdef CONFIG_BCACHEFS_POSIX_ACL
-	.get_acl	= bch2_get_acl,
+	.get_inode_acl	= bch2_get_acl,
 	.set_acl	= bch2_set_acl,
 #endif
 };
