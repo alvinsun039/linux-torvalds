@@ -463,4 +463,13 @@ static inline bool io_file_can_poll(struct io_kiocb *req)
 	}
 	return false;
 }
+
+static inline ktime_t io_get_time(struct io_ring_ctx *ctx)
+{
+	if (ctx->clockid == CLOCK_MONOTONIC)
+		return ktime_get();
+
+	return ktime_get_with_offset(ctx->clock_offset);
+}
+
 #endif

@@ -583,6 +583,8 @@ enum {
 	/* return status information for a buffer group */
 	IORING_REGISTER_PBUF_STATUS		= 26,
 
+	IORING_REGISTER_CLOCK			= 29,
+
 	/* this goes last */
 	IORING_REGISTER_LAST,
 
@@ -661,6 +663,11 @@ struct io_uring_restriction {
 	};
 	__u8 resv;
 	__u32 resv2[3];
+};
+
+struct io_uring_clock_register {
+	__u32	clockid;
+	__u32	__resv[3];
 };
 
 struct io_uring_buf {

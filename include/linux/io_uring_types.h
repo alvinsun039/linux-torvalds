@@ -207,6 +207,9 @@ struct io_ring_ctx {
 		struct io_rings		*rings;
 		struct percpu_ref	refs;
 
+		clockid_t		clockid;
+		enum tk_offsets		clock_offset;
+
 		enum task_work_notify_mode	notify_method;
 	} ____cacheline_aligned_in_smp;
 
