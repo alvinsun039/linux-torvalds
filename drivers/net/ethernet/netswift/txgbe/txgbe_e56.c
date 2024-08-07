@@ -2038,11 +2038,11 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
 	u32 value = 0;
-	u32 ppl_lock = true;
+	u32 ppl_lock = false;
 
 	if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK) ==
 	    TXGBE_EPHY_STAT_PPL_LOCK) {
-		ppl_lock = false;
+		ppl_lock = true;
 		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
 		      ~TXGBE_MAC_TX_CFG_TE);
 		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
