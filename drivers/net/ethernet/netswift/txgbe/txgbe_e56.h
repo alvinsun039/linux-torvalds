@@ -4,15 +4,6 @@
 #include "txgbe_type.h"
 #include "txgbe.h"
 
-typedef struct TPHYTXEQ {
-	bool bHasEqOpt; //Has --eq option flag
-	unsigned int main; //TX EQ main (bit[5:0])
-	unsigned int pre1; //TX EQ pre1 (bit[5:0])
-	unsigned int pre2; //TX EQ pre2 (bit[5:0])
-	unsigned int post; //TX EQ post (bit[5:0])
-	unsigned int vboost; //TX Vboost level (bit[8:6])
-} PHYTXEQ;
-
 #define FORMAT_NOPARENTHERSES(...) __VA_ARGS__
 //--------------------------------
 //LAN GPIO define for SFP+ module
@@ -1004,6 +995,14 @@ typedef union {
 #define S25G_TX_FFE_CFG_PRE1 0x0
 #define S25G_TX_FFE_CFG_PRE2 0x0
 #define S25G_TX_FFE_CFG_POST 0x0
+
+/* for dac test*/
+#define S25G_TX_FFE_CFG_DAC_MAIN 0x30303030
+#define S25G_TX_FFE_CFG_DAC_PRE1 0x8
+#define S25G_TX_FFE_CFG_DAC_PRE2 0x0
+#define S25G_TX_FFE_CFG_DAC_POST 0x7
+
+#define BYPASS_CTLE_TAG 0x0
 
 #define S10G_PHY_RX_CTLE_TAPWT_WEIGHT1 0x1
 #define S10G_PHY_RX_CTLE_TAPWT_WEIGHT2 0x0

@@ -1030,6 +1030,7 @@ struct txgbe_adapter {
 	u8  ffe_set;
 	u8  backplane_mode;
 	u8  backplane_auto;
+	struct phytxeq aml_txeq;
 
 	bool cloud_mode;
 

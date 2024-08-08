@@ -641,6 +641,17 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 				else
 					hw->phy.sfp_type =
 						     txgbe_sfp_type_da_cu_core1;
+
+				if (comp_codes_25g == TXGBE_SFF_25GBASECR_91FEC ||
+					comp_codes_25g == TXGBE_SFF_25GBASECR_74FEC ||
+					comp_codes_25g == TXGBE_SFF_25GBASECR_NOFEC) {
+					if (hw->bus.lan_id == 0)
+						hw->phy.sfp_type =
+							     txgbe_sfp_type_25g_da_cu_core0;
+					else
+						hw->phy.sfp_type =
+							     txgbe_sfp_type_25g_da_cu_core1;
+				}
 			} else if (cable_tech & TXGBE_SFF_DA_ACTIVE_CABLE) {
 				TCALL(hw, phy.ops.read_i2c_eeprom,
 						TXGBE_SFF_CABLE_SPEC_COMP,
@@ -657,7 +668,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type =
 							txgbe_sfp_type_unknown;
 				}
-			} else if (hw->mac.type == txgbe_mac_aml && comp_codes_25g & TXGBE_SFF_25GBASESR_CAPABLE) {
+			} else if (hw->mac.type == txgbe_mac_aml && (comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE)) {
 				if (hw->bus.lan_id == 0)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
 				else

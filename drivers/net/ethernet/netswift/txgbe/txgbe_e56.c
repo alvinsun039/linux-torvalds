@@ -64,33 +64,42 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 
 u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 addr;
 
 	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
-		addr = 0x141c;
-		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_MAIN);
-
-		addr = 0x1420;
-		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_PRE1);
-
-		addr = 0x1424;
-		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_PRE2);
-
-		addr = 0x1428;
-		txgbe_wr32_ephy(hw, addr, S10G_TX_FFE_CFG_POST);
+		adapter->aml_txeq.main = S10G_TX_FFE_CFG_MAIN;
+		adapter->aml_txeq.pre1 = S10G_TX_FFE_CFG_PRE1;
+		adapter->aml_txeq.pre2 = S10G_TX_FFE_CFG_PRE2;
+		adapter->aml_txeq.post = S10G_TX_FFE_CFG_POST;
 	} else if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
-		addr = 0x141c;
-		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_MAIN);
+		adapter->aml_txeq.main = S25G_TX_FFE_CFG_MAIN;
+		adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_PRE1;
+		adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_PRE2;
+		adapter->aml_txeq.post = S25G_TX_FFE_CFG_POST;
 
-		addr = 0x1420;
-		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_PRE1);
-
-		addr = 0x1424;
-		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_PRE2);
-
-		addr = 0x1428;
-		txgbe_wr32_ephy(hw, addr, S25G_TX_FFE_CFG_POST);
+		if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+			adapter->aml_txeq.main = S25G_TX_FFE_CFG_DAC_MAIN;
+			adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_DAC_PRE1;
+			adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
+			adapter->aml_txeq.post = S25G_TX_FFE_CFG_DAC_POST;
+		}
+	} else {
+		return 0;
 	}
+
+	addr = 0x141c;
+	txgbe_wr32_ephy(hw, addr, adapter->aml_txeq.main);
+
+	addr = 0x1420;
+	txgbe_wr32_ephy(hw, addr, adapter->aml_txeq.pre1);
+
+	addr = 0x1424;
+	txgbe_wr32_ephy(hw, addr, adapter->aml_txeq.pre2);
+
+	addr = 0x1428;
+	txgbe_wr32_ephy(hw, addr, adapter->aml_txeq.post);
 
 	return 0;
 }
@@ -1622,7 +1631,14 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	struct txgbe_adapter *adapter = hw->back;
 	u32 addr, timer;
 	u32 rdata = 0x0;
-	u32 bypassCtle = 1;
+	u32 bypassCtle = true;
+
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		bypassCtle = false;
+	} else {
+		bypassCtle = true;
+	}
 
 	rdata = rd32(hw, TXGBE_GPIO_EXT);
 	if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {

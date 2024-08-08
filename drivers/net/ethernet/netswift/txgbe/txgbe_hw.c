@@ -4918,6 +4918,10 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		*autoneg = true;
+	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		*speed = TXGBE_LINK_SPEED_25GB_FULL;
+		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_lx_core0 ||

@@ -2959,6 +2959,8 @@ enum txgbe_sfp_type {
 	txgbe_sfp_type_10g_cu_core1 = 16,
 	txgbe_sfp_type_25g_sr_core0 = 17,
 	txgbe_sfp_type_25g_sr_core1 = 18,
+	txgbe_sfp_type_25g_da_cu_core0 = 19,
+	txgbe_sfp_type_25g_da_cu_core1 = 20,
 	txgbe_sfp_type_not_present = 0xFFFE,
 	txgbe_sfp_type_unknown = 0xFFFF
 };
@@ -3360,6 +3362,13 @@ struct txgbe_mbx_operations {
 	s32  (*check_for_msg)(struct txgbe_hw *, u16);
 	s32  (*check_for_ack)(struct txgbe_hw *, u16);
 	s32  (*check_for_rst)(struct txgbe_hw *, u16);
+};
+
+struct phytxeq {
+	u32 main; //TX EQ main (bit[5:0])
+	u32 pre1; //TX EQ pre1 (bit[5:0])
+	u32 pre2; //TX EQ pre2 (bit[5:0])
+	u32 post; //TX EQ post (bit[5:0])
 };
 
 struct txgbe_mbx_stats {
