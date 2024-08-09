@@ -4917,7 +4917,7 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
-		*autoneg = true;
+		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
@@ -4938,7 +4938,10 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	}
 	/* SFP */
 	else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
-		*speed = TXGBE_LINK_SPEED_10GB_FULL;
+		if (hw->mac.type == txgbe_mac_aml)
+			*speed = TXGBE_LINK_SPEED_25GB_FULL;
+		else
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
 		*autoneg = true;
 	}
 	/* XAUI */

@@ -235,7 +235,7 @@ static const struct txgbe_priv_flags txgbe_gstrings_priv_flags[] = {
 #define txgbe_isbackplane(type)  \
 			((type == txgbe_media_type_backplane) ? true : false)
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbe_set_advertising_1g_10gtypes(struct txgbe_hw *hw,
 			struct ethtool_link_ksettings *cmd, u32 advertised_speed)
 {
@@ -538,6 +538,8 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_da_cu:
 		case txgbe_sfp_type_da_cu_core0:
 		case txgbe_sfp_type_da_cu_core1:
+		case txgbe_sfp_type_25g_da_cu_core0:
+		case txgbe_sfp_type_25g_da_cu_core1:
 			ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
 			ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
 			cmd->base.port = PORT_DA;
@@ -550,6 +552,8 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_sx_core1:
 		case txgbe_sfp_type_1g_lx_core0:
 		case txgbe_sfp_type_1g_lx_core1:
+		case txgbe_sfp_type_25g_sr_core0:
+		case txgbe_sfp_type_25g_sr_core1:
 			ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
 			ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
 			cmd->base.port = PORT_FIBRE;
@@ -657,7 +661,6 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		cmd->base.duplex = -1;
 	}
 
-	/*amlite TODO*/
 	if (!(ethtool_link_ksettings_test_link_mode(cmd, advertising,
 					10000baseT_Full) ||
 		ethtool_link_ksettings_test_link_mode(cmd, advertising,
@@ -681,7 +684,7 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 
 	return 0;
 }
-#else /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
+#else /* !ETHTOOL_GLINKSETTINGS */
 static __u32 txgbe_backplane_type(struct txgbe_hw *hw)
 {
 	__u32 mode = 0x00;
@@ -813,6 +816,8 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_da_cu:
 		case txgbe_sfp_type_da_cu_core0:
 		case txgbe_sfp_type_da_cu_core1:
+		case txgbe_sfp_type_25g_da_cu_core0:
+		case txgbe_sfp_type_25g_da_cu_core1:
 			ecmd->supported |= SUPPORTED_FIBRE;
 			ecmd->advertising |= ADVERTISED_FIBRE;
 			ecmd->port = PORT_DA;
@@ -825,6 +830,8 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_sx_core1:
 		case txgbe_sfp_type_1g_lx_core0:
 		case txgbe_sfp_type_1g_lx_core1:
+		case txgbe_sfp_type_25g_sr_core0:
+		case txgbe_sfp_type_25g_sr_core0:
 			ecmd->supported |= SUPPORTED_FIBRE;
 			ecmd->advertising |= ADVERTISED_FIBRE;
 			ecmd->port = PORT_FIBRE;
@@ -906,6 +913,7 @@ int txgbe_get_settings(struct net_device *netdev,
 		switch (link_speed) {
 		case TXGBE_LINK_SPEED_25GB_FULL:
 			ecmd->speed = SPEED_25000;
+			break;
 		case TXGBE_LINK_SPEED_10GB_FULL:
 			ecmd->speed = SPEED_10000;
 			break;
@@ -934,9 +942,9 @@ int txgbe_get_settings(struct net_device *netdev,
 	ecmd->autoneg = adapter->an37?AUTONEG_ENABLE:AUTONEG_DISABLE;
 	return 0;
 }
-#endif /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
+#endif /* !ETHTOOL_GLINKSETTINGS */
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbe_set_link_ksettings(struct net_device *netdev,
 				const struct ethtool_link_ksettings *cmd)
 {
@@ -1165,7 +1173,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 
 	return err;
 }
-#else /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
+#else /* !ETHTOOL_GLINKSETTINGS */
 static int txgbe_set_settings(struct net_device *netdev,
 			      struct ethtool_cmd *ecmd)
 {
@@ -1330,7 +1338,7 @@ static int txgbe_set_settings(struct net_device *netdev,
 
 	return err;
 }
-#endif /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
+#endif /* !ETHTOOL_GLINKSETTINGS */
 
 static void txgbe_get_pauseparam(struct net_device *netdev,
 				 struct ethtool_pauseparam *pause)
@@ -5185,7 +5193,7 @@ static struct ethtool_ops txgbe_ethtool_ops = {
 #elif (defined ETHTOOL_COALESCE_TX_MAX_FRAMES_IRQ)
 	.supported_coalesce_params = ETHTOOL_COALESCE_TX_MAX_FRAMES_IRQ,
 #endif
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 	.get_link_ksettings = txgbe_get_link_ksettings,
 	.set_link_ksettings = txgbe_set_link_ksettings,
 #else
