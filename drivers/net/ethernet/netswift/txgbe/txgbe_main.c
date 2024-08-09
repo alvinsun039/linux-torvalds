@@ -9088,6 +9088,21 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	flow_rx = (rd32(hw, TXGBE_MAC_RX_FLOW_CTRL) & 0x101) == 0x1;
 	flow_tx = !!(TXGBE_RDB_RFCC_RFCE_802_3X &
 		     rd32(hw, TXGBE_RDB_RFCC));
+
+	switch (adapter->link_speed) {
+	case TXGBE_LINK_SPEED_25GB_FULL:
+		adapter->speed = SPEED_25000;
+		break;
+	case TXGBE_LINK_SPEED_10GB_FULL:
+		adapter->speed = SPEED_10000;
+		break;
+	case TXGBE_LINK_SPEED_1GB_FULL:
+	default:
+		adapter->speed = SPEED_1000;
+		break;
+	}
+
+
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s\n",
 	       (link_speed == TXGBE_LINK_SPEED_25GB_FULL ?
 	       "25 Gbps" :
@@ -9125,7 +9140,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	txgbe_update_default_up(adapter);
 
 	/* ping all the active vfs to let them know link has changed */
-	txgbe_ping_all_vfs(adapter);
+	//txgbe_ping_all_vfs(adapter);
+	txgbe_ping_all_vfs_with_link_status(adapter, true);
 }
 
 /**
@@ -9160,7 +9176,8 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	netif_tx_stop_all_queues(netdev);
 
 	/* ping all the active vfs to let them know link has changed */
-	txgbe_ping_all_vfs(adapter);
+	//txgbe_ping_all_vfs(adapter);
+	txgbe_ping_all_vfs_with_link_status(adapter, false);
 }
 
 static bool txgbe_ring_tx_pending(struct txgbe_adapter *adapter)

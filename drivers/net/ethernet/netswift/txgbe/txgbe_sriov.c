@@ -1295,6 +1295,27 @@ void txgbe_ping_all_vfs(struct txgbe_adapter *adapter)
 	}
 }
 
+void txgbe_ping_all_vfs_with_link_status(struct txgbe_adapter *adapter, bool link_up)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 msgbuf[2] = {0, 0};
+	u16 i;
+
+	if (!adapter->num_vfs)
+		return;
+
+	msgbuf[0] = TXGBE_PF_NOFITY_VF_LINK_STATUS | TXGBE_PF_CONTROL_MSG;
+	if (link_up)
+		msgbuf[1] = (adapter->speed << 1) | link_up;
+	//if (adapter->notify_down)
+	//	msgbuf[1] |= TXGBE_PF_NOFITY_VF_NET_NOT_RUNNING;
+	for (i = 0 ; i < adapter->num_vfs; i++) {
+		if (adapter->vfinfo[i].clear_to_send)
+			msgbuf[0] |= TXGBE_VT_MSGTYPE_CTS;
+		txgbe_write_mbx(hw, msgbuf, 2, i);
+	}
+}
+
 /**
  * txgbe_set_all_vfs - update vfs queues
  * @adapter: Pointer to adapter struct

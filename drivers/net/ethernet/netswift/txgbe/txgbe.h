@@ -1125,6 +1125,7 @@ struct txgbe_adapter {
 	unsigned int rx_ring_count;
 
 	u32 link_speed;
+	u32 speed;
 	bool link_up;
 	unsigned long sfp_poll_time;
 	unsigned long link_check_timeout;

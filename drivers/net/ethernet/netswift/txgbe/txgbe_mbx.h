@@ -142,6 +142,9 @@ enum txgbevf_xcast_modes {
 #define TXGBE_VF_MC_TYPE_WORD           3
 
 #define TXGBE_PF_CONTROL_MSG            0x0100 /* PF control message */
+#define TXGBE_PF_NOFITY_VF_LINK_STATUS     0x1
+#define TXGBE_PF_NOFITY_VF_NET_NOT_RUNNING BIT(31)
+
 
 /* mailbox API, version 2.0 VF requests */
 #define TXGBE_VF_API_NEGOTIATE          0x08 /* negotiate API version */
