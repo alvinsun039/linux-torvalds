@@ -3412,7 +3412,7 @@ static int txgbe_fmgr_cmd_op(struct txgbe_hw *hw, u32 cmd, u32 cmd_addr)
 			return -ETIMEDOUT;
 
 		time_out = time_out + 1;
-		udelay(5);
+		udelay(50);
 	}
 
 	return 0;
