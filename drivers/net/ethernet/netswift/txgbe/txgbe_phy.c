@@ -668,7 +668,9 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type =
 							txgbe_sfp_type_unknown;
 				}
-			} else if (hw->mac.type == txgbe_mac_aml && (comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE)) {
+			} else if (comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE ||
+					comp_codes_25g == TXGBE_SFF_25GBASELR_CAPABLE ||
+					comp_codes_25g == TXGBE_SFF_25GBASEER_CAPABLE) {
 				if (hw->bus.lan_id == 0)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
 				else
