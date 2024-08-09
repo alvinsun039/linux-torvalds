@@ -615,6 +615,112 @@ s32 txgbe_setup_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed speed,
 	return 0;
 }
 
+#define   TXGBE_PFLINK_SPEED(g)        (GENMASK(19, 0) & ((g) >> 1))
+
+static int txgbe_notify_vf_link_status(struct txgbe_hw *hw, u32 *msgbuf)
+{
+	u32 links_reg = msgbuf[1];
+	u32 lan_speed = 0;
+	struct txgbe_adapter *adapter = hw->back;
+	struct txgbe_mac_info *mac = &hw->mac;
+
+	adapter->link_status_flag = true;
+	adapter->pf_link_up = links_reg & TXGBE_VXSTATUS_UP;
+
+	if (msgbuf[1] & BIT(31)) {
+		printk("%s , %d --not running .\n", __func__, __LINE__);
+		adapter->pf_speed = 0;
+		adapter->pf_link_up = false;
+		hw->pf_is_down = true;
+		adapter->flagsd &= ~TXGBE_F_REQ_RESET;
+	} else {
+		printk("%s , %d -- running .\n", __func__, __LINE__);
+		hw->pf_is_down = false;
+	}
+
+	if (!adapter->pf_link_up) {
+		adapter->pf_speed = 0;
+		return 0;
+	}
+
+	if (TXGBE_PFLINK_SPEED(links_reg) == 0) {
+		adapter->pf_link_up = false;
+		return 0;
+	}
+
+	adapter->pf_speed = TXGBE_PFLINK_SPEED(links_reg);
+	/* if pf notify vf link up, no need to rcv mailbox msg until a new interrupt*/
+	printk("%s , %d speed : %d \n", __func__, __LINE__, adapter->pf_speed);
+	switch (adapter->pf_speed) {
+	case SPEED_40000:
+		lan_speed = TXGBE_LINK_SPEED_40GB_FULL;
+		break;
+	case SPEED_25000:
+		lan_speed = TXGBE_LINK_SPEED_25GB_FULL;
+		break;
+	case SPEED_10000:
+		lan_speed = TXGBE_LINK_SPEED_10GB_FULL;
+		break;
+	case SPEED_1000:
+		lan_speed = TXGBE_LINK_SPEED_1GB_FULL;
+		break;
+	default:
+		lan_speed = 0;
+		break;
+	}
+	adapter->pf_speed = lan_speed;
+	/* if pf notify vf link up, no need to rcv mailbox msg until a new interrupt*/
+	mac->get_link_status = false;
+	return 0;
+}
+
+static int txgbe_pf_ping_vf(struct txgbe_hw *hw, u32 *msgbuf)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	s32 err = 0;
+	u32 in_msg = msgbuf[0];
+
+	if (!(in_msg & TXGBE_VT_MSGTYPE_CTS)) {
+		/* msg is not CTS, we need to do reset */
+		if (adapter->pf_running)
+			err = -1;
+	}
+
+	return err;
+}
+
+static int txgbe_rcv_msg_from_pf(struct txgbe_hw *hw)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	u16 mbx_size = TXGBE_VXMAILBOX_SIZE;
+	u32 msgbuf[TXGBE_VXMAILBOX_SIZE];
+	int retval;
+
+	retval = txgbe_read_mbx(hw, msgbuf, mbx_size, 0);
+
+	if (retval) {
+		/* if the read failed it could just be a mailbox collision, best wait
+		 * until we are called again and don't report an error
+		 */
+		return 0;
+	}
+
+	switch ((msgbuf[0] & 0xFF)) {
+	case TXGBE_NOFITY_VF_LINK_STATUS:
+		if (msgbuf[0] & TXGBE_VT_MSGTYPE_NRN)
+			adapter->pf_running = false;
+		else
+			adapter->pf_running = true;
+		retval = txgbe_notify_vf_link_status(hw, msgbuf);
+		break;
+	default:
+		retval = txgbe_pf_ping_vf(hw, msgbuf);
+		break;
+	}
+
+	return retval;
+}
+
 /**
  *  txgbe_check_mac_link_vf - Get link/speed status
  *  @hw: pointer to hardware structure
@@ -627,6 +733,7 @@ s32 txgbe_setup_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed speed,
 s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 			    bool *link_up, bool autoneg_wait_to_complete)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	struct txgbe_mac_info *mac = &hw->mac;
 	s32 err = 0;
@@ -643,6 +750,22 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 
 	if (!mac->get_link_status)
 		goto out;
+
+	/* test for link */
+	if (!txgbe_check_for_msg(hw, 0))
+		if (txgbe_rcv_msg_from_pf(hw)) {
+			err = -1;
+			goto out;
+		}
+
+	if (adapter->link_status_flag) {
+		*link_up = adapter->pf_link_up;
+		*speed = adapter->pf_speed;
+		return 0;
+	}
+
+	if (hw->pf_is_down)
+		return 0;
 
 	/* if link status is down no point in checking to see if pf is up */
 	links_reg = rd32(hw, TXGBE_VXSTATUS);

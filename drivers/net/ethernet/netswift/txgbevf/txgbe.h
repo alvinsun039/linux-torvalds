@@ -594,6 +594,11 @@ struct txgbe_adapter {
 	struct dentry *txgbe_dbg_adapter;
 #endif
 
+	bool link_status_flag;
+	bool pf_link_up;
+	bool pf_running;
+	u32 pf_speed;
+
 	//u32 rss_key[TXGBE_VFRSSRK_REGS];
 	u32* rss_key;
 	u8 rss_indir_tbl[TXGBE_VFRETA_SIZE];

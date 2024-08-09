@@ -143,6 +143,8 @@ struct txgbe_hw {
 	u16 subsystem_device_id;
 	u16 vendor_id;
 
+	bool pf_is_down;
+
 	u8  revision_id;
 	bool adapter_stopped;
 

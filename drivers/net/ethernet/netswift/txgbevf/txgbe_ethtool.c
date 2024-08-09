@@ -411,13 +411,13 @@ static void txgbe_get_drvinfo(struct net_device *netdev,
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 
-	strlcpy(drvinfo->driver, txgbe_driver_name,
+	strscpy(drvinfo->driver, txgbe_driver_name,
 		sizeof(drvinfo->driver));
-	strlcpy(drvinfo->version, txgbe_driver_version,
+	strscpy(drvinfo->version, txgbe_driver_version,
 		sizeof(drvinfo->version));
-	strlcpy(drvinfo->fw_version, txgbe_firmware_version,
+	strscpy(drvinfo->fw_version, txgbe_firmware_version,
 		sizeof(drvinfo->fw_version));
-	strlcpy(drvinfo->bus_info, pci_name(adapter->pdev),
+	strscpy(drvinfo->bus_info, pci_name(adapter->pdev),
 		sizeof(drvinfo->bus_info));
 }
 
