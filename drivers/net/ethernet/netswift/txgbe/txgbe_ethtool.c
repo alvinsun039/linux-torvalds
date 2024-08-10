@@ -383,12 +383,6 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 					 25000baseSR_Full);
-		if (hw->phy.multispeed_fiber && hw->mac.type == txgbe_mac_aml) {
-			ethtool_link_ksettings_add_link_mode(cmd, supported,
-							 10000baseSR_Full);
-			ethtool_link_ksettings_add_link_mode(cmd, supported,
-							 10000baseLR_Full);
-		}
 
 		if ((supported_link & TXGBE_LINK_SPEED_10GB_FULL) ||
 			(supported_link & TXGBE_LINK_SPEED_1GB_FULL))
@@ -970,6 +964,12 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		/* To be compatible with test cases */
 		if (hw->phy.media_type == txgbe_media_type_fiber) {
 			if (ethtool_link_ksettings_test_link_mode(cmd, advertising,
+								  25000baseSR_Full)) {
+				ethtool_link_ksettings_add_link_mode(&temp_ks, supported,
+								     25000baseSR_Full);
+			}
+
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising,
 								  10000baseT_Full)) {
 				ethtool_link_ksettings_add_link_mode(&temp_ks, supported,
 								     10000baseT_Full);
@@ -1000,7 +1000,17 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
 								   10000baseSR_Full) &&
 			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   1000baseX_Full)) |
+								   25000baseSR_Full)) ||
+			    (ethtool_link_ksettings_test_link_mode(cmd, advertising,
+								   10000baseLR_Full) &&
+			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+								   25000baseSR_Full)))
+				return -EINVAL;
+
+			if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
+								   10000baseSR_Full) &&
+			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+								   1000baseX_Full)) ||
 			    (ethtool_link_ksettings_test_link_mode(cmd, advertising,
 								   10000baseLR_Full) &&
 			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
@@ -1031,12 +1041,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		if ((advertised & TXGBE_LINK_SPEED_1GB_FULL) && hw->phy.multispeed_fiber)
 			adapter->an37 = cmd->base.autoneg ? 1 : 0;
 
-		if (hw->mac.type == txgbe_mac_aml) {
-			curr_autoneg = txgbe_rd32_epcs(hw, SR_AN_CTRL);
-			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
-			if (old == advertised && (curr_autoneg == adapter->an37))
-				return -EINVAL;
-		} else if (advertised == TXGBE_LINK_SPEED_1GB_FULL &&
+		if (advertised == TXGBE_LINK_SPEED_1GB_FULL &&
 		    hw->phy.media_type != txgbe_media_type_copper) {
 			curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
 			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
