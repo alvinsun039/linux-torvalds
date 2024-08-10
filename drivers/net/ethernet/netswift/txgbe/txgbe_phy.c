@@ -566,8 +566,8 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
 		if (value & TXGBE_SFP1_MOD_ABS_LS) {
-			status = TXGBE_ERR_SFP_NOT_PRESENT;
-			goto out;
+			hw->phy.sfp_type = txgbe_sfp_type_not_present;
+			return TXGBE_ERR_SFP_NOT_PRESENT;
 		}
 	}
 
