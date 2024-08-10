@@ -310,33 +310,33 @@ static int txgbe_set_supported_1g_10gtypes(struct txgbe_hw *hw,
 	case txgbe_sfp_type_da_cu_core1:
 	case txgbe_sfp_type_srlr_core0:
 	case txgbe_sfp_type_srlr_core1:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseSR_Full);
 		ethtool_link_ksettings_add_link_mode(cmd, supported,
 						     10000baseLR_Full);
 		break;
 	case txgbe_sfp_type_sr:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseSR_Full);
 		break;
 	case txgbe_sfp_type_lr:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseLR_Full);
 		break;
 	case txgbe_sfp_type_1g_cu_core0:
 	case txgbe_sfp_type_1g_cu_core1:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 1000baseT_Full);
 		break;
 	case txgbe_sfp_type_1g_sx_core0:
 	case txgbe_sfp_type_1g_sx_core1:
 	case txgbe_sfp_type_1g_lx_core0:
 	case txgbe_sfp_type_1g_lx_core1:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 1000baseX_Full);
 		break;
 	default:
-		ethtool_link_ksettings_add_link_mode(cmd, supported, 
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseT_Full);
 		break;
 	}
@@ -383,6 +383,13 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 					 25000baseSR_Full);
+		if (hw->phy.multispeed_fiber && hw->mac.type == txgbe_mac_aml) {
+			ethtool_link_ksettings_add_link_mode(cmd, supported,
+							 10000baseSR_Full);
+			ethtool_link_ksettings_add_link_mode(cmd, supported,
+							 10000baseLR_Full);
+		}
+
 		if ((supported_link & TXGBE_LINK_SPEED_10GB_FULL) ||
 			(supported_link & TXGBE_LINK_SPEED_1GB_FULL))
 			txgbe_set_supported_1g_10gtypes(hw, cmd);

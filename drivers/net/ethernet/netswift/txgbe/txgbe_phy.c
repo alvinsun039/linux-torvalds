@@ -715,13 +715,20 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 
 		/* Determine if the SFP+ PHY is dual speed or not. */
 		hw->phy.multispeed_fiber = false;
-		if (hw->mac.type == txgbe_mac_sp)
+		if (hw->mac.type == txgbe_mac_aml) {
+			if ((comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE ||
+				comp_codes_25g == TXGBE_SFF_25GBASELR_CAPABLE ||
+				comp_codes_25g == TXGBE_SFF_25GBASEER_CAPABLE) &&
+			   ((comp_codes_10g & TXGBE_SFF_10GBASESR_CAPABLE) ||
+			   (comp_codes_10g & TXGBE_SFF_10GBASELR_CAPABLE)))
+				hw->phy.multispeed_fiber = true;
+		} else {
 			if (((comp_codes_1g & TXGBE_SFF_1GBASESX_CAPABLE) &&
 			   (comp_codes_10g & TXGBE_SFF_10GBASESR_CAPABLE)) ||
 			   ((comp_codes_1g & TXGBE_SFF_1GBASELX_CAPABLE) &&
 			   (comp_codes_10g & TXGBE_SFF_10GBASELR_CAPABLE)))
 				hw->phy.multispeed_fiber = true;
-
+		}
 		/* Determine PHY vendor */
 		if (hw->phy.type != txgbe_phy_nl) {
 			hw->phy.id = identifier;

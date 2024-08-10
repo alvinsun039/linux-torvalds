@@ -4914,7 +4914,15 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	u32 sr_pcs_ctl, sr_pma_mmd_ctl1, sr_an_mmd_ctl;
 	u32 sr_an_mmd_adv_reg2;
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core0 ||
+	if (hw->phy.multispeed_fiber) {
+		if (hw->mac.type == txgbe_mac_aml)
+			*speed = TXGBE_LINK_SPEED_10GB_FULL |
+				  TXGBE_LINK_SPEED_25GB_FULL;
+		else
+			*speed = TXGBE_LINK_SPEED_10GB_FULL |
+				  TXGBE_LINK_SPEED_1GB_FULL;
+		*autoneg = true;
+	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		*autoneg = false;
@@ -4931,14 +4939,10 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	    /* Check if 1G SFP module. */
 		*speed = TXGBE_LINK_SPEED_1GB_FULL;
 		*autoneg = true;
-	} else if (hw->phy.multispeed_fiber) {
-		*speed = TXGBE_LINK_SPEED_10GB_FULL |
-			  TXGBE_LINK_SPEED_1GB_FULL;
-		*autoneg = true;
 	}
 	/* SFP */
 	else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
-		if (hw->mac.type == txgbe_mac_aml)
+		if (hw->mac.type == txgbe_mac_aml && hw->phy.sfp_type == txgbe_sfp_type_not_present)
 			*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		else
 			*speed = TXGBE_LINK_SPEED_10GB_FULL;
