@@ -1733,7 +1733,12 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st[5:0] = RX_RDY_ST Timeout!!!\n");
-			break;
+			adapter->phy_retry--;
+			if (adapter->phy_retry) {
+				printk("retry time: %d\n", (3 - adapter->phy_retry));
+				txgbe_set_link_to_amlite(hw, speed);
+			}
+			return 1;
 		}
 	}
 
@@ -1747,8 +1752,14 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(500);
 
 		if (timer++ > PHYINIT_TIMEOUT) {
+			txgbe_set_link_to_amlite(hw, speed);
 			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_cdr_rdy_o =1 Timeout!!!\n");
-			break;
+			adapter->phy_retry--;
+			if (adapter->phy_retry) {
+				printk("retry time: %d\n", (3 - adapter->phy_retry));
+				txgbe_set_link_to_amlite(hw, speed);
+			}
+			return 1;
 		}
 	}
 

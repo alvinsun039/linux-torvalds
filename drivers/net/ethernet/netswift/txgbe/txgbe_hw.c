@@ -6157,6 +6157,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
+		adapter->phy_retry = 3;
 		txgbe_set_link_to_amlite(hw, speed);
 		goto out;
 	}

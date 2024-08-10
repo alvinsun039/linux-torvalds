@@ -1158,6 +1158,7 @@ struct txgbe_adapter {
 	u16 bridge_mode;
 #endif
 
+	u32 phy_retry;
 	char eeprom_id[16];
 	char fl_version[16];
 	char fw_version[32];
