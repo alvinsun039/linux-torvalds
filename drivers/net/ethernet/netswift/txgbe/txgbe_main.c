@@ -770,11 +770,11 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 				break;
 			}
 		} else
-#else
+#endif
 			/* if DD is not set pending work has not been completed */
 			if (!(eop_desc->wb.status & cpu_to_le32(TXGBE_TXD_STAT_DD)))
 				break;
-#endif
+
 		/* clear next_to_watch to prevent false hangs */
 		tx_buffer->next_to_watch = NULL;
 

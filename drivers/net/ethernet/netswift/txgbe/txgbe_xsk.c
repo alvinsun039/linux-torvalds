@@ -949,7 +949,6 @@ void txgbe_xsk_clean_rx_ring(struct txgbe_ring *rx_ring)
 
 static bool txgbe_xmit_zc(struct txgbe_ring *xdp_ring, unsigned int budget)
 {
-	unsigned int sent_frames = 0, total_bytes = 0;
 	union txgbe_tx_desc *tx_desc = NULL;
 	u16 ntu = xdp_ring->next_to_use;
 	struct txgbe_tx_buffer *tx_bi;
@@ -1020,31 +1019,23 @@ static bool txgbe_xmit_zc(struct txgbe_ring *xdp_ring, unsigned int budget)
 #endif
 		smp_wmb();
 		tx_bi->next_to_watch = tx_desc;
-		xdp_ring->next_rs_idx = ntu;
+#ifdef TXGBE_TXHEAD_WB
+		tx_bi->next_eop = ntu;
+#endif
 		ntu++;
 		if (ntu == xdp_ring->count)
 			ntu = 0;
 		xdp_ring->next_to_use = ntu;
 
-		sent_frames++;
-		total_bytes += tx_bi->bytecount;
 	}
 	if (tx_desc) {
-		cmd_type |= TXGBE_TXD_RS;
-		tx_desc->read.cmd_type_len = cpu_to_le32(cmd_type);
 		wmb();
 		writel(xdp_ring->next_to_use, xdp_ring->tail);
 		xsk_tx_release(xdp_ring->xsk_pool);
-
-		u64_stats_update_begin(&xdp_ring->syncp);
-		xdp_ring->stats.bytes += total_bytes;
-		xdp_ring->stats.packets += sent_frames;
-		u64_stats_update_end(&xdp_ring->syncp);
-		xdp_ring->q_vector->tx.total_bytes += total_bytes;
-		xdp_ring->q_vector->tx.total_packets += sent_frames;
 	}
 
 	return (budget > 0) && work_done;
+
 }
 
 static void txgbe_clean_xdp_tx_buffer(struct txgbe_ring *tx_ring,
@@ -1062,53 +1053,75 @@ static void txgbe_clean_xdp_tx_buffer(struct txgbe_ring *tx_ring,
 bool txgbe_clean_xdp_tx_irq(struct txgbe_q_vector *q_vector,
 			    struct txgbe_ring *tx_ring)
 {
-	u32 next_rs_idx = tx_ring->next_rs_idx;
-	union txgbe_tx_desc *next_rs_desc;
-	u32 ntc = tx_ring->next_to_clean;
+	u32 ntu = tx_ring->next_to_use, ntc = tx_ring->next_to_clean;
+	union txgbe_tx_desc *tx_desc;
 	struct txgbe_tx_buffer *tx_bi;
-	u16 frames_ready = 0;
+	unsigned int total_packets = 0, total_bytes = 0;
 	u32 xsk_frames = 0;
-	u16 i;
+	struct txgbe_adapter *adapter = q_vector->adapter;
+	struct txgbe_hw *hw = &adapter->hw;
+#ifdef TXGBE_TXHEAD_WB
+	u32 head = *(tx_ring->headwb_mem);
+	u32 temp = tx_ring->next_to_clean;
+#endif
 
-	next_rs_desc = TXGBE_TX_DESC(tx_ring, next_rs_idx);
-	if (next_rs_desc->wb.status &
-	    cpu_to_le32(TXGBE_TXD_STAT_DD)) {
-		if (next_rs_idx >= ntc)
-			frames_ready = next_rs_idx - ntc;
+	tx_bi = &tx_ring->tx_buffer_info[ntc];
+	tx_desc = TXGBE_TX_DESC(tx_ring, ntc);
+	while (ntc != ntu) {
+#ifdef TXGBE_TXHEAD_WB
+		if (hw->mac.type == txgbe_mac_aml) {
+			/* we have caught up to head, no work left to do */
+			if (temp == head) {
+				break;
+			} else if (head > temp && !(tx_bi->next_eop >= temp && (tx_bi->next_eop < head))) {
+				break;
+			} else if (!(tx_bi->next_eop >= temp || (tx_bi->next_eop < head))) {
+				break;
+			}
+		} else
+#endif
+			/* if DD is not set pending work has not been completed */
+			if (!(tx_desc->wb.status & cpu_to_le32(TXGBE_TXD_STAT_DD)))
+				break;
+		total_bytes += tx_bi->bytecount;
+		total_packets += tx_bi->gso_segs;
+
+		if (tx_bi->xdpf)
+			txgbe_clean_xdp_tx_buffer(tx_ring, tx_bi);
 		else
-			frames_ready = next_rs_idx + tx_ring->count - ntc;
-	}
-	if (!frames_ready)
-		goto out_xmit;
+			xsk_frames++;
 
-	if (likely(!tx_ring->xdp_tx_active)) {
-		xsk_frames = frames_ready;
-	} else {
-		for (i = 0; i < frames_ready; i++) {
-			tx_bi = &tx_ring->tx_buffer_info[ntc];
+		tx_bi->xdpf = NULL;
 
-			if (tx_bi->xdpf)
-				txgbe_clean_xdp_tx_buffer(tx_ring, tx_bi);
-			else
-				xsk_frames++;
-
-			tx_bi->xdpf = NULL;
-
-			++ntc;
-			if (ntc >= tx_ring->count)
-				ntc = 0;
+		tx_bi++;
+		tx_desc++;
+		ntc++;
+		if (unlikely(ntc == tx_ring->count)) {
+			ntc = 0;
+			tx_bi = tx_ring->tx_buffer_info;
+			tx_desc = TXGBE_TX_DESC(tx_ring, 0);
 		}
+
+		/* issue prefetch for next Tx descriptor */
+		prefetch(tx_desc);
 	}
-	tx_ring->next_to_clean += frames_ready;
+	tx_ring->next_to_clean = ntc;
 
 	if (unlikely(tx_ring->next_to_clean >= tx_ring->count))
 		tx_ring->next_to_clean -= tx_ring->count;
 
+	u64_stats_update_begin(&tx_ring->syncp);
+	tx_ring->stats.bytes += total_bytes;
+	tx_ring->stats.packets += total_packets;
+	u64_stats_update_end(&tx_ring->syncp);
+	tx_ring->q_vector->tx.total_bytes += total_bytes;
+	tx_ring->q_vector->tx.total_packets += total_packets;
+
 	if (xsk_frames) {
 		xsk_tx_completed(tx_ring->xsk_pool, xsk_frames);
 	}
-out_xmit:
 	return txgbe_xmit_zc(tx_ring, q_vector->tx.work_limit);
+
 }
 
 #ifdef HAVE_NDO_XSK_WAKEUP
