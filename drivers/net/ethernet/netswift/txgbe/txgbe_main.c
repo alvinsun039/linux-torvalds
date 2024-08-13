@@ -3546,6 +3546,15 @@ static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 	}
 }
 
+static void txgbe_check_phy_event(struct txgbe_adapter *adapter)
+{
+	adapter->reconfig_rx = true;
+	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
+		txgbe_service_event_schedule(adapter);
+	}
+}
+
 /**
  * txgbe_irq_enable - Enable default interrupt generation settings
  * @adapter: board private structure
@@ -3705,8 +3714,15 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 			}
 		}
 	} else {
-		if (eicr & (TXGBE_PX_MISC_IC_ETH_LK | TXGBE_PX_MISC_IC_ETH_LKDN))
-			txgbe_check_lsc(adapter);
+		if (hw->mac.type == txgbe_mac_aml) {
+			if (eicr & TXGBE_PX_MISC_AML_ETH_LK_CHANGE)
+				txgbe_check_lsc(adapter);
+			if (eicr & TXGBE_PX_MISC_AML_ETH_PHY_EVENT)
+				txgbe_check_phy_event(adapter);
+		} else {
+			if (eicr & (TXGBE_PX_MISC_IC_ETH_LK | TXGBE_PX_MISC_IC_ETH_LKDN))
+				txgbe_check_lsc(adapter);
+		}
 	}
 
 	if (eicr & TXGBE_PX_MISC_IC_VF_MBOX)

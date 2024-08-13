@@ -1732,10 +1732,12 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(500);
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
 		if (timer++ > PHYINIT_TIMEOUT) {
+			adapter->link_valid = false;
 			printk("ERROR: Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st[5:0] = RX_RDY_ST Timeout!!!\n");
 			adapter->phy_retry--;
 			if (adapter->phy_retry) {
-				printk("retry time: %d\n", (3 - adapter->phy_retry));
+				printk("retry time: %d\n",
+				       (3 - adapter->phy_retry));
 				txgbe_set_link_to_amlite(hw, speed);
 			}
 			return 1;
@@ -1756,7 +1758,8 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_cdr_rdy_o =1 Timeout!!!\n");
 			adapter->phy_retry--;
 			if (adapter->phy_retry) {
-				printk("retry time: %d\n", (3 - adapter->phy_retry));
+				printk("retry time: %d\n",
+				       (3 - adapter->phy_retry));
 				txgbe_set_link_to_amlite(hw, speed);
 			}
 			return 1;
@@ -2061,9 +2064,73 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 	return 0;
 }
 
+int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	if (E56phyRxsCalibAdaptSeq(hw, speed))
+		return 1;
+
+	//Step 2 of 2.3.4
+	E56phySetRxsUfineLeMax(hw, speed);
+
+	//2.3.4 RXS post CDR lock temperature tracking sequence
+	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
+
+	adapter->link_valid = true;
+
+	return 0;
+}
+
+int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
+{
+	u32 addr;
+	u32 rdata;
+	u32 timer;
+
+	addr = E56PHY_INTR_0_ADDR;
+	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
+	printk("E56PHY_INTR_0_ADDR :%x\n", rdata);
+
+	if (!(rdata & E56PHY_INTR_0_IDLE_ENTRY1))
+		return 0;
+
+	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
+	//and confirm its value is POWERDN_ST
+	rdata = 0;
+	addr = E56PHY_PMD_CFG_0_ADDR;
+	rdata = rd32_ephy(hw, addr);
+	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
+	addr = E56PHY_PMD_CFG_0_ADDR;
+	txgbe_wr32_ephy(hw, addr, rdata);
+
+	timer = 0;
+	while (1) {
+		udelay(500);
+		rdata = 0;
+		addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
+		rdata = rd32_ephy(hw, addr);
+		if ((rdata & 0x3f) == 0x21) {
+			break;
+		}
+		if (timer++ > PHYINIT_TIMEOUT) {
+			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
+			break;
+			return -1;
+		}
+	}
+
+	addr = E56PHY_INTR_0_ADDR;
+	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
+
+	txgbe_e56_config_rx(hw, speed);
+
+	return 0;
+}
+
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 
@@ -2076,6 +2143,13 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		      ~TXGBE_MAC_RX_CFG_RE);
 
 		TCALL(hw, mac.ops.disable_sec_tx_path);
+	}
+
+	if (adapter->reconfig_rx) {
+		adapter->reconfig_rx = false;
+		txgbe_e56_reconfig_rx(hw, speed);
+		adapter->link_valid = true;
+		goto out;
 	}
 
 	SetFields(&value, SFP1_TX_FAULT, 1);
@@ -2274,14 +2348,10 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
 	}
 
-	if (E56phyRxsCalibAdaptSeq(hw, speed))
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x10000000);
+
+	if (txgbe_e56_config_rx(hw, speed))
 		goto out;
-
-	//Step 2 of 2.3.4
-	E56phySetRxsUfineLeMax(hw, speed);
-
-	//2.3.4 RXS post CDR lock temperature tracking sequence
-	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
 
 	//wait phy config complete
 	msleep(10);

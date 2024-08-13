@@ -1768,6 +1768,10 @@ enum TXGBE_MSCA_CMD_value {
 //#define TXGBE_PX_MISC_IC_MNG_HOST_MBOX  0x40000000U /* mng mailbox */
 #define TXGBE_PX_MISC_IC_TIMER          0x80000000U /* tcp timer */
 
+#define TXGBE_PX_MISC_AML_ETH_LK_CHANGE 0x00000100U /* link change */
+#define TXGBE_PX_MISC_AML_ETH_PHY_EVENT 0x00040000U /* Eth phy event */
+
+
 /* Extended Interrupt Cause Set */
 #define TXGBE_PX_MISC_ICS_ETH_LKDN      0x00000100U
 #define TXGBE_PX_MISC_ICS_DEV_RST       0x00000400U
