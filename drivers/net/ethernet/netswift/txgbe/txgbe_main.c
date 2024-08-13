@@ -736,8 +736,10 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 	unsigned int i = tx_ring->next_to_clean;
 	u16 vid = 0;
 #ifdef TXGBE_TXHEAD_WB
-	u32 head = *(tx_ring->headwb_mem);
+	u32 head;
 	u32 temp = tx_ring->next_to_clean;
+	if (hw->mac.type == txgbe_mac_aml)
+		head = *(tx_ring->headwb_mem);
 #endif
 	int j = 0;
 	u32 size;
