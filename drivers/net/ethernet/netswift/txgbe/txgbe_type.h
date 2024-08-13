@@ -2001,13 +2001,15 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_TXGBE_PCIE_GENERAL_SIZE   0x24
 #define TXGBE_PCIE_CONFIG_SIZE          0x08
 #define TXGBE_EEPROM_LAST_WORD          0x800
-#define TXGBE_EEPROM_AML_LAST_WORD      0x580
 #define TXGBE_FW_PTR                    0x0F
 #define TXGBE_PBANUM0_PTR               0x05
 #define TXGBE_PBANUM1_PTR               0x06
 #define TXGBE_ALT_MAC_ADDR_PTR          0x37
 #define TXGBE_FREE_SPACE_PTR            0x3E
 #define TXGBE_SW_REGION_PTR             0x1C
+#define TXGBE_SHOWROM_I2C_PTR           0xB00
+#define TXGBE_SHOWROM_I2C_END           0xF00
+
 
 #define TXGBE_SAN_MAC_ADDR_PTR          0x18
 #define TXGBE_DEVICE_CAPS               0x1C
