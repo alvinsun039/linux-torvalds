@@ -13400,6 +13400,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 			 "0x%08x", etrack_id);
 	}
 
+	adapter->etrack_id = etrack_id;
+
 	if (strcmp(adapter->eeprom_id, adapter->fl_version) == 0) {
 		memcpy(adapter->fw_version, adapter->eeprom_id, sizeof(adapter->eeprom_id));
 

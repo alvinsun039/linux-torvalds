@@ -4668,7 +4668,7 @@ s32 txgbe_get_link_capabilities_sp(struct txgbe_hw *hw,
 	/* SFP */
 	else if (TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) {
 		*speed = TXGBE_LINK_SPEED_10GB_FULL;
-		*autoneg = true;
+		*autoneg = false;
 	}
 	/* XAUI */
 	else if ((TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_copper) &&
@@ -8016,21 +8016,27 @@ int txgbe_is_lldp(struct txgbe_hw *hw)
 	return 0;
 }
 
-s32 txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg)
+void txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg)
 {
-	int status;
+	struct txgbe_adapter *adapter = hw->back;
 	struct txgbe_hic_write_autoneg buffer;
+
+	/* only support sp temporarily */
+	if (hw->mac.type != txgbe_mac_sp)
+		return;
+
+	/* only 0x64e20011 and above 0x20011 support */
+	if (adapter->etrack_id != 0x64e20011 &&
+		(adapter->etrack_id & 0xfffff) < 0x20012)
+		return;
 
 	buffer.hdr.cmd = FW_AN_STA_CMD;
 	buffer.hdr.buf_len = FW_AN_STA_LEN;
 	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
-
-	if (hw->mac.type == txgbe_mac_sp)
-		buffer.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
-
 	buffer.lan_id = hw->bus.lan_id;
 	buffer.autoneg = autoneg;
-	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
-					      sizeof(buffer), 5000, false);
-	return status;
+	buffer.hdr.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
+
+	txgbe_host_interface_command(hw, (u32 *)&buffer,
+				      sizeof(buffer), 5000, false);
 }

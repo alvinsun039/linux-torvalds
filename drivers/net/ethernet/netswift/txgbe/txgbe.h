@@ -1157,6 +1157,7 @@ struct txgbe_adapter {
 	u8 cur_fec_link;
 	bool phy_tx_ready;
 	u32 tx_speed;
+	u32 etrack_id;
 	char eeprom_id[32];
 	char fl_version[16];
 	char fw_version[64];
