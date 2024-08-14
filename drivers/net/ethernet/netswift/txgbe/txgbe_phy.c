@@ -1284,6 +1284,10 @@ s32 txgbe_tn_check_overtemp(struct txgbe_hw *hw)
 	u32 ts_state;
 
 	if (hw->mac.type == txgbe_mac_aml) {
+		/* Only support thermal sensors attached to physical port 0 */
+		if (hw->bus.lan_id)
+		return TXGBE_NOT_IMPLEMENTED;
+
 		ts_state = rd32(hw, TXGBE_AML_INTR_HIGH_STS);
 		if (ts_state) {
 			wr32(hw, TXGBE_AML_INTR_RAW_HI, TXGBE_AML_INTR_CL_HI);
