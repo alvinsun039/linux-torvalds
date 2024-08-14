@@ -59,4 +59,20 @@ extern void cma_reserve_pages_on_error(struct cma *cma);
 
 extern int __init cma_alloc_areas(unsigned int max_cma_size);
 extern void cma_enable_concurrency(struct cma *cma);
+
+#ifdef CONFIG_CMA
+struct folio *cma_alloc_folio(struct cma *cma, int order, gfp_t gfp);
+bool cma_free_folio(struct cma *cma, const struct folio *folio);
+#else
+static inline struct folio *cma_alloc_folio(struct cma *cma, int order, gfp_t gfp)
+{
+	return NULL;
+}
+
+static inline bool cma_free_folio(struct cma *cma, const struct folio *folio)
+{
+	return false;
+}
+#endif
+
 #endif
