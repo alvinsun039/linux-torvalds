@@ -13559,13 +13559,14 @@ no_info_string:
 		(adapter->flags2 & TXGBE_FLAG2_EEE_CAPABLE) &&
 		(adapter->flags2 & TXGBE_FLAG2_EEE_ENABLED));
 
-	if (TXGBE_DIS_COMP_TIMEOUT == 1) {
-		pcie_capability_read_word(pdev, PCI_EXP_DEVCTL2, &pvalue);
-		pvalue = pvalue | 0x10;
-		pcie_capability_write_word(pdev, PCI_EXP_DEVCTL2, pvalue);
-		adapter->cmplt_to_dis = true;
-		e_info(probe, "disable completion timeout\n");
-	}
+	if (hw->mac.type == txgbe_mac_sp)
+		if (TXGBE_DIS_COMP_TIMEOUT == 1) {
+			pcie_capability_read_word(pdev, PCI_EXP_DEVCTL2, &pvalue);
+			pvalue = pvalue | 0x10;
+			pcie_capability_write_word(pdev, PCI_EXP_DEVCTL2, pvalue);
+			adapter->cmplt_to_dis = true;
+			e_info(probe, "disable completion timeout\n");
+		}
 
 	return 0;
 
