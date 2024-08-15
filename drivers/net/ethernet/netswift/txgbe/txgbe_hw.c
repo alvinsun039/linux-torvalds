@@ -6268,10 +6268,13 @@ int txgbe_reset_misc(struct txgbe_hw *hw)
 	int i;
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_AMLITE_AUTONEG, false);
-		if (err) {
-			e_dev_info("txgbe_reset_misc setup phy failed\n");
-			return err;
+		if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK)
+								!= TXGBE_EPHY_STAT_PPL_LOCK) {
+			err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_AMLITE_AUTONEG, false);
+			if (err) {
+				e_dev_info("txgbe_reset_misc setup phy failed\n");
+				return err;
+			}
 		}
 	} else {
 		value = txgbe_rd32_epcs(hw, TXGBE_SR_PCS_CTL2);
