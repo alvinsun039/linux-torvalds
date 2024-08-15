@@ -101,6 +101,8 @@ static struct pci_device_id txgbe_pci_tbl[] = {
 //	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_SP1000_VF), board_sp_vf },
 //	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_WX1820_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5024_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5124_VF), board_sp_vf },
 	{ .device = 0 } /* required last entry */
 };
 

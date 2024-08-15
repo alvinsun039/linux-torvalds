@@ -36,6 +36,9 @@
 #define TXGBE_DEV_ID_SP_XAUI                    0x1003
 #define TXGBE_DEV_ID_SP_SGMII                   0x1004
 
-#define TXGBE_DEV_ID_AML_VF                  0x5001
+#define TXGBE_DEV_ID_AML_VF                     0x5001
+#define TXGBE_DEV_ID_AML5024_VF                 0x5024
+#define TXGBE_DEV_ID_AML5124_VF                 0x5124
+
 
 #endif /* _TXGBE_DEVIDS_H_ */
