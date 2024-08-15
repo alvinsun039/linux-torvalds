@@ -2067,6 +2067,9 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
+	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
+	bool link_up = false;
+
 	if (E56phyRxsCalibAdaptSeq(hw, speed))
 		return 1;
 
@@ -2078,6 +2081,17 @@ int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 
 	adapter->link_valid = true;
 
+	/* work around*/
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		TCALL(hw, mac.ops.check_link,
+				&link_speed, &link_up, false);
+		if (!link_up)
+			txgbe_set_link_to_amlite(hw, speed);
+	}
+
 	return 0;
 }
 
@@ -2086,6 +2100,7 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	u32 addr;
 	u32 rdata;
 	u32 timer;
+	u32 status = 0;
 
 	addr = E56PHY_INTR_0_ADDR;
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
@@ -2115,16 +2130,15 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
-			return -1;
 		}
 	}
 
 	addr = E56PHY_INTR_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
 
-	txgbe_e56_config_rx(hw, speed);
+	status = txgbe_e56_config_rx(hw, speed);
 
-	return 0;
+	return status;
 }
 
 //Reference setting code for SFP mode
@@ -2148,7 +2162,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	if (adapter->reconfig_rx) {
 		adapter->reconfig_rx = false;
 		txgbe_e56_reconfig_rx(hw, speed);
-		adapter->link_valid = true;
 		goto out;
 	}
 
