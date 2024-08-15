@@ -2339,11 +2339,7 @@ void mem_cgroup_commit_charge(struct folio *folio, struct mem_cgroup *memcg)
 {
 	css_get(&memcg->css);
 	commit_charge(folio, memcg);
-
-	local_irq_disable();
-	memcg1_charge_statistics(memcg, folio_nr_pages(folio));
-	memcg1_check_events(memcg, folio_nid(folio));
-	local_irq_enable();
+	memcg1_commit_charge(folio, memcg);
 }
 
 #ifdef CONFIG_MEMCG_KMEM
@@ -4591,8 +4587,6 @@ static inline void uncharge_gather_clear(struct uncharge_gather *ug)
 
 static void uncharge_batch(const struct uncharge_gather *ug)
 {
-	unsigned long flags;
-
 	if (ug->nr_memory) {
 		page_counter_uncharge(&ug->memcg->memory, ug->nr_memory);
 		if (do_memsw_account())
@@ -4604,11 +4598,7 @@ static void uncharge_batch(const struct uncharge_gather *ug)
 		memcg1_oom_recover(ug->memcg);
 	}
 
-	local_irq_save(flags);
-	__count_memcg_events(ug->memcg, PGPGOUT, ug->pgpgout);
-	__this_cpu_add(ug->memcg->events_percpu->nr_page_events, ug->nr_memory);
-	memcg1_check_events(ug->memcg, ug->nid);
-	local_irq_restore(flags);
+	memcg1_uncharge_batch(ug->memcg, ug->pgpgout, ug->nr_memory, ug->nid);
 
 	/* drop reference from uncharge_folio */
 	css_put(&ug->memcg->css);
@@ -4713,7 +4703,6 @@ void mem_cgroup_replace_folio(struct folio *old, struct folio *new)
 {
 	struct mem_cgroup *memcg;
 	long nr_pages = folio_nr_pages(new);
-	unsigned long flags;
 
 	VM_BUG_ON_FOLIO(!folio_test_locked(old), old);
 	VM_BUG_ON_FOLIO(!folio_test_locked(new), new);
@@ -4741,11 +4730,7 @@ void mem_cgroup_replace_folio(struct folio *old, struct folio *new)
 
 	css_get(&memcg->css);
 	commit_charge(new, memcg);
-
-	local_irq_save(flags);
-	memcg1_charge_statistics(memcg, nr_pages);
-	memcg1_check_events(memcg, folio_nid(new));
-	local_irq_restore(flags);
+	memcg1_commit_charge(new, memcg);
 }
 
 /**
@@ -4986,17 +4971,7 @@ void mem_cgroup_swapout(struct folio *folio, swp_entry_t entry)
 		page_counter_uncharge(&memcg->memsw, nr_entries);
 	}
 
-	/*
-	 * Interrupts should be disabled here because the caller holds the
-	 * i_pages lock which is taken with interrupts-off. It is
-	 * important here to have the interrupts disabled because it is the
-	 * only synchronisation we have for updating the per-CPU variables.
-	 */
-	memcg_stats_lock();
-	memcg1_charge_statistics(memcg, -nr_entries);
-	memcg_stats_unlock();
-	memcg1_check_events(memcg, folio_nid(folio));
-
+	memcg1_swapout(folio, memcg);
 	css_put(&memcg->css);
 }
 
