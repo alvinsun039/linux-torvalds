@@ -2032,6 +2032,9 @@ static bool dcn20_validate_bandwidth_internal(struct dc *dc, struct dc_state *co
 
 	BW_VAL_TRACE_COUNT();
 
+	if (!pipes)
+		goto validate_fail;
+
 	out = dcn20_fast_validate_bw(dc, context, pipes, &pipe_cnt, pipe_split_from, &vlevel, fast_validate);
 
 	if (pipe_cnt == 0)
@@ -2328,6 +2331,9 @@ bool dcn21_validate_bandwidth_fp(struct dc *dc,
 	BW_VAL_TRACE_COUNT();
 
 	dc_assert_fp_enabled();
+
+	if (!pipes)
+		goto validate_fail;
 
 	/*Unsafe due to current pipe merge and split logic*/
 	ASSERT(context != dc->current_state);
