@@ -6158,11 +6158,33 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		goto out;
 	}
 
+	if (!(((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4) ||
+			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_XAUI) ||
+			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_SGMII))) {
+		status = TCALL(hw, mac.ops.check_link,
+				&link_speed, &link_up, false);
+
+	if (link_speed == TXGBE_LINK_SPEED_1GB_FULL) {
+		curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
+		curr_autoneg = !!(curr_autoneg & (0x1 << 12));
+	}
+
+		if (status != 0)
+			goto out;
+		if ((link_speed == speed) && link_up &&
+			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
+			(adapter->an37 != curr_autoneg))) {
+
+			if (!(hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+				hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+				goto out;
+		}
+	}
+
 	if (hw->mac.type == txgbe_mac_aml) {
-		if (adapter->reconfig_rx)
-			adapter->phy_retry = 3;
-		else
-			adapter->phy_retry = 3;
+		adapter->phy_retry = 3;
 		for (i = 0; i < adapter->phy_retry; i++) {
 			/* this ret_status for workaorund not return to upper*/
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
@@ -6177,8 +6199,10 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 				if (adapter->link_valid) {
 					TCALL(hw, mac.ops.check_link,
 							&link_speed, &link_up, false);
-					if (!link_up)
+					if (!link_up) {
+						msleep(30);
 						continue;
+					}
 				}
 			}
 
@@ -6186,25 +6210,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 				break;
 		}
 		goto out;
-	}
-
-	if ( ! (((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4) ||
-			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_XAUI) ||
-			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_SGMII))){
-		status = TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
-
-	if (link_speed == TXGBE_LINK_SPEED_1GB_FULL) {
-		curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
-		curr_autoneg = !!(curr_autoneg & (0x1 << 12));
-	}
-
-		if (status != 0)
-			goto out;
-		if ((link_speed == speed) && link_up &&
-			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
-			(adapter->an37 != curr_autoneg)))
-			goto out;
 	}
 
 	if ((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4) {
