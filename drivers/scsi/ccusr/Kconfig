@@ -6,7 +6,7 @@ config CCUSR_RAID
 	tristate "CCUSR raid Adapter"
 	depends on PCI && SCSI
 	select BLK_DEV_BSGLIB
-	depends on ARM64 || X86_64
+	depends on ARM64 || X86_64 || LOONGARCH
 	default m
 	help
 	  This driver supports ccuser serial RAID controller, which has
