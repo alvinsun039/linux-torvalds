@@ -6142,6 +6142,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	bool link_up = false;
 	u32 curr_autoneg = 2;
+	s32 ret_status;
+	int i;
 
 	/* Check to see if speed passed in is supported. */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -6157,8 +6159,32 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		adapter->phy_retry = 3;
-		txgbe_set_link_to_amlite(hw, speed);
+		if (adapter->reconfig_rx)
+			adapter->phy_retry = 3;
+		else
+			adapter->phy_retry = 3;
+		for (i = 0; i < adapter->phy_retry; i++) {
+			/* this ret_status for workaorund not return to upper*/
+			ret_status = txgbe_set_link_to_amlite(hw, speed);
+
+			if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
+				break;
+			/* work around for dac*/
+			if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+				hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+				if (adapter->link_valid) {
+					TCALL(hw, mac.ops.check_link,
+							&link_speed, &link_up, false);
+					if (!link_up)
+						continue;
+				}
+			}
+
+			if (adapter->link_valid)
+				break;
+		}
 		goto out;
 	}
 

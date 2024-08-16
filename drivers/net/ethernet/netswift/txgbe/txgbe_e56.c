@@ -1648,7 +1648,7 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		else if (rdata & TXGBE_SFP1_RX_LOS_LS)
 			e_info(probe,
 			       "E56phyRxsCalibAdaptSeq TXGBE_SFP1_RX_LOS_LS\n");
-		return 1;
+		return TXGBE_ERR_PHY_INIT_NOT_DONE;
 	}
 
 	rdata = 0x0000;
@@ -1734,35 +1734,21 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		if (timer++ > PHYINIT_TIMEOUT) {
 			adapter->link_valid = false;
 			printk("ERROR: Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st[5:0] = RX_RDY_ST Timeout!!!\n");
-			adapter->phy_retry--;
-			if (adapter->phy_retry) {
-				printk("retry time: %d\n",
-				       (3 - adapter->phy_retry));
-				txgbe_set_link_to_amlite(hw, speed);
-			}
-			return 1;
+			return TXGBE_ERR_TIMEOUT;
 		}
 	}
 
 	//RXS ADC adaptation sequence
 	//E56phyRxsAdcAdaptSeq
-
 	rdata = 0;
 	timer = 0;
 	while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_cdr_rdy_o) != 1) {
 		EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
 		udelay(500);
-
 		if (timer++ > PHYINIT_TIMEOUT) {
-			txgbe_set_link_to_amlite(hw, speed);
+			adapter->link_valid = false;
 			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_cdr_rdy_o =1 Timeout!!!\n");
-			adapter->phy_retry--;
-			if (adapter->phy_retry) {
-				printk("retry time: %d\n",
-				       (3 - adapter->phy_retry));
-				txgbe_set_link_to_amlite(hw, speed);
-			}
-			return 1;
+			return TXGBE_ERR_TIMEOUT;
 		}
 	}
 
@@ -2067,11 +2053,11 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
-	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
-	bool link_up = false;
+	s32 status;
 
-	if (E56phyRxsCalibAdaptSeq(hw, speed))
-		return 1;
+	status = E56phyRxsCalibAdaptSeq(hw, speed);
+	if (status)
+		return status;
 
 	//Step 2 of 2.3.4
 	E56phySetRxsUfineLeMax(hw, speed);
@@ -2081,17 +2067,6 @@ int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 
 	adapter->link_valid = true;
 
-	/* work around*/
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-		TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
-		if (!link_up)
-			txgbe_set_link_to_amlite(hw, speed);
-	}
-
 	return 0;
 }
 
@@ -2100,14 +2075,19 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	u32 addr;
 	u32 rdata;
 	u32 timer;
-	u32 status = 0;
+	int status = 0;
+	struct txgbe_adapter *adapter = hw->back;
+
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
 
 	addr = E56PHY_INTR_0_ADDR;
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
 	printk("E56PHY_INTR_0_ADDR :%x\n", rdata);
 
-	if (!(rdata & E56PHY_INTR_0_IDLE_ENTRY1))
-		return 0;
+	addr = E56PHY_INTR_1_ADDR;
+	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+	e_info(link, "E56PHY_INTR_1_ADDR :%x\n", rdata);
 
 	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
 	//and confirm its value is POWERDN_ST
@@ -2136,7 +2116,20 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	addr = E56PHY_INTR_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
 
+	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
+	e_info(link, "E56PHY_INTR_0_ADDR :%x\n", rdata);
+
 	status = txgbe_e56_config_rx(hw, speed);
+
+	addr = E56PHY_INTR_1_ADDR;
+	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_1_IDLE_EXIT1);
+	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+	e_info(link, "E56PHY_INTR_1_ADDR :%x\n", rdata);
+
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+			E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+			E56PHY_INTR_1_IDLE_EXIT1);
 
 	return status;
 }
@@ -2147,6 +2140,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
+	int status;
 
 	if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK) ==
 	    TXGBE_EPHY_STAT_PPL_LOCK) {
@@ -2161,7 +2155,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	if (adapter->reconfig_rx) {
 		adapter->reconfig_rx = false;
-		txgbe_e56_reconfig_rx(hw, speed);
+		status = txgbe_e56_reconfig_rx(hw, speed);
 		goto out;
 	}
 
@@ -2361,13 +2355,27 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
 	}
 
-	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x10000000);
+	status = txgbe_e56_config_rx(hw, speed);
 
-	if (txgbe_e56_config_rx(hw, speed))
-		goto out;
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR,
+				E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR,
+				E56PHY_INTR_1_IDLE_EXIT1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+				E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+				E56PHY_INTR_1_IDLE_EXIT1);
+	}
 
 	//wait phy config complete
 	msleep(10);
+
+	if (status)
+		goto out;
 
 out:
 	if (ppl_lock) {
@@ -2375,5 +2383,5 @@ out:
 		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
 		      TXGBE_MAC_RX_CFG_RE);
 	}
-	return 0;
+	return status;
 }
