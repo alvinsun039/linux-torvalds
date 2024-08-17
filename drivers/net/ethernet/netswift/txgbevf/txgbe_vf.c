@@ -173,7 +173,8 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 		txgbe_wr32(hw->b4_addr, i * 4, hw->b4_buf[i]);
 
 	/* amlite: bme */
-	wr32(hw, 0x4B8, 0x1);
+	if (hw->mac.type == txgbe_mac_aml)
+		wr32(hw, 0x4B8, 0x1);
 
 	if (!timeout)
 		return TXGBE_ERR_RESET_FAILED;
@@ -787,19 +788,33 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 	}
 
 /* amlite: speed updates */
-	switch (TXGBE_VXSTATUS_SPEED(links_reg)) {
-	case TXGBE_VXSTATUS_SPEED_AML_10G:
-		*speed = TXGBE_LINK_SPEED_10GB_FULL;
-		break;
-	case TXGBE_VXSTATUS_SPEED_AML_25G:
-		*speed = TXGBE_LINK_SPEED_25GB_FULL;
-		break;
-	case TXGBE_VXSTATUS_SPEED_AML_40G:
-		*speed = TXGBE_LINK_SPEED_40GB_FULL;
-		break;
-	case TXGBE_VXSTATUS_SPEED_AML_50G:
-		*speed = TXGBE_LINK_SPEED_50GB_FULL;
-		break;
+	if (hw->mac.type == txgbe_mac_aml) {
+		switch (TXGBE_VXSTATUS_AML_SPEED(links_reg)) {
+		case TXGBE_VXSTATUS_SPEED_AML_10G:
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_25G:
+			*speed = TXGBE_LINK_SPEED_25GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_40G:
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_50G:
+			*speed = TXGBE_LINK_SPEED_50GB_FULL;
+			break;
+		}
+	} else {
+		switch (TXGBE_VXSTATUS_SPEED(links_reg)) {
+		case TXGBE_VXSTATUS_SPEED_10G:
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_1G:
+			*speed = TXGBE_LINK_SPEED_1GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_100M:
+			*speed = TXGBE_LINK_SPEED_100_FULL;
+			break;
+		}
 	}
 
 	/* if the read failed it could just be a mailbox collision, best wait

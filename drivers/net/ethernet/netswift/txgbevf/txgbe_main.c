@@ -83,23 +83,14 @@ char txgbe_firmware_version[TXGBE_FW_VER_SIZE] = "N/A";
 static char txgbe_copyright[] =
 	"Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.";
 
-static struct txgbe_info txgbe_sp_vf_info = {
-	.mac    = txgbe_mac_sp_vf,
-	.flags  = 0,
-};
-
 enum txgbe_boards {
 	board_sp_vf,
 };
 
-static const struct txgbe_info *txgbe_info_tbl[] = {
-	[board_sp_vf] = &txgbe_sp_vf_info,
-};
-
 /* txgbe_pci_tbl - PCI Device ID Table */
 static struct pci_device_id txgbe_pci_tbl[] = {
-//	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_SP1000_VF), board_sp_vf },
-//	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_WX1820_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_SP1000_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_WX1820_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5024_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5124_VF), board_sp_vf },
@@ -3528,8 +3519,8 @@ int txgbe_alloc_q_vector(struct txgbe_adapter *adapter, int v_idx,
 		/* errata: UDP frames with a 0 checksum
 		 * can be marked as checksum errors.
 		 */
-		if (adapter->hw.mac.type == txgbe_mac_sp_vf)
-			set_bit(__TXGBE_RX_CSUM_UDP_ZERO_ERR, &ring->state);
+
+		set_bit(__TXGBE_RX_CSUM_UDP_ZERO_ERR, &ring->state);
 
 		/* apply Rx specific ring traits */
 		ring->count = adapter->rx_ring_count;
@@ -3751,6 +3742,24 @@ void txgbe_clear_interrupt_scheme(struct txgbe_adapter *adapter)
 	txgbe_reset_interrupt_capability(adapter);
 }
 
+static void txgbe_init_type_code(struct txgbe_hw *hw)
+{
+	switch (hw->device_id) {
+	case TXGBE_DEV_ID_SP1000_VF:
+	case TXGBE_DEV_ID_WX1820_VF:
+		hw->mac.type = txgbe_mac_sp;
+		break;
+	case TXGBE_DEV_ID_AML_VF:
+	case TXGBE_DEV_ID_AML5024_VF:
+	case TXGBE_DEV_ID_AML5124_VF:
+		hw->mac.type = txgbe_mac_aml;
+		break;
+	default:
+		hw->mac.type = txgbe_mac_unknown;
+		break;
+	}
+}
+
 /**
  * txgbe_sw_init - Initialize general software structures
  * (struct txgbe_adapter)
@@ -3780,6 +3789,8 @@ int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 
 	txgbe_init_ops_vf(hw);
 	TCALL(hw, mbx.ops.init_params);
+
+	txgbe_init_type_code(hw);
 
 	err = txgbevf_init_rss_key(adapter);
 	if(err)
@@ -6218,7 +6229,6 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	unsigned int min_mtu, max_mtu;
 #endif
 	struct txgbe_hw *hw = NULL;
-	const struct txgbe_info *ei = txgbe_info_tbl[ent->driver_data];
 	bool disable_dev = false;
 	u8 fea_flags = 0;
 	u8 i = 0;
@@ -6279,8 +6289,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	hw->msg_enable = &adapter->msg_enable;
 	hw->pdev = adapter->pdev;
 
-	hw->mac.type = ei->mac;
-	adapter->flagsd = ei->flags;
+	adapter->flagsd = 0;
 	adapter->msg_enable = DEFAULT_DEBUG_LEVEL;
 
 	adapter->hw.tpid[0] = ETH_P_8021Q;
@@ -6351,11 +6360,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 			  (ETH_HLEN + ETH_FCS_LEN);
 		break;
 	default:
-		if (adapter->hw.mac.type != txgbe_mac_sp_vf)
-			max_mtu = TXGBE_MAX_JUMBO_FRAME_SIZE -
-				  (ETH_HLEN + ETH_FCS_LEN);
-		else
-			max_mtu = ETH_DATA_LEN + ETH_FCS_LEN;
+		max_mtu = ETH_DATA_LEN + ETH_FCS_LEN;
 		break;
 	}
 

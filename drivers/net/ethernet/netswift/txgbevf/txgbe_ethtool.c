@@ -1302,31 +1302,16 @@ static int txgbe_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
 #endif
-	if(adapter->hw.mac.type == 1){
-		
-		if (key)
-			memcpy(key, adapter->rss_key, txgbe_get_rxfh_key_size(netdev));
-			//memcpy(key, adapter->rss_key, sizeof(adapter->rss_key));
-	
-		if (indir) {
-			int i;
+	if (!indir && !key)
+		return 0;
+	spin_lock_bh(&adapter->mbx_lock);
+	if (indir)
+		err = txgbevf_get_reta_locked(&adapter->hw, indir,
+					      adapter->num_rx_queues);
 
-			for (i = 0; i < TXGBE_VFRETA_SIZE; i++)
-				indir[i] = adapter->rss_indir_tbl[i];
-		}	
-	} else {
-		if(!indir && !key)
-			return 0;
-		spin_lock_bh(&adapter->mbx_lock);
-		if(indir)
-			err = txgbevf_get_reta_locked(&adapter->hw, indir,
-					adapter->num_rx_queues);
-
-		if(!err && key)
-			err = txgbevf_get_rss_key_locked(&adapter->hw, key);
-		spin_unlock_bh(&adapter->mbx_lock);
-	
-	}
+	if (!err && key)
+		err = txgbevf_get_rss_key_locked(&adapter->hw, key);
+	spin_unlock_bh(&adapter->mbx_lock);
 	return err;
 }
 #endif /* ETHTOOL_GRSSH && ETHTOOL_SRSSH */

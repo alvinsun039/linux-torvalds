@@ -341,13 +341,6 @@ typedef u32 txgbe_link_speed;
 #define TXGBE_LINK_SPEED_40GB_FULL      0x0200
 #define TXGBE_LINK_SPEED_50GB_FULL      0x0400
 
-enum txgbe_mac_type {
-	txgbe_mac_unknown = 0,
-	txgbe_mac_sp,
-	txgbe_mac_sp_vf,
-	txgbe_num_macs
-};
-
 enum txgbe_media_type {
 	txgbe_media_type_unknown = 0,
 	txgbe_media_type_fiber,

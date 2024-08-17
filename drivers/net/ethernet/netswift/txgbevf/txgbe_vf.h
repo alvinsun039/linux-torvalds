@@ -69,12 +69,18 @@ struct txgbe_mac_operations {
 	s32 (*set_vfta)(struct txgbe_hw *, u32, u32, bool, bool);
 };
 
+enum txgbe_mac_type {
+	txgbe_mac_unknown = 0,
+	txgbe_mac_sp,
+	txgbe_mac_aml
+};
+
 struct txgbe_mac_info {
+	enum txgbe_mac_type type;
+
 	struct txgbe_mac_operations ops;
 	u8 addr[6];
 	u8 perm_addr[6];
-
-	enum txgbe_mac_type type;
 
 	s32  mc_filter_type;
 
