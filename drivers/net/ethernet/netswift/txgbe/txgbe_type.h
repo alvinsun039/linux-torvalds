@@ -2966,8 +2966,10 @@ enum txgbe_sfp_type {
 	txgbe_sfp_type_10g_cu_core1 = 16,
 	txgbe_sfp_type_25g_sr_core0 = 17,
 	txgbe_sfp_type_25g_sr_core1 = 18,
-	txgbe_sfp_type_25g_da_cu_core0 = 19,
-	txgbe_sfp_type_25g_da_cu_core1 = 20,
+	txgbe_sfp_type_25g_lr_core0 = 19,
+	txgbe_sfp_type_25g_lr_core1 = 20,
+	txgbe_sfp_type_25g_da_cu_core0 = 21,
+	txgbe_sfp_type_25g_da_cu_core1 = 22,
 	txgbe_sfp_type_not_present = 0xFFFE,
 	txgbe_sfp_type_unknown = 0xFFFF
 };

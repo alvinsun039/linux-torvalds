@@ -669,12 +669,16 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 							txgbe_sfp_type_unknown;
 				}
 			} else if (comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE ||
-					comp_codes_25g == TXGBE_SFF_25GBASELR_CAPABLE ||
 					comp_codes_25g == TXGBE_SFF_25GBASEER_CAPABLE) {
 				if (hw->bus.lan_id == 0)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
 				else
 					hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core1;
+			} else if (comp_codes_25g == TXGBE_SFF_25GBASELR_CAPABLE) {
+				if (hw->bus.lan_id == 0)
+					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core0;
+				else
+					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core1;
 			} else if (comp_codes_10g &
 				   (TXGBE_SFF_10GBASESR_CAPABLE |
 				    TXGBE_SFF_10GBASELR_CAPABLE)) {
