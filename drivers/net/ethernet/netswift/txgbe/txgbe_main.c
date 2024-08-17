@@ -13021,7 +13021,11 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		goto err_sw_init;
 	/* reset_hw fills in the perm_addr as well */
 	hw->phy.reset_if_overtemp = true;
+	if (hw->mac.type == txgbe_mac_aml)
+		txgbe_get_hw_control(adapter);
 	err = TCALL(hw, mac.ops.reset_hw);
+	if (hw->mac.type == txgbe_mac_aml)
+		txgbe_release_hw_control(adapter);
 
 	/* Store the permanent mac address */
 	TCALL(hw, mac.ops.get_mac_addr, hw->mac.perm_addr);
