@@ -2155,9 +2155,13 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	if (adapter->reconfig_rx) {
 		adapter->reconfig_rx = false;
-		status = txgbe_e56_reconfig_rx(hw, speed);
-		goto out;
+		if (adapter->last_speed == speed) {
+			status = txgbe_e56_reconfig_rx(hw, speed);
+			goto out;
+		}
 	}
+
+	adapter->last_speed = speed;
 
 	SetFields(&value, SFP1_TX_FAULT, 1);
 	SetFields(&value, SFP1_TX_DISABLE, 1);
