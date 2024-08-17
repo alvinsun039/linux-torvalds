@@ -946,6 +946,7 @@ int txgbe_get_settings(struct net_device *netdev,
 #endif /* !ETHTOOL_GLINKSETTINGS */
 
 #ifdef ETHTOOL_GLINKSETTINGS
+
 static int txgbe_set_link_ksettings(struct net_device *netdev,
 				const struct ethtool_link_ksettings *cmd)
 {
@@ -1020,23 +1021,31 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		old = hw->phy.autoneg_advertised;
 		advertised = 0;
 
-		if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
-			advertised |= TXGBE_LINK_SPEED_25GB_FULL;
+		if (hw->mac.type == txgbe_mac_aml &&
+		    !(cmd->base.speed == SPEED_25000 && cmd->base.autoneg)) {
+			if (cmd->base.speed + cmd->base.duplex == SPEED_25000 + DUPLEX_FULL)
+				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
+			if (cmd->base.speed+cmd->base.duplex == SPEED_10000 + DUPLEX_FULL)
+				advertised |= TXGBE_LINK_SPEED_10GB_FULL;
+		} else {
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
+				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 
-		if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseSR_Full) ||
-		    ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseLR_Full) ||
-		    ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseT_Full))
-			advertised |= TXGBE_LINK_SPEED_10GB_FULL;
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseSR_Full) ||
+				ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseLR_Full) ||
+				ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseT_Full))
+				advertised |= TXGBE_LINK_SPEED_10GB_FULL;
 
-		if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 1000baseX_Full) ||
-		    ethtool_link_ksettings_test_link_mode(cmd, advertising, 1000baseT_Full))
-			advertised |= TXGBE_LINK_SPEED_1GB_FULL;
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 1000baseX_Full) ||
+				ethtool_link_ksettings_test_link_mode(cmd, advertising, 1000baseT_Full))
+				advertised |= TXGBE_LINK_SPEED_1GB_FULL;
 
-		if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 100baseT_Full))
-			advertised |= TXGBE_LINK_SPEED_100_FULL;
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 100baseT_Full))
+				advertised |= TXGBE_LINK_SPEED_100_FULL;
 
-		if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 10baseT_Full))
-			advertised |= TXGBE_LINK_SPEED_10_FULL;
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 10baseT_Full))
+				advertised |= TXGBE_LINK_SPEED_10_FULL;
+		}
 
 		if ((advertised & TXGBE_LINK_SPEED_1GB_FULL) && hw->phy.multispeed_fiber)
 			adapter->an37 = cmd->base.autoneg ? 1 : 0;
