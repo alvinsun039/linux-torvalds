@@ -130,7 +130,7 @@ static const char txgbe_gstrings_test[][ETH_GSTRING_LEN] = {
 #define TXGBE_TEST_LEN (sizeof(txgbe_gstrings_test) / ETH_GSTRING_LEN)
 #endif /* ETHTOOL_TEST */
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbevf_get_link_ksettings(struct net_device *netdev,
 				      struct ethtool_link_ksettings *cmd)
 #else
@@ -143,10 +143,13 @@ static int txgbe_get_settings(struct net_device *netdev,
 	u32 link_speed = 0;
 	bool link_up = false;
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 	ethtool_link_ksettings_zero_link_mode(cmd, supported);
 	ethtool_link_ksettings_add_link_mode(cmd, supported,
 					     10000baseT_Full);
+	if (hw->mac.type == txgbe_mac_aml)
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
+						     25000baseSR_Full);
 	cmd->base.autoneg = AUTONEG_DISABLE;
 	cmd->base.port = -1;
 #else
@@ -193,7 +196,7 @@ static int txgbe_get_settings(struct net_device *netdev,
 			break;
 		}
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 		cmd->base.speed = speed;
 		cmd->base.duplex = DUPLEX_FULL;
 	} else {
@@ -212,7 +215,7 @@ static int txgbe_get_settings(struct net_device *netdev,
 	return 0;
 }
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbevf_set_link_ksettings(struct net_device __always_unused *netdev,
 		       const struct ethtool_link_ksettings __always_unused *cmd)
 #else
@@ -1320,7 +1323,7 @@ static struct ethtool_ops txgbe_ethtool_ops = {
 #ifdef ETHTOOL_COALESCE_USECS
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS,
 #endif
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 	.get_link_ksettings	= txgbevf_get_link_ksettings,
 	.set_link_ksettings	= txgbevf_set_link_ksettings,
 #else
