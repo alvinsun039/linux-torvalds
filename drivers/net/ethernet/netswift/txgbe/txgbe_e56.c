@@ -1642,12 +1642,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 
 	rdata = rd32(hw, TXGBE_GPIO_EXT);
 	if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {
-		if (rdata & TXGBE_SFP1_MOD_ABS_LS)
-			e_info(probe,
-			       "E56phyRxsCalibAdaptSeq TXGBE_SFP1_MOD_ABS_LS\n");
-		else if (rdata & TXGBE_SFP1_RX_LOS_LS)
-			e_info(probe,
-			       "E56phyRxsCalibAdaptSeq TXGBE_SFP1_RX_LOS_LS\n");
 		return TXGBE_ERR_PHY_INIT_NOT_DONE;
 	}
 
@@ -1733,7 +1727,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			adapter->link_valid = false;
-			printk("ERROR: Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st[5:0] = RX_RDY_ST Timeout!!!\n");
 			return TXGBE_ERR_TIMEOUT;
 		}
 	}
@@ -1747,7 +1740,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(500);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			adapter->link_valid = false;
-			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_cdr_rdy_o =1 Timeout!!!\n");
 			return TXGBE_ERR_TIMEOUT;
 		}
 	}
@@ -1801,7 +1793,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(1000);
 
 		if (timer++ > PHYINIT_TIMEOUT) {
-			printk("ERROR: Wait  E56PHY_RXS0_OVRDVAL_1_RXS0_RX0_ADC_INTL_CAL_DONE_O_LSB Timeout!!!\n");
 			break;
 		}
 	}
@@ -1827,7 +1818,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
 			udelay(500);
 			if (timer++ > PHYINIT_TIMEOUT) {
-				printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_adc_ofst_adapt_done_o =1 Timeout!!!\n");
 				break;
 			}
 		}
@@ -1862,7 +1852,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			udelay(500);
 
 			if (timer++ > PHYINIT_TIMEOUT) {
-				printk("ERROR: Wait E56G__PMD_RXS0_OVRDVAL_1[1]::rxs0_rx0_adc_gain_adapt_done_o =1 Timeout!!!\n");
 				break;
 			}
 		}
@@ -1932,7 +1921,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(500);
 
 		if (timer++ > PHYINIT_TIMEOUT) {
-			printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_vga_train_done_o =1 Timeout!!!\n");
 			break;
 			//return -1;
 		} //if (timer++ > PHYINIT_TIMEOUT) {
@@ -1949,7 +1937,6 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 			udelay(500);
 
 			if (timer++ > PHYINIT_TIMEOUT) {
-				printk("ERROR: Wait RXS0_OVRDVAL[1]::rxs0_rx0_ctle_train_done_o =1 Timeout!!!\n");
 				break;
 				//return -1;
 			} //if (timer++ > PHYINIT_TIMEOUT) {
@@ -2076,18 +2063,15 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	u32 rdata;
 	u32 timer;
 	int status = 0;
-	struct txgbe_adapter *adapter = hw->back;
 
 	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
 	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
 
 	addr = E56PHY_INTR_0_ADDR;
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
-	printk("E56PHY_INTR_0_ADDR :%x\n", rdata);
 
 	addr = E56PHY_INTR_1_ADDR;
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
-	e_info(link, "E56PHY_INTR_1_ADDR :%x\n", rdata);
 
 	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
 	//and confirm its value is POWERDN_ST
@@ -2117,14 +2101,12 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
 
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
-	e_info(link, "E56PHY_INTR_0_ADDR :%x\n", rdata);
 
 	status = txgbe_e56_config_rx(hw, speed);
 
 	addr = E56PHY_INTR_1_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_1_IDLE_EXIT1);
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
-	e_info(link, "E56PHY_INTR_1_ADDR :%x\n", rdata);
 
 	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
 			E56PHY_INTR_0_IDLE_ENTRY1);
@@ -2192,7 +2174,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core1) {
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core1) {
 		value = txgbe_rd32_epcs(hw, 0x100ab);
 		SetFields(&value, 0, 0, 1);
 		txgbe_wr32_epcs(hw, 0x100ab, value);
