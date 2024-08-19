@@ -2140,13 +2140,13 @@ static void hct_noiommu_set_memory_wb(unsigned long address)
 	}
 
 	pud = pud_offset(p4d, address);
-	if (pud_none(*pud) || pud_large(*pud) || !pud_present(*pud)) {
+	if (pud_none(*pud) || pud_leaf(*pud) || !pud_present(*pud)) {
 		pr_err("pud val is invalid.\n");
 		return;
 	}
 
 	pmd = pmd_offset(pud, address);
-	if (pmd_none(*pmd) || pmd_large(*pmd) || !pmd_present(*pmd)) {
+	if (pmd_none(*pmd) || pmd_leaf(*pmd) || !pmd_present(*pmd)) {
 		pr_err("pmd val is invalid.\n");
 		return;
 	}
