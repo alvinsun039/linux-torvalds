@@ -35,9 +35,9 @@ function commit-in-tree()
 		return 0
 	fi
 
-	STABLE_MAJ_VER=$(git --no-pager blame $BRANCH_COMMIT -s -L 2,3 $SOURCE_ROOT/Makefile | \
+	STABLE_MAJ_VER=$(git --no-pager blame $BRANCH_COMMIT -s -L 1,3 $SOURCE_ROOT/Makefile | \
 			 grep VERSION | head -n1 | awk {'print $5'})
-	STABLE_MIN_VER=$(git --no-pager blame $BRANCH_COMMIT -s -L 2,3 $SOURCE_ROOT/Makefile | \
+	STABLE_MIN_VER=$(git --no-pager blame $BRANCH_COMMIT -s -L 1,3 $SOURCE_ROOT/Makefile | \
 			 grep PATCHLEVEL | head -n1 | awk {'print $5'})
 
 	# Try and find if there's a commit with given subject the hard way
