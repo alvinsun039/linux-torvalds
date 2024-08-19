@@ -3548,11 +3548,31 @@ static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 
 static void txgbe_check_phy_event(struct txgbe_adapter *adapter)
 {
-	adapter->reconfig_rx = true;
-	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 rdata;
+
+	e_info(link, "txgbe_check_phy_event");
+
+	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
+	if (rdata & E56PHY_INTR_0_IDLE_ENTRY1) {
+		e_info(link, "E56PHY_INTR_0_IDLE_ENTRY1");
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+		adapter->link_valid = false;
+	}
+
+	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+	if (rdata & E56PHY_INTR_1_IDLE_EXIT1) {
+		e_info(link, "E56PHY_INTR_1_IDLE_EXIT1");
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+		adapter->link_valid = true;
+	}
+
+	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+
 	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
 		txgbe_service_event_schedule(adapter);
 	}
+
 }
 
 /**
@@ -8960,7 +8980,7 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 
 	for(i=0;i<3;i++){
 		TCALL(hw, mac.ops.check_link, &link_speed, &link_up, false);
-		msleep(1);
+		msleep(10);
 	}
 #endif
 
@@ -9120,6 +9140,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		break;
 	}
 
+	adapter->last_speed = adapter->link_speed;
+	adapter->last_sfp_type = hw->phy.sfp_type;
 
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s\n",
 	       (link_speed == TXGBE_LINK_SPEED_25GB_FULL ?

@@ -2064,14 +2064,19 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	u32 timer;
 	int status = 0;
 
-	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
 
-	addr = E56PHY_INTR_0_ADDR;
-	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
+		addr = E56PHY_INTR_0_ADDR;
+		rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
 
-	addr = E56PHY_INTR_1_ADDR;
-	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+		addr = E56PHY_INTR_1_ADDR;
+		rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+	}
 
 	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
 	//and confirm its value is POWERDN_ST
@@ -2108,10 +2113,15 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_1_IDLE_EXIT1);
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
 
-	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
-			E56PHY_INTR_0_IDLE_ENTRY1);
-	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
-			E56PHY_INTR_1_IDLE_EXIT1);
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+				E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+				E56PHY_INTR_1_IDLE_EXIT1);
+	}
 
 	return status;
 }
@@ -2119,7 +2129,6 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status;
@@ -2134,16 +2143,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 		TCALL(hw, mac.ops.disable_sec_tx_path);
 	}
-
-	if (adapter->reconfig_rx) {
-		adapter->reconfig_rx = false;
-		if (adapter->last_speed == speed) {
-			status = txgbe_e56_reconfig_rx(hw, speed);
-			goto out;
-		}
-	}
-
-	adapter->last_speed = speed;
 
 	SetFields(&value, SFP1_TX_FAULT, 1);
 	SetFields(&value, SFP1_TX_DISABLE, 1);

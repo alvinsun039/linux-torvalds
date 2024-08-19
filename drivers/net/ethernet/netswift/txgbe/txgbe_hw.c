@@ -6142,7 +6142,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	bool link_up = false;
 	u32 curr_autoneg = 2;
-	s32 ret_status;
+	s32 ret_status = 0;
 	int i;
 
 	/* Check to see if speed passed in is supported. */
@@ -6164,51 +6164,46 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		status = TCALL(hw, mac.ops.check_link,
 				&link_speed, &link_up, false);
 
-	if (link_speed == TXGBE_LINK_SPEED_1GB_FULL) {
-		curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
-		curr_autoneg = !!(curr_autoneg & (0x1 << 12));
-	}
+		if (link_speed == TXGBE_LINK_SPEED_1GB_FULL) {
+			curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
+			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
+		}
 
 		if (status != 0)
 			goto out;
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
 			(adapter->an37 != curr_autoneg))) {
-
-			if (!(hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-				hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+			if (hw->mac.type == txgbe_mac_aml &&
+				adapter->last_sfp_type == hw->phy.sfp_type)
 				goto out;
 		}
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		adapter->phy_retry = 3;
-		for (i = 0; i < adapter->phy_retry; i++) {
-			/* this ret_status for workaorund not return to upper*/
+		if (adapter->last_speed != speed ||
+			adapter->last_sfp_type != hw->phy.sfp_type) {
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 
-			if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-				break;
-			/* work around for dac*/
-			if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-				hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-				hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-				if (adapter->link_valid) {
+			if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
+				adapter->phy_retry = 3;
+				for (i = 0; i < adapter->phy_retry; i++) {
 					TCALL(hw, mac.ops.check_link,
 							&link_speed, &link_up, false);
-					if (!link_up) {
-						msleep(30);
-						continue;
+					if (link_up) {
+						break;
 					}
+
+					msleep(200);
+					/* this ret_status for workaorund not return to upper*/
+					ret_status = txgbe_e56_reconfig_rx(hw, speed);
+
+					if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
+						break;
 				}
 			}
-
-			if (adapter->link_valid)
-				break;
 		}
+
 		goto out;
 	}
 
