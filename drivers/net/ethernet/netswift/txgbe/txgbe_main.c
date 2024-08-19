@@ -8980,7 +8980,7 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 
 	for(i=0;i<3;i++){
 		TCALL(hw, mac.ops.check_link, &link_speed, &link_up, false);
-		msleep(10);
+		msleep(100);
 	}
 #endif
 
