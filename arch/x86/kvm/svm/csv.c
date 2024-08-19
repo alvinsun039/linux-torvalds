@@ -2110,7 +2110,7 @@ static int __pfn_mapping_level(struct kvm *kvm, gfn_t gfn,
 	if (pud_none(pud) || !pud_present(pud))
 		goto out;
 
-	if (pud_large(pud)) {
+	if (pud_leaf(pud)) {
 		level = PG_LEVEL_1G;
 		goto out;
 	}
@@ -2119,7 +2119,7 @@ static int __pfn_mapping_level(struct kvm *kvm, gfn_t gfn,
 	if (pmd_none(pmd) || !pmd_present(pmd))
 		goto out;
 
-	if (pmd_large(pmd))
+	if (pmd_leaf(pmd))
 		level = PG_LEVEL_2M;
 
 out:
