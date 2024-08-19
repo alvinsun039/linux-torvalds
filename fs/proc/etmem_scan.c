@@ -423,7 +423,7 @@ static int ept_pmd_range(struct page_idle_ctrl *pic,
 		} else if (!ept_pmd_present(*pmd)) {
 			err = vm_walk_host_range(addr, next, walk);
 			goto next;
-		} else if (!pmd_large(*pmd)) {
+		} else if (!pmd_leaf(*pmd)) {
 			if (pic->flags & SCAN_AS_HUGE)
 				page_type = ept_huge_accessed(pmd, addr, next);
 			else
@@ -469,7 +469,7 @@ static int ept_pud_range(struct page_idle_ctrl *pic,
 			goto next;
 		}
 
-		if (pud_large(*pud))
+		if (pud_leaf(*pud))
 			err = pic_add_page(pic, addr, next, PUD_PRESENT);
 		else
 			err = ept_pmd_range(pic, pud, addr, next, walk);
@@ -1076,7 +1076,7 @@ static int mm_idle_pmd_large(pmd_t pmd)
 #ifdef CONFIG_ARM64
 	return if_pmd_thp_or_huge(pmd);
 #else
-	return pmd_large(pmd);
+	return pmd_leaf(pmd);
 #endif
 }
 
