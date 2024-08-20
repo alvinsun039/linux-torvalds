@@ -775,6 +775,7 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTTYPE_LEVEL        0x14838
 #define TXGBE_GPIO_INT_POLARITY         0x1483C
 #define TXGBE_GPIO_INTSTATUS            0x14844
+#define TXGBE_GPIO_DEBOUNCE             0x14848
 #define TXGBE_GPIO_EOI                  0x1484C
 #define TXGBE_GPIO_EXT                  0x14850
 
@@ -806,6 +807,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTTYPE_LEVEL_5 0x00000020U /* SDP5 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_6 0x00000040U /* SDP6 interrupt type level */
 #define TXGBE_GPIO_INT_POLARITY_3  0x00000008U
+#define TXGBE_GPIO_INT_DEBOUNCE_2  0x00000004U
+#define TXGBE_GPIO_INT_DEBOUNCE_3  0x00000008U
 #define TXGBE_GPIO_INTSTATUS_1  0x00000002U /* SDP1 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_2  0x00000004U /* SDP2 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_3  0x00000008U /* SDP3 interrupt status */
