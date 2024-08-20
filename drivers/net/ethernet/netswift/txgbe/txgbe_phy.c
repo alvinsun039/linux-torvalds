@@ -664,6 +664,13 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					else
 						hw->phy.sfp_type =
 						txgbe_sfp_type_da_act_lmt_core1;
+				} else if (cable_spec & TXGBE_SFF_FCPI4_LIMITING) {
+					if (hw->bus.lan_id == 0)
+						hw->phy.sfp_type =
+						txgbe_sfp_type_25g_fcpi4_lmt_core0;
+					else
+						hw->phy.sfp_type =
+						txgbe_sfp_type_25g_fcpi4_lmt_core1;
 				} else {
 					hw->phy.sfp_type =
 							txgbe_sfp_type_unknown;

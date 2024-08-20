@@ -4929,7 +4929,9 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
