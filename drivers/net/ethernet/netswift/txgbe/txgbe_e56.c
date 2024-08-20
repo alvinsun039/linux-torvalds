@@ -2059,23 +2059,22 @@ int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 addr;
 	u32 rdata;
 	u32 timer;
 	int status = 0;
 
+	wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE, ~TXGBE_MAC_TX_CFG_TE);
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, ~TXGBE_MAC_RX_CFG_RE);
+
+	TCALL(hw, mac.ops.disable_sec_tx_path);
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-
-		addr = E56PHY_INTR_0_ADDR;
-		rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
-
-		addr = E56PHY_INTR_1_ADDR;
-		rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
 	}
 
 	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
@@ -2102,16 +2101,15 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 		}
 	}
 
+	status = txgbe_e56_config_rx(hw, speed);
+	if (status)
+		adapter->last_speed = TXGBE_LINK_SPEED_UNKNOWN;
+
 	addr = E56PHY_INTR_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
 
-	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
-
-	status = txgbe_e56_config_rx(hw, speed);
-
 	addr = E56PHY_INTR_1_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_1_IDLE_EXIT1);
-	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
 
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
@@ -2123,15 +2121,20 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 				E56PHY_INTR_1_IDLE_EXIT1);
 	}
 
+	TCALL(hw, mac.ops.enable_sec_tx_path);
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
+
 	return status;
 }
 
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status;
+	u32 reset = 0;
 
 	if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK) ==
 	    TXGBE_EPHY_STAT_PPL_LOCK) {
@@ -2156,6 +2159,18 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	SetFields(&value, SFP1_RS0, 1);
 	wr32(hw, TXGBE_GPIO_DR, value);
 
+	if (hw->bus.lan_id == 0) {
+		reset = TXGBE_MIS_RST_LAN0_EPHY_RST;
+	} else {
+		reset = TXGBE_MIS_RST_LAN1_EPHY_RST;
+	}
+
+	wr32(hw, TXGBE_MIS_RST, reset | rd32(hw, TXGBE_MIS_RST));
+	TXGBE_WRITE_FLUSH(hw);
+	usec_delay(10);
+
+	adapter->last_sfp_type = hw->phy.sfp_type;
+
 	/////////////////////////// XLGPCS REGS Start
 	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
 	value |= 0x8000;
@@ -2164,7 +2179,8 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	udelay(1000);
 	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
 	if ((value & 0x8000)) {
-		return -1;
+		status = TXGBE_ERR_PHY_INIT_NOT_DONE;
+		goto out;
 	}
 
 	value = txgbe_rd32_epcs(hw, SR_AN_CTRL);

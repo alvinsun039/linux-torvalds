@@ -1023,7 +1023,7 @@ struct txgbe_adapter {
 	u8  an73_mode;
 	u8  backplane_an;
 	u8  an73;
-	u8  an37;
+	u8  autoneg;
 	u16 ffe_main;
 	u16 ffe_pre;
 	u16 ffe_post;

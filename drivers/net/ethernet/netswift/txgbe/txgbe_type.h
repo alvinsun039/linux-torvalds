@@ -497,6 +497,8 @@
 #define TXGBE_MIS_RST_SW_RST            0x00000001U
 #define TXGBE_MIS_RST_LAN0_RST          0x00000002U
 #define TXGBE_MIS_RST_LAN1_RST          0x00000004U
+#define TXGBE_MIS_RST_LAN0_EPHY_RST     0x00080000U
+#define TXGBE_MIS_RST_LAN1_EPHY_RST     0x00010000U
 #define TXGBE_MIS_RST_LAN0_CHG_ETH_MODE 0x20000000U
 #define TXGBE_MIS_RST_LAN1_CHG_ETH_MODE 0x40000000U
 #define TXGBE_MIS_RST_GLOBAL_RST        0x80000000U
@@ -701,6 +703,12 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_CFG_TEREDO                0x1441C
 #define TXGBE_CFG_TCP_TIME              0x14420
 #define TXGBE_CFG_TAG_TPID(_i)          (0x14430 + ((_i) * 4))
+
+/*AML LINK STATUS OVERWRITE*/
+#define TXGBE_AML_EPCS_MISC_CTL         0x13240
+#define TXGBE_AML_LINK_STATUS_OVRD_EN   0x00000020
+#define TXGBE_AML_LINK_STATUS_OVRD_VAL  0x00000010
+
 /* port cfg bit */
 #define TXGBE_CFG_PORT_CTL_PFRSTD       0x00004000U /* Phy Function Reset Done */
 #define TXGBE_CFG_PORT_CTL_D_VLAN       0x00000001U /* double vlan*/
@@ -765,6 +773,7 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTEN                0x14830
 #define TXGBE_GPIO_INTMASK              0x14834
 #define TXGBE_GPIO_INTTYPE_LEVEL        0x14838
+#define TXGBE_GPIO_INT_POLARITY         0x1483C
 #define TXGBE_GPIO_INTSTATUS            0x14844
 #define TXGBE_GPIO_EOI                  0x1484C
 #define TXGBE_GPIO_EXT                  0x14850
@@ -796,6 +805,7 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTTYPE_LEVEL_3 0x00000008U /* SDP3 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_5 0x00000020U /* SDP5 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_6 0x00000040U /* SDP6 interrupt type level */
+#define TXGBE_GPIO_INT_POLARITY_3  0x00000008U
 #define TXGBE_GPIO_INTSTATUS_1  0x00000002U /* SDP1 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_2  0x00000004U /* SDP2 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_3  0x00000008U /* SDP3 interrupt status */

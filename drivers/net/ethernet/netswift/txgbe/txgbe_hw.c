@@ -4291,7 +4291,7 @@ s32 txgbe_setup_mac_link_multispeed_fiber(struct txgbe_hw *hw,
 		}
 
 		if ((link_speed == TXGBE_LINK_SPEED_1GB_FULL) && link_up
-		&&(adapter->an37 == curr_autoneg))
+			&& (adapter->autoneg == curr_autoneg))
 			goto out;
 
 		/* Allow module to change analog characteristics (10G->1G) */
@@ -5278,7 +5278,7 @@ s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw)
 
 	value = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
 	value = (value & ~0x1200) | (0x1 << 9);
-	if(adapter->an37)
+	if (adapter->autoneg)
 		value |= (0x1 << 12);
 	
 	txgbe_wr32_epcs(hw, TXGBE_SR_MII_MMD_CTL, value);
@@ -6175,7 +6175,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			goto out;
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
-			(adapter->an37 != curr_autoneg))) {
+			(adapter->autoneg != curr_autoneg))) {
 			if (hw->mac.type == txgbe_mac_aml &&
 				adapter->last_sfp_type == hw->phy.sfp_type)
 				goto out;
@@ -6183,8 +6183,10 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		if (adapter->last_speed != speed ||
-			adapter->last_sfp_type != hw->phy.sfp_type) {
+		if ((adapter->last_speed != speed ||
+			adapter->last_sfp_type != hw->phy.sfp_type) &&
+			hw->phy.sfp_type != txgbe_sfp_type_not_present &&
+			hw->phy.sfp_type != txgbe_sfp_type_unknown) {
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 
 			if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {

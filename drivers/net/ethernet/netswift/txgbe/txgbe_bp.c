@@ -15,7 +15,7 @@ int txgbe_bp_mode_setting(struct txgbe_adapter *adapter)
 
 	/*default to open an73*/
 	adapter->backplane_an = AUTO?1:0;
-	adapter->an37 = AUTO?1:0;
+	adapter->autoneg = AUTO?1:0;
 	switch (adapter->backplane_mode) {
 	case TXGBE_BP_M_KR:
 		hw->subsystem_device_id = TXGBE_ID_WX1820_KR_KX_KX4;
@@ -35,10 +35,10 @@ int txgbe_bp_mode_setting(struct txgbe_adapter *adapter)
 
 	if (adapter->backplane_auto == TXGBE_BP_M_AUTO) {
 		adapter->backplane_an = 1;
-		adapter->an37 = 1;
+		adapter->autoneg = 1;
 	} else if (adapter->backplane_auto == TXGBE_BP_M_NAUTO) {
 		adapter->backplane_an = 0;
-		adapter->an37 = 0;
+		adapter->autoneg = 0;
 	}
 
 	if ((adapter->ffe_set == 0) && (KR_SET == 0))
