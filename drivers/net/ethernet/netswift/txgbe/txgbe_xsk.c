@@ -1061,7 +1061,7 @@ bool txgbe_clean_xdp_tx_irq(struct txgbe_q_vector *q_vector,
 	struct txgbe_adapter *adapter = q_vector->adapter;
 	struct txgbe_hw *hw = &adapter->hw;
 #ifdef TXGBE_TXHEAD_WB
-	u32 head;
+	u32 head = 0;
 	u32 temp = tx_ring->next_to_clean;
 	if (hw->mac.type == txgbe_mac_aml)
 		head = *(tx_ring->headwb_mem);
