@@ -1125,14 +1125,15 @@ STATIC s32 txgbe_get_eeprom_semaphore(struct txgbe_hw *hw)
 		 */
 		if (i >= timeout) {
 			ERROR_REPORT1(TXGBE_ERROR_POLLING,
-			    "SWESMBI Software EEPROM semaphore not granted.\n");
+			    "SWESMBI Software EEPROM semaphore not granted, MNG_SW_SM_SM is 0x%08x.\n",
+				swsm);
 			txgbe_release_eeprom_semaphore(hw);
 			status = TXGBE_ERR_EEPROM;
 		}
 	} else {
 		ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			     "Software semaphore SMBI between device drivers "
-			     "not granted.\n");
+			     "not granted, MNG_SW_SM_SM is 0x%08x.\n", swsm);
 	}
 
 	return status;
