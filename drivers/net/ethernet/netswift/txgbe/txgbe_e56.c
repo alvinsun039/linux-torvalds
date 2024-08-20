@@ -2169,7 +2169,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	TXGBE_WRITE_FLUSH(hw);
 	usec_delay(10);
 
-	adapter->last_sfp_type = hw->phy.sfp_type;
+	adapter->last_sfp_type = txgbe_sfp_type_not_present;
 
 	/////////////////////////// XLGPCS REGS Start
 	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
@@ -2385,6 +2385,8 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	if (status)
 		goto out;
+
+	adapter->last_sfp_type = hw->phy.sfp_type;
 
 out:
 	if (ppl_lock) {
