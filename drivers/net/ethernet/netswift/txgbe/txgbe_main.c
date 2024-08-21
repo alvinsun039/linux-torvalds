@@ -6966,7 +6966,6 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_0);
 		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
 				TXGBE_GPIO_INT_POLARITY_3, 0x0);
-		wr32(hw, TXGBE_GPIO_DEBOUNCE, TXGBE_GPIO_INT_DEBOUNCE_2 | TXGBE_GPIO_INT_DEBOUNCE_3);
 	} else {
 		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
@@ -9455,6 +9454,10 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 			goto sfp_out;
 		}
 	}
+
+	/* wait for sfp module ready*/
+	if (hw->mac.type == txgbe_mac_aml)
+		msleep(200);
 
 	err = TCALL(hw, phy.ops.identify_sfp);
 	if (err == TXGBE_ERR_SFP_NOT_SUPPORTED)
