@@ -3548,34 +3548,9 @@ static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 
 static void txgbe_check_phy_event(struct txgbe_adapter *adapter)
 {
-	struct txgbe_hw *hw = &adapter->hw;
-	u32 rdata;
-
 	e_info(link, "txgbe_check_phy_event");
 
-	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
-	if (rdata & E56PHY_INTR_0_IDLE_ENTRY1) {
-		e_info(link, "E56PHY_INTR_0_IDLE_ENTRY1");
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				TXGBE_AML_LINK_STATUS_OVRD_EN, TXGBE_AML_LINK_STATUS_OVRD_EN);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
-		adapter->link_valid = false;
-	}
-
-	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
-	if (rdata & E56PHY_INTR_1_IDLE_EXIT1) {
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-		e_info(link, "E56PHY_INTR_1_IDLE_EXIT1");
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
-		adapter->link_valid = true;
-	}
-
-	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+	adapter->flags3 |= TXGBE_FLAG3_PHY_EVENT;
 
 	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
 		txgbe_service_event_schedule(adapter);
@@ -6946,6 +6921,8 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 #endif
 
 	if (txgbe_is_sfp(hw)) {
+		if (hw->mac.type == txgbe_mac_aml)
+			adapter->last_speed = TXGBE_LINK_SPEED_UNKNOWN;
 		txgbe_sfp_link_config(adapter);
 	} else if (txgbe_is_backplane(hw)) {
 		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
@@ -7544,7 +7521,6 @@ void txgbe_disable_device(struct txgbe_adapter *adapter)
 	/* workaround gpio int lost in lldp-on condition */
 	reinit_gpio_int(adapter);
 }
-
 
 void txgbe_down(struct txgbe_adapter *adapter)
 {
@@ -9402,6 +9378,49 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	txgbe_watchdog_flush_tx(adapter);
 }
 
+static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 rdata;
+
+	/* if interface is down do nothing */
+	if (test_bit(__TXGBE_DOWN, &adapter->state) ||
+	    test_bit(__TXGBE_REMOVING, &adapter->state) ||
+	    test_bit(__TXGBE_RESETTING, &adapter->state))
+		return;
+
+	if (!(adapter->flags3 & TXGBE_FLAG3_PHY_EVENT))
+		return;
+
+	adapter->flags3 &= ~TXGBE_FLAG3_PHY_EVENT;
+
+	mutex_lock(&adapter->e56_lock);
+	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
+	if (rdata & E56PHY_INTR_0_IDLE_ENTRY1) {
+		e_info(link, "E56PHY_INTR_0_IDLE_ENTRY1");
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
+		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+				TXGBE_AML_LINK_STATUS_OVRD_EN, TXGBE_AML_LINK_STATUS_OVRD_EN);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+		adapter->link_valid = false;
+	}
+
+	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
+	if (rdata & E56PHY_INTR_1_IDLE_EXIT1) {
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
+		e_info(link, "E56PHY_INTR_1_IDLE_EXIT1");
+		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+		adapter->link_valid = true;
+	}
+	mutex_unlock(&adapter->e56_lock);
+
+	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+}
+
 /**
  * txgbe_sfp_detection_subtask - poll for SFP+ cable
  * @adapter - the txgbe adapter structure
@@ -9706,7 +9725,9 @@ static void txgbe_amlit_temp_work(struct work_struct *work)
 		adapter->amlite_temp - temp > 5))
 		return;
 
+	mutex_lock(&adapter->e56_lock);
 	txgbe_e56_cfg_temp(hw);
+	mutex_unlock(&adapter->e56_lock);
 
 }
 
@@ -10075,6 +10096,7 @@ static void txgbe_service_task(struct work_struct *work)
 	txgbe_check_pcie_subtask(adapter);
 /*	txgbe_swfw_mbox_subtask(adapter); */
 	txgbe_reset_subtask(adapter);
+	txgbe_phy_event_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
 	txgbe_sfp_reset_eth_phy_subtask(adapter);

@@ -983,6 +983,7 @@ struct txgbe_therm_proc_data {
 /* amlite: dma reset */
 #define TXGBE_FLAG2_DMA_RESET_REQUESTED          (1U << 2)
 
+#define TXGBE_FLAG3_PHY_EVENT                   (1U << 0)
 
 
 #define TXGBE_SET_FLAG(_input, _flag, _result) \
@@ -1020,6 +1021,7 @@ struct txgbe_adapter {
 	 */
 	u32 flags;
 	u32 flags2;
+	u32 flags3;
 	u8  an73_mode;
 	u8  backplane_an;
 	u8  an73;
@@ -1129,6 +1131,7 @@ struct txgbe_adapter {
 	bool link_up;
 	unsigned long sfp_poll_time;
 	unsigned long link_check_timeout;
+	struct mutex e56_lock;
 
 	struct timer_list service_timer;
 	struct work_struct service_task;

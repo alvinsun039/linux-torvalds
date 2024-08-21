@@ -4731,6 +4731,7 @@ void txgbe_init_mac_link_ops(struct txgbe_hw *hw)
 s32 txgbe_init_phy_ops(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
+	struct txgbe_adapter *adapter = hw->back;
 	s32 ret_val = 0;
 
 	/* amlite TODO*/
@@ -4738,6 +4739,7 @@ s32 txgbe_init_phy_ops(struct txgbe_hw *hw)
 	if (hw->mac.type == txgbe_mac_aml)
 		wr32(hw, 0x11220, 0xF);
 
+	mutex_init(&adapter->e56_lock);
 	/* Identify the PHY or SFP module */
 	ret_val = TCALL(hw, phy.ops.identify);
 	if (ret_val == TXGBE_ERR_SFP_NOT_SUPPORTED)
@@ -6189,6 +6191,10 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			adapter->last_sfp_type != hw->phy.sfp_type) &&
 			hw->phy.sfp_type != txgbe_sfp_type_not_present &&
 			hw->phy.sfp_type != txgbe_sfp_type_unknown) {
+			wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
+
+			mutex_lock(&adapter->e56_lock);
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 
 			if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
@@ -6208,6 +6214,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 						break;
 				}
 			}
+			mutex_unlock(&adapter->e56_lock);
 		}
 
 		goto out;
