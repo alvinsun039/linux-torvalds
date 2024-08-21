@@ -2367,17 +2367,18 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	status = txgbe_e56_config_rx(hw, speed);
 
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR,
-				E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR,
-				E56PHY_INTR_1_IDLE_EXIT1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
-				E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
-				E56PHY_INTR_1_IDLE_EXIT1);
+		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
+		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
+		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
+		txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, value);
+
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
 	}
 
 	//wait phy config complete
