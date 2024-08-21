@@ -3575,7 +3575,7 @@ static void txgbe_check_phy_event(struct txgbe_adapter *adapter)
 		adapter->link_valid = true;
 	}
 
-	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 
 	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
 		txgbe_service_event_schedule(adapter);
