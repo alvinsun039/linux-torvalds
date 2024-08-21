@@ -27,6 +27,7 @@
 #include "txgbe_phy.h"
 #include "txgbe_dcb.h"
 #include "txgbe_e56.h"
+#include "txgbe_e56_bp.h"
 #include "txgbe.h"
 
 #define TXGBE_SP_MAX_TX_QUEUES  128
@@ -6187,6 +6188,14 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
+		if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+			mutex_lock(&adapter->e56_lock);
+			txgbe_e56_set_link_to_kr(adapter, 25, 0);
+			mutex_unlock(&adapter->e56_lock);
+
+			return 0;
+		}
 		if ((adapter->last_speed != speed ||
 			adapter->last_sfp_type != hw->phy.sfp_type) &&
 			hw->phy.sfp_type != txgbe_sfp_type_not_present &&

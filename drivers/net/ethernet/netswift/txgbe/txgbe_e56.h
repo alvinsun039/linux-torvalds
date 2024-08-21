@@ -5,6 +5,43 @@
 #include "txgbe.h"
 
 #define FORMAT_NOPARENTHERSES(...) __VA_ARGS__
+
+#define EPHY_RREG(REG)                             \
+	do {                                       \
+		rdata = 0;                         \
+		rdata = rd32_ephy(hw, REG##_ADDR); \
+	} while (0)
+
+#define EPHY_WREG(REG)                                  \
+	do {                                            \
+		txgbe_wr32_ephy(hw, REG##_ADDR, rdata); \
+	} while (0)
+
+#define EPCS_RREG(REG)                                   \
+	do {                                             \
+		rdata = 0;                               \
+		rdata = txgbe_rd32_epcs(hw, REG##_ADDR); \
+	} while (0)
+
+#define EPCS_WREG(REG)                                  \
+	do {                                            \
+		txgbe_wr32_epcs(hw, REG##_ADDR, rdata); \
+	} while (0)
+
+#define txgbe_e56_ephy_config(reg, field, val) \
+	do {                                   \
+		EPHY_RREG(reg);                \
+		EPHY_XFLD(reg, field) = (val); \
+		EPHY_WREG(reg);                \
+	} while (0)
+
+#define txgbe_e56_epcs_config(reg, field, val) \
+	do {                                   \
+		EPCS_RREG(reg);                \
+		EPCS_XFLD(reg, field) = (val); \
+		EPCS_WREG(reg);                \
+	} while (0)
+
 //--------------------------------
 //LAN GPIO define for SFP+ module
 //--------------------------------
@@ -1023,6 +1060,13 @@ typedef union {
 #define S25G_PHY_RX_CTLE_TAP_FRACP1 0x18
 #define S25G_PHY_RX_CTLE_TAP_FRACP2 0x0
 #define S25G_PHY_RX_CTLE_TAP_FRACP3 0x0
+
+void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
+	       unsigned int bitLow, unsigned int setValue);
+int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE);
+u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw);
+u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw);
+//u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed);
 
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
 u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw);

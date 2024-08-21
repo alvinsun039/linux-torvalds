@@ -3,42 +3,6 @@
 
 #include <linux/sort.h>
 
-#define EPHY_RREG(REG)                             \
-	do {                                       \
-		rdata = 0;                         \
-		rdata = rd32_ephy(hw, REG##_ADDR); \
-	} while (0)
-
-#define EPHY_WREG(REG)                                  \
-	do {                                            \
-		txgbe_wr32_ephy(hw, REG##_ADDR, rdata); \
-	} while (0)
-
-#define EPCS_RREG(REG)                                   \
-	do {                                             \
-		rdata = 0;                               \
-		rdata = txgbe_rd32_epcs(hw, REG##_ADDR); \
-	} while (0)
-
-#define EPCS_WREG(REG)                                  \
-	do {                                            \
-		txgbe_wr32_epcs(hw, REG##_ADDR, rdata); \
-	} while (0)
-
-#define txgbe_e56_ephy_config(reg, field, val) \
-	do {                                   \
-		EPHY_RREG(reg);                \
-		EPHY_XFLD(reg, field) = (val); \
-		EPHY_WREG(reg);                \
-	} while (0)
-
-#define txgbe_e56_epcs_config(reg, field, val) \
-	do {                                   \
-		EPCS_RREG(reg);                \
-		EPCS_XFLD(reg, field) = (val); \
-		EPCS_WREG(reg);                \
-	} while (0)
-
 void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 	       unsigned int bitLow, unsigned int setValue)
 {
@@ -87,6 +51,14 @@ u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 		}
 	} else {
 		return 0;
+	}
+
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		adapter->aml_txeq.main = S25G_TX_FFE_CFG_DAC_MAIN;
+		adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_DAC_PRE1;
+		adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
+		adapter->aml_txeq.post = S25G_TX_FFE_CFG_DAC_POST;
 	}
 
 	addr = 0x141c;
@@ -2367,18 +2339,24 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	status = txgbe_e56_config_rx(hw, speed);
 
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
 		value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
-		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
-		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
+		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX,
+			  0x28);
+		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN,
+			  0xa);
 		txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, value);
 
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR,
+				E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR,
+				E56PHY_INTR_1_IDLE_EXIT1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+				E56PHY_INTR_0_IDLE_ENTRY1);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+				E56PHY_INTR_1_IDLE_EXIT1);
 	}
 
 	//wait phy config complete

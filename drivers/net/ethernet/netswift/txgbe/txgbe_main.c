@@ -82,6 +82,7 @@
 #include "txgbe_pcierr.h"
 #include "txgbe_bp.h"
 #include "txgbe_e56.h"
+#include "txgbe_e56_bp.h"
 
 char txgbe_driver_name[32] = TXGBE_NAME;
 static const char txgbe_driver_string[] =
@@ -3694,7 +3695,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	u32 value = 0;
 
 	eicr = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
-
+#if 0
 	if (eicr & TXGBE_PX_MISC_IC_ETH_AN) {
 		if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
 			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
@@ -3705,6 +3706,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 			}
 		}
 	}
+#endif
 
 	if(BOND_CHECK_LINK_MODE == 1){
 		if (eicr & (TXGBE_PX_MISC_IC_ETH_LKDN)){
@@ -3727,7 +3729,6 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 				txgbe_check_lsc(adapter);
 		}
 	}
-
 	if (eicr & TXGBE_PX_MISC_IC_VF_MBOX)
 		txgbe_msg_task(adapter);
 
@@ -9190,6 +9191,11 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 		txgbe_bp_down_event(adapter);
 	}
 
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		txgbe_e65_bp_down_event(adapter);
+	}
+
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
 		return;
@@ -9351,6 +9357,11 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	    hw->dac_sfp) {
 		txgbe_bp_watchdog_event(adapter);
 	}
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		txgbe_e56_bp_watchdog_event(adapter);
+	}
+
 #ifndef POLL_LINK_STATUS
 	if(BOND_CHECK_LINK_MODE == 1){
 		value = rd32(hw, 0x14404);
@@ -9392,6 +9403,19 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	adapter->flags3 &= ~TXGBE_FLAG3_PHY_EVENT;
+
+	if (!(hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)) {
+		mutex_lock(&adapter->e56_lock);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
+		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
+		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+			TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
+		mutex_unlock(&adapter->e56_lock);
+		return;
+	}
 
 	mutex_lock(&adapter->e56_lock);
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);

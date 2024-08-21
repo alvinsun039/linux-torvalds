@@ -1030,6 +1030,7 @@ struct txgbe_adapter {
 	u16 ffe_pre;
 	u16 ffe_post;
 	u8  ffe_set;
+	u16 fec_mode;
 	u8  backplane_mode;
 	u8  backplane_auto;
 	struct phytxeq aml_txeq;
