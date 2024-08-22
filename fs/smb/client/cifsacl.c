@@ -566,8 +566,8 @@ exit_cifs_idmap(void)
 }
 
 /* copy ntsd, owner sid, and group sid from a security descriptor to another */
-static __u32 copy_sec_desc(const struct cifs_ntsd *pntsd,
-				struct cifs_ntsd *pnntsd,
+static __u32 copy_sec_desc(const struct smb_ntsd *pntsd,
+				struct smb_ntsd *pnntsd,
 				__u32 sidsoffset,
 				struct smb_sid *pownersid,
 				struct smb_sid *pgrpsid)
@@ -578,7 +578,7 @@ static __u32 copy_sec_desc(const struct cifs_ntsd *pntsd,
 	/* copy security descriptor control portion */
 	pnntsd->revision = pntsd->revision;
 	pnntsd->type = pntsd->type;
-	pnntsd->dacloffset = cpu_to_le32(sizeof(struct cifs_ntsd));
+	pnntsd->dacloffset = cpu_to_le32(sizeof(struct smb_ntsd));
 	pnntsd->sacloffset = 0;
 	pnntsd->osidoffset = cpu_to_le32(sidsoffset);
 	pnntsd->gsidoffset = cpu_to_le32(sidsoffset + sizeof(struct smb_sid));
@@ -1250,7 +1250,7 @@ static int parse_sid(struct smb_sid *psid, char *end_of_acl)
 
 /* Convert CIFS ACL to POSIX form */
 static int parse_sec_desc(struct cifs_sb_info *cifs_sb,
-		struct cifs_ntsd *pntsd, int acl_len, struct cifs_fattr *fattr,
+		struct smb_ntsd *pntsd, int acl_len, struct cifs_fattr *fattr,
 		bool get_mode_from_special_sid)
 {
 	int rc = 0;
@@ -1308,7 +1308,7 @@ static int parse_sec_desc(struct cifs_sb_info *cifs_sb,
 }
 
 /* Convert permission bits from mode to equivalent CIFS ACL */
-static int build_sec_desc(struct cifs_ntsd *pntsd, struct cifs_ntsd *pnntsd,
+static int build_sec_desc(struct smb_ntsd *pntsd, struct smb_ntsd *pnntsd,
 	__u32 secdesclen, __u32 *pnsecdesclen, __u64 *pnmode, kuid_t uid, kgid_t gid,
 	bool mode_from_sid, bool id_from_sid, bool posix, int *aclflag)
 {
@@ -1338,7 +1338,7 @@ static int build_sec_desc(struct cifs_ntsd *pntsd, struct cifs_ntsd *pnntsd,
 			le32_to_cpu(pntsd->gsidoffset));
 
 	if (pnmode && *pnmode != NO_CHANGE_64) { /* chmod */
-		ndacloffset = sizeof(struct cifs_ntsd);
+		ndacloffset = sizeof(struct smb_ntsd);
 		ndacl_ptr = (struct smb_acl *)((char *)pnntsd + ndacloffset);
 		ndacl_ptr->revision =
 			dacloffset ? dacl_ptr->revision : cpu_to_le16(ACL_REVISION);
@@ -1356,7 +1356,7 @@ static int build_sec_desc(struct cifs_ntsd *pntsd, struct cifs_ntsd *pnntsd,
 
 		*aclflag |= CIFS_ACL_DACL;
 	} else {
-		ndacloffset = sizeof(struct cifs_ntsd);
+		ndacloffset = sizeof(struct smb_ntsd);
 		ndacl_ptr = (struct smb_acl *)((char *)pnntsd + ndacloffset);
 		ndacl_ptr->revision =
 			dacloffset ? dacl_ptr->revision : cpu_to_le16(ACL_REVISION);
@@ -1444,11 +1444,11 @@ chown_chgrp_exit:
 }
 
 #ifdef CONFIG_CIFS_ALLOW_INSECURE_LEGACY
-struct cifs_ntsd *get_cifs_acl_by_fid(struct cifs_sb_info *cifs_sb,
+struct smb_ntsd *get_cifs_acl_by_fid(struct cifs_sb_info *cifs_sb,
 				      const struct cifs_fid *cifsfid, u32 *pacllen,
 				      u32 __maybe_unused unused)
 {
-	struct cifs_ntsd *pntsd = NULL;
+	struct smb_ntsd *pntsd = NULL;
 	unsigned int xid;
 	int rc;
 	struct tcon_link *tlink = cifs_sb_tlink(cifs_sb);
@@ -1469,10 +1469,10 @@ struct cifs_ntsd *get_cifs_acl_by_fid(struct cifs_sb_info *cifs_sb,
 	return pntsd;
 }
 
-static struct cifs_ntsd *get_cifs_acl_by_path(struct cifs_sb_info *cifs_sb,
+static struct smb_ntsd *get_cifs_acl_by_path(struct cifs_sb_info *cifs_sb,
 		const char *path, u32 *pacllen)
 {
-	struct cifs_ntsd *pntsd = NULL;
+	struct smb_ntsd *pntsd = NULL;
 	int oplock = 0;
 	unsigned int xid;
 	int rc;
@@ -1513,11 +1513,11 @@ static struct cifs_ntsd *get_cifs_acl_by_path(struct cifs_sb_info *cifs_sb,
 }
 
 /* Retrieve an ACL from the server */
-struct cifs_ntsd *get_cifs_acl(struct cifs_sb_info *cifs_sb,
+struct smb_ntsd *get_cifs_acl(struct cifs_sb_info *cifs_sb,
 				      struct inode *inode, const char *path,
 			       u32 *pacllen, u32 info)
 {
-	struct cifs_ntsd *pntsd = NULL;
+	struct smb_ntsd *pntsd = NULL;
 	struct cifsFileInfo *open_file = NULL;
 
 	if (inode)
@@ -1531,7 +1531,7 @@ struct cifs_ntsd *get_cifs_acl(struct cifs_sb_info *cifs_sb,
 }
 
  /* Set an ACL on the server */
-int set_cifs_acl(struct cifs_ntsd *pnntsd, __u32 acllen,
+int set_cifs_acl(struct smb_ntsd *pnntsd, __u32 acllen,
 			struct inode *inode, const char *path, int aclflag)
 {
 	int oplock = 0;
@@ -1587,7 +1587,7 @@ cifs_acl_to_fattr(struct cifs_sb_info *cifs_sb, struct cifs_fattr *fattr,
 		  struct inode *inode, bool mode_from_special_sid,
 		  const char *path, const struct cifs_fid *pfid)
 {
-	struct cifs_ntsd *pntsd = NULL;
+	struct smb_ntsd *pntsd = NULL;
 	u32 acllen = 0;
 	int rc = 0;
 	struct tcon_link *tlink = cifs_sb_tlink(cifs_sb);
@@ -1640,8 +1640,8 @@ id_mode_to_cifs_acl(struct inode *inode, const char *path, __u64 *pnmode,
 	__u32 nsecdesclen = 0;
 	__u32 dacloffset = 0;
 	struct smb_acl *dacl_ptr = NULL;
-	struct cifs_ntsd *pntsd = NULL; /* acl obtained from server */
-	struct cifs_ntsd *pnntsd = NULL; /* modified acl to be sent to server */
+	struct smb_ntsd *pntsd = NULL; /* acl obtained from server */
+	struct smb_ntsd *pnntsd = NULL; /* modified acl to be sent to server */
 	struct cifs_sb_info *cifs_sb = CIFS_SB(inode->i_sb);
 	struct tcon_link *tlink = cifs_sb_tlink(cifs_sb);
 	struct smb_version_operations *ops;
@@ -1691,7 +1691,7 @@ id_mode_to_cifs_acl(struct inode *inode, const char *path, __u64 *pnmode,
 			nsecdesclen = secdesclen + (5 * sizeof(struct smb_ace));
 	} else { /* chown */
 		/* When ownership changes, changes new owner sid length could be different */
-		nsecdesclen = sizeof(struct cifs_ntsd) + (sizeof(struct smb_sid) * 2);
+		nsecdesclen = sizeof(struct smb_ntsd) + (sizeof(struct smb_sid) * 2);
 		dacloffset = le32_to_cpu(pntsd->dacloffset);
 		if (dacloffset) {
 			dacl_ptr = (struct smb_acl *)((char *)pntsd + dacloffset);
