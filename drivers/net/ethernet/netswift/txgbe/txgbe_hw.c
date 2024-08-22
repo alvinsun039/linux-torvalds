@@ -6210,7 +6210,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 					break;
 				}
 
-				msleep(200);
 				/* this ret_status for workaorund not return to upper*/
 				ret_status = txgbe_e56_reconfig_rx(hw, speed);
 
