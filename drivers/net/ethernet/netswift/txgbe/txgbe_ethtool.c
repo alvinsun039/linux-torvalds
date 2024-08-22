@@ -4975,6 +4975,14 @@ static int txgbe_get_module_info(struct net_device *dev,
 	u8 sff8472_rev, addr_mode;
 	bool page_swap = false;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+	u32 value;
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_ABS_LS) {
+			return -EIO;
+		}
+	}
 
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 	   return -EBUSY;
@@ -5033,7 +5041,15 @@ static int txgbe_get_module_eeprom(struct net_device *dev,
 	u32 status = TXGBE_ERR_PHY_ADDR_INVALID;
 	u8 databyte = 0xFF;
 	int i = 0;
+	u32 value;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_ABS_LS) {
+			return -EIO;
+		}
+	}
 
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 	   return -EBUSY;
