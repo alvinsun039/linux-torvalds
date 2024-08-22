@@ -6182,8 +6182,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
 			(adapter->autoneg != curr_autoneg))) {
-			if (hw->mac.type == txgbe_mac_aml &&
-				adapter->last_sfp_type == hw->phy.sfp_type)
 				goto out;
 		}
 	}
@@ -6194,38 +6192,33 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			mutex_lock(&adapter->e56_lock);
 			txgbe_e56_set_link_to_kr(adapter, 25, 0);
 			mutex_unlock(&adapter->e56_lock);
-
 			return 0;
 		}
-		if ((adapter->last_speed != speed ||
-			adapter->last_sfp_type != hw->phy.sfp_type) &&
-			hw->phy.sfp_type != txgbe_sfp_type_not_present &&
-			hw->phy.sfp_type != txgbe_sfp_type_unknown) {
-			wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 
-			mutex_lock(&adapter->e56_lock);
-			ret_status = txgbe_set_link_to_amlite(hw, speed);
+		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+			TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 
-			if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
-				adapter->phy_retry = 3;
-				for (i = 0; i < adapter->phy_retry; i++) {
-					TCALL(hw, mac.ops.check_link,
-							&link_speed, &link_up, false);
-					if (link_up) {
-						break;
-					}
+		mutex_lock(&adapter->e56_lock);
+		ret_status = txgbe_set_link_to_amlite(hw, speed);
 
-					msleep(200);
-					/* this ret_status for workaorund not return to upper*/
-					ret_status = txgbe_e56_reconfig_rx(hw, speed);
-
-					if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-						break;
+		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
+			adapter->phy_retry = 3;
+			for (i = 0; i < adapter->phy_retry; i++) {
+				TCALL(hw, mac.ops.check_link,
+						&link_speed, &link_up, false);
+				if (link_up) {
+					break;
 				}
+
+				msleep(200);
+				/* this ret_status for workaorund not return to upper*/
+				ret_status = txgbe_e56_reconfig_rx(hw, speed);
+
+				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
+					break;
 			}
-			mutex_unlock(&adapter->e56_lock);
 		}
+		mutex_unlock(&adapter->e56_lock);
 
 		goto out;
 	}

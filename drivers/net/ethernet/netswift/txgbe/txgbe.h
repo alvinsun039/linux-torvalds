@@ -1163,8 +1163,6 @@ struct txgbe_adapter {
 #endif
 
 	u32 phy_retry;
-	u32 last_speed;
-	enum txgbe_sfp_type last_sfp_type;
 	bool link_valid;
 	bool reconfig_rx;
 	char eeprom_id[32];

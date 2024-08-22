@@ -287,11 +287,12 @@ typedef union {
 #define E56PHY_CMS_ANA_OVRDVAL_10_ADDR (E56PHY_CMS_BASE_ADDR + 0xD8)
 #define E56PHY_CMS_ANA_OVRDVAL_7_ANA_LCPLL_LF_LPF_SETCODE_CALIB_I \
 	FORMAT_NOPARENTHERSES(8, 4)
+#define E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR \
+	FORMAT_NOPARENTHERSES(5, 5)
 
-static int E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
+static void E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	int status = 0;
 	u32 rdata;
 	u32 ULTRAFINE_CODE;
 
@@ -314,8 +315,6 @@ static int E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
 				      ovrd_en_ana_bbcdr_ultrafine_i, 1);
 		msleep(10);
 	}
-
-	return status;
 }
 
 static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
@@ -1014,9 +1013,9 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_adapter *adapter, u8 byLinkMode,
 	/* Wait an fsm_rx_sts 25G */
 	kr_dbg(KR_MODE,
 	       "Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st to be ready ...\n");
-	status = read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0x1b),
-				   1000, 200000, false, hw,
-				   E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+	status |= read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0x1b),
+				    1000, 200000, false, hw,
+				    E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	kr_dbg(KR_MODE, "Wait 25G fsm_rx_sts = %x, Wait rx_sts %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 
@@ -1534,7 +1533,7 @@ static int E56phy25gCfg(struct txgbe_adapter *adapter)
 	rdata = 0x0000;
 	addr = E56PHY_CTRL_FSM_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR, 0x1);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -2005,7 +2004,8 @@ static int E56phy10gCfg(struct txgbe_adapter *adapter)
 	rdata = 0x0000;
 	addr = E56PHY_CTRL_FSM_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR, 0x1);
+
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -2272,7 +2272,7 @@ static int SetPhyLinkMode(struct txgbe_adapter *adapter, u8 byLinkMode,
 		SetFields(&rdata, 4, 0, 0x9);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	status |= E56phyCmsCfgForTempTrackRange(adapter, byLinkMode);
+	status = E56phyCmsCfgForTempTrackRange(adapter, byLinkMode);
 
 	if (byLinkMode == 10)
 		E56phy10gCfg(adapter);
@@ -2289,7 +2289,7 @@ static int SetPhyLinkMode(struct txgbe_adapter *adapter, u8 byLinkMode,
 	SetFields(&rdata, 1, 1, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	return 0;
+	return status;
 }
 
 int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
@@ -2312,8 +2312,10 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 	else
 		rdata |= BIT(19);
 	wr32(hw, 0x1000c, rdata);
-	udelay(1000);
+	msleep(20);
 
+	/* clear interrupt */
+	txgbe_wr32_epcs(hw, 0x078002, 0x0000);
 	txgbe_wr32_epcs(hw, 0x030000, 0x8000);
 	rdata = txgbe_rd32_epcs(hw, 0x070000);
 	SetFields(&rdata, 12, 12, 0x1);
@@ -2330,8 +2332,6 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 	txgbe_wr32_epcs(hw, 0x070016, 0x0000);
 	txgbe_wr32_epcs(hw, 0x070017, 0x0);
 	txgbe_wr32_epcs(hw, 0x070018, 0x0);
-	/* clear interrupt */
-	txgbe_wr32_epcs(hw, 0x078002, 0x0000);
 
 	/* config timer */
 	txgbe_wr32_epcs(hw, 0x078004, 0x003c);
@@ -2348,9 +2348,11 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 				   false, hw, 0x038000);
 	kr_dbg(KR_MODE, "Wait PHY VR_RST = %x, Wait VR_RST %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
+	if (status)
+		return status;
 
 	/* wait rx/tx/cm powerdn_st */
-	udelay(20);
+	msleep(20);
 	/* set phy an status to 0 */
 	txgbe_wr32_ephy(hw, 0x1640, 0x0000);
 	rdata = rd32_ephy(hw, 0x1434);
@@ -2358,10 +2360,14 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 	txgbe_wr32_ephy(hw, 0x1434, rdata);
 
 	kr_dbg(KR_MODE, "1.2 Wait 10G KR phy/pcs mode init ....\n");
-	status |= SetPhyLinkMode(adapter, 10, bypassCtle);
+	status = SetPhyLinkMode(adapter, 10, bypassCtle);
+	if (status)
+		return status;
 
 	kr_dbg(KR_MODE, "1.3 Wait 10G PHY RXS....\n");
-	status |= E56phyRxsOscInitForTempTrackRange(adapter, 10);
+	status = E56phyRxsOscInitForTempTrackRange(adapter, 10);
+	if (status)
+		return status;
 
 	/* Wait an 10g fsm_rx_sts */
 	status = read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0xb),
@@ -2372,7 +2378,7 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 
 	kr_dbg(KR_MODE, "Setup the KR module...========end ==\n");
 
-	return 0;
+	return status;
 }
 
 #define TXGBE_10G_FEC_REQ BIT(15)
@@ -2466,10 +2472,11 @@ static void txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 			/* clear an pacv int */
 			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
 			kr_dbg(KR_MODE, "write 78002 0x%0x\n", 0x0000);
+			usec_delay(100);
 			if (next_page == 0)
-				break;
+				return;
 		}
-		udelay(100);
+		usec_delay(100);
 	}
 }
 
@@ -2501,7 +2508,7 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	kr_dbg(KR_MODE, "Ephy Write A: 0x%x, D: 0x%x\n", 0x1400, rdata);
 
 	/* wait rx/tx/cm powerdn_st */
-	udelay(20);
+	msleep(20);
 	switch (adapter->fec_mode) {
 	case TXGBE_25G_BASE_FEC_REQ:
 		/* FEC: FC-FEC/BASE-R */
@@ -2549,19 +2556,19 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	SetFields(&rdata, 7, 0, 0x3);
 	txgbe_wr32_ephy(hw, 0x1640, rdata);
 	kr_dbg(KR_MODE, "2.3 Wait 25G KR phy mode init ....\n");
-	status |= SetPhyLinkMode(adapter, byLinkMode, bypassCtle);
+	status = SetPhyLinkMode(adapter, byLinkMode, bypassCtle);
 
 	kr_dbg(KR_MODE, "2.4 Wait 25G RXS....\n");
 	status |= E56phyRxsCalibAdaptSeq(adapter, byLinkMode, bypassCtle);
 
 	kr_dbg(KR_MODE, "2.5 Wait 25G phy calibration....\n");
-	status |= E56phySetRxsUfineLeMax(adapter, byLinkMode);
+	E56phySetRxsUfineLeMax(adapter, byLinkMode);
 
 	status |= txgbe_e56_get_temp(hw, &pTempData);
 	status |= E56phyRxsPostCdrLockTempTrackSeq(adapter, byLinkMode);
 
 	kr_dbg(KR_MODE, "2.6 Wait 25G phy kr training check....\n");
-	status = read_poll_timeout(rd32_ephy, rdata, (rdata & BIT(1)), 1000,
+	status = read_poll_timeout(rd32_ephy, rdata, (rdata & BIT(1)), 100,
 				   200000, false, hw, 0x163c);
 	kr_dbg(KR_MODE, "KR TRAINNING CHECK = %x, %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
@@ -2572,20 +2579,31 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	/* Wait an complete INT */
 	kr_dbg(KR_MODE, "2.8 Wait 25G phy an complet int....\n");
 	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(0)),
-				   1000, 10000, false, hw, 0x78002);
+				   100, 20000, false, hw, 0x78002);
 	kr_dbg(KR_MODE, "AN_INT_CMPLT = %x, an_complete %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 
 	/* Wait an RLU */
 	kr_dbg(KR_MODE, "2.9 Wait 25G phy RLU....\n");
 	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(2)),
-				   1000, 10000, false, hw, 0x30001);
+				   100, 20000, false, hw, 0x30001);
 	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
-	if (!status)
+	if (!status) {
 		adapter->link_valid = TRUE;
+	}
+	rdata = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
+	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
+	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
+	txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, rdata);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+			E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+			E56PHY_INTR_1_IDLE_EXIT1);
 
-	return 0;
+	return status;
 }
 
 void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
@@ -2593,6 +2611,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 value = 0;
+	int ret = 0;
 
 	/* only continue if link is down */
 	if (netif_carrier_ok(netdev))
@@ -2600,19 +2619,27 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 
 	value = txgbe_rd32_epcs(hw, 0x78002);
 	if (value & BIT(2)) {
-		e_dev_info("Enter training\n");
-		handle_e56_bkp_an73_flow(0, adapter);
+		if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
+			adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+			e_dev_info("Enter training\n");
+			ret = handle_e56_bkp_an73_flow(0, adapter);
+			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
+		}
 	}
 }
 
 void txgbe_e65_bp_down_event(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
+	u32 val = 0;
 
 	if (adapter->backplane_an == 0)
 		return;
 
+	val = txgbe_rd32_epcs(hw, 0x78002);
+	SetFields(&val, 3, 3, 0);
+	txgbe_wr32_epcs(hw, 0x78002, val);
 	kr_dbg(KR_MODE, "RLU : %x - AN INT : %x - AN CTL : %x AN defsm: %x\n",
-	       txgbe_rd32_epcs(hw, 0x30001), txgbe_rd32_epcs(hw, 0x78002),
-	       txgbe_rd32_epcs(hw, 0x70000), txgbe_rd32_epcs(hw, 0x78010));
+	       txgbe_rd32_epcs(hw, 0x30001), val, txgbe_rd32_epcs(hw, 0x70000),
+	       txgbe_rd32_epcs(hw, 0x78010));
 }

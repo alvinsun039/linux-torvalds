@@ -356,6 +356,8 @@ typedef union {
 #define E56PHY_CTRL_FSM_CFG_0_ADDR (E56PHY_PMD_BASE_ADDR + 0x040)
 #define E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR \
 	FORMAT_NOPARENTHERSES(4, 4)
+#define E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR \
+	FORMAT_NOPARENTHERSES(5, 5)
 #define E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL FORMAT_NOPARENTHERSES(9, 8)
 #define E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN FORMAT_NOPARENTHERSES(31, 24)
 
@@ -1070,7 +1072,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw);
 
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
 u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw);
-u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
+int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed);
 
 #endif /* _TXGBE_E56_H_ */

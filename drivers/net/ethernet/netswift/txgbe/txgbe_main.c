@@ -6923,7 +6923,6 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 
 	if (txgbe_is_sfp(hw)) {
 		if (hw->mac.type == txgbe_mac_aml)
-			adapter->last_speed = TXGBE_LINK_SPEED_UNKNOWN;
 		txgbe_sfp_link_config(adapter);
 	} else if (txgbe_is_backplane(hw)) {
 		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
@@ -9127,7 +9126,6 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		adapter->last_speed = adapter->link_speed;
 		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
 				TXGBE_GPIO_INT_POLARITY_3, TXGBE_GPIO_INT_POLARITY_3);
 	}

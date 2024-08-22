@@ -53,14 +53,6 @@ u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 		return 0;
 	}
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
-		adapter->aml_txeq.main = S25G_TX_FFE_CFG_DAC_MAIN;
-		adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_DAC_PRE1;
-		adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
-		adapter->aml_txeq.post = S25G_TX_FFE_CFG_DAC_POST;
-	}
-
 	addr = 0x141c;
 	txgbe_wr32_ephy(hw, addr, adapter->aml_txeq.main);
 
@@ -76,23 +68,20 @@ u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 	return 0;
 }
 
-u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
+int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 {
 	int data_code, temp_data, temp_fraction;
-	u32 addr, rdata, wdata;
+	u32 rdata;
 	u32 timer = 0;
-
-	addr = 0x10338;
-	wdata = 0x0001;
-	wr32(hw, addr, wdata);
 
 	while (1) {
 		rdata = rd32(hw, 0x1033c);
 		if (((rdata >> 12) & 0x1) != 0)
 			break;
+
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait 0x1033c Timeout!!!\n");
-			return -1;
+			return -ETIMEDOUT;
 		}
 	}
 
@@ -102,9 +91,8 @@ u32 txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 	//Change double Temperature to int
 	*pTempData = temp_data / 10000;
 	temp_fraction = temp_data - (*pTempData * 10000);
-	if (temp_fraction >= 5000) {
+	if (temp_fraction >= 5000)
 		*pTempData += 1;
-	}
 
 	return 0;
 }
@@ -431,7 +419,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 
 	addr = E56PHY_CTRL_FSM_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR, 0x1);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -846,7 +834,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_CTRL_FSM_CFG_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_OFST_CAL_ERR, 0x1);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -2031,7 +2019,6 @@ int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 addr;
 	u32 rdata;
 	u32 timer;
@@ -2074,8 +2061,6 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	}
 
 	status = txgbe_e56_config_rx(hw, speed);
-	if (status)
-		adapter->last_speed = TXGBE_LINK_SPEED_UNKNOWN;
 
 	addr = E56PHY_INTR_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
@@ -2102,7 +2087,6 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status;
@@ -2140,8 +2124,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	wr32(hw, TXGBE_MIS_RST, reset | rd32(hw, TXGBE_MIS_RST));
 	TXGBE_WRITE_FLUSH(hw);
 	usec_delay(10);
-
-	adapter->last_sfp_type = txgbe_sfp_type_not_present;
 
 	/////////////////////////// XLGPCS REGS Start
 	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
@@ -2364,8 +2346,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	if (status)
 		goto out;
-
-	adapter->last_sfp_type = hw->phy.sfp_type;
 
 out:
 	if (ppl_lock) {
