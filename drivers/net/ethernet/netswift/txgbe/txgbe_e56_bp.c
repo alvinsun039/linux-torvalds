@@ -2625,21 +2625,21 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 			ret = handle_e56_bkp_an73_flow(0, adapter);
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 		}
+	} else if ((value & BIT(1)) == BIT(1) || (value & BIT(3)) == BIT(3)) {
+		mutex_lock(&adapter->e56_lock);
+		txgbe_e56_set_link_to_kr(adapter, 25, 0);
+		mutex_unlock(&adapter->e56_lock);
 	}
 }
 
 void txgbe_e65_bp_down_event(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 val = 0;
 
 	if (adapter->backplane_an == 0)
 		return;
 
-	val = txgbe_rd32_epcs(hw, 0x78002);
-	SetFields(&val, 3, 3, 0);
-	txgbe_wr32_epcs(hw, 0x78002, val);
 	kr_dbg(KR_MODE, "RLU : %x - AN INT : %x - AN CTL : %x AN defsm: %x\n",
-	       txgbe_rd32_epcs(hw, 0x30001), val, txgbe_rd32_epcs(hw, 0x70000),
-	       txgbe_rd32_epcs(hw, 0x78010));
+	       txgbe_rd32_epcs(hw, 0x30001), txgbe_rd32_epcs(hw, 0x78002),
+	       txgbe_rd32_epcs(hw, 0x70000), txgbe_rd32_epcs(hw, 0x78010));
 }
