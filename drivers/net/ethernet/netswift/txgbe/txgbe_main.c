@@ -3532,7 +3532,6 @@ static void txgbe_check_sfp_event(struct txgbe_adapter *adapter, u32 eicr)
 					TXGBE_FLAG_NEED_LINK_CONFIG;
 				txgbe_service_event_schedule(adapter);
 			}
-			wr32(hw, TXGBE_GPIO_INTMASK, 0x0);
 		}
 	}
 }
@@ -3809,6 +3808,8 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	/* re-enable the original interrupt state, no lsc, no queues */
 	if (!test_bit(__TXGBE_DOWN, &adapter->state))
 		txgbe_irq_enable(adapter, false, false);
+
+	wr32(hw, TXGBE_GPIO_INTMASK, 0x0);
 
 	return IRQ_HANDLED;
 }
