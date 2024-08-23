@@ -139,11 +139,11 @@
 #endif
 
 #ifndef TXGBE_1588_PPS_LEVEL
-#define TXGBE_1588_PPS_LEVEL 0
+#define TXGBE_1588_PPS_LEVEL 10
 #endif
 
 #ifndef TXGBE_1588_PPS_WIDTH
-#define TXGBE_1588_PPS_WIDTH 120
+#define TXGBE_1588_PPS_WIDTH 200
 #endif
 
 /**************************performance************************************/
