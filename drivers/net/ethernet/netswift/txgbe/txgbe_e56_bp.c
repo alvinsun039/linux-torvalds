@@ -2416,6 +2416,9 @@ static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter)
 		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ |
 				    TXGBE_25G_BASE_FEC_REQ;
 		break;
+	case TXGBE_10G_FEC_ABL | TXGBE_25G_RS_FEC_REQ:
+		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ | TXGBE_10G_FEC_ABL;
+		break;
 	default:
 		adapter->fec_mode = 0;
 		break;
@@ -2443,7 +2446,8 @@ static void txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 	int count = 0;
 
 	an_int = txgbe_rd32_epcs(hw, 0x78002);
-	for (count = 0; count < 100; count++) {
+	/* 500ms timeout */
+	for (count = 0; count < 5000; count++) {
 		kr_dbg(KR_MODE, "-----count----- %d\n", count);
 		if (an_int & BIT(2)) {
 			u8 next_page = 0;
@@ -2516,6 +2520,7 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
 		e_dev_info("Advertised FEC modes : %s\n", "BASE-R");
 		break;
+	case TXGBE_10G_FEC_ABL | TXGBE_25G_RS_FEC_REQ:
 	case TXGBE_25G_BASE_FEC_REQ | TXGBE_25G_RS_FEC_REQ:
 	case TXGBE_25G_RS_FEC_REQ:
 		txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
@@ -2625,7 +2630,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 			ret = handle_e56_bkp_an73_flow(0, adapter);
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 		}
-	} else if ((value & BIT(1)) == BIT(1) || (value & BIT(3)) == BIT(3)) {
+	} else if ((value & BIT(1)) == BIT(1)) {
 		mutex_lock(&adapter->e56_lock);
 		txgbe_e56_set_link_to_kr(adapter, 25, 0);
 		mutex_unlock(&adapter->e56_lock);
