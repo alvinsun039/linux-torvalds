@@ -1008,13 +1008,15 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		old = hw->phy.autoneg_advertised;
 		advertised = 0;
 
-		if (hw->mac.type == txgbe_mac_aml &&
-		    !(cmd->base.speed == SPEED_25000 && cmd->base.autoneg)) {
-			if (cmd->base.speed + cmd->base.duplex == SPEED_25000 + DUPLEX_FULL)
+		if (hw->mac.type == txgbe_mac_aml && !cmd->base.autoneg) {
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
 				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
-			if (cmd->base.speed+cmd->base.duplex == SPEED_10000 + DUPLEX_FULL)
+			else
 				advertised |= TXGBE_LINK_SPEED_10GB_FULL;
 		} else {
+			if (hw->mac.type == txgbe_mac_aml && cmd->base.autoneg &&
+			   !ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
+				return -EINVAL;
 			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
 				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 
@@ -1041,10 +1043,6 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			if (old == advertised && (curr_autoneg == !!(cmd->base.autoneg)))
 				return -EINVAL;
 		}
-
-		if (advertised == TXGBE_LINK_SPEED_10GB_FULL &&
-			cmd->base.autoneg == AUTONEG_DISABLE)
-			return -EINVAL;
 
 		/* this sets the link speed and restarts auto-neg */
 		while (test_and_set_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
