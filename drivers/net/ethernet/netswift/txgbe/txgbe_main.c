@@ -3568,15 +3568,6 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 	struct txgbe_hw *hw = &adapter->hw;
 	u8 device_type = hw->subsystem_device_id & 0xF0;
 
-	/* enable gpio interrupt */
-	if (device_type != TXGBE_ID_MAC_XAUI &&
-	    device_type != TXGBE_ID_MAC_SGMII) {
-		mask |= TXGBE_GPIO_INTEN_2;
-		mask |= TXGBE_GPIO_INTEN_3;
-		mask |= TXGBE_GPIO_INTEN_6;
-	}
-	wr32(&adapter->hw, TXGBE_GPIO_INTEN, mask);
-
 	if (device_type != TXGBE_ID_MAC_XAUI &&
 	    device_type != TXGBE_ID_MAC_SGMII) {
 		mask = TXGBE_GPIO_INTTYPE_LEVEL_2 | TXGBE_GPIO_INTTYPE_LEVEL_3 |
@@ -3615,6 +3606,16 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 	/* flush configuration */
 	if (flush)
 		TXGBE_WRITE_FLUSH(&adapter->hw);
+
+	/* enable gpio interrupt */
+	if (device_type != TXGBE_ID_MAC_XAUI &&
+	    device_type != TXGBE_ID_MAC_SGMII) {
+		mask |= TXGBE_GPIO_INTEN_2;
+		mask |= TXGBE_GPIO_INTEN_3;
+		mask |= TXGBE_GPIO_INTEN_6;
+	}
+	wr32(&adapter->hw, TXGBE_GPIO_INTEN, mask);
+
 }
 
 static void txgbe_do_lan_reset(struct txgbe_adapter *adapter)
@@ -6893,9 +6894,6 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	u32 links_reg;
 	u16 value;
 
-	/* workaround gpio int lost in lldp-on condition */
-	reinit_gpio_int(adapter);
-
 	txgbe_get_hw_control(adapter);
 	txgbe_setup_gpie(adapter);
 	if (adapter->flags & TXGBE_FLAG_MSIX_ENABLED)
@@ -6983,6 +6981,9 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 			}
 		}
 	}
+
+	/* workaround gpio int lost in lldp-on condition */
+	reinit_gpio_int(adapter);
 
 	/* clear any pending interrupts, may auto mask */
 	rd32(hw, TXGBE_PX_IC(0));
