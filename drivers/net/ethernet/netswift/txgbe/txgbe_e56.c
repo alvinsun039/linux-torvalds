@@ -80,7 +80,6 @@ int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 			break;
 
 		if (timer++ > PHYINIT_TIMEOUT) {
-			printk("ERROR: Wait 0x1033c Timeout!!!\n");
 			return -ETIMEDOUT;
 		}
 	}
