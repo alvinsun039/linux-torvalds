@@ -2300,10 +2300,6 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 	u32 rdata;
 
 	kr_dbg(KR_MODE, "Setup to KR ==========\n");
-	/* Lan0 and Lan1 is same for config gpio_ddr and gpio_dr. */
-	wr32(hw, TXGBE_GPIO_DDR,
-	     SFP2_TX_FAULT | SFP2_TX_DISABLE | SFP2_RS1 | SFP2_RS0);
-	wr32(hw, TXGBE_GPIO_DR, SFP2_RS1 | SFP2_RS0);
 
 	/* pcs + phy rst */
 	rdata = rd32(hw, 0x1000c);

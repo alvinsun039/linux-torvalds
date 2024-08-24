@@ -2102,18 +2102,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		TCALL(hw, mac.ops.disable_sec_tx_path);
 	}
 
-	SetFields(&value, SFP1_TX_FAULT, 1);
-	SetFields(&value, SFP1_TX_DISABLE, 1);
-	SetFields(&value, SFP1_RS1, 1);
-	SetFields(&value, SFP1_RS0, 1);
-	wr32(hw, TXGBE_GPIO_DDR, value);
-
-	SetFields(&value, SFP1_TX_FAULT, 0);
-	SetFields(&value, SFP1_TX_DISABLE, 0);
-	SetFields(&value, SFP1_RS1, 1);
-	SetFields(&value, SFP1_RS0, 1);
-	wr32(hw, TXGBE_GPIO_DR, value);
-
 	if (hw->bus.lan_id == 0) {
 		reset = TXGBE_MIS_RST_LAN0_EPHY_RST;
 	} else {

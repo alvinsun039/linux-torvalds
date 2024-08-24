@@ -6959,8 +6959,10 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 		}
 
 		/* amlite: restart gpio */
-		wr32(hw, TXGBE_GPIO_DDR, TXGBE_GPIO_DDR_0 | TXGBE_GPIO_DDR_1);
-		wr32(hw, TXGBE_GPIO_DR, 0x0);
+		wr32(hw, TXGBE_GPIO_DDR,
+			 TXGBE_GPIO_DDR_0 | TXGBE_GPIO_DDR_1 | TXGBE_GPIO_DDR_4 | TXGBE_GPIO_DDR_5);
+		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_4 | TXGBE_GPIO_DR_5);
+
 		msleep(10);
 		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_0);
 		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
