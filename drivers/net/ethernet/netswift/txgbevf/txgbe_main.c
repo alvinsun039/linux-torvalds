@@ -5428,7 +5428,9 @@ int txgbe_change_mtu(struct net_device *netdev, int new_mtu)
 	}
 
 	/* notify the PF of our intent to use this size of frame */
+	spin_lock_bh(&adapter->mbx_lock);
 	ret = txgbe_rlpml_set_vf(hw, max_frame);
+	spin_unlock_bh(&adapter->mbx_lock);
 	if (ret)
 		return -EINVAL;
 
