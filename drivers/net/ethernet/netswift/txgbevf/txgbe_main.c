@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -73,7 +73,7 @@
 
 char txgbe_driver_name[] = KBUILD_MODNAME;
 static const char txgbe_driver_string[] =
-	"WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver";
+	"WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver";
 
 #define TXGBE_CONF_VERSION DRV_VERSION
 const char txgbe_driver_version[] = TXGBE_CONF_VERSION;
@@ -99,7 +99,7 @@ static struct pci_device_id txgbe_pci_tbl[] = {
 
 MODULE_DEVICE_TABLE(pci, txgbe_pci_tbl);
 MODULE_AUTHOR("WangXun Technology, <linux.nic@trustnetic.com>");
-MODULE_DESCRIPTION("WangXun(R) 10GbE Virtual Function Linux Network Driver");
+MODULE_DESCRIPTION("WangXun(R) 25/10GbE Virtual Function Linux Network Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(TXGBE_CONF_VERSION);
 
