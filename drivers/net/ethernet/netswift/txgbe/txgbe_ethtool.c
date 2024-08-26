@@ -542,6 +542,8 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_da_cu_core1:
 		case txgbe_sfp_type_25g_da_cu_core0:
 		case txgbe_sfp_type_25g_da_cu_core1:
+		case txgbe_sfp_type_25g_5m_da_cu_core0:
+		case txgbe_sfp_type_25g_5m_da_cu_core1:
 			ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
 			ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
 			cmd->base.port = PORT_DA;
@@ -809,6 +811,8 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_da_cu_core1:
 		case txgbe_sfp_type_25g_da_cu_core0:
 		case txgbe_sfp_type_25g_da_cu_core1:
+		case txgbe_sfp_type_25g_5m_da_cu_core0:
+		case txgbe_sfp_type_25g_5m_da_cu_core1:
 			ecmd->supported |= SUPPORTED_FIBRE;
 			ecmd->advertising |= ADVERTISED_FIBRE;
 			ecmd->port = PORT_DA;

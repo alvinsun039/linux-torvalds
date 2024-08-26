@@ -9193,8 +9193,8 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 		txgbe_bp_down_event(adapter);
 	}
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1) {
 		txgbe_e65_bp_down_event(adapter);
 	}
 
@@ -9359,8 +9359,8 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	    hw->dac_sfp) {
 		txgbe_bp_watchdog_event(adapter);
 	}
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+	if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1) {
 		txgbe_e56_bp_watchdog_event(adapter);
 	}
 
@@ -9408,6 +9408,8 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 
 	if (!(hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
 		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)) {
 		mutex_lock(&adapter->e56_lock);

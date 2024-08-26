@@ -555,6 +555,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u8 comp_codes_1g = 0;
 	u8 comp_codes_10g = 0;
 	u8 comp_codes_25g = 0;
+	u8 comp_copper_len = 0;
 	u8 oui_bytes[3] = {0, 0, 0};
 	u8 cable_tech = 0;
 	u8 cable_spec = 0;
@@ -612,6 +613,12 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 			goto err_read_i2c_eeprom;
 
 		status = TCALL(hw, phy.ops.read_i2c_eeprom,
+						     TXGBE_SFF_COPPER_LENGTH,
+						     &comp_copper_len);
+		if (status != 0)
+			goto err_read_i2c_eeprom;
+
+		status = TCALL(hw, phy.ops.read_i2c_eeprom,
 						     TXGBE_SFF_CABLE_TECHNOLOGY,
 						     &cable_tech);
 		if (status != 0)
@@ -651,6 +658,15 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					else
 						hw->phy.sfp_type =
 							     txgbe_sfp_type_25g_da_cu_core1;
+
+					if (comp_copper_len == TXGBE_SFF_COPPER_5M) {
+						if (hw->bus.lan_id == 0)
+							hw->phy.sfp_type =
+								     txgbe_sfp_type_25g_5m_da_cu_core0;
+						else
+							hw->phy.sfp_type =
+								     txgbe_sfp_type_25g_5m_da_cu_core1;
+					}
 				}
 			} else if (cable_tech & TXGBE_SFF_DA_ACTIVE_CABLE) {
 				TCALL(hw, phy.ops.read_i2c_eeprom,

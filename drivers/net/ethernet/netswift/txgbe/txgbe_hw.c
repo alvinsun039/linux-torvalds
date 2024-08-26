@@ -4934,6 +4934,8 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core1) {
 		*speed = TXGBE_LINK_SPEED_25GB_FULL;
@@ -6187,8 +6189,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
-		if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1) {
 			mutex_lock(&adapter->e56_lock);
 			txgbe_e56_set_link_to_kr(adapter, 25, 0);
 			mutex_unlock(&adapter->e56_lock);
