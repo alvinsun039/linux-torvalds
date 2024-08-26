@@ -1686,6 +1686,15 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			adapter->link_valid = false;
+			if (hw->phy.sfp_type ==
+				    txgbe_sfp_type_25g_da_cu_core0 ||
+			    hw->phy.sfp_type ==
+				    txgbe_sfp_type_25g_da_cu_core1 ||
+			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)
+				wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+				      TXGBE_AML_LINK_STATUS_OVRD_EN,
+				      TXGBE_AML_LINK_STATUS_OVRD_EN);
 			return TXGBE_ERR_TIMEOUT;
 		}
 	}
@@ -1699,6 +1708,15 @@ int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		udelay(500);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			adapter->link_valid = false;
+			if (hw->phy.sfp_type ==
+				    txgbe_sfp_type_25g_da_cu_core0 ||
+			    hw->phy.sfp_type ==
+				    txgbe_sfp_type_25g_da_cu_core1 ||
+			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)
+				wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
+				      TXGBE_AML_LINK_STATUS_OVRD_EN,
+				      TXGBE_AML_LINK_STATUS_OVRD_EN);
 			return TXGBE_ERR_TIMEOUT;
 		}
 	}

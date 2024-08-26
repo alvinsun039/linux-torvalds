@@ -6197,9 +6197,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			return 0;
 		}
 
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-			TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
-
 		mutex_lock(&adapter->e56_lock);
 		ret_status = txgbe_set_link_to_amlite(hw, speed);
 

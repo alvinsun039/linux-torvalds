@@ -3548,7 +3548,6 @@ static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 
 static void txgbe_check_phy_event(struct txgbe_adapter *adapter)
 {
-	e_info(link, "txgbe_check_phy_event");
 
 	adapter->flags3 |= TXGBE_FLAG3_PHY_EVENT;
 
