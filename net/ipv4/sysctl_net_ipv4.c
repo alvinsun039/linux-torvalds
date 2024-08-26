@@ -575,6 +575,13 @@ static struct ctl_table ipv4_table[] = {
 		.extra1		= &sysctl_fib_sync_mem_min,
 		.extra2		= &sysctl_fib_sync_mem_max,
 	},
+	{
+		.procname	= "local_port_allocation",
+		.data		= &sysctl_local_port_allocation,
+		.maxlen		= sizeof(sysctl_local_port_allocation),
+		.mode		= 0644,
+		.proc_handler	= proc_dobool,
+	},
 };
 
 static struct ctl_table ipv4_net_table[] = {

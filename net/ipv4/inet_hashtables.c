@@ -28,6 +28,8 @@
 #include <net/tcp.h>
 #include <net/sock_reuseport.h>
 
+bool sysctl_local_port_allocation;
+
 u32 inet_ehashfn(const struct net *net, const __be32 laddr,
 		 const __u16 lport, const __be32 faddr,
 		 const __be16 fport)
@@ -1026,6 +1028,11 @@ int __inet_hash_connect(struct inet_timewait_death_row *death_row,
 	l3mdev = inet_sk_bound_l3mdev(sk);
 
 	local_ports = inet_sk_get_local_port_range(sk, &low, &high);
+	/* local_port_allocation 0 means even and odd port allocation strategy
+	 * will be applied, so step is 2; otherwise sequential allocation will
+	 * be used and step is 1. Default value is 0.
+	 */
+	local_ports |= READ_ONCE(sysctl_local_port_allocation);
 	step = local_ports ? 1 : 2;
 
 	high++; /* [32768, 60999] -> [32768, 61000[ */

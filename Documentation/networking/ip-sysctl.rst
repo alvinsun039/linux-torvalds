@@ -137,6 +137,18 @@ fib_sync_mem - UNSIGNED INTEGER
 
 	Default: 512kB   Minimum: 64kB   Maximum: 64MB
 
+local_port_allocation - BOOLEAN
+	Enable all odd and even ports to use for connect(), 0 means even and odd
+	port allocation strategy will be applied, otherwise sequential allocation
+	will be used.
+
+	Default: 0
+
+	Possible values:
+
+	- 0 - Use even ports for connect()
+	- 1 - Use all odd and even ports for connect()
+
 ip_forward_update_priority - INTEGER
 	Whether to update SKB priority from "TOS" field in IPv4 header after it
 	is forwarded. The new SKB priority is mapped from TOS field value
