@@ -9422,7 +9422,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 	mutex_lock(&adapter->e56_lock);
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
 	if (rdata & E56PHY_INTR_0_IDLE_ENTRY1) {
-		e_info(link, "E56PHY_INTR_0_IDLE_ENTRY1");
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
 		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
 				TXGBE_AML_LINK_STATUS_OVRD_EN, TXGBE_AML_LINK_STATUS_OVRD_EN);
@@ -9434,7 +9433,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
 	if (rdata & E56PHY_INTR_1_IDLE_EXIT1) {
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-		e_info(link, "E56PHY_INTR_1_IDLE_EXIT1");
 		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
 				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
