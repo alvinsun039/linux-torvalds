@@ -1,5 +1,5 @@
 /*
- * WangXun 10 Gigabit PCI Express Linux driver
+ * WangXun 25/10 Gigabit PCI Express Linux driver
  * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
