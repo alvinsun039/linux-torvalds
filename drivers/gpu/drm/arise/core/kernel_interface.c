@@ -1311,7 +1311,7 @@ static void krnl_task_timeout_update(void* data, unsigned long long *value, int 
     if (update)
         adapter->hw_hang_fast_timeout_ns = *value * 1000000;
     else
-        *value = adapter->hw_hang_fast_timeout_ns / 1000000;
+        *value = gf_do_div(adapter->hw_hang_fast_timeout_ns, 1000000);
 }
 
 static core_interface_t gfe3k_gpu_core = {
