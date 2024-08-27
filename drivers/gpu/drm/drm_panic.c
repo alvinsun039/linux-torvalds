@@ -19,6 +19,10 @@
 #include <linux/printk.h>
 #include <linux/types.h>
 
+#ifdef CONFIG_QRLIB
+#include <linux/qrencode.h>
+#endif
+
 #include <drm/drm_drv.h>
 #include <drm/drm_fourcc.h>
 #include <drm/drm_framebuffer.h>
@@ -34,8 +38,8 @@ MODULE_LICENSE("GPL");
 static char drm_panic_screen[16] = CONFIG_DRM_PANIC_SCREEN;
 module_param_string(panic_screen, drm_panic_screen, sizeof(drm_panic_screen), 0644);
 MODULE_PARM_DESC(panic_screen,
-		 "Choose what will be displayed by drm_panic, 'user' or 'kmsg' [default="
-		 CONFIG_DRM_PANIC_SCREEN "]");
+		 "Choose what will be displayed by drm_panic, 'user' or 'kmsg' or "
+		 "'qr_code' [default=" CONFIG_DRM_PANIC_SCREEN "]");
 
 /**
  * DOC: overview
@@ -608,6 +612,104 @@ static void draw_panic_static_kmsg(struct drm_scanout_buffer *sb)
 	}
 }
 
+#ifdef CONFIG_QRLIB
+
+#define WHITE_LINE		16
+#define MAX_QR_DATA		2956
+#define QR_MAX_DRAW_WIDTH	600
+
+char kernel_message_data[MAX_QR_DATA * 3];
+
+static void draw_qr_code(struct drm_scanout_buffer *sb, struct drm_rect *qr_code_screen,
+			 struct QRcode *qr, size_t scale, u32 bg_color)
+{
+	unsigned int x, y;
+	struct iosys_map map = sb->map[0];
+
+	if (!sb->set_pixel)
+		iosys_map_incr(&map, qr_code_screen->y1 * sb->pitch[0] + qr_code_screen->x1 * sb->format->cpp[0]);
+
+	for (y = 0; y < drm_rect_height(qr_code_screen); y++)
+		for (x = 0; x < drm_rect_width(qr_code_screen); x++)
+			if (qr->data[y / scale * qr->width + x / scale] & 0x1) {
+				if (sb->set_pixel)
+					sb->set_pixel(sb, qr_code_screen->x1 + x, qr_code_screen->y1 + y, bg_color);
+				else
+					iosys_map_wr(&map, y * sb->pitch[0] + x * sizeof(u32), u32, bg_color);
+			}
+}
+
+static void draw_panic_qr_code(struct drm_scanout_buffer *sb)
+{
+	struct kmsg_dump_iter iter;
+	size_t kmsg_len;
+	char *qr_encode_start;
+	struct QRcode *qr;
+	size_t min_side, scale;
+	struct drm_rect r_screen, r_msg;
+	int qr_draw_width;
+	size_t msg_lines = ARRAY_SIZE(panic_msg);
+	u32 fg_color = convert_from_xrgb8888(CONFIG_DRM_PANIC_FOREGROUND_COLOR, sb->format->format);
+	u32 bg_color = convert_from_xrgb8888(CONFIG_DRM_PANIC_BACKGROUND_COLOR, sb->format->format);
+	const struct font_desc *font = get_default_font(sb->width, sb->height, NULL, NULL);
+
+	// Gets a 3xMAX_QR_DATA length kernel log from which the encoded text content is cut
+	kmsg_dump_rewind(&iter);
+	kmsg_dump_get_buffer(&iter, false, kernel_message_data, MAX_QR_DATA * 3, &kmsg_len);
+
+	qr_encode_start = strstr(kernel_message_data, "Call Trace:");
+
+	if (qr_encode_start) {
+		size_t tmp_len = strlen(qr_encode_start);
+
+		if (tmp_len > MAX_QR_DATA) {
+			kmsg_len = MAX_QR_DATA;
+		} else {
+			qr_encode_start -= MAX_QR_DATA - tmp_len;
+			qr_encode_start = strchr(qr_encode_start, '\n');
+			kmsg_len = strlen(qr_encode_start);
+		}
+	} else {
+		size_t tmp_len = min(MAX_QR_DATA, kmsg_len);
+
+		qr_encode_start = kernel_message_data + kmsg_len - tmp_len;
+		qr_encode_start = strchr(qr_encode_start, '\n');
+		kmsg_len = strlen(qr_encode_start);
+	}
+
+	qr = QRcode_encodeData(kmsg_len, qr_encode_start, 0, QR_ECLEVEL_L);
+	if (!qr)
+		return;
+
+	r_screen = DRM_RECT_INIT(0, 0, sb->width, sb->height);
+	drm_panic_fill(sb, &r_screen, bg_color);
+
+	min_side = min(sb->height * 4 / 5, sb->width);
+	min_side = min(min_side, QR_MAX_DRAW_WIDTH);
+	scale = min_side / (qr->width + WHITE_LINE);
+	qr_draw_width = qr->width * scale;
+
+	r_screen = DRM_RECT_INIT((sb->width - qr_draw_width - WHITE_LINE) / 2,
+				 (sb->height * 4 / 5 - qr_draw_width - WHITE_LINE) / 2,
+				 qr_draw_width + WHITE_LINE, qr_draw_width + WHITE_LINE);
+	drm_panic_fill(sb, &r_screen, 0xffffff);
+
+	r_screen = DRM_RECT_INIT((sb->width - qr_draw_width) / 2,
+				 (sb->height * 4 / 5 - qr_draw_width) / 2,
+				 qr_draw_width, qr_draw_width);
+	draw_qr_code(sb, &r_screen, qr, scale, bg_color);
+
+	if (!font)
+		return;
+
+	r_msg = DRM_RECT_INIT(0, 0,
+			      min(get_max_line_len(panic_msg, msg_lines) * font->width, sb->width),
+			      min(msg_lines * font->height, sb->height));
+	drm_rect_translate(&r_msg, (sb->width - r_msg.x2) / 2, sb->height * 3 / 4);
+	draw_txt_rectangle(sb, font, panic_msg, msg_lines, true, &r_msg, fg_color);
+}
+#endif
+
 /*
  * drm_panic_is_format_supported()
  * @format: a fourcc color code
@@ -624,11 +726,14 @@ static bool drm_panic_is_format_supported(const struct drm_format_info *format)
 
 static void draw_panic_dispatch(struct drm_scanout_buffer *sb)
 {
-	if (!strcmp(drm_panic_screen, "kmsg")) {
+	if (!strcmp(drm_panic_screen, "kmsg"))
 		draw_panic_static_kmsg(sb);
-	} else {
+#ifdef CONFIG_QRLIB
+	else if (!strcmp(drm_panic_screen, "qr_code"))
+		draw_panic_qr_code(sb);
+#endif
+	else
 		draw_panic_static_user(sb);
-	}
 }
 
 static void draw_panic_plane(struct drm_plane *plane)
