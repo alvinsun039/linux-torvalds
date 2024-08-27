@@ -450,6 +450,11 @@ config BCH_CONST_T
 	  Drivers should declare a default value for this symbol if
 	  they select option BCH_CONST_PARAMS.
 
+config QRLIB
+	bool "QR encoding library"
+	help
+	  QR encoding library
+
 #
 # Textsearch support is select'ed if needed
 #
