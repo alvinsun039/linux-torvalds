@@ -86,13 +86,16 @@ static struct drm_panic_line panic_msg[] = {
 };
 
 static const struct drm_panic_line logo_ascii[] = {
-	PANIC_LINE("     .--.        _"),
-	PANIC_LINE("    |o_o |      | |"),
-	PANIC_LINE("    |:_/ |      | |"),
-	PANIC_LINE("   //   \\ \\     |_|"),
-	PANIC_LINE("  (|     | )     _"),
-	PANIC_LINE(" /'\\_   _/`\\    (_)"),
-	PANIC_LINE(" \\___)=(___/"),
+	PANIC_LINE(" .---.     .---."),
+	PANIC_LINE(" |   |    /   /"),
+	PANIC_LINE(" |   |   /   /  .---.    .---. .---.      .---. .---.    .---."),
+	PANIC_LINE(" |   |  /   /    \\   \\  /   /  |   |      |   | |    \\   |   |"),
+	PANIC_LINE(" |   | /   /      \\   \\/   /   |   |      |   | |   | \\  |   |"),
+	PANIC_LINE(" |   | \\   \\       \\      /    |   |      |   | |   |  \\ |   |"),
+	PANIC_LINE(" |   |  \\   \\       |    |     |   |      |   | |   \\   \\|   |"),
+	PANIC_LINE(" |   |   \\   \\      |    |     |   |      |   | |   |\\   |   |"),
+	PANIC_LINE(" |   |    \\   \\     |    |     |   \\.---. |   | |   | \\  |   |"),
+	PANIC_LINE(" \\___/     \\__/     \\____/     \\________| \\___/ \\__/   \\____/ "),
 };
 
 #if defined(CONFIG_LOGO) && !defined(MODULE)
@@ -646,9 +649,11 @@ static void draw_panic_qr_code(struct drm_scanout_buffer *sb)
 	char *qr_encode_start;
 	struct QRcode *qr;
 	size_t min_side, scale;
-	struct drm_rect r_screen, r_msg;
+	struct drm_rect r_screen, r_msg, r_logo;
 	int qr_draw_width;
+	unsigned int logo_width, logo_height;
 	size_t msg_lines = ARRAY_SIZE(panic_msg);
+	size_t logo_ascii_lines = ARRAY_SIZE(logo_ascii);
 	u32 fg_color = convert_from_xrgb8888(CONFIG_DRM_PANIC_FOREGROUND_COLOR, sb->format->format);
 	u32 bg_color = convert_from_xrgb8888(CONFIG_DRM_PANIC_BACKGROUND_COLOR, sb->format->format);
 	const struct font_desc *font = get_default_font(sb->width, sb->height, NULL, NULL);
@@ -707,6 +712,11 @@ static void draw_panic_qr_code(struct drm_scanout_buffer *sb)
 			      min(msg_lines * font->height, sb->height));
 	drm_rect_translate(&r_msg, (sb->width - r_msg.x2) / 2, sb->height * 3 / 4);
 	draw_txt_rectangle(sb, font, panic_msg, msg_lines, true, &r_msg, fg_color);
+
+	logo_width = get_max_line_len(logo_ascii, logo_ascii_lines) * font->width;
+	logo_height = logo_ascii_lines * font->height;
+	r_logo = DRM_RECT_INIT(0, 0, logo_width, logo_height);
+	draw_txt_rectangle(sb, font, logo_ascii, logo_ascii_lines, false, &r_logo, fg_color);
 }
 #endif
 
