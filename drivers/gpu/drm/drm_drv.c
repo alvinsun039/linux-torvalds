@@ -43,6 +43,7 @@
 #include <drm/drm_file.h>
 #include <drm/drm_managed.h>
 #include <drm/drm_mode_object.h>
+#include <drm/drm_panic.h>
 #include <drm/drm_print.h>
 #include <drm/drm_privacy_screen_machine.h>
 
@@ -958,6 +959,7 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 		if (ret)
 			goto err_unload;
 	}
+	drm_panic_register(dev);
 
 	DRM_INFO("Initialized %s %d.%d.%d %s for %s on minor %d\n",
 		 driver->name, driver->major, driver->minor,
@@ -1004,6 +1006,8 @@ void drm_dev_unregister(struct drm_device *dev)
 		drm_lastclose(dev);
 
 	dev->registered = false;
+
+	drm_panic_unregister(dev);
 
 	drm_client_dev_unregister(dev);
 
