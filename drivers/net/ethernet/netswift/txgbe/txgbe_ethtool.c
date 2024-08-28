@@ -1013,7 +1013,8 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		advertised = 0;
 
 		if (hw->mac.type == txgbe_mac_aml && !cmd->base.autoneg) {
-			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
+			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full) ||
+			    cmd->base.speed == SPEED_25000)
 				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 			else
 				advertised |= TXGBE_LINK_SPEED_10GB_FULL;
