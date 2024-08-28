@@ -1020,6 +1020,7 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
  * @f_task_work: task work entry point
  * @f_llist: work queue entrypoint
  * @f_ra: file's readahead state
+ * @f_freeptr: Pointer used by SLAB_TYPESAFE_BY_RCU file cache (don't touch.)
  */
 struct file {
 	atomic_long_t			f_count;
@@ -1053,6 +1054,7 @@ struct file {
 		/* fput() must use workqueue (most kernel threads). */
 		struct llist_node	f_llist;
 		struct file_ra_state	f_ra;
+		freeptr_t		f_freeptr;
 	};
 	/* --- cacheline 3 boundary (192 bytes) --- */
 } __randomize_layout
