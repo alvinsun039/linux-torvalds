@@ -23,6 +23,7 @@
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/drm_gem_atomic_helper.h>
+#include <drm/drm_panic.h>
 #include "mwv207_bo.h"
 #include "mwv207_va.h"
 #include "mwv207_vi.h"
@@ -206,6 +207,37 @@ static void mwv207_primary_atomic_disable(struct drm_plane *plane,
 
 }
 
+static int mwv207_primary_plane_get_scanout_buffer(struct drm_plane *plane,
+						   struct drm_scanout_buffer *sb)
+{
+	struct drm_framebuffer *fb;
+	struct mwv207_bo *jbo;
+
+	if (!plane->state || !plane->state->fb)
+		return -EINVAL;
+
+	fb = plane->state->fb;
+	jbo = gem_to_mwv207_bo(fb->obj[0]);
+
+	if (!jbo->kmap.virtual &&
+	    ttm_bo_kmap(&jbo->tbo, 0, PFN_UP(jbo->tbo.base.size), &jbo->kmap)) {
+		DRM_WARN("mwv207 bo map failed, panic won't be displayed\n");
+		return -ENOMEM;
+	}
+
+	if (jbo->kmap.bo_kmap_type & TTM_BO_MAP_IOMEM_MASK)
+		iosys_map_set_vaddr_iomem(&sb->map[0], jbo->kmap.virtual);
+	else
+		iosys_map_set_vaddr(&sb->map[0], jbo->kmap.virtual);
+
+	sb->width = fb->width;
+	sb->height = fb->height;
+	sb->format = fb->format;
+	sb->pitch[0] = fb->pitches[0];
+
+	return 0;
+}
+
 static void mwv207_cursor_switch(struct mwv207_va *va, bool on)
 {
 	mwv207_va_modify(va, 0x478, 0xff, on ? 6 : 0);
@@ -256,11 +288,12 @@ static const struct drm_plane_funcs mwv207_plane_funcs = {
 };
 
 static const struct drm_plane_helper_funcs mwv207_primary_helper_funcs = {
-	.prepare_fb     = mwv207_plane_prepare_fb,
-	.cleanup_fb     = mwv207_plane_cleanup_fb,
-	.atomic_check   = mwv207_plane_atomic_check,
-	.atomic_update  = mwv207_primary_atomic_update,
-	.atomic_disable = mwv207_primary_atomic_disable,
+	.prepare_fb         = mwv207_plane_prepare_fb,
+	.cleanup_fb         = mwv207_plane_cleanup_fb,
+	.atomic_check       = mwv207_plane_atomic_check,
+	.atomic_update      = mwv207_primary_atomic_update,
+	.atomic_disable     = mwv207_primary_atomic_disable,
+	.get_scanout_buffer = mwv207_primary_plane_get_scanout_buffer,
 };
 
 static const struct drm_plane_helper_funcs mwv207_cursor_helper_funcs = {
