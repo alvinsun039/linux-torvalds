@@ -51,43 +51,35 @@ static void mwv207_i2c_gpio_multi(struct mwv207_i2c *i2c, int mask)
 	struct mwv207_device *jdev = i2c->jdev;
 
 	switch (mask) {
-	case (1 << 19):
-
+	case BIT(19):
 		jdev_modify(jdev, (0x9b0918), 0x3 << 12, 0);
 		jdev_modify(jdev, (0x9b0918), 0x3 << 16, 0);
 		break;
-	case (1 << 21):
-
+	case BIT(21):
 		jdev_modify(jdev, (0x9b0918), 0x3 << 20, 0);
 		jdev_modify(jdev, (0x9b0918), 0x3 << 24, 0);
 		break;
-	case (1 << 23):
-
+	case BIT(23):
 		jdev_modify(jdev, (0x9b0918), 0x3 << 28, 0);
 		jdev_modify(jdev, (0x9b091c), 0x3, 0);
 		break;
-	case (1 << 25):
-
+	case BIT(25):
 		jdev_modify(jdev, (0x9b091c), 0x3 << 4, 0);
 		jdev_modify(jdev, (0x9b091c), 0x3 << 8, 0);
 		break;
-	case (1 << 27):
-
+	case BIT(27):
 		jdev_modify(jdev, (0x9b091c), 0x3 << 12, 0);
 		jdev_modify(jdev, (0x9b091c), 0x3 << 16, 0);
 		break;
-	case (1 << 29):
-
+	case BIT(29):
 		jdev_modify(jdev, (0x9b091c), 0x3 << 20, 0);
 		jdev_modify(jdev, (0x9b091c), 0x3 << 24, 0);
 		break;
-	case (1 << 31):
-
+	case BIT(31):
 		jdev_modify(jdev, (0x9b091c), 0x3 << 28, 0);
 		jdev_modify(jdev, (0x9b0910), 0x3, 0);
 		break;
-	case (1 << 1):
-
+	case BIT(1):
 		jdev_modify(jdev, (0x9b0910), 0x3 << 4, 0);
 		jdev_modify(jdev, (0x9b0910), 0x3 << 8, 0);
 		break;
