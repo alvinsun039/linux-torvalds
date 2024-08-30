@@ -57,11 +57,6 @@
 
 #define ETHTOOL_LINK_MODE_SPEED_MASK	0xfffe903f
 
-#ifndef SUPPORTED_25000baseSR_Full
-#define SUPPORTED_25000baseSR_Full    __ETHTOOL_LINK_MODE_LEGACY_MASK(25000baseSR_Full)
-#define ADVERTISED_25000baseSR_Full   __ETHTOOL_LINK_MODE_LEGACY_MASK(25000baseSR_Full)
-#endif
-
 #ifdef ETHTOOL_GSTATS
 struct txgbe_stats {
 	char stat_string[ETH_GSTRING_LEN];
@@ -718,8 +713,6 @@ int txgbe_get_settings(struct net_device *netdev,
 		autoneg = adapter->autoneg ? 1 : 0;
 
 	/* set the supported link speeds */
-	if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
-		ecmd->supported |= SUPPORTED_25000baseSR_Full;
 	if (supported_link & TXGBE_LINK_SPEED_10GB_FULL)
 		ecmd->supported |= (txgbe_isbackplane(hw->phy.media_type)) ?
 			txgbe_backplane_type(hw) : SUPPORTED_10000baseT_Full;
@@ -737,8 +730,6 @@ int txgbe_get_settings(struct net_device *netdev,
 	/* set the advertised speeds */
 	if (hw->phy.autoneg_advertised) {
 		ecmd->advertising = 0;
-		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_25GB_FULL)
-			ecmd->advertising |= ADVERTISED_25000baseSR_Full;
 		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_100_FULL)
 			ecmd->advertising |= ADVERTISED_100baseT_Full;
 		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_10GB_FULL)
@@ -752,8 +743,6 @@ int txgbe_get_settings(struct net_device *netdev,
 		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_10_FULL)
 			ecmd->advertising |= ADVERTISED_10baseT_Full;
 	} else {
-		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
-			ecmd->advertising |= ADVERTISED_25000baseSR_Full;
 		/* default modes in case phy.autoneg_advertised isn't set */
 		if (supported_link & TXGBE_LINK_SPEED_10GB_FULL)
 			ecmd->advertising |= (txgbe_isbackplane(hw->phy.media_type)) ?
@@ -826,7 +815,7 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_lx_core0:
 		case txgbe_sfp_type_1g_lx_core1:
 		case txgbe_sfp_type_25g_sr_core0:
-		case txgbe_sfp_type_25g_sr_core0:
+		case txgbe_sfp_type_25g_sr_core1:
 			ecmd->supported |= SUPPORTED_FIBRE;
 			ecmd->advertising |= ADVERTISED_FIBRE;
 			ecmd->port = PORT_FIBRE;
@@ -1200,8 +1189,6 @@ static int txgbe_set_settings(struct net_device *netdev,
 
 		old = hw->phy.autoneg_advertised;
 		advertised = 0;
-		if (ecmd->advertising & ADVERTISED_25000baseSR_Full)
-			advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 
 		if (ecmd->advertising & ADVERTISED_10000baseT_Full)
 			advertised |= TXGBE_LINK_SPEED_10GB_FULL;
@@ -1273,7 +1260,6 @@ static int txgbe_set_settings(struct net_device *netdev,
 		return err;
 	} else {
 		/* in this case we currently only support 10Gb/FULL and 1Gb/FULL*/
-		u32 speed = ethtool_cmd_speed(ecmd);
 		if (hw->mac.type == txgbe_mac_aml) {
 				return -EINVAL;
 		} else if (ecmd->advertising & ADVERTISED_10000baseT_Full) {
