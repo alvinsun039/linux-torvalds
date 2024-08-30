@@ -6666,6 +6666,18 @@ static inline bool uuid_equal(const uuid_t *u1, const uuid_t *u2)
 #define ethtool_link_ksettings_del_link_mode(ptr, name, mode)		\
 	__clear_bit(ETHTOOL_LINK_MODE_ ## mode ## _BIT, (ptr)->link_modes.name)
 #endif
+#ifndef ETHTOOL_LINK_MODE_1000baseX_Full_BIT
+#define ETHTOOL_LINK_MODE_1000baseX_Full_BIT    0
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseCR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseCR_Full_BIT  0
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseSR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseSR_Full_BIT  0
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseLR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseLR_Full_BIT  0
+#endif
 #endif /* ETHTOOL_GLINKSETTINGS */
 #if (SLE_VERSION_CODE && (SLE_VERSION_CODE >= SLE_VERSION(12,4,0)))
 #define HAVE_NDO_SETUP_TC_REMOVE_TC_TO_NETDEV
