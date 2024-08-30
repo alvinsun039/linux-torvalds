@@ -411,6 +411,8 @@ unsigned long lruvec_page_state_local(struct lruvec *lruvec,
 static const unsigned int memcg_vm_event_stat[] = {
 	PGPGIN,
 	PGPGOUT,
+	PSWPIN,
+	PSWPOUT,
 	PGSCAN_KSWAPD,
 	PGSCAN_DIRECT,
 	PGSCAN_KHUGEPAGED,
