@@ -115,6 +115,7 @@ extern const struct bus_type amba_bustype;
 #ifdef CONFIG_ARM_AMBA
 int amba_driver_register(struct amba_driver *);
 void amba_driver_unregister(struct amba_driver *);
+bool dev_is_amba(const struct device *dev);
 #else
 static inline int amba_driver_register(struct amba_driver *drv)
 {
@@ -122,6 +123,10 @@ static inline int amba_driver_register(struct amba_driver *drv)
 }
 static inline void amba_driver_unregister(struct amba_driver *drv)
 {
+}
+static inline bool dev_is_amba(const struct device *dev)
+{
+	return false;
 }
 #endif
 
