@@ -6920,7 +6920,6 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 #endif
 
 	if (txgbe_is_sfp(hw)) {
-		if (hw->mac.type == txgbe_mac_aml)
 		txgbe_sfp_link_config(adapter);
 	} else if (txgbe_is_backplane(hw)) {
 		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
