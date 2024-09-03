@@ -7,6 +7,7 @@ ccflags-y += -Wno-misleading-indentation
 ccflags-y += -Wno-address
 ccflags-y += -Wno-stringop-overread
 ccflags-y += -Wno-enum-int-mismatch
+ccflags-y += -Wno-int-in-bool-context
 
 EXTRA_CFLAGS += $(USER_EXTRA_CFLAGS)
 EXTRA_CFLAGS += -O1

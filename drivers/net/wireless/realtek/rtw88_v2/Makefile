@@ -8,6 +8,7 @@ ccflags-y += -Wno-misleading-indentation
 ccflags-y += -Wno-address
 ccflags-y += -Wno-stringop-overread
 ccflags-y += -Wno-enum-int-mismatch
+ccflags-y += -Wno-int-in-bool-context
 
 obj-$(CONFIG_RTW88_CORE)	+= rtw88_core.o
 rtw88_core-y += drv_ver.o
