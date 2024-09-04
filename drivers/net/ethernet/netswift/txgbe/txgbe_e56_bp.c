@@ -1168,7 +1168,7 @@ static int E56phyTxFfeCfg(struct txgbe_adapter *adapter)
 static int E56phy25gCfg(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	int addr, rdata;
+	u32 addr, rdata;
 
 	rdata = 0x0000;
 	addr = E56PHY_CMS_PIN_OVRDVAL_0_ADDR;
@@ -1668,7 +1668,7 @@ static int E56phy25gCfg(struct txgbe_adapter *adapter)
 static int E56phy10gCfg(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	int addr, rdata;
+	u32 addr, rdata;
 
 	rdata = 0x0000;
 	addr = E56G__CMS_ANA_OVRDVAL_7_ADDR;
