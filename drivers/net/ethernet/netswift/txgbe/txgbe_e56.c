@@ -26,7 +26,7 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 	}
 }
 
-u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
+static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	u32 addr;
@@ -948,7 +948,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 	return 0;
 }
 
-int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
+static int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0;
 	unsigned int addr, rdata, timer;
@@ -1283,7 +1283,7 @@ int E56phyRxsOscInitForTempTrackRange(struct txgbe_hw *hw, u32 speed)
 	return status;
 }
 
-int E56phySetRxsUfineLeMax(struct txgbe_hw *hw, u32 speed)
+static int E56phySetRxsUfineLeMax(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0;
 	unsigned int rdata;
@@ -1321,7 +1321,7 @@ int E56phySetRxsUfineLeMax(struct txgbe_hw *hw, u32 speed)
 //--------------------------------------------------------------
 //compare function for qsort()
 //--------------------------------------------------------------
-int compare(const void *a, const void *b)
+static int compare(const void *a, const void *b)
 {
 	const int *num1 = (const int *)a;
 	const int *num2 = (const int *)b;
@@ -1373,7 +1373,7 @@ int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE)
 //ious time this sequence was run. It is recommended to call this sequence periodically (eg: once every 100ms) or trigger
 // sequence if the temperature drifts by >=5degC. Temperature must be read from an on-die temperature sensor.
 //--------------------------------------------------------------
-int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
+static int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0;
 	unsigned int rdata;
@@ -1545,7 +1545,7 @@ int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
 	return status;
 }
 
-int E56phyCtleBypassSeq(struct txgbe_hw *hw)
+static int E56phyCtleBypassSeq(struct txgbe_hw *hw)
 {
 	int status = 0;
 	unsigned int rdata;
@@ -1584,7 +1584,7 @@ int E56phyCtleBypassSeq(struct txgbe_hw *hw)
 	return status;
 }
 
-int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
+static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0, i;
 	struct txgbe_adapter *adapter = hw->back;
@@ -2014,7 +2014,7 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 	return 0;
 }
 
-int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
+static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	s32 status;

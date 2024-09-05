@@ -344,34 +344,6 @@ MTD_SEM txgbe_sem_create(MTD_SEM_BEGIN_STATE state)
 }
 */
 
-void
-txgbe_amlfpga_phy_reset(struct txgbe_hw *hw)
-{
-	u32 loop = TXGBE_PHY_RST_WAIT_PERIOD;
-	u16 value;
-
-	txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
-	value |= MV1119_C_RESET;
-	printk("MV1119_C_RESET = 0x%X\n", MV1119_C_RESET);
-	printk("Control Reg 0 = 0x%X\n", value);
-	txgbe_write_phy_reg_mdi(hw, MV1119_CTRL, 0, value);
-	txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
-	printk("Control Reg = 0x%X\n", value);
-
-	do {
-		loop--;
-		txgbe_read_phy_reg_mdi(hw, MV1119_CTRL, 0, &value);
-		if (!(value & MV1119_C_RESET))
-			break;
-		msleep(1);
-	} while (loop > 0);
-
-	if (loop == 0) {
-		printk("MV88E1119 Copper Reset Fail\n");
-	}
-
-	return;
-}
 /**
  *  txgbe_setup_phy_link - Set and restart auto-neg
  *  @hw: pointer to hardware structure

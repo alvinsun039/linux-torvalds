@@ -339,8 +339,8 @@ static int txgbe_set_supported_1g_10gtypes(struct txgbe_hw *hw,
 	return 0;
 }
 
-int txgbe_get_link_ksettings(struct net_device *netdev,
-		    struct ethtool_link_ksettings *cmd)
+static int txgbe_get_link_ksettings(struct net_device *netdev,
+				    struct ethtool_link_ksettings *cmd)
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct txgbe_hw *hw = &adapter->hw;

@@ -114,242 +114,6 @@ void txgbe_wr32_epcs(struct txgbe_hw *hw, u32 addr, u32 data)
 	wr32(hw, portRegOffset, data);
 }
 
-void txgbe_wr32_ephym(struct txgbe_hw *hw, u32 addr, u32 mask, u32 field)
-{
-	u32 val;
-
-	val = rd32_ephy(hw, addr);
-	val = ((val & ~mask) | (field & mask));
-
-	txgbe_wr32_ephy(hw, addr, val);
-}
-
-void txgbe_wr32_epcsm(struct txgbe_hw *hw, u32 addr, u32 mask, u32 field)
-{
-	u32 val;
-
-	val = txgbe_rd32_epcs(hw, addr);
-	val = ((val & ~mask) | (field & mask));
-
-	txgbe_wr32_epcs(hw, addr, val);
-}
-
-s32 txgbe_set_link_to_amlite_back(struct txgbe_hw *hw,
-		  u32 speed)
-{
-	u32 value = 0;
-
-	/* Set the module link speed */
-	//TCALL(hw, mac.ops.set_rate_select_speed,
-	//	speed);
-
-	//initialization sequence
-	value = txgbe_rd32_epcs(hw, SR_AN_CTRL);
-	value &= ~0x1000;
-	txgbe_wr32_epcs(hw, SR_AN_CTRL, value);
-
-	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
-	value |= 0x8000;
-	txgbe_wr32_epcs(hw, VR_PCS_DIG_CTRL1, value);
-
-	udelay(1000);
-	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
-	if ((value & 0x8000)) {
-		printk("VR_PCS_DIG_CTRL1 : %x\n", value);
-		return -1;
-	}
-	if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
-		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL1);
-		value = (value & ~0x3c) | 0x14;
-		txgbe_wr32_epcs(hw, SR_PCS_CTRL1, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL2);
-		value = (value & ~0xf) | 0x7;
-		txgbe_wr32_epcs(hw, SR_PCS_CTRL2, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PMA_CTRL2);
-		value = (value & ~0x7f) | 0x39;
-		txgbe_wr32_epcs(hw, SR_PMA_CTRL2, value);
-
-		value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL3);
-		value &= ~0x60c;
-		txgbe_wr32_epcs(hw, VR_PCS_DIG_CTRL3, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PMA_RS_FEC_CTRL);
-		value = (value & ~0x4) | ((value & 0x8) >> 1);
-		txgbe_wr32_epcs(hw, SR_PMA_RS_FEC_CTRL, value);
-
-		value = rd32_ephy(hw, ANA_OVRDEN0);
-		value |= 0x2;
-		txgbe_wr32_ephy(hw, ANA_OVRDEN0, value);
-
-		value = rd32_ephy(hw, ANA_OVRDEN1);
-		value |= 0x42000000;
-		txgbe_wr32_ephy(hw, ANA_OVRDEN1, value);
-
-		value = rd32_ephy(hw, ANA_OVRDVAL0);
-		value |= 0x20000002;
-		txgbe_wr32_ephy(hw, ANA_OVRDVAL0, value);
-
-		value = rd32_ephy(hw, ANA_OVRDVAL5);
-		value |= 0x1000000;
-		txgbe_wr32_ephy(hw, ANA_OVRDVAL5, value);
-
-		value = rd32_ephy(hw, OSC_CAL_N_CDR4);
-		value = (value & ~0x7ff00) | 0x5ff00;
-		txgbe_wr32_ephy(hw, OSC_CAL_N_CDR4, value);
-
-		value = rd32_ephy(hw, PLL0_CFG0);
-		value = (value & ~0x3030000) | 0x1030000;
-		txgbe_wr32_ephy(hw, PLL0_CFG0, value);
-
-		value = rd32_ephy(hw, PLL0_CFG2);
-		value = (value & ~0x1f00) | 0x400;
-		txgbe_wr32_ephy(hw, PLL0_CFG2, value);
-
-		value = rd32_ephy(hw, PLL0_DIV_CFG0);
-		value = (value & ~0x7ff1f) | 0x29408;
-		txgbe_wr32_ephy(hw, PLL0_DIV_CFG0, value);
-
-		value = rd32_ephy(hw, PLL1_CFG0);
-		value = (value & ~0x3030000) | 0x1030000;
-		txgbe_wr32_ephy(hw, PLL1_CFG0, value);
-
-		value = rd32_ephy(hw, PLL1_CFG2);
-		value = (value & ~0x1f00) | 0x800;
-		txgbe_wr32_ephy(hw, PLL1_CFG2, value);
-
-		value = rd32_ephy(hw, PIN_OVRDEN0);
-		value &= ~0x1000;
-		txgbe_wr32_ephy(hw, PIN_OVRDEN0, value);
-
-		value = rd32_ephy(hw, PIN_OVRDVAL0);
-		value &= ~0x400;
-		txgbe_wr32_ephy(hw, PIN_OVRDVAL0, value);
-
-		value = rd32_ephy(hw, DATAPATH_CFG0);
-		value = (value & ~0x77077700) | (value & 0x70000) | 0x75005500;
-		txgbe_wr32_ephy(hw, DATAPATH_CFG0, value);
-
-		value = rd32_ephy(hw, DATAPATH_CFG1);
-		value = (value & ~0x7000700) | 0x5000500;
-		txgbe_wr32_ephy(hw, DATAPATH_CFG1, value);
-
-		value = rd32_ephy(hw, AN_CFG1);
-		value = (value & ~0x1f) | 0xa;
-		txgbe_wr32_ephy(hw, AN_CFG1, value);
-
-		value = rd32_ephy(hw, SPARE52);
-		value &= ~0x10;
-		txgbe_wr32_ephy(hw, SPARE52, value);
-
-		value = rd32_ephy(hw, PMD_CFG0);
-		value = (value | 0x1311002) & ~0x100;
-		txgbe_wr32_ephy(hw, PMD_CFG0, value);
-
-	}
-
-	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
-		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL1);
-		value &= ~0x3c;
-		txgbe_wr32_epcs(hw, SR_PCS_CTRL1, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL2);
-		value &= ~0xf;
-		txgbe_wr32_epcs(hw, SR_PCS_CTRL2, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PMA_CTRL2);
-		value = (value & ~0x7f) | 0xb;
-		txgbe_wr32_epcs(hw, SR_PMA_CTRL2, value);
-
-		value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL3);
-		value &= ~0x60c;
-		txgbe_wr32_epcs(hw, VR_PCS_DIG_CTRL3, value);
-
-		value = txgbe_rd32_epcs(hw, SR_PMA_RS_FEC_CTRL);
-		value = (value & ~0x4) | ((value & 0x8) >> 1);
-		txgbe_wr32_epcs(hw, SR_PMA_RS_FEC_CTRL, value);
-
-		value = rd32_ephy(hw, ANA_OVRDEN0);
-		value |= 0x2;
-		txgbe_wr32_ephy(hw, ANA_OVRDEN0, value);
-
-		value = rd32_ephy(hw, ANA_OVRDEN1);
-		value |= 0x42000000;
-		txgbe_wr32_ephy(hw, ANA_OVRDEN1, value);
-
-		value = rd32_ephy(hw, ANA_OVRDVAL0);
-		value |= 0x20000002;
-		txgbe_wr32_ephy(hw, ANA_OVRDVAL0, value);
-
-		value = rd32_ephy(hw, ANA_OVRDVAL5);
-		value |= 0x1000000;
-		txgbe_wr32_ephy(hw, ANA_OVRDVAL5, value);
-
-		value = rd32_ephy(hw, OSC_CAL_N_CDR4);
-		value = (value & ~0x7ff00) | 0x7ff00;
-		txgbe_wr32_ephy(hw, OSC_CAL_N_CDR4, value);
-
-		value = rd32_ephy(hw, PLL0_CFG0);
-		value = (value & ~0x3030000) | 0x1030000;
-		txgbe_wr32_ephy(hw, PLL0_CFG0, value);
-
-		value = rd32_ephy(hw, PLL0_CFG2);
-		value = (value & ~0x1f00) | 0x400;
-		txgbe_wr32_ephy(hw, PLL0_CFG2, value);
-
-		value = rd32_ephy(hw, PLL0_DIV_CFG0);
-		value = (value & ~0x7ff1f) | 0x29408;
-		txgbe_wr32_ephy(hw, PLL0_DIV_CFG0, value);
-
-		value = rd32_ephy(hw, PLL1_CFG0);
-		value = (value & ~0x3030000) | 0x1030000;
-		txgbe_wr32_ephy(hw, PLL1_CFG0, value);
-
-		value = rd32_ephy(hw, PLL1_CFG2);
-		value = (value & ~0x1f00) | 0x800;
-		txgbe_wr32_ephy(hw, PLL1_CFG2, value);
-
-		value = rd32_ephy(hw, PIN_OVRDEN0);
-		value &= ~0x1000;
-		txgbe_wr32_ephy(hw, PIN_OVRDEN0, value);
-
-		value = rd32_ephy(hw, PIN_OVRDVAL0);
-		value &= ~0x400;
-		txgbe_wr32_ephy(hw, PIN_OVRDVAL0, value);
-
-		value = rd32_ephy(hw, DATAPATH_CFG0);
-		value = (value & ~0x77077700) | 0x75055500;
-		txgbe_wr32_ephy(hw, DATAPATH_CFG0, value);
-
-		value = rd32_ephy(hw, DATAPATH_CFG1);
-		value = (value & ~0x7070707) | 0x5050505;
-		txgbe_wr32_ephy(hw, DATAPATH_CFG1, value);
-
-		value = rd32_ephy(hw, AN_CFG1);
-		value = (value & ~0x1f) | 0x2;
-		txgbe_wr32_ephy(hw, AN_CFG1, value);
-
-		value = rd32_ephy(hw, SPARE52);
-		value &= ~0x10;
-		txgbe_wr32_ephy(hw, SPARE52, value);
-
-		value = rd32_ephy(hw, PMD_CFG0);
-		value = (value | 0x1311002) & ~0x100;
-		txgbe_wr32_ephy(hw, PMD_CFG0, value);
-	}
-
-	udelay(1000);
-
-	value = txgbe_rd32_epcs(hw, SR_PCS_STS1);
-
-	TCALL(hw, mac.ops.enable_sec_tx_path);
-	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
-					TXGBE_MAC_RX_CFG_RE);
-
-	return 0;
-}
-
 #if 0
 s32 txgbe_set_amlite_pcs_mode(struct txgbe_hw *hw, int eth_mode)
 {
@@ -1354,7 +1118,7 @@ s32 txgbe_init_rx_addrs(struct txgbe_hw *hw)
  *
  *  Adds it to unused receive address register or goes into promiscuous mode.
  **/
-void txgbe_add_uc_addr(struct txgbe_hw *hw, u8 *addr, u32 vmdq)
+static void txgbe_add_uc_addr(struct txgbe_hw *hw, u8 *addr, u32 vmdq)
 {
 	u32 rar_entries = hw->mac.num_rar_entries;
 	u32 rar;
@@ -1492,7 +1256,7 @@ STATIC s32 txgbe_mta_vector(struct txgbe_hw *hw, u8 *mc_addr)
  *
  *  Sets the bit-vector in the multicast table.
  **/
-void txgbe_set_mta(struct txgbe_hw *hw, u8 *mc_addr)
+static void txgbe_set_mta(struct txgbe_hw *hw, u8 *mc_addr)
 {
 	u32 vector;
 	u32 vector_bit;
@@ -3244,48 +3008,7 @@ s32 txgbe_reset_hostif(struct txgbe_hw *hw)
 	return status;
 }
 
-
-s32 txgbe_setup_mac_link_hostif(struct txgbe_hw *hw, u32 speed)
-{
-	struct txgbe_hic_phy_cfg cmd;
-	int i;
-	s32 status = 0;
-
-	cmd.hdr.cmd = FW_SETUP_MAC_LINK_CMD;
-	cmd.hdr.buf_len = FW_SETUP_MAC_LINK_LEN;
-	cmd.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
-	cmd.lan_id = hw->bus.lan_id;
-	cmd.phy_mode = 0;
-	cmd.phy_speed = (u16)speed;
-
-	if (hw->mac.type == txgbe_mac_sp) {
-		cmd.hdr.cksum_or_index.checksum = 0;
-		cmd.hdr.cksum_or_index.checksum = txgbe_calculate_checksum((u8 *)&cmd,
-					(FW_CEM_HDR_LEN + cmd.hdr.buf_len));
-	}
-
-	for (i = 0; i <= FW_CEM_MAX_RETRIES; i++) {
-		status = txgbe_host_interface_command(hw, (u32 *)&cmd,
-						       sizeof(cmd),
-						       TXGBE_HI_COMMAND_TIMEOUT,
-						       true);
-		if (status != 0)
-			continue;
-
-		if (cmd.hdr.cmd_or_resp.ret_status ==
-		    FW_CEM_RESP_STATUS_SUCCESS)
-			status = 0;
-		else
-			status = TXGBE_ERR_HOST_INTERFACE_COMMAND;
-
-		break;
-	}
-
-	return status;
-
-}
-
-u16 txgbe_crc16_ccitt(const u8 *buf, int size)
+static u16 txgbe_crc16_ccitt(const u8 *buf, int size)
 {
 	u16 crc = 0;
 	int i;
@@ -3469,70 +3192,7 @@ int txgbe_flash_read_dword(struct txgbe_hw *hw, u32 addr, u32 *data)
 
 }
 
-int txgbe_flash_write_cab(struct txgbe_hw *hw,u32 addr, u32 value,u16 lan_id)
-{
-	int status;
-	struct txgbe_hic_read_cab buffer;
-	
-	buffer.hdr.req.cmd = 0xE2;
-	buffer.hdr.req.buf_lenh = 0x6;
-	buffer.hdr.req.buf_lenl = 0x0;
-
-	if (hw->mac.type == txgbe_mac_sp)
-		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
-
-
-	/* convert offset from words to bytes */
-	buffer.dbuf.d16[0] = cpu_to_le16(lan_id);
-	/* one word */
-	buffer.dbuf.d32[0] = htonl(addr);
-	buffer.dbuf.d32[1] = htonl(value);
-
-	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
-						sizeof(buffer), 5000, true);
-	printk("0x1e100 :%08x\n",rd32(hw,0x1e100));
-	printk("0x1e104 :%08x\n",rd32(hw,0x1e104));
-	printk("0x1e108 :%08x\n",rd32(hw,0x1e108));
-	printk("0x1e10c :%08x\n",rd32(hw,0x1e10c));
-
-	return status;
-}
-
-int txgbe_flash_read_cab(struct txgbe_hw *hw, u32 addr ,u16 lan_id )
-{
-	int status;
-	struct txgbe_hic_read_cab buffer;
-
-	buffer.hdr.req.cmd = 0xE1;
-	buffer.hdr.req.buf_lenh = 0xaa;
-	buffer.hdr.req.buf_lenl = 0;
-
-	if (hw->mac.type == txgbe_mac_sp)
-		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
-
-	/* convert offset from words to bytes */
-	buffer.dbuf.d16[0] = cpu_to_le16(lan_id);
-	/* one word */
-	buffer.dbuf.d32[0] = htonl(addr);
-
-	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
-										sizeof(buffer), 5000, true);
-
-	if (status)
-		return status;
-	if (txgbe_check_mng_access(hw)) {
-		printk("0x1e100 :%08x\n",rd32(hw,0x1e100));
-		printk("0x1e104 :%08x\n",rd32(hw,0x1e104));
-		printk("0x1e108 :%08x\n",rd32(hw,0x1e108));
-		printk("0x1e10c :%08x\n",rd32(hw,0x1e10c));
-	} else {
-		status = -147;
-		return status;
-	}
-
-	return rd32(hw,0x1e108);
-}
-int txgbe_flash_write_unlock(struct txgbe_hw *hw)
+static int txgbe_flash_write_unlock(struct txgbe_hw *hw)
 {
 	int status;
 	struct txgbe_hic_read_shadow_ram buffer;
@@ -3551,29 +3211,6 @@ int txgbe_flash_write_unlock(struct txgbe_hw *hw)
 
 	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
 										sizeof(buffer), 5000,false);
-
-	return status;
-}
-
-int txgbe_flash_write_lock(struct txgbe_hw *hw)
-{
-	int status;
-	struct txgbe_hic_read_shadow_ram buffer;
-
-	buffer.hdr.req.cmd = 0x39;
-	buffer.hdr.req.buf_lenh = 0;
-	buffer.hdr.req.buf_lenl = 0;
-
-	if (hw->mac.type == txgbe_mac_sp)
-		buffer.hdr.req.cksum_or_index.checksum = 0xFF;
-
-	/* convert offset from words to bytes */
-	buffer.address = 0;
-	/* one word */
-	buffer.length = 0;
-
-	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
-										sizeof(buffer), 5000, false);
 
 	return status;
 }
@@ -5244,27 +4881,6 @@ void txgbe_set_hard_rate_select_speed(struct txgbe_hw *hw,
 	TXGBE_WRITE_FLUSH(hw);
 }
 
-s32 txgbe_enable_rx_adapter(struct txgbe_hw *hw)
-{
-	u32 value;
-
-	value = txgbe_rd32_epcs(hw, TXGBE_PHY_RX_EQ_CTL);
-	value |= 1 << 12;
-	txgbe_wr32_epcs(hw, TXGBE_PHY_RX_EQ_CTL, value);
-
-	value = 0;
-	while (!(value >> 11)) {
-		value = txgbe_rd32_epcs(hw, TXGBE_PHY_RX_AD_ACK);
-		msleep(1);
-	}
-
-	value = txgbe_rd32_epcs(hw, TXGBE_PHY_RX_EQ_CTL);
-	value &= ~(1 << 12);
-	txgbe_wr32_epcs(hw, TXGBE_PHY_RX_EQ_CTL, value);
-
-	return 0;
-}
-
 s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw)
 {
 	u32 value;
@@ -5843,7 +5459,7 @@ out:
 	return status;
 }
 
-s32 txgbe_set_link_to_sfi(struct txgbe_hw *hw,
+static s32 txgbe_set_link_to_sfi(struct txgbe_hw *hw,
 			       u32 speed)
 {
 	u32 i;
@@ -6300,7 +5916,7 @@ STATIC s32 txgbe_setup_copper_link(struct txgbe_hw *hw,
 	return status;
 }
 
-int txgbe_reset_misc(struct txgbe_hw *hw)
+static int txgbe_reset_misc(struct txgbe_hw *hw)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	u32 value;
@@ -7635,7 +7251,7 @@ s32 txgbe_init_eeprom_params(struct txgbe_hw *hw)
  *
  *  Reads a 16 bit word from the EEPROM using the hostif.
  **/
-s32 txgbe_read_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
+static s32 txgbe_read_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 				   u16 *data)
 {
 	s32 status;
@@ -7792,7 +7408,7 @@ out:
  *
  *  Write a 16 bit word to the EEPROM using the hostif.
  **/
-s32 txgbe_write_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
+static s32 txgbe_write_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 				    u16 data)
 {
 	s32 status;
@@ -8324,7 +7940,7 @@ s32 txgbe_hic_write_lldp(struct txgbe_hw *hw,u32 open)
 	
 }
 
-int txgbe_hic_get_lldp(struct txgbe_hw *hw)
+static int txgbe_hic_get_lldp(struct txgbe_hw *hw)
 {
 	int status;
 	struct txgbe_hic_write_lldp buffer;

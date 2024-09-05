@@ -304,7 +304,7 @@ static inline int txgbe_enumerate_functions(struct txgbe_adapter *adapter)
 	return physfns;
 }
 
-void txgbe_service_event_schedule(struct txgbe_adapter *adapter)
+static void txgbe_service_event_schedule(struct txgbe_adapter *adapter)
 {
 	if (!test_bit(__TXGBE_DOWN, &adapter->state) &&
 	    !test_bit(__TXGBE_REMOVING, &adapter->state) &&
@@ -4170,7 +4170,7 @@ static void txgbe_configure_msi_and_legacy(struct txgbe_adapter *adapter)
 
 /* amlite: tx header wb */
 #ifdef TXGBE_TXHEAD_WB
-int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
+static int txgbe_setup_headwb_resources(struct txgbe_ring *ring)
 {
 	struct txgbe_adapter *adapter;
 	struct txgbe_hw *hw;
@@ -4700,36 +4700,6 @@ static void txgbe_rx_desc_queue_enable(struct txgbe_adapter *adapter,
 	if (!wait_loop) {
 		e_err(drv, "RXDCTL.ENABLE on Rx queue %d "
 		      "not set within the polling period\n", reg_idx);
-	}
-}
-
-/* disable the specified tx ring/queue */
-void txgbe_disable_tx_queue(struct txgbe_adapter *adapter,
-			    struct txgbe_ring *ring)
-{
-	struct txgbe_hw *hw = &adapter->hw;
-	int wait_loop = TXGBE_MAX_RX_DESC_POLL;
-	u32 rxdctl, reg_offset, enable_mask;
-	u8 reg_idx = ring->reg_idx;
-
-	if (TXGBE_REMOVED(hw->hw_addr))
-		return;
-
-	reg_offset = TXGBE_PX_TR_CFG(reg_idx);
-	enable_mask = TXGBE_PX_TR_CFG_ENABLE;
-
-	/* write value back with TDCFG.ENABLE bit cleared */
-	wr32m(hw, reg_offset, enable_mask, 0);
-
-	/* the hardware may take up to 100us to really disable the tx queue */
-	do {
-		udelay(10);
-		rxdctl = rd32(hw, reg_offset);
-	} while (--wait_loop && (rxdctl & enable_mask));
-
-	if (!wait_loop) {
-		e_err(drv, "TDCFG.ENABLE on Tx queue %d not cleared within "
-			  "the polling period\n", reg_idx);
 	}
 }
 
@@ -5705,7 +5675,8 @@ static int txgbe_uc_unsync(struct net_device *netdev, const unsigned char *addr)
 
 #endif
 
-int txgbe_add_cloud_switcher(struct txgbe_adapter *adapter, u32 key, u16 pool)
+static int txgbe_add_cloud_switcher(struct txgbe_adapter *adapter,
+				    u32 key, u16 pool)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 
@@ -5717,21 +5688,6 @@ int txgbe_add_cloud_switcher(struct txgbe_adapter *adapter, u32 key, u16 pool)
 		TXGBE_PSR_CL_SWC_CTL_VLD | TXGBE_PSR_CL_SWC_CTL_DST_MSK);
 	wr32(hw, TXGBE_PSR_CL_SWC_VM_L, 0x1);
 	wr32(hw, TXGBE_PSR_CL_SWC_VM_H, 0x0);
-
-	return 0;
-}
-
-
-int txgbe_del_cloud_switcher(struct txgbe_adapter *adapter, u32 key, u16 pool)
-{
-	/* search table for addr, if found, set to 0 and sync */
-	struct txgbe_hw *hw = &adapter->hw;
-
-	UNREFERENCED_PARAMETER(key);
-	UNREFERENCED_PARAMETER(pool);
-
-	wr32(hw, TXGBE_PSR_CL_SWC_IDX, 0);
-	wr32(hw, TXGBE_PSR_CL_SWC_CTL, 0);
 
 	return 0;
 }
@@ -6453,7 +6409,7 @@ void txgbe_configure_isb(struct txgbe_adapter *adapter)
 #endif
 }
 
-void txgbe_configure_port(struct txgbe_adapter *adapter)
+static void txgbe_configure_port(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 value, i;
@@ -7069,7 +7025,7 @@ void txgbe_reinit_locked(struct txgbe_adapter *adapter)
 	adapter->flags2 &= ~TXGBE_FLAG2_KR_PRO_REINIT;
 }
 
-void txgbe_reinit_locked_dma_reset(struct txgbe_adapter *adapter)
+static void txgbe_reinit_locked_dma_reset(struct txgbe_adapter *adapter)
 {
 #ifdef TXGBE_DMA_RESET
 	struct txgbe_hw *hw = &adapter->hw;
@@ -7412,7 +7368,7 @@ static void txgbe_fdir_filter_exit(struct txgbe_adapter *adapter)
 	spin_unlock(&adapter->fdir_perfect_lock);
 }
 
-void txgbe_disable_device(struct txgbe_adapter *adapter)
+static void txgbe_disable_device(struct txgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	struct txgbe_hw *hw = &adapter->hw;
@@ -7559,12 +7515,9 @@ void txgbe_down(struct txgbe_adapter *adapter)
  *  hw_addr, back, device_id, vendor_id, subsystem_device_id,
  *  subsystem_vendor_id, and revision_id
  **/
-s32 txgbe_init_shared_code(struct txgbe_hw *hw)
+static int txgbe_init_shared_code(struct txgbe_hw *hw)
 {
-	s32 status;
-
-	status = txgbe_init_ops(hw);
-	return status;
+	return txgbe_init_ops(hw);
 }
 
 /**
@@ -11376,7 +11329,7 @@ static u16 txgbe_select_queue(struct net_device *dev, struct sk_buff *skb)
  *	May return error in out of memory cases. The skb is freed on error.
  */
 
-int txgbe_skb_pad_nonzero(struct sk_buff *skb, int pad)
+static int txgbe_skb_pad_nonzero(struct sk_buff *skb, int pad)
 {
 	int err;
 	int ntail;
