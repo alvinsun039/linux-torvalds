@@ -1014,7 +1014,7 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_adapter *adapter, u8 byLinkMode,
 	kr_dbg(KR_MODE,
 	       "Wait CTRL_FSM_RX_STAT[0]::ctrl_fsm_rx0_st to be ready ...\n");
 	status |= read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0x1b),
-				    1000, 200000, false, hw,
+				    1000, 500000, false, hw,
 				    E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	kr_dbg(KR_MODE, "Wait 25G fsm_rx_sts = %x, Wait rx_sts %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
@@ -2331,7 +2331,7 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 
 	/* config timer */
 	txgbe_wr32_epcs(hw, 0x078004, 0x003c);
-	txgbe_wr32_epcs(hw, 0x078005, 0x3fff);
+	txgbe_wr32_epcs(hw, 0x078005, CL74_KRTR_TRAINNING_TIMEOUT);
 	txgbe_wr32_epcs(hw, 0x078006, 25);
 	txgbe_wr32_epcs(hw, 0x078000, 0x0008);
 
@@ -2494,6 +2494,13 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	txgbe_e56_exchange_page(adapter);
 	kr_dbg(KR_MODE, "2.2 Wait 25G page changed ..done..\n");
 
+	if (AN74_TRAINNING_MODE) {
+		rdata = txgbe_rd32_epcs(hw, 0x70000);
+		kr_dbg(KR_MODE, "read 0x70000 data %0x\n", rdata);
+		txgbe_wr32_epcs(hw, 0x70000, 0);
+		kr_dbg(KR_MODE, "write 0x70000 0x%0x\n", 0);
+	}
+
 	rdata = txgbe_rd32_epcs(hw, 0x78002);
 	kr_dbg(KR_MODE, "read 78002 data %0x\n", rdata);
 	txgbe_wr32_epcs(hw, 0x78002, 0);
@@ -2587,7 +2594,7 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	/* Wait an RLU */
 	kr_dbg(KR_MODE, "2.9 Wait 25G phy RLU....\n");
 	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(2)),
-				   100, 20000, false, hw, 0x30001);
+				   100, 200000, false, hw, 0x30001);
 	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 	if (!status) {

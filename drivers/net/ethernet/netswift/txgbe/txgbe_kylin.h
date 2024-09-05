@@ -101,6 +101,13 @@
 #define CL72_KRTR_PRBS_MODE_EN 0xffff			/*open kr prbs check */
 #endif 
 
+#ifndef CL74_KRTR_TRAINNING_TIMEOUT
+#define CL74_KRTR_TRAINNING_TIMEOUT 9000
+#endif
+#ifndef AN74_TRAINNING_MODE
+#define AN74_TRAINNING_MODE 1
+#endif
+
 #ifndef TXGBE_STATIC_ITR
 #define TXGBE_STATIC_ITR 1		/* static itr configure */
 #endif 
