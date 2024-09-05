@@ -4736,6 +4736,11 @@ out_fput:
 
 static int __init io_uring_init(void)
 {
+	struct kmem_cache_args kmem_args = {
+		.useroffset = offsetof(struct io_kiocb, cmd.data),
+		.usersize = sizeof_field(struct io_kiocb, cmd.data),
+	};
+
 #define __BUILD_BUG_VERIFY_OFFSET_SIZE(stype, eoffset, esize, ename) do { \
 	BUILD_BUG_ON(offsetof(stype, ename) != eoffset); \
 	BUILD_BUG_ON(sizeof_field(stype, ename) != esize); \
@@ -4817,12 +4822,9 @@ static int __init io_uring_init(void)
 	 * range, and HARDENED_USERCOPY will complain if we haven't
 	 * correctly annotated this range.
 	 */
-	req_cachep = kmem_cache_create_usercopy("io_kiocb",
-				sizeof(struct io_kiocb), 0,
-				SLAB_HWCACHE_ALIGN | SLAB_PANIC |
-				SLAB_ACCOUNT | SLAB_TYPESAFE_BY_RCU,
-				offsetof(struct io_kiocb, cmd.data),
-				sizeof_field(struct io_kiocb, cmd.data), NULL);
+	req_cachep = kmem_cache_create("io_kiocb", sizeof(struct io_kiocb), &kmem_args,
+				SLAB_HWCACHE_ALIGN | SLAB_PANIC | SLAB_ACCOUNT |
+				SLAB_TYPESAFE_BY_RCU);
 
 	iou_wq = alloc_workqueue("iou_exit", WQ_UNBOUND, 64);
 
