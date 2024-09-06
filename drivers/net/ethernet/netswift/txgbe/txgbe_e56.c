@@ -1588,7 +1588,6 @@ static int E56phyCtleBypassSeq(struct txgbe_hw *hw)
 static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0, i;
-	struct txgbe_adapter *adapter = hw->back;
 	u32 addr, timer;
 	u32 rdata = 0x0;
 	u32 bypassCtle = true;
@@ -1685,19 +1684,8 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		rdata = rd32_ephy(hw, addr);
 		udelay(500);
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
-		if (timer++ > PHYINIT_TIMEOUT) {
-			adapter->link_valid = false;
-			if (hw->phy.sfp_type ==
-				    txgbe_sfp_type_25g_da_cu_core0 ||
-			    hw->phy.sfp_type ==
-				    txgbe_sfp_type_25g_da_cu_core1 ||
-			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)
-				wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				      TXGBE_AML_LINK_STATUS_OVRD_EN,
-				      TXGBE_AML_LINK_STATUS_OVRD_EN);
+		if (timer++ > PHYINIT_TIMEOUT)
 			return TXGBE_ERR_TIMEOUT;
-		}
 	}
 
 	//RXS ADC adaptation sequence
@@ -1707,19 +1695,8 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	while (EPHY_XFLD(E56G__PMD_RXS0_OVRDVAL_1, rxs0_rx0_cdr_rdy_o) != 1) {
 		EPHY_RREG(E56G__PMD_RXS0_OVRDVAL_1);
 		udelay(500);
-		if (timer++ > PHYINIT_TIMEOUT) {
-			adapter->link_valid = false;
-			if (hw->phy.sfp_type ==
-				    txgbe_sfp_type_25g_da_cu_core0 ||
-			    hw->phy.sfp_type ==
-				    txgbe_sfp_type_25g_da_cu_core1 ||
-			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-			    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)
-				wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				      TXGBE_AML_LINK_STATUS_OVRD_EN,
-				      TXGBE_AML_LINK_STATUS_OVRD_EN);
+		if (timer++ > PHYINIT_TIMEOUT)
 			return TXGBE_ERR_TIMEOUT;
-		}
 	}
 
 	//4. Disable VGA and CTLE training so that they don't interfere with ADC calibration
@@ -2017,7 +1994,6 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 
 static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	s32 status;
 
 	status = E56phyRxsCalibAdaptSeq(hw, speed);
@@ -2029,8 +2005,6 @@ static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 
 	//2.3.4 RXS post CDR lock temperature tracking sequence
 	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
-
-	adapter->link_valid = true;
 
 	return 0;
 }

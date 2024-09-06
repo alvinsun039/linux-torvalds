@@ -1163,8 +1163,6 @@ struct txgbe_adapter {
 #endif
 
 	u32 phy_retry;
-	bool link_valid;
-	bool reconfig_rx;
 	char eeprom_id[32];
 	char fl_version[16];
 	char fw_version[64];

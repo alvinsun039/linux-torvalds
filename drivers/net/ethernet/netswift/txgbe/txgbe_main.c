@@ -6919,8 +6919,6 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 
 		msleep(10);
 		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_0);
-		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
-				TXGBE_GPIO_INT_POLARITY_3, 0x0);
 	} else {
 		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
@@ -9080,11 +9078,6 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		break;
 	}
 
-	if (hw->mac.type == txgbe_mac_aml) {
-		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
-				TXGBE_GPIO_INT_POLARITY_3, TXGBE_GPIO_INT_POLARITY_3);
-	}
-
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s\n",
 	       (link_speed == TXGBE_LINK_SPEED_25GB_FULL ?
 	       "25 Gbps" :
@@ -9152,9 +9145,6 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
 		return;
-	if (hw->mac.type == txgbe_mac_aml)
-		wr32m(hw, TXGBE_GPIO_INT_POLARITY,
-				TXGBE_GPIO_INT_POLARITY_3, 0x0);
 
 #ifdef HAVE_PTP_1588_CLOCK
 	if (test_bit(__TXGBE_PTP_RUNNING, &adapter->state))
@@ -9380,7 +9370,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 				TXGBE_AML_LINK_STATUS_OVRD_EN, TXGBE_AML_LINK_STATUS_OVRD_EN);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
-		adapter->link_valid = false;
 	}
 
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
@@ -9390,7 +9379,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
-		adapter->link_valid = true;
 	}
 	mutex_unlock(&adapter->e56_lock);
 

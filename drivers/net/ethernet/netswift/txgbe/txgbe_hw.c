@@ -7754,7 +7754,6 @@ s32 txgbe_update_flash(struct txgbe_hw *hw)
 s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				bool *link_up, bool link_up_wait_to_complete)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 links_reg = 0;
 	u16 value = 0;
 	u32 i;
@@ -7775,19 +7774,6 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 			}
 
 			if (*link_up) {
-				if (hw->mac.type == txgbe_mac_aml) {
-					value = rd32(hw, TXGBE_GPIO_EXT);
-					if (value & TXGBE_SFP1_RX_LOS_LS) {
-						*link_up = false;
-						continue;
-					}
-				}
-
-				if (!adapter->link_valid) {
-					*link_up = false;
-					continue;
-				}
-
 				links_reg = rd32(hw,
 							TXGBE_CFG_PORT_ST);
 				if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
@@ -7818,16 +7804,6 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				*link_up = true;
 			} else {
 				*link_up = false;
-			}
-
-			if (hw->mac.type == txgbe_mac_aml) {
-				value = rd32(hw, TXGBE_GPIO_EXT);
-				if (value & TXGBE_SFP1_RX_LOS_LS) {
-					*link_up = false;
-				}
-
-				if (!adapter->link_valid)
-					*link_up = false;
 			}
 		}
 	}

@@ -2598,9 +2598,7 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 				   100, 200000, false, hw, 0x30001);
 	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
-	if (!status) {
-		adapter->link_valid = TRUE;
-	}
+
 	rdata = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
