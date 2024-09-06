@@ -73,6 +73,14 @@ static  char*  plane_name[] = {
     "FS",
 };
 
+static const unsigned int vsync_int_tbl[] = {
+    INT_VSYNC1,
+    INT_VSYNC2,
+    INT_VSYNC3,
+    INT_VSYNC4,
+};
+#define VSYNC_INT_TABLE_LEN (sizeof(vsync_int_tbl)/sizeof(vsync_int_tbl[0]))
+
 static char*  cursor_name = "cursor";
 
 #if  DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
@@ -672,6 +680,13 @@ static int  disp_crtc_init(disp_info_t* disp_info, unsigned int index)
     crtc_state->base_cstate.crtc = &gf_crtc->base_crtc;
     gf_crtc->crtc_dpms = 0;
 
+    if (index >= VSYNC_INT_TABLE_LEN)
+    {
+        gf_error("index excceds vsync int table length\n");
+        goto fail;
+    }
+    gf_crtc->vsync_int = vsync_int_tbl[index];
+
     gf_crtc->support_scale = disp_info->scale_support;
 
     gf_crtc->plane_cnt = disp_info->num_plane[index];
@@ -741,6 +756,13 @@ static int  disp_crtc_init(disp_info_t* disp_info, unsigned int index)
     gf_crtc->plane_cnt = disp_info->num_plane[index];
 
     gf_crtc->crtc_dpms = 0;
+
+    if (index >= VSYNC_INT_TABLE_LEN)
+    {
+        gf_error("index excceds vsync int table length\n");
+        goto fail;
+    }
+    gf_crtc->vsync_int = vsync_int_tbl[index];
 
     ret = drm_crtc_init(drm, &gf_crtc->base_crtc, &gf_crtc_funcs);
 
@@ -831,54 +853,12 @@ static void  disp_hotplug_init(disp_info_t* disp_info)
 {
     gf_card_t*  gf_card = disp_info->gf_card;
     struct drm_device*  drm = gf_card->drm_dev;
-    struct drm_connector* connector = NULL;
-    gf_connector_t*  gf_connector = NULL;
-    unsigned int  hpd_int_bits = 0;
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    struct drm_connector_list_iter conn_iter;
-#endif
 
     //at boot/resume stage, no hpd event for all output, we need poll the hpd outputs once
     drm_helper_hpd_irq_event(drm);
 
-    mutex_lock(&drm->mode_config.mutex);
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-    drm_connector_list_iter_begin(drm, &conn_iter);
-#endif
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    drm_for_each_connector_iter(connector, &conn_iter)
-#else
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
-    drm_for_each_connector(connector, drm)
-#else
-    list_for_each_entry(connector, &drm->mode_config.connector_list, head)
-#endif
-
-#endif
-    {
-        //mark status to enable for all outputs that support hot plug
-        gf_connector = to_gf_connector(connector);
-
-        if((connector->polled == DRM_CONNECTOR_POLL_HPD) && gf_connector->hpd_int_bit)
-        {
-            gf_connector->hpd_enable = 1;
-            hpd_int_bits |= gf_connector->hpd_int_bit;
-        }
-    }
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-    drm_connector_list_iter_end(&conn_iter);
-#endif
-
-    mutex_unlock(&drm->mode_config.mutex);
-
     //enable hot plug interrupt
-    if(hpd_int_bits)
-    {
-        gf_hot_plug_intr_ctrl(disp_info, hpd_int_bits, 1);
-    }
+    gf_hot_plug_intr_onoff(disp_info, 1);
 }
 
 static void  disp_polling_init(disp_info_t* disp_info)
@@ -984,12 +964,14 @@ void  gf_disp_suspend_helper(struct drm_device *dev)
 
 int disp_suspend(struct drm_device *dev)
 {
-    gf_card_t  *gf = dev->dev_private;
+    gf_card_t *gf = dev->dev_private;
     disp_info_t *disp_info = (disp_info_t *)gf->disp_info;
     int ret = 0;
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
     struct drm_atomic_state *state;
 #endif
+
+    gf_hot_plug_intr_onoff(disp_info, 0);
 
     gf_poll_disable(disp_info);
 
@@ -1142,6 +1124,8 @@ void disp_post_resume(struct drm_device *dev)
     gf_poll_enable(disp_info);
 
     disp_probe_connector_after_resume(dev);
+
+    gf_hot_plug_intr_onoff(disp_info, 1);
 }
 
 static int disp_mode_config_init(disp_info_t* disp_info)
@@ -1243,11 +1227,11 @@ static void disp_info_print(disp_info_t* disp_info)
     }
     if (DISP_OK == disp_cbios_get_clock(disp_info, GF_QUERY_ENGINE_CLOCK, &value))
     {
-        gf_info("displayinfo Eclk:%dMHz\n", value / 1000);
+        //gf_info("displayinfo Eclk:%dMHz\n", value / 1000);
     }
     if(DISP_OK == disp_cbios_get_clock(disp_info, GF_QUERY_VCLK, &value))
     {
-        gf_info("displayinfo Vclk:%dMHz\n", (value + 500)/1000);
+        //gf_info("displayinfo Vclk:%dMHz\n", (value + 500)/1000);
     }
     if(DISP_OK == disp_cbios_get_clock(disp_info, GF_QUERY_MCLK, &value))
     {
@@ -1631,7 +1615,7 @@ int gf_debugfs_clock_dump(struct seq_file* file, struct drm_device* dev)
 
     if(DISP_OK == disp_cbios_get_clock(disp_info, GF_QUERY_ENGINE_CLOCK, &value))
     {
-        seq_printf(file, "Engine clock = %dMHz.\n", value/10000);
+        seq_printf(file, "Engine clock = %dMHz.\n", value/1000);
     }
 
     return 0;

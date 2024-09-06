@@ -160,6 +160,7 @@ typedef struct
     void (*ctl_flags_set)(void *data,unsigned int num,unsigned int mask,unsigned int value);
     int (*hwq_process_vsync_event)(void *data, unsigned long long time);
     void (*task_timeout_update)(void* data, unsigned long long *value, int update);
+    void (*reset_dvfs_power_flag)(void* data);
 } core_interface_t;
 
 extern core_interface_t *gf_core_interface;

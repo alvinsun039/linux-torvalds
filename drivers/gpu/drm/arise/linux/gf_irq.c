@@ -19,6 +19,7 @@
 #include "gf_kms.h"
 #include "gf_splice.h"
 #include "gf_trace.h"
+#include "gf_pm.h"
 
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
 /* get_scanout_position() return flags */
@@ -32,7 +33,6 @@
 
 #define RESET_TIME_MINUTE_interval  10
 
-
 static int video_irq_info_count[VIDEO_ERROR_INFO_NUM] = {0};
 static ktime_t video_irq_info_time[VIDEO_ERROR_INFO_NUM] = {0};
 static int video_irq_mask[VIDEO_ERROR_INFO_NUM] = {INT_FE_HANG_VD0, INT_BE_HANG_VD0, INT_FE_HANG_VD1, INT_BE_HANG_VD1,
@@ -40,9 +40,6 @@ static int video_irq_mask[VIDEO_ERROR_INFO_NUM] = {INT_FE_HANG_VD0, INT_BE_HANG_
 static char* video_irq_name[VIDEO_ERROR_INFO_NUM] = {"CORE0_FE_HANG", "CORE0_BE_HANG", "CORE1_FE_HANG", "CORE1_BE_HANG",
     "CORE0_FE_ERROR", "CORE0_BE_ERROR", "CORE1_FE_ERROR", "CORE1_BE_ERROR"};
 static int video_reg_offset[VIDEO_ERROR_INFO_NUM] = {0x4C81C, 0x4C81C, 0x4A81C, 0x4A81C, 0x4C81C, 0x4C81C, 0x4A81C, 0x4A81C};
-
-
-
 
 static struct drm_crtc* gf_get_crtc_by_pipe(struct drm_device *dev, pipe_t pipe)
 {
@@ -586,15 +583,15 @@ int gf_irq_install(struct drm_device *drm_dev)
 
 static void  gf_vblank_intrr_handle(struct drm_device* dev, unsigned int intrr)
 {
-    unsigned int index = 0;
-    unsigned int vsync[MAX_CRTC_NUM] = {INT_VSYNC1, INT_VSYNC2, INT_VSYNC3, INT_VSYNC4};
-    struct  drm_crtc* crtc = NULL;
     gf_card_t *gf = dev->dev_private;
-    disp_info_t* disp_info = (disp_info_t *)gf->disp_info;
+    disp_info_t *disp_info = (disp_info_t *)gf->disp_info;
     gf_splice_manager_t *splice_manager = disp_info->splice_manager;
     gf_splice_target_t *target = NULL;
     gf_splice_source_t *source = NULL;
     struct drm_crtc *splice_source_crtc = NULL, *splice_target_crtc = NULL;
+    struct drm_crtc *crtc = NULL;
+    gf_crtc_t *gf_crtc = NULL;
+    unsigned int crtc_idx = 0;
 
     if (splice_manager != NULL)
     {
@@ -608,48 +605,46 @@ static void  gf_vblank_intrr_handle(struct drm_device* dev, unsigned int intrr)
         }
     }
 
-    if(intrr & INT_VSYNCS)
+    list_for_each_entry(crtc, &(dev->mode_config.crtc_list), head)
     {
-        for (index = 0; index < MAX_CRTC_NUM; index++)
+        gf_crtc = to_gf_crtc(crtc);
+
+        if (intrr & gf_crtc->vsync_int)
         {
-            if (intrr & vsync[index])
+            gf_perf_event_t perf_event = {0, };
+            gf_get_counter_t get_cnt = {0, };
+            unsigned int vblcnt = 0;
+            unsigned long long timestamp;
+
+            if (splice_source_crtc == crtc)
             {
-                gf_perf_event_t perf_event = {0, };
-                gf_get_counter_t get_cnt = {0, };
-                unsigned int vblcnt = 0;
-                unsigned long long timestamp;
-
-                crtc = gf_get_crtc_by_pipe(dev, index);
-
-                //TODO: support splice combination with stand along connector
-                if (splice_source_crtc == crtc)
-                {
-                    drm_crtc_handle_vblank(splice_target_crtc);
-                }
-
-                if (to_gf_crtc(crtc)->enabled)
-                {
-                    drm_crtc_handle_vblank(crtc);
-                }
-
-                get_cnt.crtc_index = index;
-                get_cnt.vblk = &vblcnt;
-                disp_cbios_get_counter(disp_info, &get_cnt);
-
-                trace_gfx_vblank_intrr(gf->index << 16 | index, vblcnt);
-
-                gf_get_nsecs(&timestamp);
-                perf_event.header.timestamp_high = timestamp >> 32;
-                perf_event.header.timestamp_low = timestamp & 0xffffffff;
-                perf_event.header.size = sizeof(gf_perf_event_vsync_t);
-                perf_event.header.type = GF_PERF_EVENT_VSYNC;
-                perf_event.vsync_event.iga_idx = index + 1;
-                perf_event.vsync_event.vsync_cnt_low = vblcnt;
-                perf_event.vsync_event.vsync_cnt_high = 0;
-
-                gf_core_interface->perf_event_add_isr_event(gf->adapter, &perf_event);
-                //gf_core_interface->hwq_process_vsync_event(gf->adapter, timestamp);
+                drm_crtc_handle_vblank(splice_target_crtc);
             }
+
+            if (gf_crtc->enabled)
+            {
+                drm_crtc_handle_vblank(crtc);
+            }
+
+            crtc_idx = drm_get_crtc_index(crtc);
+
+            get_cnt.crtc_index = crtc_idx;
+            get_cnt.vblk = &vblcnt;
+            disp_cbios_get_counter(disp_info, &get_cnt);
+
+            trace_gfx_vblank_intrr(gf->index << 16 | crtc_idx, vblcnt);
+
+            gf_get_nsecs(&timestamp);
+            perf_event.header.timestamp_high = timestamp >> 32;
+            perf_event.header.timestamp_low = timestamp & 0xffffffff;
+            perf_event.header.size = sizeof(gf_perf_event_vsync_t);
+            perf_event.header.type = GF_PERF_EVENT_VSYNC;
+            perf_event.vsync_event.iga_idx = crtc_idx + 1;
+            perf_event.vsync_event.vsync_cnt_low = vblcnt;
+            perf_event.vsync_event.vsync_cnt_high = 0;
+
+            gf_core_interface->perf_event_add_isr_event(gf->adapter, &perf_event);
+            //gf_core_interface->hwq_process_vsync_event(gf->adapter, timestamp);
         }
     }
 }
@@ -935,7 +930,7 @@ irqreturn_t gf_irq_handle(int irq, void *arg)
         gf_hdaudio_handle(dev);
     }
 
-    if(intrr & INT_HOTPLUG)
+    if (intrr & INT_HOTPLUG)
     {
         gf_hpd_handle(dev, intrr & INT_HOTPLUG);
     }
@@ -960,6 +955,7 @@ irqreturn_t gf_irq_handle(int irq, void *arg)
     {
         intrr |= INT_FENCE;
     }
+
     if(intrr & INT_FENCE)
     {
         tasklet_schedule(&gf_card->fence_notify);
@@ -969,16 +965,18 @@ irqreturn_t gf_irq_handle(int irq, void *arg)
 
     atomic_set(&disp_info->atomic_irq_lock, 0);
 
+    gf_rpm_mark_last_busy(dev->dev);
+
     return  IRQ_HANDLED;
 }
 
-void gf_hot_plug_intr_ctrl(disp_info_t* disp_info, unsigned int intr, int enable)
+static void gf_hot_plug_intr_ctrl(disp_info_t* disp_info, unsigned int intr, int enable)
 {
     irq_chip_funcs_t* chip_func = (irq_chip_funcs_t*)disp_info->irq_chip_func;
     unsigned long  flags = 0;
     unsigned int  intr_en = 0;
 
-    if(!chip_func || !chip_func->get_intr_enable_mask || !chip_func->set_intr_enable_mask)
+    if (!chip_func || !chip_func->get_intr_enable_mask || !chip_func->set_intr_enable_mask)
     {
         return;
     }
@@ -1018,9 +1016,60 @@ void gf_hot_plug_intr_ctrl(disp_info_t* disp_info, unsigned int intr, int enable
     gf_spin_unlock_irqrestore(disp_info->intr_lock, flags);
 }
 
+void gf_hot_plug_intr_onoff(disp_info_t* disp_info, int on)
+{
+    gf_card_t* gf_card = disp_info->gf_card;
+    struct drm_device* drm = gf_card->drm_dev;
+    struct drm_connector* connector = NULL;
+    gf_connector_t* gf_connector = NULL;
+    unsigned int  hpd_int_bits = 0;
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+    struct drm_connector_list_iter conn_iter;
+#endif
+
+    mutex_lock(&drm->mode_config.mutex);
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+    drm_connector_list_iter_begin(drm, &conn_iter);
+#endif
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+    drm_for_each_connector_iter(connector, &conn_iter)
+#else
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+    drm_for_each_connector(connector, drm)
+#else
+    list_for_each_entry(connector, &drm->mode_config.connector_list, head)
+#endif
+
+#endif
+    {
+        //mark status to enable for all outputs that support hot plug
+        gf_connector = to_gf_connector(connector);
+
+        if ((connector->polled == DRM_CONNECTOR_POLL_HPD) && gf_connector->hpd_int_bit)
+        {
+            gf_connector->hpd_enable = on;
+            hpd_int_bits |= gf_connector->hpd_int_bit;
+        }
+    }
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+    drm_connector_list_iter_end(&conn_iter);
+#endif
+
+    mutex_unlock(&drm->mode_config.mutex);
+
+    if (hpd_int_bits)
+    {
+        gf_hot_plug_intr_ctrl(disp_info, hpd_int_bits, on);
+    }
+}
+
 void gf_dp_irq_work_func(struct work_struct *work)
 {
-    disp_info_t*  disp_info = container_of(work, disp_info_t, dp_irq_work);
+    disp_info_t  *disp_info = container_of(work, disp_info_t, dp_irq_work);
+    gf_connector_t  *gf_connector = NULL;
     unsigned long irq = 0;
     int device = 0, int_type = 0, detect_devices = 0, comp_edid_devs = 0;
     int  empty = 0, need_detect = 0, need_comp_edid = 0;
@@ -1047,9 +1096,16 @@ void gf_dp_irq_work_func(struct work_struct *work)
             break;
         }
 
+        gf_connector = gf_get_connector_by_device_id(disp_info, device);
+        if(!gf_connector)
+        {
+            continue;
+        }
         need_detect = need_comp_edid = 0;
 
+        gf_mutex_lock(gf_connector->conn_mutex);
         disp_cbios_handle_dp_irq(disp_info, device, int_type, &need_detect, &need_comp_edid);
+        gf_mutex_unlock(gf_connector->conn_mutex);
 
         if(need_detect)
         {
@@ -1079,6 +1135,54 @@ void gf_dp_irq_work_func(struct work_struct *work)
     }
 }
 
+static void gf_poll_enable_locked(struct drm_device *dev)
+{
+    int poll = 0;
+    struct drm_connector *connector = NULL;
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+    struct drm_connector_list_iter conn_iter;
+#endif
+
+    WARN_ON(!mutex_is_locked(&dev->mode_config.mutex));
+
+    if (!dev->mode_config.poll_enabled)
+    {
+        return;
+    }
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+    drm_connector_list_iter_begin(dev, &conn_iter);
+#endif
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
+    drm_for_each_connector_iter(connector, &conn_iter)
+#else
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
+    drm_for_each_connector(connector, dev)
+#else
+    list_for_each_entry(connector, &dev->mode_config.connector_list, head)
+#endif
+
+#endif
+    {
+        if (connector->polled & (DRM_CONNECTOR_POLL_CONNECT | DRM_CONNECTOR_POLL_DISCONNECT))
+        {
+            poll = true;
+            break;
+        }
+    }
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
+    drm_connector_list_iter_end(&conn_iter);
+#endif
+
+    if (poll)
+    {
+        schedule_delayed_work(&dev->mode_config.output_poll_work, OUTPUT_POLL_PERIOD);
+    }
+}
+
+#define INIT_POLLING_TIME 10
 
 void gf_hotplug_work_func(struct work_struct *work)
 {
@@ -1089,7 +1193,7 @@ void gf_hotplug_work_func(struct work_struct *work)
     struct  drm_connector* connector = NULL;
     gf_connector_t*  gf_connector = NULL;
     unsigned long irq = 0;
-    unsigned int hpd_outputs = 0, changed = 0, comp_edid_outputs = 0;
+    unsigned int hpd_outputs = 0, changed = 0, comp_edid_outputs = 0, need_poll = 0;
     unsigned int plug_out = 0, plug_in = 0, cur_output = 0;
     enum drm_connector_status old_status;
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
@@ -1156,9 +1260,26 @@ void gf_hotplug_work_func(struct work_struct *work)
             {
                 plug_in |= gf_connector->output_type;
             }
-            if((old_status != connector->status) || (gf_connector->compare_edid && gf_connector->edid_changed))
+
+            if(old_status != connector->status)
             {
                 changed = 1;
+                gf_connector->polling_time = 0;
+            }
+            else if(gf_connector->compare_edid && gf_connector->edid_changed)
+            {
+                changed = 1;
+                gf_connector->polling_time = 0;
+            }
+            else if(old_status == connector_status_connected && UT_OUTPUT_TYPE_HDMI == gf_connector->monitor_type)
+            {
+                //HDMI plug out INT happen, but no change can be detected, use polling
+                gf_info("Polling work will detect connector 0x%x for %d times.\n", gf_connector->output_type, INIT_POLLING_TIME);
+                gf_connector->polling_time = INIT_POLLING_TIME;
+                if(!disp_info->poll_running)
+                {
+                    need_poll = 1;
+                }
             }
             gf_connector->compare_edid = 0;
         }
@@ -1190,6 +1311,11 @@ void gf_hotplug_work_func(struct work_struct *work)
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
     drm_connector_list_iter_end(&conn_iter);
 #endif
+
+    if(need_poll)
+    {
+        gf_poll_enable_locked(drm);
+    }
 
     mutex_unlock(&mode_config->mutex);
 
@@ -1358,53 +1484,6 @@ void gf_irq_uninstall (struct drm_device *dev)
     gf_disp_disable_interrupt(disp_info, 1);
 }
 
-static void gf_poll_enable_locked(struct drm_device *dev)
-{
-    int poll = 0;
-    struct drm_connector *connector = NULL;
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    struct drm_connector_list_iter conn_iter;
-#endif
-
-    WARN_ON(!mutex_is_locked(&dev->mode_config.mutex));
-
-    if (!dev->mode_config.poll_enabled)
-    {
-        return;
-    }
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-    drm_connector_list_iter_begin(dev, &conn_iter);
-#endif
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 11, 0)
-    drm_for_each_connector_iter(connector, &conn_iter)
-#else
-
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
-    drm_for_each_connector(connector, dev)
-#else
-    list_for_each_entry(connector, &dev->mode_config.connector_list, head)
-#endif
-
-#endif
-    {
-        if (connector->polled & (DRM_CONNECTOR_POLL_CONNECT | DRM_CONNECTOR_POLL_DISCONNECT))
-        {
-            poll = true;
-            break;
-        }
-    }
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
-    drm_connector_list_iter_end(&conn_iter);
-#endif
-
-    if (poll)
-    {
-        schedule_delayed_work(&dev->mode_config.output_poll_work, OUTPUT_POLL_PERIOD);
-    }
-}
-
 void gf_poll_enable(disp_info_t* disp_info)
 {
     gf_card_t*  gf_card = disp_info->gf_card;
@@ -1466,7 +1545,7 @@ void gf_output_poll_work_func(struct work_struct *work)
 
         /* Ignore forced connectors. */
         if ((connector->force) || gf_connector->output_type == DISP_OUTPUT_SPLICE ||
-            (!connector->polled || connector->polled == DRM_CONNECTOR_POLL_HPD))
+            (!connector->polled || (connector->polled == DRM_CONNECTOR_POLL_HPD && !gf_connector->polling_time)))
         {
             continue;
         }
@@ -1474,6 +1553,7 @@ void gf_output_poll_work_func(struct work_struct *work)
         old_status = connector->status;
         /* if we are connected and don't want to poll for disconnect skip it */
         if (old_status == connector_status_connected &&
+         connector->polled != DRM_CONNECTOR_POLL_HPD &&
         !(connector->polled & DRM_CONNECTOR_POLL_DISCONNECT))
         {
             continue;
@@ -1516,16 +1596,30 @@ void gf_output_poll_work_func(struct work_struct *work)
             }
 
             changed = 1;
+            gf_connector->polling_time = 0;
         }
-        else
+        else if(gf_connector->polling_time > 0)
         {
-            changed = gf_connector->edid_changed;
+            if (gf_connector->edid_changed)
+            {
+                changed = 1;
+                gf_connector->polling_time = 0;
+            }
+            else
+            {
+                gf_connector->polling_time--;
+            }
         }
     }
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
     drm_connector_list_iter_end(&conn_iter);
 #endif
 
+    disp_info->poll_running = 0;
+    if(repoll)
+    {
+        disp_info->poll_running = 1;
+    }
     mutex_unlock(&dev->mode_config.mutex);
 
 out:

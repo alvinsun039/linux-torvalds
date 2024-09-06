@@ -29,12 +29,12 @@ static CBREGISTER NewCRTDetectEnv[] = {
 //notes: CBE has reserved 128 Byte array:pcbe->SavedReg[128]
     //Per Ping, DAC phy need clock to trigger DATA into DAC,
     //thus we should  enable clock before setting sense data.
-    {CR_B,(CBIOS_U8)~0x01,0xFC, 0x00 },     //Turn on DCLK1
+    //{CR_B,(CBIOS_U8)~0x01,0xFC, 0x00 },     //Turn on DCLK1
     {SR,(CBIOS_U8)~0x01,0x0B, 0x00 },       //Turn on DCLK2
     {SR,(CBIOS_U8)~0x20,0x18, 0x20 },       //Turn on CRT Dac1
     {SR,(CBIOS_U8)~0x02,0x21, 0x02 },       //Turn on CRT Dac1 Sense power
-    {SR,(CBIOS_U8)~0x02,0x20, 0x00 },       //CRT DAC not off in Standby mode
-    {SR,(CBIOS_U8)~0x40,0x31, 0x40 },       //DAC1 Sense Data Source Select
+    {SR,(CBIOS_U8)~0x02,0x20, 0x00 },       //CRT DAC not off in Standby mode 
+    {SR,(CBIOS_U8)~0x4C,0x31, 0x44 },       //DAC1 Sense Data Source Select
     {SR, 0x00,0x4B, 0x94 },        // R sense data
     {SR, 0x00,0x4C, 0x94 },        // G sense data
     {SR, 0x00,0x4D, 0x94 },        // B sense data
@@ -175,30 +175,104 @@ CBIOS_VOID cbDIU_CRT_SyncOnOff(PCBIOS_VOID pvcbe, CBIOS_BOOL bOn)
     }
 }
 
-CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCrtMonitorContext)
+typedef struct _CBIOS_DAC_SENSE_PARA
+{
+    CBIOS_IN  CBIOS_U8  PowerState;
+    CBIOS_IN  CBIOS_U8  PrevEdidValid;
+    CBIOS_OUT  CBIOS_U8  Connected;           // if don't need dac sense, need return connect status
+    CBIOS_OUT  CBIOS_U8  UseNewSense;     // if need dac sense, need return sense path(new or old)
+}CBIOS_DAC_SENSE_PARA;
+
+static CBIOS_BOOL  cbIsNeedDacSense(PCBIOS_EXTENSION_COMMON pcbe, CBIOS_DAC_SENSE_PARA *pSensePara)
+{
+    CBIOS_BOOL  bNeedSense = CBIOS_FALSE;
+    CBIOS_BOOL  bRetConnected = CBIOS_FALSE;
+    CBIOS_BOOL  bUseNewSense = CBIOS_FALSE;
+    REG_SR31_Pair           RegSR31Value;
+
+    if(!pcbe || !pSensePara)
+    {
+        return CBIOS_FALSE;
+    }
+
+    pSensePara->Connected = 0;
+    pSensePara->UseNewSense = 0;
+
+    if(pcbe->ChipID != CHIPID_ARISE2030 && pcbe->ChipID != CHIPID_ARISE2020)
+    {
+        pSensePara->UseNewSense = (pSensePara->PowerState == CBIOS_PM_ON)? 1 : 0;
+        return CBIOS_TRUE;
+    }
+
+    //patch for arise2030, check CRT's power and connect status
+    if(pSensePara->PowerState == CBIOS_PM_ON && (pcbe->DeviceMgr.ConnectedDevices & CBIOS_TYPE_CRT))
+    {
+        //CRT is connected and turned on, check its binded IGA
+        RegSR31Value.Value = cbMMIOReadReg(pcbe, SR_31);
+        if(RegSR31Value.DAC1_Source_Select == 0x2)          //source is IGA3
+        {
+            //It's binded to IGA3, can't do dac sense, check whether previous EDID is valid
+            if(pSensePara->PrevEdidValid)
+            {
+                //previous EDID is valid, and can't read current EDID, it's edid-monitor plug out case
+                bNeedSense = CBIOS_FALSE;
+                bRetConnected = CBIOS_FALSE;
+            }
+            else
+            {
+                //can't detect plug out of non-EDID-monitor
+                bNeedSense = CBIOS_FALSE;
+                bRetConnected = CBIOS_TRUE;
+            }
+        }
+        else
+        {
+            //not bind to IGA3, do normal new dac sense
+            bNeedSense = CBIOS_TRUE;
+            bUseNewSense = CBIOS_TRUE;
+        }
+    }
+    else
+    {
+        //not connected or not turned on, can switch to IGA1/IGA2 to do old dac sense
+        bNeedSense = CBIOS_TRUE;
+        bUseNewSense = CBIOS_FALSE;
+    }
+
+    if(bNeedSense)
+    {
+        pSensePara->UseNewSense = (bUseNewSense)? 1 : 0;
+    }
+    else
+    {
+        pSensePara->Connected = (bRetConnected)? 1 : 0;
+    }
+
+    return bNeedSense;
+}
+
+CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon, CBIOS_BOOL  bPrevEdidValid)
 {
     PCBIOS_EXTENSION_COMMON pcbe       = (PCBIOS_EXTENSION_COMMON)pvcbe;
-    PCBIOS_DEVICE_COMMON    pDevCommon = pCrtMonitorContext->pDevCommon;
     CBIOS_U32               IGAIndex = pDevCommon->DispSource.ModuleList.IGAModule.Index;
-    CBIOS_U32               bStatus = CBIOS_FALSE;
+    CBIOS_BOOL            bStatus = CBIOS_FALSE;
     CBIOS_U8                by3C2;
-    REG_SR21                RegSR21Value;
-    REG_SR21                RegSR21Mask;
-    REG_SR31_Pair           RegSR31Value;
-    REG_SR31_Pair           RegSR31Mask;
-    REG_SR3F                RegSR3FValue;
-    REG_SR3F                RegSR3FMask;
-    REG_CR71_Pair           RegCR71Value;
-    REG_CR71_Pair           RegCR71Mask;
-    REG_SR4B                RegSR4BValue;
-    REG_SR4B                RegSR4BMask;
-    REG_SR4C                RegSR4CValue;
-    REG_SR4C                RegSR4CMask;
-    REG_SR4D                RegSR4DValue;
-    REG_SR4D                RegSR4DMask;
+    REG_SR21                RegSR21Value, RegSR21Mask;
+    REG_SR31_Pair           RegSR31Value, RegSR31Mask;
+    REG_SR3F                RegSR3FValue, RegSR3FMask;
+    REG_CR71_Pair           RegCR71Value, RegCR71Mask;
+    CBIOS_DAC_SENSE_PARA  DacSensePara = {0};
 
-    if(pDevCommon->PowerState == CBIOS_PM_ON)
+    DacSensePara.PowerState = pDevCommon->PowerState;
+    DacSensePara.PrevEdidValid = (bPrevEdidValid)? 1 : 0;
+
+    if(!cbIsNeedDacSense(pcbe, &DacSensePara))
     {
+        return  (DacSensePara.Connected)? CBIOS_TRUE : CBIOS_FALSE;
+    }
+    
+    if(DacSensePara.UseNewSense)
+    {        
         //Use new DAC1 sense logic when CRT is on.
         RegSR21Value.Value = 0;
         RegSR21Value.DAC1_SENSE_Power_Down_Enable = 0;
@@ -227,23 +301,11 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCrt
         RegCR71Mask.SENSEL = 0;
         RegCR71Mask.SENWIDTH = 0;
         cbMMIOWriteReg(pcbe,CR_71, RegCR71Value.Value, RegCR71Mask.Value);
-
-        RegSR4BValue.Value = 0;
-        RegSR4BValue.R_SENSE = 0x7A;
-        RegSR4BMask.Value = 0xFF;
-        RegSR4BMask.R_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4B, RegSR4BValue.Value, RegSR4BMask.Value);
-        RegSR4CValue.Value = 0;
-        RegSR4CValue.G_SENSE = 0x7A;
-        RegSR4CMask.Value = 0xFF;
-        RegSR4CMask.G_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4C, RegSR4CValue.Value, RegSR4CMask.Value);
-        RegSR4DValue.Value = 0;
-        RegSR4DValue.B_SENSE = 0x7A;
-        RegSR4DMask.Value = 0xFF;
-        RegSR4DMask.B_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4D, RegSR4DValue.Value, RegSR4DMask.Value);
-
+        
+        cbMMIOWriteReg(pcbe,SR_4B, 0x7A, 0x00);   //R sense
+        cbMMIOWriteReg(pcbe,SR_4C, 0x7A, 0x00);   // G sense
+        cbMMIOWriteReg(pcbe,SR_4D, 0x7A, 0x00);  // B sense
+        
         RegSR3FValue.Value = 0;
         RegSR3FValue.B_Sense_1to0 = 3;
         RegSR3FValue.G_Sense_1to0 = 3;
@@ -279,7 +341,7 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCrt
     }
     else
     {
-        //Use old DAC1 sense logic when CRT is off.
+        //Use old DAC1 sense logic when CRT is off. Use IGA2 to sense
         cbSaveRegTableU8(pcbe, NewCRTDetectEnv, sizeofarray(NewCRTDetectEnv), pcbe->SavedReg);
 
         RegSR21Value.Value = 0;
@@ -292,21 +354,10 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCrt
         RegSR3FMask.Value = 0xFF;
         RegSR3FMask.SENSE_Mode = 0;
         cbMMIOWriteReg(pcbe,SR_3F, RegSR3FValue.Value, RegSR3FMask.Value);
-        RegSR4BValue.Value = 0;
-        RegSR4BValue.R_SENSE = 0x7A;
-        RegSR4BMask.Value = 0xFF;
-        RegSR4BMask.R_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4B, RegSR4BValue.Value, RegSR4BMask.Value);
-        RegSR4CValue.Value = 0;
-        RegSR4CValue.G_SENSE = 0x7A;
-        RegSR4CMask.Value = 0xFF;
-        RegSR4CMask.G_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4C, RegSR4CValue.Value, RegSR4CMask.Value);
-        RegSR4DValue.Value = 0;
-        RegSR4DValue.B_SENSE = 0x7A;
-        RegSR4DMask.Value = 0xFF;
-        RegSR4DMask.B_SENSE = 0;
-        cbMMIOWriteReg(pcbe,SR_4D, RegSR4DValue.Value, RegSR4DMask.Value);
+
+        cbMMIOWriteReg(pcbe,SR_4B, 0x7A, 0x00);
+        cbMMIOWriteReg(pcbe,SR_4C, 0x7A, 0x00);
+        cbMMIOWriteReg(pcbe,SR_4D, 0x7A, 0x00);
 
         cb_DelayMicroSeconds(570);
     }
@@ -319,7 +370,7 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCrt
     }
 
     // Restore register
-    if(pDevCommon->PowerState == CBIOS_PM_ON)
+    if(DacSensePara.UseNewSense)
     {
         //Use new DAC1 sense logic when CRT is on.
         RegSR21Value.Value = 0;

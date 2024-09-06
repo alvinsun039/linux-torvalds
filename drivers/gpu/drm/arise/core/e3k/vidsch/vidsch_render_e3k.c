@@ -38,7 +38,7 @@ int vidsch_render_e3k(gpu_context_t *gpu_context, task_dma_t *task_dma)
         static unsigned long long  start_time = 0;
         /* I saw many small garbage flash in screen after reset about 10? times when use wrong cmd, so add this counter and notes */
         static unsigned int        hang_reset_counters = 0;
-        static unsigned int        max_hang_reset_counters = 1;
+        static unsigned int        max_hang_reset_counters = 99999999;
 
         /* only reset twice and need reboot to restart reset. */
         if (/*adapter->ctl_flags.recovery_enable &&*/ (hang_reset_counters < max_hang_reset_counters))

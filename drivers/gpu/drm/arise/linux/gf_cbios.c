@@ -1755,10 +1755,15 @@ int disp_cbios_get_clock(disp_info_t *disp_info, unsigned int type, unsigned int
     {
         *output = (gf_do_div(*output, 10000) + 1) * 10000;
 
-        if(adapter_info->chip_id >= CHIP_ARISE1020 && type == GF_QUERY_CORE_CLOCK)
+        if((adapter_info->chip_id >= CHIP_ARISE1020) && (adapter_info->chip_id < CHIP_ARISE2030) && (type == GF_QUERY_CORE_CLOCK))
         {
             *output *= 2;
         }
+    }
+
+    if ((adapter_info->chip_id >= CHIP_ARISE2030) && (type == GF_QUERY_VCLK))
+    {
+        *output = (gf_do_div(*output, 10000) + 1) * 10000 * 2;
     }
 
     return (status == CBIOS_OK) ? DISP_OK : DISP_FAIL;

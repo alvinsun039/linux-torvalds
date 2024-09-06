@@ -38,16 +38,20 @@ void vidmm_init_mem_settings_e3k(adapter_t *adapter)
     unsigned int pending_buf_len = (adapter->chip_id < CHIP_ARISE1020) ? 0x4 : 0x40;
 
     //vcp0 decouple disable 0x4c910 0x1
-    pRegAddr = adapter->mmio + 0x4c910;
-    gf_write32(pRegAddr, 0x1);
-
-    //CHIP_ARISE1020 only has one vcp core
-    if(adapter->chip_id < CHIP_ARISE1020)
+    //if miu numble is larger than 1, we enable decouple, others disable.
+    if(adapter->chip_id >= CHIP_ARISE1020 && adapter->chip_id != CHIP_ARISE2030)
     {
-        //vcp1 decouple disable 0x4a910 0x1
-        pRegAddr = adapter->mmio + 0x4a910;
+        pRegAddr = adapter->mmio + 0x4c910;
         gf_write32(pRegAddr, 0x1);
     }
+
+    //CHIP_ARISE1020 only has one vcp core
+    //if(adapter->chip_id < CHIP_ARISE1020)
+    //{
+        //vcp1 decouple disable 0x4a910 0x1
+    //    pRegAddr = adapter->mmio + 0x4a910;
+    //    gf_write32(pRegAddr, 0x1);
+    //}
 
     reg_Mmu_Mode.reg.Vmen = 0;//use PA mode
     reg_Mmu_Mode.reg.Video_Size = (adapter->Real_vram_size>> 28) - 1;

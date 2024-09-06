@@ -34,14 +34,15 @@ CBIOS_STATUS cbPathMgrGetDevComb(PCBIOS_VOID pvcbe, PCBIOS_GET_DEV_COMB pDevComb
     PCBIOS_EXTENSION_COMMON pcbe = (PCBIOS_EXTENSION_COMMON)pvcbe;
     PCBIOS_DEVICE_COMB pDeviceComb = pDevComb->pDeviceComb;
     CBIOS_ACTIVE_TYPE  Devices = pDeviceComb->Devices;
-
-    pDeviceComb->Iga1Dev = CBIOS_TYPE_NONE;
-    pDeviceComb->Iga2Dev = CBIOS_TYPE_NONE;
-    pDeviceComb->Iga3Dev = CBIOS_TYPE_NONE;
-    pDeviceComb->Iga4Dev = CBIOS_TYPE_NONE;
+    CBIOS_ACTIVE_TYPE  TempDev = CBIOS_TYPE_NONE;
+    CBIOS_GET_IGA_MASK GetIgaMask = {0};
+    CBIOS_U32          IgaMask = 0, IgaIndex = 0;
+    CBIOS_U32          DevOnIga[CBIOS_IGACOUNTS] = {0};
+    CBIOS_BOOL         bAssigned = CBIOS_FALSE;
 
     if (Devices == CBIOS_TYPE_NONE)
     {
+        cbDebugPrint((MAKE_LEVEL(GENERIC, INFO), "%s: Devices is NONE ! \n", FUNCTION_NAME));
         return  CBIOS_OK;
     }
 
@@ -58,51 +59,54 @@ CBIOS_STATUS cbPathMgrGetDevComb(PCBIOS_VOID pvcbe, PCBIOS_GET_DEV_COMB pDevComb
         pDevComb->bSupported = CBIOS_FALSE;
         return CBIOS_ER_INVALID_PARAMETER;
     }
-    else
+
+    GetIgaMask.Size = sizeof(CBIOS_GET_IGA_MASK);
+    while(Devices)
     {
-        if(Devices & CBIOS_TYPE_DP1)
+        bAssigned = CBIOS_FALSE;
+        
+        //select a high priority device if more than one device
+        TempDev = cbDevGetPrimaryDevice(Devices);
+        Devices &= ~TempDev;
+        GetIgaMask.DeviceId = (CBIOS_U32)TempDev;
+        cbPathMgrGetIgaMask(pcbe, &GetIgaMask);
+
+        IgaMask = GetIgaMask.IgaMask;
+        while(IgaMask)
         {
-            pDevComb->pDeviceComb->Iga1Dev = CBIOS_TYPE_DP1;
+            IgaIndex = cbGetLastBitIndex(IgaMask);
+            IgaMask &= ~(1 << IgaIndex);
+            if(DevOnIga[IgaIndex] == CBIOS_TYPE_NONE)
+            {
+                DevOnIga[IgaIndex] = TempDev;
+                bAssigned = CBIOS_TRUE;
+                break;
+            }
         }
 
-        if(pcbe->DispMgr.IgaCount == 2)
+        if (!bAssigned)
         {
-            if(Devices & CBIOS_TYPE_DP2)
-            {
-                pDevComb->pDeviceComb->Iga2Dev = CBIOS_TYPE_DP2;
-            }
-            else if(Devices & CBIOS_TYPE_CRT)
-            {
-                pDevComb->pDeviceComb->Iga2Dev = CBIOS_TYPE_CRT;
-            }
+            cbDebugPrint((MAKE_LEVEL(GENERIC, ERROR), "%s: Can't assign IGA for device: 0x%x\n", FUNCTION_NAME, TempDev));
+            break;
         }
-        else if(pcbe->DispMgr.IgaCount == 3)
-        {
-            if(Devices & CBIOS_TYPE_DP3)
-            {
-                pDevComb->pDeviceComb->Iga3Dev = CBIOS_TYPE_DP3;
-            }
-            else if(Devices & CBIOS_TYPE_CRT)
-            {
-                pDevComb->pDeviceComb->Iga3Dev = CBIOS_TYPE_CRT;
-            }
-        }
-        else if(pcbe->DispMgr.IgaCount == 4)
-        {
-            if(Devices & CBIOS_TYPE_DP4)
-            {
-                pDevComb->pDeviceComb->Iga4Dev = CBIOS_TYPE_DP4;
-            }
-            else if(Devices & CBIOS_TYPE_CRT)
-            {
-                pDevComb->pDeviceComb->Iga4Dev = CBIOS_TYPE_CRT;
-            }
-        }
-        pDevComb->bSupported = CBIOS_TRUE;
-        return CBIOS_OK;
     }
 
-    return  CBIOS_OK;
+    if(bAssigned)
+    {
+        pDeviceComb->Iga1Dev = DevOnIga[IGA1];
+        pDeviceComb->Iga2Dev = DevOnIga[IGA2];
+        pDeviceComb->Iga3Dev = DevOnIga[IGA3];
+        pDeviceComb->Iga4Dev = DevOnIga[IGA4];
+        pDevComb->bSupported = CBIOS_TRUE;
+        
+        return CBIOS_OK;
+    }
+    else
+    {
+        pDevComb->bSupported = CBIOS_FALSE;
+        return CBIOS_ER_INVALID_PARAMETER;
+    }
+    
 }
 
 CBIOS_STATUS cbPathMgrGetIgaMask(PCBIOS_VOID pvcbe, PCBIOS_GET_IGA_MASK pGetIgaMask)

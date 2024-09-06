@@ -20,6 +20,30 @@
 #include "gf_sink.h"
 #include "gf_splice.h"
 
+gf_connector_t* gf_get_connector_by_device_id(disp_info_t*  disp_info, int device_id)
+{
+    gf_card_t *gf_card = (gf_card_t *)disp_info->gf_card;
+    struct drm_device *drm = gf_card->drm_dev;
+    gf_connector_t *gf_conn = NULL;
+    struct drm_connector *connector = NULL;
+
+    if(!drm || !device_id)
+    {
+        return gf_conn;
+    }
+
+    list_for_each_entry(connector, &drm->mode_config.connector_list, head)
+    {
+        if((to_gf_connector(connector))->output_type == device_id)
+        {
+            gf_conn = to_gf_connector(connector);
+            break;
+        }
+    }
+
+    return gf_conn;
+}
+
 enum drm_connector_status
 gf_connector_detect_internal(struct drm_connector *connector, bool force, int full_detect)
 {
@@ -572,7 +596,13 @@ struct drm_connector* disp_connector_init(disp_info_t* disp_info, disp_output_ty
         connector->stereo_allowed = FALSE;
         connector->interlace_allowed = FALSE;
     }
-    else if (output & DISP_OUTPUT_DP_TYPES)
+    else if (output == DISP_OUTPUT_DP2)
+    {
+        conn_type = DRM_MODE_CONNECTOR_DisplayPort;
+        connector->stereo_allowed = TRUE;
+        connector->interlace_allowed = TRUE;
+    }
+    else if (output & (DISP_OUTPUT_DP_TYPES & (~DISP_OUTPUT_DP2)))
     {
         conn_type = DRM_MODE_CONNECTOR_HDMIA;
         connector->stereo_allowed = TRUE;

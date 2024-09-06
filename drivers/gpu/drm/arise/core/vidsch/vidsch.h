@@ -226,7 +226,7 @@ extern void vidsch_wait_engine_idle(adapter_t *adapter, int idx);
 
 extern int vidsch_save(adapter_t *adapter);
 extern void vidsch_restore(adapter_t *adapter);
-
+extern void vidsch_dvfs_power_flag_reset(adapter_t *adapter);
 extern task_dma_t *vidsch_allocate_task_dma(adapter_t *adapter, unsigned int engine_index, vidsch_allocate_task_dma_t *dma_arg);
 
 extern task_paging_t *vidsch_allocate_paging_task(adapter_t *adapter, int dma_size, int allocation_num);

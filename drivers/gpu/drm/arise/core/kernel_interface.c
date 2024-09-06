@@ -137,7 +137,7 @@ static  void krnl_init_adapter(void* adp, int reserved_vmem, void *disp_info)
     gf_info("power caps: ClockGating:%d, PowerGating:%d\n",
         adapter->pwm_level.EnableClockGating, adapter->pwm_level.EnablePowerGating);
 
-    gf_info("Ctrl: Recovery:%d, WK-thread:%d, Hang-Dump:%d, RunOnQT:%d, PwmMode:%d, NonsnoopEnable:%d\n",
+    gf_info("Ctrl: Recovery:%d, WK-thread:%d, Hang-Dump:%d, RunOnQT:%d, PwmMode:0x%x, NonsnoopEnable:%d\n",
         adapter->ctl_flags.recovery_enable, adapter->ctl_flags.worker_thread_enable,
         adapter->ctl_flags.hang_dump, adapter->ctl_flags.run_on_qt, adapter->pm_caps.pwm_mode, adapter->hw_caps.snoop_only ? 0 : 1);
 
@@ -1314,6 +1314,13 @@ static void krnl_task_timeout_update(void* data, unsigned long long *value, int 
         *value = gf_do_div(adapter->hw_hang_fast_timeout_ns, 1000000);
 }
 
+static void krnl_reset_dvfs_power_flag(void* data)
+{
+    adapter_t *adapter = data;
+
+    vidsch_dvfs_power_flag_reset(adapter);
+}
+
 static core_interface_t gfe3k_gpu_core = {
 #define INTERFACE(item) .item = krnl_##item
     INTERFACE(pre_init_adapter),
@@ -1373,6 +1380,7 @@ static core_interface_t gfe3k_gpu_core = {
     INTERFACE(ctl_flags_set),
     INTERFACE(hwq_process_vsync_event),
     INTERFACE(task_timeout_update),
+    INTERFACE(reset_dvfs_power_flag),
 #undef INTERFACE
 };
 

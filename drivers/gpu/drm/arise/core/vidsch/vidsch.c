@@ -324,12 +324,12 @@ static int vidsch_is_fence_back_condition(void *argu)
     return vidsch_is_fence_back(wait_fence->adapter, wait_fence->engine, wait_fence->fence_id);
 }
 
-int inline vidschi_allocation_in_cmd_queue(unsigned char engine_index, vidmm_allocation_t *allocation)
+inline int vidschi_allocation_in_cmd_queue(unsigned char engine_index, vidmm_allocation_t *allocation)
 {
     return allocation->render_count[engine_index] == 0 ? FALSE : TRUE;
 }
 
-int inline vidschi_allocation_in_write_cmd_queue(unsigned char engine_index, vidmm_allocation_t *allocation)
+inline int vidschi_allocation_in_write_cmd_queue(unsigned char engine_index, vidmm_allocation_t *allocation)
 {
     return allocation->write_render_count[engine_index] == 0 ? FALSE : TRUE;
 }
@@ -676,6 +676,21 @@ void vidsch_restore(adapter_t *adapter)
         vidsch->engine_dvfs_power_on = TRUE;
         vidsch->init_submit = TRUE;
 
+    }
+}
+
+void vidsch_dvfs_power_flag_reset(adapter_t *adapter)
+{
+    vidsch_mgr_t *vidsch = NULL;
+    int i;
+
+    for (i = 0; i < adapter->active_engine_count; i++)
+    {
+        vidsch = adapter->sch_mgr[i];
+        if (vidsch == NULL)
+            continue;
+
+        vidsch->engine_dvfs_power_on = FALSE;
     }
 }
 

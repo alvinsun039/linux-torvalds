@@ -32,6 +32,7 @@ CBIOS_BOOL cbCRTMonitor_Detect(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCr
     CBIOS_BOOL              bGotEdid     = CBIOS_FALSE;
     CBIOS_BOOL              IsDevChanged = CBIOS_FALSE;
     CBIOS_BOOL              bConnected   = CBIOS_FALSE;
+    CBIOS_BOOL              bPrevEdidValid = CBIOS_FALSE;
 
     if (bHardcodeDetected)
     {
@@ -39,6 +40,8 @@ CBIOS_BOOL cbCRTMonitor_Detect(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCr
         bConnected = CBIOS_TRUE;
         goto EXIT;
     }
+
+    bPrevEdidValid = cbEDIDModule_IsEDIDValid(pDevCommon->EdidData);
 
     bGotEdid = cbGetDeviceEDID(pcbe, pDevCommon, &IsDevChanged, FullDetect);
 
@@ -67,8 +70,8 @@ CBIOS_BOOL cbCRTMonitor_Detect(PCBIOS_VOID pvcbe, PCBIOS_CRT_MONITOR_CONTEXT pCr
         //then after resume,driver will not enter some hdmi module related codes,so monitor can't light
         //so not memset pDevCommon->EdidStruct when device is not connected
         cbClearEdidRelatedData(pcbe, pDevCommon);
-
-        if (cbDIU_CRT_DACSense(pcbe, pCrtMonitorContext))
+                
+        if(cbDIU_CRT_DACSense(pcbe, pDevCommon, bPrevEdidValid))
         {
             pDevCommon->CurrentMonitorType = CBIOS_MONITOR_TYPE_CRT;
             bConnected = CBIOS_TRUE;

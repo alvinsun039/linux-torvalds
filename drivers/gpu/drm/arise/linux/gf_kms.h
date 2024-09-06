@@ -102,6 +102,7 @@ typedef  struct
     unsigned int  lut_entry[256];  //(b | g << 8 | r << 16) for 8bit lut or (b | g << 10 | r << 20) for 10bit lut
 #endif
     unsigned int enabled;
+    unsigned int vsync_int;
 }gf_crtc_t;
 
 typedef struct
@@ -123,6 +124,7 @@ typedef struct
     int                   hda_codec_index;
     int                   hpd_int_bit;
     int                   hpd_enable;
+    int                   polling_time;
     struct os_mutex*      conn_mutex;
 #if DRM_VERSION_CODE < KERNEL_VERSION(4, 8, 0)
     gf_encoder_t*  new_encoder;

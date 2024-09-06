@@ -98,7 +98,7 @@ irqreturn_t gf_irq_handle(int irq, void *arg);
 
 void gf_irq_uninstall (struct drm_device *dev);
 
-void gf_hot_plug_intr_ctrl(disp_info_t* disp_info, unsigned int intr, int enable);
+void gf_hot_plug_intr_onoff(disp_info_t* disp_info, int on);
 
 void gf_hotplug_work_func(struct work_struct *work);
 

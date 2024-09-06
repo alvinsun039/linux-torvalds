@@ -385,7 +385,10 @@ CBIOS_STATUS cbDevGetEdidFromBuffer(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDev
     else
     {
         bRetStatus = CBIOS_ER_EDID_INVALID;
-        cbDebugPrint((MAKE_LEVEL(GENERIC, DEBUG), "%s: Not a valid EDID!\n", FUNCTION_NAME));
+        if(pDevCommon->DeviceType != CBIOS_TYPE_CRT)
+        {
+            cbDebugPrint((MAKE_LEVEL(GENERIC, WARNING), "Can't get valid EDID for device 0x%x!\n", pDevCommon->DeviceType));
+        }
     }
 
     return bRetStatus;

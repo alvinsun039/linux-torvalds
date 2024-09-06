@@ -234,6 +234,7 @@ typedef struct
     struct os_spinlock *hda_lock;
     struct os_spinlock *hdcp_lock;
     int              irq_enabled;
+    int              poll_running;
     atomic_t         atomic_irq_lock;
     struct work_struct hotplug_work;
     struct work_struct dp_irq_work;
@@ -393,5 +394,7 @@ void gf_restore_drm_connector_state(struct drm_device *dev, struct drm_connector
 void disp_probe_connector_after_resume(struct drm_device *dev);
 
 void disp_create_plane_property(struct drm_device* dev, gf_plane_t* gf_plane);
+
+gf_connector_t* gf_get_connector_by_device_id(disp_info_t *disp_info, int device_id);
 
 #endif

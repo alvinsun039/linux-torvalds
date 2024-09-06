@@ -523,7 +523,7 @@ long gf_gem_fence_await_reservation(struct reservation_object *resv, int exclude
         kfree(fences);
 
     if (timeout <= 0)
-        gf_debug("wait fences timeout or interrupted:%d\n", timeout);
+        gf_warning("wait fences timeout or interrupted:%d\n", timeout);
 
     return timeout;
 }

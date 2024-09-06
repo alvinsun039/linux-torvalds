@@ -2542,13 +2542,16 @@ CBIOS_BOOL cbEDIDModule_IsEDIDValid(CBIOS_U8 *pEDID)
         {
             byTemp = byTemp + pEDID[i];
             //if checksum of 128 or 256 bytes is 0, success.
-            if(((i == 127) && (byTemp == 0)) ||
-                ((i == 255) && (byTemp == 0)))
+            if(((i == 127) && (byTemp == 0)) ||((i == 255) && (byTemp == 0)))
+            {
                 break;
+            }
         }
 
         if(byTemp == 0)
+        {
             bRet = CBIOS_TRUE;
+        }
     }
 
     return bRet;

@@ -255,7 +255,7 @@ __inline DWORD SET_REGISTER_ADDR_E3K(DWORD Block, DWORD Offset,BOOL AddressMode)
     return Cmd.uint;
 }
 
-_inline DWORD  SET_REGISTER_ADDR_LOW_E3K(DWORD LowAddress)
+__inline DWORD  SET_REGISTER_ADDR_LOW_E3K(DWORD LowAddress)
 {
     Cmd_Set_Register_Addr_Dword1 Cmd = {0};
 
@@ -264,7 +264,7 @@ _inline DWORD  SET_REGISTER_ADDR_LOW_E3K(DWORD LowAddress)
     return *(DWORD*)&Cmd;
 }
 
-_inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_E3K(DWORD HighAddress, DWORD RegCnt)
+__inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_E3K(DWORD HighAddress, DWORD RegCnt)
 {
     Cmd_Set_Register_Addr_Dword2 Cmd = {0};
 
@@ -273,7 +273,7 @@ _inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_E3K(DWORD HighAddress, DWORD Re
     return *(DWORD*)&Cmd;
 }
 
-_inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_AND_L2_E3K(DWORD HighAddress, DWORD RegCnt, DWORD L2cacheable)
+__inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_AND_L2_E3K(DWORD HighAddress, DWORD RegCnt, DWORD L2cacheable)
 {
     Cmd_Set_Register_Addr_Dword2 Cmd = {0};
 
@@ -283,7 +283,7 @@ _inline DWORD  SET_REGISTER_ADDR_HIGH_AND_REGCNT_AND_L2_E3K(DWORD HighAddress, D
     return *(DWORD*)&Cmd;
 }
 
-DWORD _inline SEND_SKIP_E3K(DWORD SkipCount)
+__inline DWORD SEND_SKIP_E3K(DWORD SkipCount)
 {
     Csp_Opcodes_cmd SkipCmd = {0};
     SkipCmd.cmd_Skip.Dwc = (DWORD)(SkipCount - 1);
@@ -292,7 +292,7 @@ DWORD _inline SEND_SKIP_E3K(DWORD SkipCount)
     return SkipCmd.uint;
 }
 
-_inline DWORD  SEND_TBR_INDICATOR_COMMAND_E3K(DWORD value)
+__inline DWORD  SEND_TBR_INDICATOR_COMMAND_E3K(DWORD value)
 {
     Csp_Opcodes_cmd indicator = {0};
 
@@ -303,7 +303,7 @@ _inline DWORD  SEND_TBR_INDICATOR_COMMAND_E3K(DWORD value)
     return *((DWORD*)&indicator);
 }
 
-DWORD _inline SEND_FFCACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_FFCACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -317,7 +317,7 @@ DWORD _inline SEND_FFCACHE_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_UCACHE_3DFE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_3DFE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -331,7 +331,7 @@ DWORD _inline SEND_UCACHE_3DFE_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_UCACHE_3DBE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_3DBE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -345,7 +345,7 @@ DWORD _inline SEND_UCACHE_3DBE_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_UCACHE_CSL_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_CSL_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -359,7 +359,7 @@ DWORD _inline SEND_UCACHE_CSL_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_UCACHE_CSH_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_CSH_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -373,7 +373,7 @@ DWORD _inline SEND_UCACHE_CSH_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_DCACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_DCACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -386,7 +386,7 @@ DWORD _inline SEND_DCACHE_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-DWORD _inline SEND_2D_ONLY_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_2D_ONLY_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -399,7 +399,7 @@ DWORD _inline SEND_2D_ONLY_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-_inline DWORD  SEND_DEPTH_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD  SEND_DEPTH_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -412,7 +412,7 @@ _inline DWORD  SEND_DEPTH_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-_inline DWORD  SEND_STENCIL_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD  SEND_STENCIL_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Inv = {0};
 
@@ -425,7 +425,7 @@ _inline DWORD  SEND_STENCIL_INVALIDATE_COMMAND_E3K(void)
     return Inv.uint;
 }
 
-_inline DWORD  SEND_FLAGBUFFER_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD  SEND_FLAGBUFFER_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd FbInvCmd = {0};
 
@@ -437,12 +437,12 @@ _inline DWORD  SEND_FLAGBUFFER_INVALIDATE_COMMAND_E3K(void)
     return FbInvCmd.uint;
 }
 
-_inline DWORD SEND_GMCACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_GMCACHE_INVALIDATE_COMMAND_E3K(void)
 {
     return 0;
 }
 
-_inline DWORD SEND_TUFE_CSL_L1CACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_TUFE_CSL_L1CACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd TexInvCmd = {0};
 
@@ -455,7 +455,7 @@ _inline DWORD SEND_TUFE_CSL_L1CACHE_INVALIDATE_COMMAND_E3K(void)
     return TexInvCmd.uint;
 }
 
-_inline DWORD SEND_TUFE_CSH_L1CACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_TUFE_CSH_L1CACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd TexInvCmd = {0};
 
@@ -468,7 +468,7 @@ _inline DWORD SEND_TUFE_CSH_L1CACHE_INVALIDATE_COMMAND_E3K(void)
     return TexInvCmd.uint;
 }
 
-_inline DWORD SEND_TUFE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_TUFE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd TexInvCmd = {0};
 
@@ -481,7 +481,7 @@ _inline DWORD SEND_TUFE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
     return TexInvCmd.uint;
 }
 
-_inline DWORD SEND_TUBE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_TUBE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd TexInvCmd = {0};
 
@@ -494,7 +494,7 @@ _inline DWORD SEND_TUBE_L1CACHE_INVALIDATE_COMMAND_E3K(void)
     return TexInvCmd.uint;
 }
 
-_inline DWORD SEND_FFCACHE_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_FFCACHE_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -508,7 +508,7 @@ _inline DWORD SEND_FFCACHE_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_DSIGBUF_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_DSIGBUF_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd DSigBufFlushCmd = {0};
 
@@ -521,7 +521,7 @@ _inline DWORD SEND_DSIGBUF_FLUSH_COMMAND_E3K(void)
     return DSigBufFlushCmd.uint;
 }
 
-_inline DWORD SEND_UCACHE_3DFE_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_3DFE_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -535,7 +535,7 @@ _inline DWORD SEND_UCACHE_3DFE_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_UCACHE_3DBE_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_3DBE_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -549,7 +549,7 @@ _inline DWORD SEND_UCACHE_3DBE_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_UCACHE_CSL_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_CSL_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -563,7 +563,7 @@ _inline DWORD SEND_UCACHE_CSL_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_UCACHE_CSH_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_CSH_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -577,7 +577,7 @@ _inline DWORD SEND_UCACHE_CSH_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_UCACHE_3DL_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_UCACHE_3DL_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -590,7 +590,7 @@ _inline DWORD SEND_UCACHE_3DL_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_DCACHE_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_DCACHE_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -603,7 +603,7 @@ _inline DWORD SEND_DCACHE_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_2D_ONLY_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_2D_ONLY_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -616,7 +616,7 @@ _inline DWORD SEND_2D_ONLY_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_DEPTH_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_DEPTH_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -629,7 +629,7 @@ _inline DWORD SEND_DEPTH_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_STENCIL_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_STENCIL_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd Flush = {0};
 
@@ -642,7 +642,7 @@ _inline DWORD SEND_STENCIL_FLUSH_COMMAND_E3K(void)
     return Flush.uint;
 }
 
-_inline DWORD SEND_FLAGBUFFER_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_FLAGBUFFER_FLUSH_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd FbInvCmd = {0};
 
@@ -654,12 +654,12 @@ _inline DWORD SEND_FLAGBUFFER_FLUSH_COMMAND_E3K(void)
     return FbInvCmd.uint;
 }
 
-_inline DWORD SEND_GMCACHE_FLUSH_COMMAND_E3K(void)
+__inline DWORD SEND_GMCACHE_FLUSH_COMMAND_E3K(void)
 {
     return 0;
 }
 
-DWORD _inline SEND_BL_CLEAR_COMMAND_E3K(DWORD dwCounter)
+__inline DWORD SEND_BL_CLEAR_COMMAND_E3K(DWORD dwCounter)
 {
     Csp_Opcodes_cmd     clearCmd={0};
 
@@ -671,7 +671,7 @@ DWORD _inline SEND_BL_CLEAR_COMMAND_E3K(DWORD dwCounter)
 
     return (DWORD)clearCmd.uint;
 }
-_inline DWORD SEND_RT_CLEAR_COMMAND_E3K(BOOL bPredicate,BOOL bTiled)
+__inline DWORD SEND_RT_CLEAR_COMMAND_E3K(BOOL bPredicate,BOOL bTiled)
 {
     Csp_Opcodes_cmd  Cmd = {0};
 
@@ -689,7 +689,7 @@ _inline DWORD SEND_RT_CLEAR_COMMAND_E3K(BOOL bPredicate,BOOL bTiled)
     return (DWORD)Cmd.uint;
 }
 
-_inline DWORD SEND_DEPTH_CLEAR_COMMAND_E3K(BOOL bPredicate)
+__inline DWORD SEND_DEPTH_CLEAR_COMMAND_E3K(BOOL bPredicate)
 {
     Csp_Opcodes_cmd     Zc={0};
 
@@ -704,7 +704,7 @@ _inline DWORD SEND_DEPTH_CLEAR_COMMAND_E3K(BOOL bPredicate)
     return (DWORD)Zc.uint;
 }
 
-_inline DWORD SEND_STENCIL_CLEAR_COMMAND_E3K(BOOL bPredicate)
+__inline DWORD SEND_STENCIL_CLEAR_COMMAND_E3K(BOOL bPredicate)
 {
     Csp_Opcodes_cmd     Sc={0};
 
@@ -719,7 +719,7 @@ _inline DWORD SEND_STENCIL_CLEAR_COMMAND_E3K(BOOL bPredicate)
     return (DWORD)Sc.uint;
 }
 
-_inline DWORD SEND_MCE_RT_CLEAR_COMMAND_E3K(BOOL bTiled)
+__inline DWORD SEND_MCE_RT_CLEAR_COMMAND_E3K(BOOL bTiled)
 {
     Csp_Opcodes_cmd  Cmd = {0};
 
@@ -737,7 +737,7 @@ _inline DWORD SEND_MCE_RT_CLEAR_COMMAND_E3K(BOOL bTiled)
     return (DWORD)Cmd.uint;
 }
 
-_inline DWORD SEND_MCE_DEPTH_CLEAR_COMMAND_E3K(void)
+__inline DWORD SEND_MCE_DEPTH_CLEAR_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd     Zc={0};
 
@@ -752,7 +752,7 @@ _inline DWORD SEND_MCE_DEPTH_CLEAR_COMMAND_E3K(void)
     return (DWORD)Zc.uint;
 }
 
-_inline DWORD SEND_MCE_STENCIL_CLEAR_COMMAND_E3K(void)
+__inline DWORD SEND_MCE_STENCIL_CLEAR_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd     Sc={0};
 
@@ -784,7 +784,7 @@ __inline DWORD SEND_2DCOPY_COMMAND_E3K(BOOL bPredicate, BOOL bOverlay)
 }
 
 
-_inline DWORD SEND_GRADIENTFILL_COMMAND_E3K(void)
+__inline DWORD SEND_GRADIENTFILL_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd     Cmd = {0};
 
@@ -843,7 +843,7 @@ _inline DWORD SEND_COPY_IMM_COMMAND_E3K(DWORD Dwf, BOOL bPredicate)
     return (DWORD)CopyImm.uint;
 }
 
-_inline DWORD SEND_DP_LINE_COMMAND_E3K(BOOL ColorIncluded, DWORD lineNum)
+__inline DWORD SEND_DP_LINE_COMMAND_E3K(BOOL ColorIncluded, DWORD lineNum)
 {
     Csp_Opcodes_cmd     DPLine={0};
     DWORD dwc = ColorIncluded ? (1 + lineNum*2) : (lineNum*2);
@@ -857,7 +857,7 @@ _inline DWORD SEND_DP_LINE_COMMAND_E3K(BOOL ColorIncluded, DWORD lineNum)
     return (DWORD)DPLine.uint;
 }
 
-_inline DWORD SEND_DRAWAUTO_COMMAND_E3K(DWORD P_Type, BOOL bInstanceMode, BOOL bPredicate)
+__inline DWORD SEND_DRAWAUTO_COMMAND_E3K(DWORD P_Type, BOOL bInstanceMode, BOOL bPredicate)
 {
     Csp_Opcodes_cmd     DIPCmd={0};
 
@@ -870,7 +870,7 @@ _inline DWORD SEND_DRAWAUTO_COMMAND_E3K(DWORD P_Type, BOOL bInstanceMode, BOOL b
     return (DWORD)DIPCmd.uint;
 }
 
-_inline DWORD SEND_DRAW_COMMAND_E3K(DWORD P_Type, DWORD IndexSize, BOOL bInstanceMode)
+__inline DWORD SEND_DRAW_COMMAND_E3K(DWORD P_Type, DWORD IndexSize, BOOL bInstanceMode)
 {
     Csp_Opcodes_cmd     DIPCmd={0};
     DWORD Index_Mode;
@@ -1260,7 +1260,7 @@ __inline DWORD SEND_FS_CFG_COMMAND_E3K(DWORD* pCmd)
     return 0;
 }
 
-DWORD __inline SEND_FS_L1I_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_FS_L1I_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd     BlockCommandEu = {0};
 
@@ -1273,7 +1273,7 @@ DWORD __inline SEND_FS_L1I_INVALIDATE_COMMAND_E3K(void)
     return (DWORD)BlockCommandEu.uint;
 }
 
-DWORD __inline SEND_CS_L1I_INVALIDATE_COMMAND_E3K(void)
+__inline DWORD SEND_CS_L1I_INVALIDATE_COMMAND_E3K(void)
 {
     Csp_Opcodes_cmd     BlockCommandEu = {0};
 

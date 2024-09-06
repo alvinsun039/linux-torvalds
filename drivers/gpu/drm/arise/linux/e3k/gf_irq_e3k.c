@@ -40,7 +40,7 @@ static void gf_translate_interrupt_bits(disp_info_t* disp_info, int sw2hw, intr_
         info->biu_intr_bits |= (*masks & INT_VIP2)? VIP2_INT : 0;
         info->biu_intr_bits |= (*masks & INT_VIP3)? VIP3_INT : 0;
         info->biu_intr_bits |= (*masks & INT_VIP4)? VIP4_INT : 0;
-        if(adapter->non_simul_chip)
+        if((adapter->chip_id == CHIP_ARISE1020) && adapter->non_simul_chip)
         {
             info->biu_intr_bits |= (*masks & INT_HDCODEC)? HDCODEC_INT_1020 : 0;
         }
@@ -75,7 +75,7 @@ static void gf_translate_interrupt_bits(disp_info_t* disp_info, int sw2hw, intr_
         *masks |= (info->biu_intr_bits & VIP2_INT)? INT_VIP2 : 0;
         *masks |= (info->biu_intr_bits & VIP3_INT)? INT_VIP3 : 0;
         *masks |= (info->biu_intr_bits & VIP4_INT)? INT_VIP4 : 0;
-        if(adapter->non_simul_chip)
+        if((adapter->chip_id == CHIP_ARISE1020) && adapter->non_simul_chip)
         {
             *masks |= (info->biu_intr_bits & HDCODEC_INT_1020)? INT_HDCODEC : 0;
         }

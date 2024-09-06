@@ -239,21 +239,31 @@ typedef struct
     unsigned int    HWCtxBufIndex;
     unsigned int    Pad;                            // for alignment request
     unsigned int    GF_Interface_Version;
-    unsigned int    Contain3dCmd                :1; // keep consistent with source_new, not used for elite
-    unsigned int    ContainLpdpCmd              :1;
-    unsigned int    CLCSOnly                    :1; // opencl without 2D/3D blt/L2 invalidate
-    unsigned int    Flag2dCmd                   :1; // Xserver 2d command
-    unsigned int    Flag3dbltCmd                :1; // Xserver composite 3d blt command
-    unsigned int    DvfsForceLevel              :3;
-    unsigned int    InitializeContext           :1;
-    unsigned int    ContainDIP                  :1;
-    unsigned int    TraceDMA                    :1;
 
-    unsigned int    resize_command_buffer       :1; /* resize command buffer after render */
-    unsigned int    resize_allocation_list      :1; /* resize allocation list after render */
-    unsigned int    resize_patch_location_list  :1; /* resize patch location list after render */
-    unsigned int    null_rendering              :1; /* null rendering, refer to WDK */
-    unsigned int    normal_recovery             :1; /* recovery normally if engine hang */
+    union
+    {
+        struct
+        {
+            unsigned int    Contain3dCmd                :1; // keep consistent with source_new, not used for elite
+            unsigned int    ContainLpdpCmd              :1;
+            unsigned int    CLCSOnly                    :1; // opencl without 2D/3D blt/L2 invalidate
+            unsigned int    Flag2dCmd                   :1; // Xserver 2d command
+            unsigned int    Flag3dbltCmd                :1; // Xserver composite 3d blt command
+            unsigned int    DvfsForceLevel              :3;
+            unsigned int    InitializeContext           :1;
+            unsigned int    ContainDIP                  :1;
+            unsigned int    TraceDMA                    :1;
+
+            unsigned int    resize_command_buffer       :1; /* resize command buffer after render */
+            unsigned int    resize_allocation_list      :1; /* resize allocation list after render */
+            unsigned int    resize_patch_location_list  :1; /* resize patch location list after render */
+            unsigned int    null_rendering              :1; /* null rendering, refer to WDK */
+            unsigned int    normal_recovery             :1; /* recovery normally if engine hang */
+            unsigned int    ForceSlice                  :1; /* ForceSlice */
+            unsigned int    Reserved                    :15;
+        };
+        unsigned int flags;
+    };
 } gf_render_flags_t;
 
 typedef struct gf_allocation_list

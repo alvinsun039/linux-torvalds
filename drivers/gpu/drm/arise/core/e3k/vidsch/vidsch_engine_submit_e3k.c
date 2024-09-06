@@ -601,6 +601,7 @@ static int enginei_common_submit_e3k(engine_e3k_t *engine, task_dma_t *task)
     RINGBUFFER_COMMANDS_E3K *pRb = NULL;
     unsigned int            RbCase;
     Cmd_Dma                 *p;
+    unsigned int            slice_mask = 0;
 
 #if DBG_HW_RING_BUFFER
     enginei_idle_ring_buffer_e3k(engine);
@@ -707,6 +708,7 @@ static int enginei_common_submit_e3k(engine_e3k_t *engine, task_dma_t *task)
         pRbCmds->c0.CommandDMA_Address_L = dma_phy_addr.low32;
         pRbCmds->c0.CommandDMA_Address_H = dma_phy_addr.high32 & 0xFF;
     }
+
     //when move RT to PCIE and open backdoor , 2 slice's performance is better than 1 slice
 #if 0
     if (adapter->vcp_index_cnt[VCP0_INDEX] || adapter->vcp_index_cnt[VCP1_INDEX]) {
@@ -714,15 +716,23 @@ static int enginei_common_submit_e3k(engine_e3k_t *engine, task_dma_t *task)
     } else {
         slice_mask = adapter->hw_caps.chip_slice_mask;
     }
+#endif
 
-    if (adapter->current_slice_mask != slice_mask) {
-        adapter->current_slice_mask = slice_mask;
-        if (RbCase == 0) {
-            gf_memcpy(&pRbCmds->c0.SliceSwitchInitCommands, &share->SliceSwitchInitCommands[0].c0, sizeof(pRbCmds->c0.SliceSwitchInitCommands));
-        } else if (RbCase == 1) {
-            gf_memcpy(&pRbCmds->c1.SliceSwitchInitCommands, &share->SliceSwitchInitCommands[1].c1, sizeof(pRbCmds->c1.SliceSwitchInitCommands));
+    //force 2 slice for occlusion query counter limitation
+#if 1
+    if (adapter->chip_id >= CHIP_ARISE2030)
+    {
+        slice_mask = task->desc.Flags.ForceSlice ? 0x3 : adapter->hw_caps.chip_slice_mask;
+
+        if (adapter->current_slice_mask != slice_mask) {
+            adapter->current_slice_mask = slice_mask;
+            if (RbCase == 0) {
+                gf_memcpy(&pRbCmds->c0.SliceSwitchInitCommands, &share->SliceSwitchInitCommands[0].c0, sizeof(pRbCmds->c0.SliceSwitchInitCommands));
+            } else if (RbCase == 1) {
+                gf_memcpy(&pRbCmds->c1.SliceSwitchInitCommands, &share->SliceSwitchInitCommands[1].c1, sizeof(pRbCmds->c1.SliceSwitchInitCommands));
+            }
+            //gf_info("switch slice mask to 0x%x\n", adapter->current_slice_mask);
         }
-        gf_info("switch slice mask to 0x%x\n", adapter->current_slice_mask);
     }
 #endif
     pRbCmds->c1.trigger_Dw.Slice_Mask = adapter->current_slice_mask;

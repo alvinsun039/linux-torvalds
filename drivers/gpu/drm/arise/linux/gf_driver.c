@@ -285,8 +285,6 @@ static krnl_import_func_list_t gf_export =
     .find_next_zero_bit            = gf_find_next_zero_bit,
     .set_bit                       = gf_set_bit,
     .clear_bit                     = gf_clear_bit,
-    .getsecs                       = gf_getsecs,
-    .get_nsecs                     = gf_get_nsecs,
     .create_thread                 = gf_create_thread,
     .destroy_thread                = gf_destroy_thread,
     .thread_should_stop            = gf_thread_should_stop,
@@ -329,7 +327,6 @@ static krnl_import_func_list_t gf_export =
     .thread_wait                   = gf_thread_wait,
     .create_wait_queue             = gf_create_wait_queue,
     .thread_wake_up                = gf_thread_wake_up,
-    .dump_stack                    = gf_dump_stack,
     .try_to_freeze                 = gf_try_to_freeze,
     .freezable                     = gf_freezable,
     .clear_freezable               = gf_clear_freezable,
@@ -449,7 +446,7 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
     int ret = 0;
     size_t len = 0;
     static int print_flag = 1;
-    char *buffer = NULL, *memory_type = "DDR4", *pmp_version = NULL, *product_name = NULL;
+    char *buffer = NULL, *memory_type = "DDR4", *pmp_version = NULL, *product_name = NULL, *type_dp = "\0";
     char *output_type_vga_hdmi = "VGA, HDMI", *output_type_full = "VGA, HDMI, DP", *hdmi_resolution = "3840 x 2160", *vga_resolution = "1920 x 1080", *output_type = output_type_vga_hdmi;
     unsigned int mclk, coreclk, eclk, free_mem, mem_usage, usage_3d, usage_vcp, usage_vpp;
     unsigned int subsystemid, technology, pixel_fillrate, texture_fillrate;
@@ -579,20 +576,24 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
         hdmi_fps = 60;
         subsystemid = 0x2030;
         technology = 28;
-        pixel_fillrate = 96 * eclk;
+        pixel_fillrate = 32 * eclk;
         texture_fillrate = pixel_fillrate *2;
         product_name = "Arise2030";
+        output_cnt = 3;
         output_type = output_type_full;
+        type_dp = "/DP";
         break;
 
     case 0x3d08:
         hdmi_fps = 60;
         subsystemid = 0x2020;
         technology = 28;
-        pixel_fillrate = 96 * eclk;
+        pixel_fillrate = 32 * eclk;
         texture_fillrate = pixel_fillrate *2;
         product_name = "Arise2020";
+        output_cnt = 3;
         output_type = output_type_full;
+        type_dp = "/DP";
         break;
 
     default:
@@ -638,11 +639,11 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
     len += sprintf(buffer + len, "Memory ddr Remain Size : %d MB\n", free_mem);
     len += sprintf(buffer + len, "Memory Clock Freq : %d MHz\n", mclk / 2);
     len += sprintf(buffer + len, "Memory Transfer Rates : %d MT/s\n", mclk);
-    len += sprintf(buffer + len, "GPU Work Frequency : Core %d MHz / Aux %d MHz\n", coreclk, eclk);
+    len += sprintf(buffer + len, "GPU Work Frequency : %d MHz\n", coreclk);
     len += sprintf(buffer + len, "Realtime Temperature : %d Degree\n", temp);
     len += sprintf(buffer + len, "Max Display Port : %d\n", output_cnt);
     len += sprintf(buffer + len, "Support Display Type : %s\n", output_type);
-    len += sprintf(buffer + len, "HDMI Max Display Resolution : %s@%dHz\n", hdmi_resolution, hdmi_fps);
+    len += sprintf(buffer + len, "HDMI%s Max Display Resolution : %s@%dHz\n", type_dp, hdmi_resolution, hdmi_fps);
     len += sprintf(buffer + len, "VGA Max Display Resolution : %s@60Hz\n", vga_resolution);
 
     len += sprintf(buffer + len, "GPU Memory Usage : %d%%\n", mem_usage);
@@ -1008,6 +1009,7 @@ int gf_card_init(gf_card_t *gf, void *pdev)
     gf->misc_control_flag = gf_modparams.misc_control_flag;
     gf->allocation_trace_tags = 0;
     gf->video_irq_info_all = 0;
+    gf->runtime_pm = gf_modparams.gf_runtime_pm;
 
     return ret;
 }

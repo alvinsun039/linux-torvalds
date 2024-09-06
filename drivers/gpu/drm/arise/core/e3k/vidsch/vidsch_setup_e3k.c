@@ -502,10 +502,15 @@ static void vidsch_read_miu_reg_e3k(adapter_t *adapter,gf_query_info_t *info)
 
 static void vidsch_dump_info_e3k(struct os_seq_file *seq_file, adapter_t *adapter)
 {
-#define GPC_COUNT 3
     EngineSatus_e3k     engine_status = {0};
     unsigned int        *status =(unsigned int*) &engine_status;
+    unsigned int        power_status = 0;
+    unsigned int        gpc_count = (CHIP_ARISE1020 <= adapter->chip_id) ? 1 : 3;
     int i;
+
+    power_status = gf_read32(adapter->mmio + MMIO_CSP_START_ADDRESS + Reg_Pwr_Mgr_Status0_Offset *4);
+
+    gf_seq_printf(seq_file, "engine power/clock status:0x%x\n", power_status);
 
     for( i = 0; i <7; i++)
     {
@@ -525,7 +530,7 @@ static void vidsch_dump_info_e3k(struct os_seq_file *seq_file, adapter_t *adapte
     gf_seq_printf(seq_file,"\t Tasbe_Busy   :%d \n", engine_status.Top.reg.Tasbe_Busy);
     gf_seq_printf(seq_file,"\t Hub_Busy     :%d \n", engine_status.Top.reg.Hub_Busy);
 
-    for (i = 0; i < GPC_COUNT; i++)
+    for (i = 0; i < gpc_count; i++)
     {
         Reg_Block_Busy_Bits_Gpc0_0 *s0 = (Reg_Block_Busy_Bits_Gpc0_0 *)(status + i * 2 + 1);
         Reg_Block_Busy_Bits_Gpc0_1 *s1 = (Reg_Block_Busy_Bits_Gpc0_1 *)(status + i * 2 + 2);
