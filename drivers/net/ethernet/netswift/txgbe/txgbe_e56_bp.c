@@ -1349,8 +1349,9 @@ static int E56phy25gCfg(struct txgbe_adapter *adapter)
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFFL_HINT__MSB,
 		  E56G__RXS0_FOM_18__DFE_COEFFL_HINT__LSB, 0x0);
+	//change 0x90 to 0x0 to fix 25G link up keep when cable unplugged
 	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFFH_HINT__MSB,
-		  E56G__RXS0_FOM_18__DFE_COEFFH_HINT__LSB, 0x90);
+		  E56G__RXS0_FOM_18__DFE_COEFFH_HINT__LSB, 0x0);
 	SetFields(&rdata, E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__MSB,
 		  E56G__RXS0_FOM_18__DFE_COEFF_HINT_LOAD__LSB, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -1535,7 +1536,7 @@ static int E56phy25gCfg(struct txgbe_adapter *adapter)
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x40);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	rdata = 0x0000;
@@ -2007,7 +2008,7 @@ static int E56phy10gCfg(struct txgbe_adapter *adapter)
 
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x40);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	rdata = 0x0000;
