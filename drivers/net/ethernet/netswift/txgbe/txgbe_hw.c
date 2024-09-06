@@ -369,7 +369,7 @@ s32 txgbe_setup_fc(struct txgbe_hw *hw)
 	u32 pcap_backplane = 0;
 
 	/*amlite TODO*/
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		return 0;
 
 	/* Validate the requested mode */
@@ -2695,7 +2695,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 
 	dword_len = length >> 2;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		/* try to get lock and lock */
 		/* wait max to 50ms to get lock */
 		WARN_ON(in_interrupt());
@@ -2890,7 +2890,7 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 
 rel_out:
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		/* index++, index replace txgbe_hic_hdr.checksum */
 		adapter->swfw_index = send_hdr->cksum_or_index.index == TXGBE_HIC_HDR_INDEX_MAX ?
 						  0 : send_hdr->cksum_or_index.index + 1;
@@ -3569,7 +3569,7 @@ s32 txgbe_get_thermal_sensor_data(struct txgbe_hw *hw)
 	if (hw->bus.lan_id)
 		return TXGBE_NOT_IMPLEMENTED;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_AML_TS_ENA, 0x0001);
 
 		while (1) {
@@ -3656,7 +3656,7 @@ s32 txgbe_init_thermal_sensor_thresh(struct txgbe_hw *hw)
 	data->sensor.alarm_thresh = 100;
 	data->sensor.dalarm_thresh = 90;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml  || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_AML_TS_ENA, 0x0);
 		wr32(hw, TXGBE_AML_INTR_RAW_LO, TXGBE_AML_INTR_CL_LO);
 		wr32(hw, TXGBE_AML_INTR_RAW_HI, TXGBE_AML_INTR_CL_HI);
@@ -4375,7 +4375,7 @@ s32 txgbe_init_phy_ops(struct txgbe_hw *hw)
 
 	/* amlite TODO*/
 	txgbe_init_i2c(hw);
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml  || hw->mac.type == txgbe_mac_aml40)
 		wr32(hw, 0x11220, 0xF);
 
 	mutex_init(&adapter->e56_lock);
@@ -4563,6 +4563,10 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 			*speed = TXGBE_LINK_SPEED_10GB_FULL |
 				  TXGBE_LINK_SPEED_1GB_FULL;
 		*autoneg = true;
+	} else if (hw->phy.sfp_type == txgbe_sfp_type_40g_core0 ||
+		hw->phy.sfp_type == txgbe_sfp_type_40g_core1) {
+		*speed = TXGBE_LINK_SPEED_40GB_FULL;
+		*autoneg = false;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core0 ||
@@ -4589,7 +4593,9 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	}
 	/* SFP */
 	else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
-		if (hw->mac.type == txgbe_mac_aml && hw->phy.sfp_type == txgbe_sfp_type_not_present)
+		if (hw->mac.type == txgbe_mac_aml40) {
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+		} else if (hw->mac.type == txgbe_mac_aml && hw->phy.sfp_type == txgbe_sfp_type_not_present)
 			*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		else
 			*speed = TXGBE_LINK_SPEED_10GB_FULL;
@@ -4705,6 +4711,9 @@ enum txgbe_media_type txgbe_get_media_type(struct txgbe_hw *hw)
 	enum txgbe_media_type media_type;
 	u8 device_type = hw->subsystem_device_id & 0xF0;
 
+	if (hw->mac.type == txgbe_mac_aml40)
+		return txgbe_media_type_fiber;
+
 	if (hw->mac.type == txgbe_mac_aml)
 		return txgbe_media_type_fiber;
 
@@ -4781,7 +4790,10 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 
 	if (txgbe_close_notify(hw)) {
 		/* over write led when ifconfig down */
-		if (hw->mac.type == txgbe_mac_aml)
+		if (hw->mac.type == txgbe_mac_aml40) {
+			TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_AMLITE_LED_LINK_40G |
+					TXGBE_AMLITE_LED_LINK_ACTIVE);
+		} else if (hw->mac.type == txgbe_mac_aml)
 			TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_AMLITE_LED_LINK_25G |
 					TXGBE_AMLITE_LED_LINK_10G | TXGBE_AMLITE_LED_LINK_ACTIVE);
 		else
@@ -4789,7 +4801,13 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 	}
 	
 	/* Disable Tx laser; allow 100us to go dark per spec */
-	esdp_reg |= TXGBE_GPIO_DR_1 | TXGBE_GPIO_DR_0;
+	if (hw->mac.type == txgbe_mac_aml40) {
+		wr32m(hw, TXGBE_GPIO_DDR, TXGBE_GPIO_DR_1, TXGBE_GPIO_DR_1);
+		esdp_reg &= ~TXGBE_GPIO_DR_1;
+	} else {
+		esdp_reg |= TXGBE_GPIO_DR_1 | TXGBE_GPIO_DR_0;
+	}
+
 	wr32(hw, TXGBE_GPIO_DR, esdp_reg);
 	TXGBE_WRITE_FLUSH(hw);
 	usec_delay(100);
@@ -4812,8 +4830,13 @@ void txgbe_enable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 		wr32(hw, TXGBE_CFG_LED_CTL, 0);
 	
 	/* Enable Tx laser; allow 100ms to light up */
-	wr32m(hw, TXGBE_GPIO_DR,
-		TXGBE_GPIO_DR_0 | TXGBE_GPIO_DR_1, 0);
+	if (hw->mac.type == txgbe_mac_aml40) {
+		wr32m(hw, TXGBE_GPIO_DDR, TXGBE_GPIO_DR_1, TXGBE_GPIO_DR_1);
+		wr32m(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_1, TXGBE_GPIO_DR_1);
+	} else {
+		wr32m(hw, TXGBE_GPIO_DR,
+			TXGBE_GPIO_DR_0 | TXGBE_GPIO_DR_1, 0);
+	}
 	TXGBE_WRITE_FLUSH(hw);
 	msec_delay(100);
 }
@@ -5768,8 +5791,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	bool link_up = false;
 	u32 curr_autoneg = 2;
-	s32 ret_status = 0;
-	int i;
 
 	/* Check to see if speed passed in is supported. */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -5804,7 +5825,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		}
 	}
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
 		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1) {
 			mutex_lock(&adapter->e56_lock);
@@ -5814,24 +5835,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		}
 
 		mutex_lock(&adapter->e56_lock);
-		ret_status = txgbe_set_link_to_amlite(hw, speed);
-
-		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
-			adapter->phy_retry = 3;
-			for (i = 0; i < adapter->phy_retry; i++) {
-				TCALL(hw, mac.ops.check_link,
-						&link_speed, &link_up, false);
-				if (link_up) {
-					break;
-				}
-
-				/* this ret_status for workaorund not return to upper*/
-				ret_status = txgbe_e56_reconfig_rx(hw, speed);
-
-				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-					break;
-			}
-		}
+		txgbe_set_link_to_amlite(hw, speed);
 		mutex_unlock(&adapter->e56_lock);
 
 		goto out;
@@ -5923,7 +5927,16 @@ static int txgbe_reset_misc(struct txgbe_hw *hw)
 	u32 err;
 	int i;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml40) {
+		if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK)
+								!= TXGBE_EPHY_STAT_PPL_LOCK) {
+			err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_40GB_FULL, false);
+			if (err) {
+				e_dev_info("txgbe_reset_misc setup phy failed\n");
+				return err;
+			}
+		}
+	} else if (hw->mac.type == txgbe_mac_aml) {
 		if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK)
 								!= TXGBE_EPHY_STAT_PPL_LOCK) {
 			err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_AMLITE_AUTONEG, false);
@@ -6096,7 +6109,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 		goto reset_hw_out;
 
 	/* amlite TODO*/
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		/* amlite: bme */
 		wr32(hw, 0x4B8, 0x1);
 		/* amlite: rdm_rsc_ctl_free_ctl set to 1 */
@@ -7276,7 +7289,7 @@ static s32 txgbe_read_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 	if (status)
 		return status;
 	if (txgbe_check_mng_access(hw)) {
-		if (hw->mac.type == txgbe_mac_aml)
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 			*data = (u16)rd32a(hw, TXGBE_AML_MNG_MBOX_FW2SW,
 						FW_NVM_DATA_OFFSET);
 		else if (hw->mac.type == txgbe_mac_sp)
@@ -7370,7 +7383,7 @@ s32 txgbe_read_ee_hostif_buffer(struct txgbe_hw *hw,
 			goto out;
 		}
 
-		if (hw->mac.type == txgbe_mac_aml)
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 			reg = TXGBE_AML_MNG_MBOX_FW2SW;
 		else
 			reg = TXGBE_MNG_MBOX;
@@ -7614,7 +7627,7 @@ s32 txgbe_calc_eeprom_checksum(struct txgbe_hw *hw)
 	}
 
 	for (i = 0; i < TXGBE_EEPROM_LAST_WORD; i++) {
-		if (hw->mac.type == txgbe_mac_aml)
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 			if ((i > (TXGBE_SHOWROM_I2C_PTR / 2)) && (i < (TXGBE_SHOWROM_I2C_END / 2)))
 				local_buffer[i] = 0xffff;
 		if (i != hw->eeprom.sw_region_offset + TXGBE_EEPROM_CHECKSUM)
@@ -7845,14 +7858,12 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				*speed = TXGBE_LINK_SPEED_10_FULL;
 			}
 		} else {
-			if (hw->mac.type == txgbe_mac_aml) {
-				if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_50G) ==
-						TXGBE_CFG_PORT_ST_AML_LINK_50G) {
-					*speed = TXGBE_LINK_SPEED_50GB_FULL;
-				} else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==
-						TXGBE_CFG_PORT_ST_AML_LINK_40G) {
+			if (hw->mac.type == txgbe_mac_aml40) {
+				if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==
+						TXGBE_CFG_PORT_ST_AML_LINK_40G)
 					*speed = TXGBE_LINK_SPEED_40GB_FULL;
-				} else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) ==
+			} else if (hw->mac.type == txgbe_mac_aml) {
+				 if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) ==
 						TXGBE_CFG_PORT_ST_AML_LINK_25G) {
 					*speed = TXGBE_LINK_SPEED_25GB_FULL;
 				} else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_10G) ==

@@ -96,7 +96,7 @@ static void txgbe_ptp_setup_sdp(struct txgbe_adapter *adapter)
 	u64 ns = 0;
 	unsigned long flags;
 
-	if (hw->mac.type != txgbe_mac_aml)
+	if (hw->mac.type != txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		return;
 
 	if (TXGBE_1588_PPS_WIDTH >= NS_PER_SEC) {
@@ -372,7 +372,7 @@ static int txgbe_ptp_feature_enable(struct ptp_clock_info *ptp,
 	 * event when the clock SDP triggers. Clear mask when PPS is
 	 * disabled
 	 */
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		if (rq->type != PTP_CLK_REQ_PPS || !adapter->ptp_setup_sdp)
 			return -ENOTSUPP;
 
@@ -409,7 +409,7 @@ void txgbe_ptp_check_pps_event(struct txgbe_adapter *adapter)
 	if (!adapter->ptp_clock)
 		return;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		int_status = rd32(hw, TXGBE_TSEC_1588_INT_ST);
 		if (int_status & TXGBE_TSEC_1588_INT_ST_TT1) {
 			/* disable the pin first */
@@ -816,7 +816,7 @@ static void txgbe_ptp_link_speed_adjust(struct txgbe_adapter *adapter,
 	 */
 
 	/*amlite TODO*/
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		*shift = TXGBE_INCVAL_SHIFT_AML;
 		*incval = TXGBE_INCVAL_AML;
 	} else {
@@ -919,7 +919,7 @@ void txgbe_ptp_reset(struct txgbe_adapter *adapter)
 	txgbe_ptp_set_timestamp_mode(adapter, &adapter->tstamp_config);
 	txgbe_ptp_start_cyclecounter(adapter);
 
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		txgbe_ptp_init_systime(adapter);
 
 	spin_lock_irqsave(&adapter->tmreg_lock, flags);

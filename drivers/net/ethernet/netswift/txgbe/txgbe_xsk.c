@@ -1077,11 +1077,11 @@ bool txgbe_clean_xdp_tx_irq(struct txgbe_q_vector *q_vector,
 #ifdef TXGBE_TXHEAD_WB
 	u32 head = 0;
 	u32 temp = tx_ring->next_to_clean;
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		head = *(tx_ring->headwb_mem);
 #endif
 #ifdef TXGBE_TXHEAD_WB
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		/* we have caught up to head, no work left to do */
 		if (temp == head) {
 			goto out_xmit;

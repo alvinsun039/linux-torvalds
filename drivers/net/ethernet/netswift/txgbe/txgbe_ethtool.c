@@ -557,6 +557,8 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_25g_lr_core1:
 		case txgbe_sfp_type_25g_fcpi4_lmt_core0:
 		case txgbe_sfp_type_25g_fcpi4_lmt_core1:
+		case txgbe_sfp_type_40g_core0:
+		case txgbe_sfp_type_40g_core1:
 			ethtool_link_ksettings_add_link_mode(cmd, supported, FIBRE);
 			ethtool_link_ksettings_add_link_mode(cmd, advertising, FIBRE);
 			cmd->base.port = PORT_FIBRE;
@@ -816,6 +818,8 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_lx_core1:
 		case txgbe_sfp_type_25g_sr_core0:
 		case txgbe_sfp_type_25g_sr_core1:
+		case txgbe_sfp_type_40g_core0:
+		case txgbe_sfp_type_40g_core1:
 			ecmd->supported |= SUPPORTED_FIBRE;
 			ecmd->advertising |= ADVERTISED_FIBRE;
 			ecmd->port = PORT_FIBRE;
@@ -1244,7 +1248,7 @@ static int txgbe_set_settings(struct net_device *netdev,
 		return err;
 	} else {
 		/* in this case we currently only support 10Gb/FULL and 1Gb/FULL*/
-		if (hw->mac.type == txgbe_mac_aml) {
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 				return -EINVAL;
 		} else if (ecmd->advertising & ADVERTISED_10000baseT_Full) {
 			if ((ecmd->autoneg == AUTONEG_ENABLE) ||
@@ -2684,11 +2688,15 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 
 	txgbe_configure_tx_ring(adapter, tx_ring);
 	/* enable mac transmitter */
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml40) {
+		wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
+				~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+				TXGBE_MAC_TX_CFG_AML_SPEED_40G);
+	} else if (hw->mac.type == txgbe_mac_aml) {
 		wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
 					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
 					TXGBE_MAC_TX_CFG_AML_SPEED_25G);
-	else
+	} else {
 		if (txgbe_check_reset_blocked(hw) && (hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL ||
 						     adapter->link_speed == TXGBE_LINK_SPEED_1GB_FULL))
 			wr32m(hw, TXGBE_MAC_TX_CFG,
@@ -2698,7 +2706,7 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 			wr32m(hw, TXGBE_MAC_TX_CFG,
 				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
 				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
-
+	}
 	/* Setup Rx Descriptor ring and Rx buffers */
 	rx_ring->count = TXGBE_DEFAULT_RXD;
 	rx_ring->queue_index = 0;
@@ -2755,7 +2763,7 @@ static int txgbe_setup_config(struct txgbe_adapter *adapter)
 		TXGBE_CFG_PORT_CTL_FORCE_LKUP, ~TXGBE_CFG_PORT_CTL_FORCE_LKUP);
 
 	/* enable mac transmitter */
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_TSC_CTL, 0);
 		wr32m(hw, TXGBE_RSC_CTL,
 			TXGBE_RSC_CTL_RX_DIS, 0);
@@ -3007,7 +3015,7 @@ static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 	if (*data)
 		goto err_loopback;
 
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		*data = txgbe_setup_mac_loopback_test(adapter);
 	else
 		*data = txgbe_setup_phy_loopback_test(adapter);
@@ -3020,7 +3028,7 @@ static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 	*data = txgbe_run_loopback_test(adapter);
 	if (*data)
 			e_info(hw, "phy loopback testing failed\n");
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		txgbe_mac_loopback_cleanup(adapter);
 	else
 		txgbe_phy_loopback_cleanup(adapter);
@@ -4950,6 +4958,13 @@ static int txgbe_get_module_info(struct net_device *dev,
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 	u32 value;
 
+	if (hw->mac.type == txgbe_mac_aml40) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_PRST_LS) {
+			return -EIO;
+		}
+	}
+
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
 		if (value & TXGBE_SFP1_MOD_ABS_LS) {
@@ -5016,6 +5031,13 @@ static int txgbe_get_module_eeprom(struct net_device *dev,
 	int i = 0;
 	u32 value;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+
+	if (hw->mac.type == txgbe_mac_aml40) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_PRST_LS) {
+			return -EIO;
+		}
+	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);

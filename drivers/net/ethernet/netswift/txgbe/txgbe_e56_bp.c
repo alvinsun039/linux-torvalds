@@ -343,7 +343,7 @@ static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
 		RX_COARSE_MID_TD = 6;
 
 	/*Set CMVAR_RANGE_H/L based on the link speed mode*/
-	if (speed == 10) {
+	if (speed == 10 || speed == 40) {
 		CMVAR_RANGE_H = S10G_CMVAR_RANGE_H;
 		CMVAR_RANGE_L = S10G_CMVAR_RANGE_L;
 	} else if (speed == 25) {

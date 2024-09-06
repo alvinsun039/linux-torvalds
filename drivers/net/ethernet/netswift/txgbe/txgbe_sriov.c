@@ -1631,7 +1631,7 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 	 */
 	wr32(hw, TXGBE_TDM_MMW, 0x14);
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		if (max_tx_rate) {
 			link_speed = adapter->vf_rate_link_speed;
 

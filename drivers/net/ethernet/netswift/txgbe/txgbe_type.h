@@ -102,6 +102,8 @@
 #define TXGBE_DEV_ID_AML                        0x5000
 #define TXGBE_DEV_ID_AML5025                    0x5025
 #define TXGBE_DEV_ID_AML5125                    0x5125
+#define TXGBE_DEV_ID_AML5040                    0x5040
+#define TXGBE_DEV_ID_AML5140                    0x5140
 
 /* Subsystem IDs */
 /* SFP */
@@ -800,26 +802,33 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_GPIO_INTEN_1      0x00000002U /* SDP1 interrupt enable */
 #define TXGBE_GPIO_INTEN_2      0x00000004U /* SDP2 interrupt enable */
 #define TXGBE_GPIO_INTEN_3      0x00000008U /* SDP3 interrupt enable */
+#define TXGBE_GPIO_INTEN_4      0x00000010U /* SDP4 interrupt enable */
 #define TXGBE_GPIO_INTEN_5      0x00000020U /* SDP5 interrupt enable */
 #define TXGBE_GPIO_INTEN_6      0x00000040U /* SDP6 interrupt enable */
 #define TXGBE_GPIO_INTTYPE_LEVEL_2 0x00000004U /* SDP2 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_3 0x00000008U /* SDP3 interrupt type level */
+#define TXGBE_GPIO_INTTYPE_LEVEL_4 0x00000010U /* SDP3 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_5 0x00000020U /* SDP5 interrupt type level */
 #define TXGBE_GPIO_INTTYPE_LEVEL_6 0x00000040U /* SDP6 interrupt type level */
 #define TXGBE_GPIO_INT_POLARITY_3  0x00000008U
+#define TXGBE_GPIO_INT_POLARITY_4  0x00000010U
 #define TXGBE_GPIO_INT_DEBOUNCE_2  0x00000004U
 #define TXGBE_GPIO_INT_DEBOUNCE_3  0x00000008U
 #define TXGBE_GPIO_INTSTATUS_1  0x00000002U /* SDP1 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_2  0x00000004U /* SDP2 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_3  0x00000008U /* SDP3 interrupt status */
+#define TXGBE_GPIO_INTSTATUS_4  0x00000010U /* SDP4 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_5  0x00000020U /* SDP5 interrupt status */
 #define TXGBE_GPIO_INTSTATUS_6  0x00000040U /* SDP6 interrupt status */
 #define TXGBE_GPIO_EOI_2        0x00000004U /* SDP2 interrupt clear */
 #define TXGBE_GPIO_EOI_3        0x00000008U /* SDP3 interrupt clear */
+#define TXGBE_GPIO_EOI_4        0x00000010U /* SDP3 interrupt clear */
 #define TXGBE_GPIO_EOI_5        0x00000020U /* SDP5 interrupt clear */
 #define TXGBE_GPIO_EOI_6        0x00000040U /* SDP6 interrupt clear */
 #define TXGBE_SFP1_MOD_ABS_LS   0x00000004U /* GPIO_EXT SFP ABSENT*/
 #define TXGBE_SFP1_RX_LOS_LS    0x00000008U /* GPIO_EXT RX LOSS */
+
+#define TXGBE_SFP1_MOD_PRST_LS   0x00000010U /* GPIO_EXT SFP ABSENT*/
 
 /* TPH registers */
 #define TXGBE_CFG_TPH_TDESC     0x14F00 /* TPH conf for Tx desc write back */
@@ -2987,6 +2996,8 @@ enum txgbe_sfp_type {
 	txgbe_sfp_type_25g_fcpi4_lmt_core1 = 24,
 	txgbe_sfp_type_25g_5m_da_cu_core0 = 25,
 	txgbe_sfp_type_25g_5m_da_cu_core1 = 26,
+	txgbe_sfp_type_40g_core0 = 27,
+	txgbe_sfp_type_40g_core1 = 28,
 	txgbe_sfp_type_not_present = 0xFFFE,
 	txgbe_sfp_type_unknown = 0xFFFF
 };
@@ -3304,7 +3315,8 @@ struct txgbe_eeprom_info {
 enum txgbe_mac_type {
 	txgbe_mac_unknown = 0,
 	txgbe_mac_sp,
-	txgbe_mac_aml
+	txgbe_mac_aml,
+	txgbe_mac_aml40
 };
 
 struct txgbe_flash_info {

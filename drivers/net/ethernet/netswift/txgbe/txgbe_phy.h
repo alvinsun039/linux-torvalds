@@ -82,6 +82,10 @@
 #define TXGBE_SFF_25GBASECR_91FEC       0xB
 #define TXGBE_SFF_25GBASECR_74FEC       0xC
 #define TXGBE_SFF_25GBASECR_NOFEC       0xD
+#define TXGBE_SFF_40GBASE_SR_CAPABLE    0x10
+#define TXGBE_SFF_4x10GBASESR_CAP       0x11
+#define TXGBE_SFF_40GBASEPSM4_Parallel  0x12
+#define TXGBE_SFF_40GBASE_SWMD4_CAP     0x1f
 #define TXGBE_SFF_COPPER_5M             0x5
 #define TXGBE_SFF_COPPER_3M             0x3
 #define TXGBE_SFF_COPPER_1M             0x1

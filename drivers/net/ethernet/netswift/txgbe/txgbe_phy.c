@@ -536,6 +536,14 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 	u32 value;
 
+	if (hw->mac.type == txgbe_mac_aml40) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_PRST_LS) {
+			hw->phy.sfp_type = txgbe_sfp_type_not_present;
+			return TXGBE_ERR_SFP_NOT_PRESENT;
+		}
+	}
+
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
 		if (value & TXGBE_SFP1_MOD_ABS_LS) {
@@ -674,6 +682,14 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core0;
 				else
 					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core1;
+			} else if (comp_codes_25g == TXGBE_SFF_40GBASE_SR_CAPABLE ||
+						comp_codes_25g == TXGBE_SFF_4x10GBASESR_CAP ||
+						comp_codes_25g == TXGBE_SFF_40GBASEPSM4_Parallel ||
+						comp_codes_25g == TXGBE_SFF_40GBASE_SWMD4_CAP) {
+				if (hw->bus.lan_id == 0)
+					hw->phy.sfp_type = txgbe_sfp_type_40g_core0;
+				else
+					hw->phy.sfp_type = txgbe_sfp_type_40g_core1;
 			} else if (comp_codes_10g &
 				   (TXGBE_SFF_10GBASESR_CAPABLE |
 				    TXGBE_SFF_10GBASELR_CAPABLE)) {
@@ -876,7 +892,7 @@ s32 txgbe_init_i2c(struct txgbe_hw *hw)
 	 * SCL_Low_time = [(LCNT + 1) * ic_clk] - SCL_Fall_time + SCL_Rise_time
 	 * set I2C Frequency to Standard Speed Mode 100KHz
 	 */
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 2000);
 		wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 2000);
 	} else if (hw->mac.type == txgbe_mac_sp) {
@@ -1282,7 +1298,7 @@ s32 txgbe_tn_check_overtemp(struct txgbe_hw *hw)
 	s32 status = 0;
 	u32 ts_state;
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		/* Only support thermal sensors attached to physical port 0 */
 		if (hw->bus.lan_id)
 		return TXGBE_NOT_IMPLEMENTED;
