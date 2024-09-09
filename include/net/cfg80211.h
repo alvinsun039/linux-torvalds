@@ -6195,11 +6195,11 @@ void wiphy_delayed_work_flush(struct wiphy *wiphy,
  *	unprotected beacon report
  * @links: array of %IEEE80211_MLD_MAX_NUM_LINKS elements containing @addr
  *	@ap and @client for each link
- * @links[].cac_started: true if DFS channel availability check has been
+ * @links.cac_started: true if DFS channel availability check has been
  *	started
- * @links[].cac_start_time: timestamp (jiffies) when the dfs state was
+ * @links.cac_start_time: timestamp (jiffies) when the dfs state was
  *	entered.
- * @links[].cac_time_ms: CAC time in ms
+ * @links.cac_time_ms: CAC time in ms
  * @valid_links: bitmap describing what elements of @links are valid
  */
 struct wireless_dev {
