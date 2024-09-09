@@ -884,8 +884,6 @@ struct mlx5_roce {
 	/* Protect mlx5_ib_get_netdev from invoking dev_hold() with a NULL
 	 * netdev pointer
 	 */
-	rwlock_t		netdev_lock;
-	struct net_device	*netdev;
 	struct notifier_block	nb;
 	struct netdev_net_notifier nn;
 	struct notifier_block	mdev_nb;
@@ -1131,6 +1129,7 @@ struct mlx5_ib_dev {
 	struct ib_device		ib_dev;
 	struct mlx5_core_dev		*mdev;
 	struct notifier_block		mdev_events;
+	struct notifier_block           lag_events;
 	int				num_ports;
 	/* serialize update of capability mask
 	 */
