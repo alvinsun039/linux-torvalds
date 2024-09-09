@@ -976,41 +976,19 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 				   __ETHTOOL_LINK_MODE_MASK_NBITS))
 			return -EINVAL;
 
-		/* only allow one speed at a time if no autoneg */
-		if (!cmd->base.autoneg && hw->phy.multispeed_fiber) {
-			if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   10000baseSR_Full) &&
-			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   25000baseSR_Full)) ||
-			    (ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   10000baseLR_Full) &&
-			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   25000baseSR_Full)))
-				return -EINVAL;
-
-			if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   10000baseSR_Full) &&
-			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   1000baseX_Full)) ||
-			    (ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   10000baseLR_Full) &&
-			     ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								   1000baseX_Full)))
-				return -EINVAL;
-		}
 		old = hw->phy.autoneg_advertised;
 		advertised = 0;
 
-		if (hw->mac.type == txgbe_mac_aml && !cmd->base.autoneg) {
-			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full) ||
-			    cmd->base.speed == SPEED_25000)
+		if (!cmd->base.autoneg) {
+			if (cmd->base.speed == SPEED_25000)
 				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
-			else
+			else if (cmd->base.speed == SPEED_10000)
 				advertised |= TXGBE_LINK_SPEED_10GB_FULL;
+			else if (cmd->base.speed == SPEED_1000)
+				advertised |= TXGBE_LINK_SPEED_1GB_FULL;
+			else
+				advertised |= old;
 		} else {
-			if (hw->mac.type == txgbe_mac_aml && cmd->base.autoneg &&
-			   !ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
-				return -EINVAL;
 			if (ethtool_link_ksettings_test_link_mode(cmd, advertising, 25000baseSR_Full))
 				advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 
@@ -1035,7 +1013,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			curr_autoneg = txgbe_rd32_epcs(hw, TXGBE_SR_MII_MMD_CTL);
 			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
 			if (old == advertised && (curr_autoneg == !!(cmd->base.autoneg)))
-				return -EINVAL;
+				return 0;
 		}
 
 		/* this sets the link speed and restarts auto-neg */
