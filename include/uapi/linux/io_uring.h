@@ -596,6 +596,9 @@ enum {
 
 	IORING_REGISTER_CLOCK			= 29,
 
+	/* copy registered buffers from source ring to current ring */
+	IORING_REGISTER_COPY_BUFFERS		= 30,
+
 	/* this goes last */
 	IORING_REGISTER_LAST,
 
@@ -679,6 +682,16 @@ struct io_uring_restriction {
 struct io_uring_clock_register {
 	__u32	clockid;
 	__u32	__resv[3];
+};
+
+enum {
+	IORING_REGISTER_SRC_REGISTERED = 1,
+};
+
+struct io_uring_copy_buffers {
+	__u32	src_fd;
+	__u32	flags;
+	__u32	pad[6];
 };
 
 struct io_uring_buf {
