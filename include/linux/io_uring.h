@@ -6,17 +6,6 @@
 #include <linux/xarray.h>
 #include <uapi/linux/io_uring.h>
 
-#include <linux/io_uring/cmd.h>
-
-
-static inline void io_uring_cmd_private_sz_check(size_t cmd_sz)
-{
-	BUILD_BUG_ON(cmd_sz > sizeof_field(struct io_uring_cmd, pdu));
-}
-#define io_uring_cmd_to_pdu(cmd, pdu_type) ( \
-	io_uring_cmd_private_sz_check(sizeof(pdu_type)), \
-	((pdu_type *)&(cmd)->pdu) \
-)
 
 #if defined(CONFIG_IO_URING)
 void __io_uring_cancel(bool cancel_all);
