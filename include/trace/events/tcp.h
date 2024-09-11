@@ -79,9 +79,9 @@ DEFINE_EVENT(tcp_event_sk_skb, tcp_retransmit_skb,
  */
 TRACE_EVENT(tcp_send_reset,
 
-	TP_PROTO(const struct sock *sk, const struct sk_buff *skb),
+	TP_PROTO(const struct sock *sk, const struct sk_buff *skb__nullable),
 
-	TP_ARGS(sk, skb),
+	TP_ARGS(sk, skb__nullable),
 
 	TP_STRUCT__entry(
 		__field(const void *, skbaddr)
@@ -92,7 +92,7 @@ TRACE_EVENT(tcp_send_reset,
 	),
 
 	TP_fast_assign(
-		__entry->skbaddr = skb;
+		__entry->skbaddr = skb__nullable;
 		__entry->skaddr = sk;
 		/* Zero means unknown state. */
 		__entry->state = sk ? sk->sk_state : 0;
@@ -104,13 +104,13 @@ TRACE_EVENT(tcp_send_reset,
 			const struct inet_sock *inet = inet_sk(sk);
 
 			TP_STORE_ADDR_PORTS(__entry, inet, sk);
-		} else if (skb) {
-			const struct tcphdr *th = (const struct tcphdr *)skb->data;
+		} else if (skb__nullable) {
+			const struct tcphdr *th = (const struct tcphdr *)skb__nullable->data;
 			/*
 			 * We should reverse the 4-tuple of skb, so later
 			 * it can print the right flow direction of rst.
 			 */
-			TP_STORE_ADDR_PORTS_SKB(skb, th, entry->daddr, entry->saddr);
+			TP_STORE_ADDR_PORTS_SKB(skb__nullable, th, entry->daddr, entry->saddr);
 		}
 	),
 
