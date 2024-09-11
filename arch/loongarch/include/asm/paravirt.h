@@ -31,5 +31,11 @@ static inline int pv_time_init(void)
 {
 	return 0;
 }
+
+static inline int pv_spinlock_init(void)
+{
+	return 0;
+}
+
 #endif // CONFIG_PARAVIRT
 #endif
