@@ -150,7 +150,7 @@
 #endif
 
 #ifndef TXGBE_1588_PPS_WIDTH
-#define TXGBE_1588_PPS_WIDTH 200
+#define TXGBE_1588_PPS_WIDTH 100
 #endif
 
 /**************************performance************************************/
