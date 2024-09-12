@@ -621,6 +621,16 @@ s32 txgbe_get_mac_addr(struct txgbe_hw *hw, u8 *mac_addr)
 	for (i = 0; i < 4; i++)
 		mac_addr[i + 2] = (u8)(rar_low >> (3 - i) * 8);
 
+	for (i = 0; i < 2; i++)
+		mac_addr[i] = 0x02;
+
+	for (i = 0; i < 4; i++) {
+		if (hw->bus.lan_id)
+			mac_addr[i + 2] = 0x05;
+		else
+			mac_addr[i + 2] = 0x04;
+	}
+
 	return 0;
 }
 
@@ -827,6 +837,8 @@ STATIC s32 txgbe_get_eeprom_semaphore(struct txgbe_hw *hw)
 	u32 timeout = 4000;
 	u32 i;
 	u32 swsm;
+
+	return TXGBE_ERR_EEPROM;
 
 	/* Get SMBI software semaphore between device drivers first */
 	for (i = 0; i < timeout; i++) {
@@ -1791,6 +1803,7 @@ s32 txgbe_acquire_swfw_sync(struct txgbe_hw *hw, u32 mask)
 	u32 timeout = 200;
 	u32 i;
 
+	return TXGBE_ERR_SWFW_SYNC;
 	for (i = 0; i < timeout; i++) {
 		/*
 		 * SW NVM semaphore bit is used for access to all
@@ -2674,6 +2687,9 @@ s32 txgbe_host_interface_command(struct txgbe_hw *hw, u32 *buffer,
 	u32 dword_len;
 	u16 buf_len;
 	u8 send_cmd;
+
+	status = TXGBE_ERR_TIMEOUT;
+	goto rel_out;
 
 	if (length == 0 || length > TXGBE_HI_MAX_BLOCK_BYTE_LENGTH) {
 		ERROR_REPORT1(TXGBE_ERROR_CAUTION,
