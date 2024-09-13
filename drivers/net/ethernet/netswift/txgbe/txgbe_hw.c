@@ -3987,6 +3987,9 @@ out:
 	/* Set autoneg_advertised value based on input link speed */
 	hw->phy.autoneg_advertised = 0;
 
+	if (speed & TXGBE_LINK_SPEED_40GB_FULL)
+		hw->phy.autoneg_advertised |= TXGBE_LINK_SPEED_40GB_FULL;
+
 	if (speed & TXGBE_LINK_SPEED_25GB_FULL)
 		hw->phy.autoneg_advertised |= TXGBE_LINK_SPEED_25GB_FULL;
 

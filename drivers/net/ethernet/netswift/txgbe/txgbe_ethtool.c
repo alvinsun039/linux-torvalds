@@ -375,6 +375,10 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 								 10baseT_Full);
 	} else if (hw->phy.media_type == txgbe_media_type_fiber) {
+		if (supported_link & TXGBE_LINK_SPEED_40GB_FULL)
+			ethtool_link_ksettings_add_link_mode(cmd, supported,
+					 40000baseSR4_Full);
+
 		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 					 25000baseSR_Full);
@@ -410,6 +414,10 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 	
 		/* set the advertised speeds */
 	if (hw->phy.autoneg_advertised) {
+		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_40GB_FULL) {
+			ethtool_link_ksettings_add_link_mode(cmd, advertising,
+						 40000baseSR4_Full);
+		}
 		if (hw->phy.autoneg_advertised & TXGBE_LINK_SPEED_25GB_FULL) {
 			ethtool_link_ksettings_add_link_mode(cmd, advertising,
 						 25000baseSR_Full);
@@ -460,6 +468,10 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 							 10baseT_Full);
 		}			
 	} else {
+		if (supported_link & TXGBE_LINK_SPEED_40GB_FULL) {
+			ethtool_link_ksettings_add_link_mode(cmd, advertising,
+					 40000baseSR4_Full);
+		}
 		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL) {
 			ethtool_link_ksettings_add_link_mode(cmd, advertising,
 					 25000baseSR_Full);
@@ -642,6 +654,9 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 
 	if (link_up) {
 		switch (link_speed) {
+		case TXGBE_LINK_SPEED_40GB_FULL:
+			cmd->base.speed = SPEED_40000;
+			break;
 		case TXGBE_LINK_SPEED_25GB_FULL:
 			cmd->base.speed = SPEED_25000;
 			break;
