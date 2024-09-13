@@ -145,6 +145,9 @@ void efi_retrieve_tpm2_eventlog(void)
 			event_size = __calc_tpm2_event_size(header,
 						   (void *)(long)log_location,
 						   false);
+			/* If calc fails this is a malformed log */
+			if (!event_size)
+				break;
 			final_events_size += event_size;
 			i--;
 		}
