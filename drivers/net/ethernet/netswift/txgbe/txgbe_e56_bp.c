@@ -313,7 +313,7 @@ static void E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
 				      ana_bbcdr_ultrafine_i, ULTRAFINE_CODE);
 		txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_1,
 				      ovrd_en_ana_bbcdr_ultrafine_i, 1);
-		msleep(10);
+		msleep(20);
 	}
 }
 
@@ -2277,18 +2277,18 @@ static int SetPhyLinkMode(struct txgbe_adapter *adapter, u8 byLinkMode,
 
 	if (byLinkMode == 10)
 		E56phy10gCfg(adapter);
-	//txgbe_e56_cfg_10g(hw);
 	else
 		E56phy25gCfg(adapter);
-	//txgbe_e56_cfg_25g(hw);
-	rdata = 0x0000;
-	addr = 0x1400;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, 21, 20, 0x3);
-	SetFields(&rdata, 19, 12, 0x1);
-	SetFields(&rdata, 8, 8, 0x0);
-	SetFields(&rdata, 1, 1, 0x1);
-	txgbe_wr32_ephy(hw, addr, rdata);
+	if (byLinkMode == 10) {
+		rdata = 0x0000;
+		addr = 0x1400;
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 21, 20, 0x3); //pll en
+		SetFields(&rdata, 19, 12, 0x1); // tx/rx en
+		SetFields(&rdata, 8, 8, 0x0); // pmd mode
+		SetFields(&rdata, 1, 1, 0x1); // pmd en
+		txgbe_wr32_ephy(hw, addr, rdata);
+	}
 
 	return status;
 }
@@ -2312,11 +2312,11 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 	msleep(20);
 
 	/* clear interrupt */
+	txgbe_wr32_epcs(hw, 0x070000, 0);
 	txgbe_wr32_epcs(hw, 0x078002, 0x0000);
 	txgbe_wr32_epcs(hw, 0x030000, 0x8000);
 	rdata = txgbe_rd32_epcs(hw, 0x070000);
 	SetFields(&rdata, 12, 12, 0x1);
-	SetFields(&rdata, 9, 9, 0x1);
 	txgbe_wr32_epcs(hw, 0x070000, rdata);
 	txgbe_wr32_epcs(hw, 0x070010, 0x0001);
 	/* 25KR-S */
@@ -2555,6 +2555,9 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 		break;
 	}
 
+	kr_dbg(KR_MODE, "2.3 Wait 25G KR phy mode init ....\n");
+	status = SetPhyLinkMode(adapter, byLinkMode, bypassCtle);
+
 	/* set phy an status to 1 */
 	rdata = rd32_ephy(hw, 0x1434);
 	SetFields(&rdata, 7, 4, 0xf);
@@ -2564,17 +2567,23 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	rdata = rd32_ephy(hw, 0x1640);
 	SetFields(&rdata, 7, 0, 0x3);
 	txgbe_wr32_ephy(hw, 0x1640, rdata);
-	kr_dbg(KR_MODE, "2.3 Wait 25G KR phy mode init ....\n");
-	status = SetPhyLinkMode(adapter, byLinkMode, bypassCtle);
+
+	/* enable CMS and its internal PLL and tx enable */
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 21, 20, 0x3); //pll en
+	SetFields(&rdata, 19, 12, 0x1); // tx/rx en
+	SetFields(&rdata, 8, 8, 0x0); // pmd mode
+	SetFields(&rdata, 1, 1, 0x1); // pmd en
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
 
 	kr_dbg(KR_MODE, "2.4 Wait 25G RXS....\n");
-	status |= E56phyRxsCalibAdaptSeq(adapter, byLinkMode, bypassCtle);
+	status = E56phyRxsCalibAdaptSeq(adapter, byLinkMode, bypassCtle);
 
 	kr_dbg(KR_MODE, "2.5 Wait 25G phy calibration....\n");
 	E56phySetRxsUfineLeMax(adapter, byLinkMode);
 
-	status |= txgbe_e56_get_temp(hw, &pTempData);
-	status |= E56phyRxsPostCdrLockTempTrackSeq(adapter, byLinkMode);
+	status = txgbe_e56_get_temp(hw, &pTempData);
+	status = E56phyRxsPostCdrLockTempTrackSeq(adapter, byLinkMode);
 
 	kr_dbg(KR_MODE, "2.6 Wait 25G phy kr training check....\n");
 	status = read_poll_timeout(rd32_ephy, rdata, (rdata & BIT(1)), 100,
@@ -2583,19 +2592,12 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	       status ? "FAILED" : "SUCCESS");
 
 	kr_dbg(KR_MODE, "2.7 Wait 25G phy Rx adc....\n");
-	status |= E56phyRxsAdcAdaptSeq(adapter, bypassCtle);
-
-	/* Wait an complete INT */
-	kr_dbg(KR_MODE, "2.8 Wait 25G phy an complet int....\n");
-	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(0)),
-				   100, 20000, false, hw, 0x78002);
-	kr_dbg(KR_MODE, "AN_INT_CMPLT = %x, an_complete %s.\n", rdata,
-	       status ? "FAILED" : "SUCCESS");
+	status = E56phyRxsAdcAdaptSeq(adapter, bypassCtle);
 
 	/* Wait an RLU */
-	kr_dbg(KR_MODE, "2.9 Wait 25G phy RLU....\n");
+	kr_dbg(KR_MODE, "2.8 Wait 25G phy RLU....\n");
 	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(2)),
-				   100, 200000, false, hw, 0x30001);
+				   100, 500000, false, hw, 0x30001);
 	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 
@@ -2613,6 +2615,11 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 	return status;
 }
 
+#define TXGBE_E56_AN_TXDIS BIT(3)
+#define TXGBE_E56_AN_PG_RCV BIT(2)
+#define TXGBE_E56_AN_INC_LINK BIT(1)
+#define TXGBE_E56_AN_INT_CMPLT BIT(0)
+
 void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
@@ -2625,17 +2632,34 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		return;
 
 	value = txgbe_rd32_epcs(hw, 0x78002);
-	if (value & BIT(2)) {
+	if (value & TXGBE_E56_AN_INT_CMPLT) {
+		txgbe_wr32_epcs(hw, 0x78002, 0);
+		return;
+	}
+
+	if (value & TXGBE_E56_AN_PG_RCV) {
 		if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
 			adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
 			e_dev_info("Enter training\n");
 			ret = handle_e56_bkp_an73_flow(0, adapter);
+			if (ret) {
+				mutex_lock(&adapter->e56_lock);
+				txgbe_e56_set_link_to_kr(adapter, 25, 0);
+				mutex_unlock(&adapter->e56_lock);
+			}
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 		}
-	} else if ((value & BIT(1)) == BIT(1)) {
-		mutex_lock(&adapter->e56_lock);
-		txgbe_e56_set_link_to_kr(adapter, 25, 0);
-		mutex_unlock(&adapter->e56_lock);
+		return;
+	}
+
+	if (value & TXGBE_E56_AN_INC_LINK) {
+		SetFields(&value, 1, 1, 0);
+		txgbe_wr32_epcs(hw, 0x78002, value);
+	}
+
+	if (value & TXGBE_E56_AN_TXDIS) {
+		SetFields(&value, 3, 3, 0);
+		txgbe_wr32_epcs(hw, 0x78002, value);
 	}
 }
 

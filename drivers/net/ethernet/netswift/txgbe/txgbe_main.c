@@ -3694,18 +3694,23 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	u32 value = 0;
 
 	eicr = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
-#if 0
+
 	if (eicr & TXGBE_PX_MISC_IC_ETH_AN) {
-		if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
-			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
-				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
-					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-					txgbe_service_event_schedule(adapter);
+		if (hw->mac.type == txgbe_mac_aml) {
+			txgbe_service_event_schedule(adapter);
+		} else {
+			if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
+				value = txgbe_rd32_epcs(hw, 0x78002);
+				value = value & 0x4;
+				if (value == 0x4) {
+					if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
+						adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+						txgbe_service_event_schedule(adapter);
+					}
 				}
 			}
 		}
 	}
-#endif
 
 	if(BOND_CHECK_LINK_MODE == 1){
 		if (eicr & (TXGBE_PX_MISC_IC_ETH_LKDN)){
@@ -9381,8 +9386,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
 	}
 	mutex_unlock(&adapter->e56_lock);
-
-	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 }
 
 /**
