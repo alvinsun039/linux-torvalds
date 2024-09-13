@@ -954,17 +954,23 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 								  10000baseT_Full)) {
 				ethtool_link_ksettings_add_link_mode(&temp_ks, supported,
 								     10000baseT_Full);
+#ifndef HAVE_NO_ETHTOOL_10000SR
 				ethtool_link_ksettings_del_link_mode(&temp_ks, supported,
 								     10000baseSR_Full);
+#endif
+#ifndef HAVE_NO_ETHTOOL_10000LR
 				ethtool_link_ksettings_del_link_mode(&temp_ks, supported,
 								     10000baseLR_Full);
+#endif
 			}
 			if (ethtool_link_ksettings_test_link_mode(cmd, advertising,
 								  1000baseT_Full)) {
 				ethtool_link_ksettings_add_link_mode(&temp_ks, supported,
 								     1000baseT_Full);
+#ifndef HAVE_NO_ETHTOOL_1000X
 				ethtool_link_ksettings_del_link_mode(&temp_ks, supported,
 								     1000baseX_Full);
+#endif
 			}
 		}
 
