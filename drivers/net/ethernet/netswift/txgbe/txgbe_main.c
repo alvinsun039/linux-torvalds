@@ -3780,8 +3780,11 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		txgbe_service_event_schedule(adapter);
 	}
 	if (eicr & TXGBE_PX_MISC_IC_DEV_RST) {
-		adapter->flags2 |= TXGBE_FLAG2_RESET_INTR_RECEIVED;
-		txgbe_service_event_schedule(adapter);
+		value = rd32(hw, TXGBE_TSC_LSEC_PKTNUM1); //This reg is used by fw to tell drv not to drv rst
+		if (!(value & 0x1)) {
+			adapter->flags2 |= TXGBE_FLAG2_RESET_INTR_RECEIVED;
+			txgbe_service_event_schedule(adapter);
+		}
 	}
 	if ((eicr & TXGBE_PX_MISC_IC_STALL) ||
 		(eicr & TXGBE_PX_MISC_IC_ETH_EVENT)) {
@@ -4072,8 +4075,11 @@ static irqreturn_t txgbe_intr(int __always_unused irq, void *data)
 	}
 
 	if (eicr_misc & TXGBE_PX_MISC_IC_DEV_RST) {
-		adapter->flags2 |= TXGBE_FLAG2_RESET_INTR_RECEIVED;
-		txgbe_service_event_schedule(adapter);
+		value = rd32(hw, TXGBE_TSC_LSEC_PKTNUM1); //This reg is used by fw to tell drv not to drv rst
+		if (!(value & 0x1)) {
+			adapter->flags2 |= TXGBE_FLAG2_RESET_INTR_RECEIVED;
+			txgbe_service_event_schedule(adapter);
+		}
 	}
 	txgbe_check_sfp_event(adapter, eicr_misc);
 	txgbe_check_overtemp_event(adapter, eicr_misc);
