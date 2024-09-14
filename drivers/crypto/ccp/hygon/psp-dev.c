@@ -332,6 +332,9 @@ static long ioctl_psp(struct file *file, unsigned int ioctl, unsigned long arg)
 	struct vpsp_dev_ctrl vpsp_ctrl_op;
 	int ret = -EFAULT;
 
+	if (!hygon_psp_hooks.sev_dev_hooks_installed)
+		return -ENODEV;
+
 	if (_IOC_TYPE(ioctl) != HYGON_PSP_IOC_TYPE) {
 		printk(KERN_INFO "%s: invalid ioctl type: 0x%x\n", __func__, _IOC_TYPE(ioctl));
 		return -EINVAL;
@@ -391,6 +394,9 @@ int hygon_psp_additional_setup(struct sp_device *sp)
 {
 	struct device *dev = sp->dev;
 	int ret = 0;
+
+	if (!hygon_psp_hooks.sev_dev_hooks_installed)
+		return -ENODEV;
 
 	if (!psp_misc) {
 		struct miscdevice *misc;
@@ -597,7 +603,10 @@ int psp_do_cmd(int cmd, void *data, int *psp_ret)
 	int rc;
 	int mutex_enabled = READ_ONCE(hygon_psp_hooks.psp_mutex_enabled);
 
-	if (is_vendor_hygon() && mutex_enabled) {
+	if (!hygon_psp_hooks.sev_dev_hooks_installed)
+		return -ENODEV;
+
+	if (mutex_enabled) {
 		if (psp_mutex_lock_timeout(&psp_misc->data_pg_aligned->mb_mutex,
 					   PSP_MUTEX_TIMEOUT) != 1)
 			return -EBUSY;
@@ -605,7 +614,7 @@ int psp_do_cmd(int cmd, void *data, int *psp_ret)
 		mutex_lock(hygon_psp_hooks.sev_cmd_mutex);
 	}
 	rc = __psp_do_cmd_locked(cmd, data, psp_ret);
-	if (is_vendor_hygon() && mutex_enabled)
+	if (mutex_enabled)
 		psp_mutex_unlock(&psp_misc->data_pg_aligned->mb_mutex);
 	else
 		mutex_unlock(hygon_psp_hooks.sev_cmd_mutex);
