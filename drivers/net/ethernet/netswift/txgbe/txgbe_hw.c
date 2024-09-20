@@ -4451,6 +4451,7 @@ s32 txgbe_init_ops(struct txgbe_hw *hw)
 	phy->ops.read_i2c_byte = txgbe_read_i2c_byte;
 	phy->ops.write_i2c_byte = txgbe_write_i2c_byte;
 	phy->ops.read_i2c_sff8472 = txgbe_read_i2c_sff8472;
+	phy->ops.read_i2c_sff8636 = txgbe_read_i2c_sff8636;
 	phy->ops.read_i2c_eeprom = txgbe_read_i2c_eeprom;
 	phy->ops.read_i2c_sfp_phy = txgbe_read_i2c_sfp_phy;
 	phy->ops.write_i2c_eeprom = txgbe_write_i2c_eeprom;

@@ -500,7 +500,10 @@ s32 txgbe_identify_module(struct txgbe_hw *hw)
 
 	switch (TCALL(hw, mac.ops.get_media_type)) {
 	case txgbe_media_type_fiber:
-		status = txgbe_identify_sfp_module(hw);
+		if (hw->mac.type == txgbe_mac_aml40)
+			status = txgbe_identify_qsfp_module(hw);
+		else
+			status = txgbe_identify_sfp_module(hw);
 		break;
 
 	default:
@@ -535,14 +538,6 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u16 phy_data = 0;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 	u32 value;
-
-	if (hw->mac.type == txgbe_mac_aml40) {
-		value = rd32(hw, TXGBE_GPIO_EXT);
-		if (value & TXGBE_SFP1_MOD_PRST_LS) {
-			hw->phy.sfp_type = txgbe_sfp_type_not_present;
-			return TXGBE_ERR_SFP_NOT_PRESENT;
-		}
-	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
@@ -682,14 +677,6 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core0;
 				else
 					hw->phy.sfp_type = txgbe_sfp_type_25g_lr_core1;
-			} else if (comp_codes_25g == TXGBE_SFF_40GBASE_SR_CAPABLE ||
-						comp_codes_25g == TXGBE_SFF_4x10GBASESR_CAP ||
-						comp_codes_25g == TXGBE_SFF_40GBASEPSM4_Parallel ||
-						comp_codes_25g == TXGBE_SFF_40GBASE_SWMD4_CAP) {
-				if (hw->bus.lan_id == 0)
-					hw->phy.sfp_type = txgbe_sfp_type_40g_core0;
-				else
-					hw->phy.sfp_type = txgbe_sfp_type_40g_core1;
 			} else if (comp_codes_10g &
 				   (TXGBE_SFF_10GBASESR_CAPABLE |
 				    TXGBE_SFF_10GBASELR_CAPABLE)) {
@@ -875,6 +862,66 @@ err_read_i2c_eeprom:
 	return TXGBE_ERR_SFP_NOT_PRESENT;
 }
 
+s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw)
+{
+	s32 status = TXGBE_ERR_PHY_ADDR_INVALID;
+	u8 identifier = 0;
+	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+	u32 value;
+
+	if (hw->mac.type == txgbe_mac_aml40) {
+		value = rd32(hw, TXGBE_GPIO_EXT);
+		if (value & TXGBE_SFP1_MOD_PRST_LS) {
+			hw->phy.sfp_type = txgbe_sfp_type_not_present;
+			return TXGBE_ERR_SFP_NOT_PRESENT;
+		}
+	}
+
+	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
+		return TXGBE_ERR_SWFW_SYNC;
+
+	if (TCALL(hw, mac.ops.get_media_type) != txgbe_media_type_fiber) {
+		hw->phy.sfp_type = txgbe_sfp_type_not_present;
+		status = TXGBE_ERR_SFP_NOT_PRESENT;
+		goto out;
+	}
+
+	/* LAN ID is needed for I2C access */
+	txgbe_init_i2c(hw);
+	status = TCALL(hw, phy.ops.read_i2c_eeprom,
+					     TXGBE_SFF_IDENTIFIER,
+					     &identifier);
+
+	if (status != 0)
+		goto err_read_i2c_eeprom;
+
+	if (identifier != TXGBE_SFF_IDENTIFIER_QSFP &&
+		identifier != TXGBE_SFF_IDENTIFIER_QSFP_PLUS) {
+		hw->phy.type = txgbe_phy_sfp_unsupported;
+		status = TXGBE_ERR_SFP_NOT_SUPPORTED;
+	} else {
+		if (hw->bus.lan_id == 0)
+			hw->phy.sfp_type = txgbe_sfp_type_40g_core0;
+		else
+			hw->phy.sfp_type = txgbe_sfp_type_40g_core1;
+
+	}
+
+out:
+	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
+
+	return status;
+
+err_read_i2c_eeprom:
+	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
+
+	hw->phy.sfp_type = txgbe_sfp_type_not_present;
+	hw->phy.id = 0;
+	hw->phy.type = txgbe_phy_unknown;
+
+	return TXGBE_ERR_SFP_NOT_PRESENT;
+}
+
 s32 txgbe_init_i2c(struct txgbe_hw *hw)
 {
 	wr32(hw, TXGBE_I2C_ENABLE, 0);
@@ -989,7 +1036,29 @@ s32 txgbe_read_i2c_sff8472(struct txgbe_hw *hw, u8 byte_offset,
 					 TXGBE_I2C_EEPROM_DEV_ADDR2,
 					 sff8472_data);
 }
-					  
+
+/**
+ *  txgbe_read_i2c_sff8636 - Reads 8 bit word over I2C interface
+ *  @hw: pointer to hardware structure
+ *  @byte_offset: byte offset at address 0xA2
+ *  @eeprom_data: value read
+ *
+ *  Performs byte read operation to SFP module's SFF-8472 data over I2C
+ **/
+s32 txgbe_read_i2c_sff8636(struct txgbe_hw *hw, u8 page, u8 byte_offset,
+					  u8 *sff8636_data)
+{
+	txgbe_init_i2c(hw);
+	TCALL(hw, phy.ops.write_i2c_byte, TXGBE_SFF_QSFP_PAGE_SELECT,
+					 TXGBE_I2C_EEPROM_DEV_ADDR,
+					 page);
+
+	return TCALL(hw, phy.ops.read_i2c_byte, byte_offset,
+					 TXGBE_I2C_EEPROM_DEV_ADDR,
+					 sff8636_data);
+}
+
+
 /**
  *  txgbe_read_i2c_sfp_phy - Reads 16 bit word over I2C interface
  *  @hw: pointer to hardware structure

@@ -39,6 +39,8 @@
 /* EEPROM byte offsets */
 #define TXGBE_SFF_IDENTIFIER            0x0
 #define TXGBE_SFF_IDENTIFIER_SFP        0x3
+#define TXGBE_SFF_IDENTIFIER_QSFP       0xC
+#define TXGBE_SFF_IDENTIFIER_QSFP_PLUS  0xD
 #define TXGBE_SFF_VENDOR_OUI_BYTE0      0x25
 #define TXGBE_SFF_VENDOR_OUI_BYTE1      0x26
 #define TXGBE_SFF_VENDOR_OUI_BYTE2      0x27
@@ -53,6 +55,11 @@
 #define TXGBE_SFF_SFF_8472_COMP         0x5E
 #define TXGBE_SFF_SFF_8472_OSCB         0x6E
 #define TXGBE_SFF_SFF_8472_ESCB         0x76
+#define TXGBE_SFF_SFF_REVISION_ADDR     0x01
+#define TXGBE_SFF_QSFP_PAGE_SELECT      0x7F
+
+#define TXGBE_MODULE_QSFP_MAX_LEN       640
+
 #define TXGBE_SFF_IDENTIFIER_QSFP_PLUS  0xD
 #define TXGBE_SFF_QSFP_VENDOR_OUI_BYTE0 0xA5
 #define TXGBE_SFF_QSFP_VENDOR_OUI_BYTE1 0xA6
@@ -185,6 +192,7 @@ s32 txgbe_get_phy_firmware_version(struct txgbe_hw *hw,
 
 s32 txgbe_identify_module(struct txgbe_hw *hw);
 s32 txgbe_identify_sfp_module(struct txgbe_hw *hw);
+s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw);
 s32 txgbe_tn_check_overtemp(struct txgbe_hw *hw);
 s32 txgbe_init_i2c(struct txgbe_hw *hw);
 s32 txgbe_clear_i2c(struct txgbe_hw *hw);
@@ -203,6 +211,8 @@ s32 txgbe_write_i2c_eeprom(struct txgbe_hw *hw, u8 byte_offset,
 				   u8 eeprom_data);
 s32 txgbe_read_i2c_sff8472(struct txgbe_hw *hw, u8 byte_offset,
 							u8 *sff8472_data);
+s32 txgbe_read_i2c_sff8636(struct txgbe_hw *hw, u8 page, u8 byte_offset,
+					  u8 *sff8636_data);
 s32 txgbe_read_i2c_sfp_phy(struct txgbe_hw *hw, u16 byte_offset,
 					  u16 *data);
 

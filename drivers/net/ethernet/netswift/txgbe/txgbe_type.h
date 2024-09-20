@@ -3295,6 +3295,7 @@ struct txgbe_phy_operations {
 	s32 (*read_i2c_byte)(struct txgbe_hw *, u8, u8, u8 *);
 	s32 (*write_i2c_byte)(struct txgbe_hw *, u8, u8, u8);
 	s32 (*read_i2c_sff8472)(struct txgbe_hw *, u8, u8 *);
+	s32 (*read_i2c_sff8636)(struct txgbe_hw *, u8, u8, u8 *);
 	s32 (*read_i2c_eeprom)(struct txgbe_hw *, u8, u8 *);
 	s32 (*read_i2c_sfp_phy)(struct txgbe_hw *, u16, u16 *);
 	s32 (*write_i2c_eeprom)(struct txgbe_hw *, u8, u8);
