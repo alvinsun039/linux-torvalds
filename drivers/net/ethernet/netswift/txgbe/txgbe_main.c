@@ -9386,12 +9386,11 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
 		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
 		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1)) {
+		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
+		hw->mac.type == txgbe_mac_aml40)) {
 		mutex_lock(&adapter->e56_lock);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-			TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 		mutex_unlock(&adapter->e56_lock);
 		return;
 	}
@@ -9400,8 +9399,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
 	if (rdata & E56PHY_INTR_0_IDLE_ENTRY1) {
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				TXGBE_AML_LINK_STATUS_OVRD_EN, TXGBE_AML_LINK_STATUS_OVRD_EN);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
 	}
@@ -9409,10 +9406,10 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 	rdata = rd32_ephy(hw, E56PHY_INTR_1_ADDR);
 	if (rdata & E56PHY_INTR_1_IDLE_EXIT1) {
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-		wr32m(hw, TXGBE_AML_EPCS_MISC_CTL,
-				TXGBE_AML_LINK_STATUS_OVRD_EN, 0x0);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
 		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 	}
 	mutex_unlock(&adapter->e56_lock);
 }
