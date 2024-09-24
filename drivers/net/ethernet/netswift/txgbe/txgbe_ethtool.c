@@ -4988,10 +4988,10 @@ static int txgbe_get_module_info(struct net_device *dev,
 			return -EIO;
 		}
 	}
-#if 0
+
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 	   return -EBUSY;
-#endif
+
 	if (!test_bit(__TXGBE_DOWN, &adapter->state))
 		cancel_work_sync(&adapter->sfp_sta_task);
 
@@ -5095,10 +5095,10 @@ static int txgbe_get_module_eeprom(struct net_device *dev,
 			return -EIO;
 		}
 	}
-#if 0
+
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 	   return -EBUSY;
-#endif
+
 	if (!test_bit(__TXGBE_DOWN, &adapter->state))
 		cancel_work_sync(&adapter->sfp_sta_task);
 
