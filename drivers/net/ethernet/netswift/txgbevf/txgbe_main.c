@@ -4563,6 +4563,9 @@ int txgbe_tso(struct txgbe_ring *tx_ring,
 	int err = 0;
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 	u8 tun_prot = 0;
+	unsigned char *exthdr;
+	unsigned char *l4_hdr;
+	__be16 frag_off;
 	bool enc = skb->encapsulation;
 #endif /* HAVE_ENCAP_TSO_OFFLOAD */
 #ifdef NETIF_F_TSO6
@@ -4653,7 +4656,12 @@ int txgbe_tso(struct txgbe_ring *tx_ring,
 			first->tx_flags |= TXGBE_TX_FLAGS_OUTER_IPV4;
 			break;
 		case __constant_htons(ETH_P_IPV6):
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 			tun_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &tun_prot, &frag_off);
 			break;
 		default:
 			break;
@@ -4679,6 +4687,7 @@ int txgbe_tso(struct txgbe_ring *tx_ring,
 					TXGBE_TXD_TUNNEL_LEN_SHIFT);
 			break;
 		case IPPROTO_IPIP:
+		case IPPROTO_IPV6:
 			tunhdr_eiplen_tunlen = (((char *)inner_ip_hdr(skb)-
 						(char *)ip_hdr(skb)) >> 2) <<
 						TXGBE_TXD_OUTER_IPLEN_SHIFT;
@@ -4744,6 +4753,9 @@ csum_failed:
 				  TXGBE_TXD_MACLEN_SHIFT;
 	} else {
 		u8 l4_prot = 0;
+		unsigned char *exthdr;
+		unsigned char *l4_hdr;
+		__be16 frag_off;
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 		union {
 			struct iphdr *ipv4;
@@ -4765,7 +4777,12 @@ csum_failed:
 				tun_prot = ip_hdr(skb)->protocol;
 				break;
 			case __constant_htons(ETH_P_IPV6):
+				l4_hdr = skb_transport_header(skb);
+				exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 				tun_prot = ipv6_hdr(skb)->nexthdr;
+				if (l4_hdr != exthdr)
+					ipv6_skip_exthdr(skb, exthdr - skb->data,
+						 &tun_prot, &frag_off);
 				break;
 			default:
 				if (unlikely(net_ratelimit())) {
@@ -4795,6 +4812,7 @@ csum_failed:
 					TXGBE_TXD_TUNNEL_LEN_SHIFT);
 				break;
 			case IPPROTO_IPIP:
+			case IPPROTO_IPV6:
 				tunhdr_eiplen_tunlen =
 					(((char *)inner_ip_hdr(skb)-
 					(char *)ip_hdr(skb)) >> 2) <<
@@ -4835,7 +4853,12 @@ csum_failed:
 #ifdef NETIF_F_IPV6_CSUM
 		case __constant_htons(ETH_P_IPV6):
 			vlan_macip_lens |= skb_network_header_len(skb) >> 1;
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 			l4_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					&l4_prot, &frag_off);
 			break;
 #endif /* NETIF_F_IPV6_CSUM */
 		default:

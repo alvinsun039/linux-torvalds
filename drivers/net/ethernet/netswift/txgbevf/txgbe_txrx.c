@@ -359,36 +359,6 @@ static inline txgbe_dptype txgbe_decode_ptype(const u8 ptype)
 	return txgbe_ptype_lookup[ptype];
 }
 
-static u8 get_ipv6_proto(struct sk_buff *skb, int offset)
-{
-	struct ipv6hdr *iphdr = (struct ipv6hdr*)(skb->data + offset);
-	u8 nexthdr = iphdr->nexthdr;
-
-	offset += sizeof(struct ipv6hdr);
-
-	while (ipv6_ext_hdr(nexthdr)) {
-		struct ipv6_opt_hdr _hdr, *hp;
-
-		if (nexthdr == NEXTHDR_NONE)
-			break;
-
-		hp = skb_header_pointer(skb, offset, sizeof(_hdr), &_hdr);
-		if (!hp)
-			break;
-
-		if (nexthdr == NEXTHDR_FRAGMENT)
-			break;
-		else if (nexthdr == NEXTHDR_AUTH)
-			offset +=  ipv6_authlen(hp);
-		else
-			offset +=  ipv6_optlen(hp);
-
-		nexthdr = hp->nexthdr;
-	}
-
-	return nexthdr;
-}
-
 txgbe_dptype txgbe_rx_decode_ptype(const union txgbe_rx_desc *rx_desc)
 {
 	return txgbe_decode_ptype(TXGBE_RXD_PKTTYPE(rx_desc));
@@ -405,6 +375,9 @@ txgbe_dptype txgbe_tx_encode_ptype(const struct txgbe_tx_buffer *first)
 #endif
 	u8 l4_prot = 0;
 	u8 ptype = 0;
+	unsigned char *exthdr;
+	unsigned char *l4_hdr;
+	__be16 frag_off;
 
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 	if (skb->encapsulation) {
@@ -418,7 +391,13 @@ txgbe_dptype txgbe_tx_encode_ptype(const struct txgbe_tx_buffer *first)
 			ptype = TXGBE_PTYPE_TUN_IPV4;
 			break;
 		case __constant_htons(ETH_P_IPV6):
-			tun_prot = get_ipv6_proto(skb, skb_network_offset(skb));
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
+			tun_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &tun_prot, &frag_off);
+
 			if (tun_prot == NEXTHDR_FRAGMENT)
 				goto encap_frag;
 			ptype = TXGBE_PTYPE_TUN_IPV6;
@@ -427,7 +406,8 @@ txgbe_dptype txgbe_tx_encode_ptype(const struct txgbe_tx_buffer *first)
 			goto exit;
 		}
 
-		if (tun_prot == IPPROTO_IPIP) {
+		if (tun_prot == IPPROTO_IPIP ||
+			tun_prot == IPPROTO_IPV6) {
 			hdr.raw = (void *)inner_ip_hdr(skb);
 			ptype |= TXGBE_PTYPE_PKT_IPIP;
 		} else if (tun_prot == IPPROTO_UDP) {
@@ -474,8 +454,13 @@ txgbe_dptype txgbe_tx_encode_ptype(const struct txgbe_tx_buffer *first)
 			}
 			break;
 		case 6:
-			l4_prot = get_ipv6_proto(skb,
-						 skb_inner_network_offset(skb));
+			l4_hdr = skb_inner_transport_header(skb);
+			exthdr = skb_inner_network_header(skb) + sizeof(struct ipv6hdr);
+			l4_prot = inner_ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &l4_prot, &frag_off);
+
 			ptype |= TXGBE_PTYPE_PKT_IPV6;
 			if (l4_prot == NEXTHDR_FRAGMENT) {
 				ptype |= TXGBE_PTYPE_TYP_IPFRAG;
@@ -499,7 +484,13 @@ encap_frag:
 			break;
 #ifdef NETIF_F_IPV6_CSUM
 		case __constant_htons(ETH_P_IPV6):
-			l4_prot = get_ipv6_proto(skb, skb_network_offset(skb));
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
+			l4_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &l4_prot, &frag_off);
+
 			ptype = TXGBE_PTYPE_PKT_IP | TXGBE_PTYPE_PKT_IPV6;
 			if (l4_prot == NEXTHDR_FRAGMENT) {
 				ptype |= TXGBE_PTYPE_TYP_IPFRAG;
