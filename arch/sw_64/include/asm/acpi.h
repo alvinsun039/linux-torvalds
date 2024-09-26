@@ -105,6 +105,18 @@ static inline bool arch_has_acpi_pdc(void)
 static inline void arch_acpi_set_pdc_bits(u32 *buf)
 {
 }
+
+static inline unsigned long acpi_get_wakeup_address(void)
+{
+	return 0;
+}
+
+static inline bool acpi_skip_set_wakeup_address(void)
+{
+	return true;
+}
+
+#define acpi_skip_set_wakeup_address acpi_skip_set_wakeup_address
 #else /* !CONFIG_ACPI */
 
 static inline void acpi_noirq_set(void) { }
