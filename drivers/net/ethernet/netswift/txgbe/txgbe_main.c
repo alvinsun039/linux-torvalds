@@ -9079,6 +9079,7 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 link_speed = adapter->link_speed;
 	bool flow_rx, flow_tx;
+	bool fec = 0;
 #ifdef HAVE_VIRTUAL_STATION
 	struct net_device *upper;
 	struct list_head *iter;
@@ -9109,7 +9110,10 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		break;
 	}
 
-	e_info(drv, "NIC Link is Up %s, Flow Control: %s\n",
+	if (hw->mac.type == txgbe_mac_aml)
+		fec = txgbe_rd32_epcs(hw, 0x100ab) & BIT(0);
+
+	e_info(drv, "NIC Link is Up %s, Flow Control: %s%s\n",
 	       (link_speed == TXGBE_LINK_SPEED_40GB_FULL ?
 	       "40 Gbps" :
 	       (link_speed == TXGBE_LINK_SPEED_25GB_FULL ?
@@ -9125,7 +9129,9 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	       "unknown speed")))))),
 	       ((flow_rx && flow_tx) ? "RX/TX" :
 	       (flow_rx ? "RX" :
-	       (flow_tx ? "TX" : "None"))));
+	       (flow_tx ? "TX" : "None"))),
+	       ((hw->mac.type == txgbe_mac_aml && link_speed == TXGBE_LINK_SPEED_25GB_FULL) ?
+		(fec ? ", FEC: ON" : ", FEC: OFF") : ""));
 
 	netif_carrier_on(netdev);
 	txgbe_check_vf_rate_limit(adapter);

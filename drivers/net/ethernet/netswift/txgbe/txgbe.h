@@ -1161,7 +1161,7 @@ struct txgbe_adapter {
 #ifdef HAVE_BRIDGE_ATTRIBS
 	u16 bridge_mode;
 #endif
-
+	bool fec_retry;
 	u32 phy_retry;
 	char eeprom_id[32];
 	char fl_version[16];
