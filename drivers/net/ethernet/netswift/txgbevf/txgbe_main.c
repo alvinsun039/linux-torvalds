@@ -5673,6 +5673,15 @@ txgbe_features_check(struct sk_buff *skb, struct net_device *dev,
 			return features & ~NETIF_F_CSUM_MASK;
 			     }
 	}
+
+	if (skb->encapsulation) {
+		if (skb->inner_protocol_type == ENCAP_TYPE_ETHER &&
+			skb->inner_protocol != htons(ETH_P_IP) &&
+			skb->inner_protocol != htons(ETH_P_IPV6) &&
+			skb->inner_protocol != htons(ETH_P_TEB))
+			return features & ~(NETIF_F_CSUM_MASK | NETIF_F_GSO_MASK);
+	}
+
 	return features;
 }
 #endif /* NETIF_F_GSO_PARTIAL */
