@@ -106,4 +106,8 @@
 #define HWCAP2_HBC		(1UL << 44)
 #define HWCAP2_SVE_B16B16	(1UL << 45)
 
+/*
+ * HWCAP3 flags - for AT_HWCAP3
+ */
+
 #endif /* _UAPI__ASM_HWCAP_H */
