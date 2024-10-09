@@ -998,6 +998,11 @@ enum txgbe_isb_idx {
 	TXGBE_ISB_VEC1,
 	TXGBE_ISB_MAX
 };
+#define TXGBE_PHY_FEC_OFF	(1U)
+#define TXGBE_PHY_FEC_BASER	(1U << 1)
+#define TXGBE_PHY_FEC_RS	(1U << 2)
+#define TXGBE_PHY_FEC_AUTO (TXGBE_PHY_FEC_OFF | TXGBE_PHY_FEC_BASER |\
+			   TXGBE_PHY_FEC_RS)
 
 /* board specific private data structure */
 struct txgbe_adapter {
@@ -1161,7 +1166,8 @@ struct txgbe_adapter {
 #ifdef HAVE_BRIDGE_ATTRIBS
 	u16 bridge_mode;
 #endif
-	bool fec_retry;
+	u8 fec_link_mode;
+	u8 cur_fec_link;
 	u32 phy_retry;
 	char eeprom_id[32];
 	char fl_version[16];

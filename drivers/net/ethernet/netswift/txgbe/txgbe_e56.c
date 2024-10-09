@@ -3512,11 +3512,20 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
 		/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
-		if (adapter->fec_retry) {
-			value = txgbe_rd32_epcs(hw, 0x100ab);
+		if (adapter->cur_fec_link & TXGBE_PHY_FEC_BASER) {
+			value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
 			SetFields(&value, 0, 0, 1);
-			txgbe_wr32_epcs(hw, 0x100ab, value);
-			adapter->fec_retry = 0;
+			txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+		} else if (adapter->cur_fec_link & TXGBE_PHY_FEC_RS) {
+			txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
+			txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
+			txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
+			txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
+
+			txgbe_wr32_epcs(hw, 0x38018, 1024);
+			value = txgbe_rd32_epcs(hw, 0x100c8);
+			SetFields(&value, 2, 2, 1);
+			txgbe_wr32_epcs(hw, 0x100c8, value);
 		}
 		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL1);
 		SetFields(&value, 5, 2, 5);

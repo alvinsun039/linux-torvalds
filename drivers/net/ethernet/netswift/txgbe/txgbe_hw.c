@@ -5796,7 +5796,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	bool link_up = false;
 	u32 curr_autoneg = 2;
 	s32 ret_status = 0;
-	int i;
+	int i = 0, j = 0, need_check_link = 0;
 
 	/* Check to see if speed passed in is supported. */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -5826,7 +5826,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			goto out;
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
-			(adapter->autoneg != curr_autoneg))) {
+			(adapter->autoneg != curr_autoneg)) &&
+			(speed != TXGBE_LINK_SPEED_25GB_FULL)) { /*25GB not skip to update fec mode*/
 				goto out;
 		}
 	}
@@ -5839,38 +5840,31 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			mutex_unlock(&adapter->e56_lock);
 			return 0;
 		}
-
-		mutex_lock(&adapter->e56_lock);
-		ret_status = txgbe_set_link_to_amlite(hw, speed);
-
-		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
-			adapter->phy_retry = 3;
-			for (i = 0; i < adapter->phy_retry; i++) {
-				TCALL(hw, mac.ops.check_link,
-						&link_speed, &link_up, false);
-				if (link_up) {
-					break;
-				}
-
-				/* this ret_status for workaorund not return to upper*/
-				ret_status = txgbe_e56_reconfig_rx(hw, speed);
-
-				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-					break;
+		do {
+			if (!(adapter->fec_link_mode & BIT(j))) {
+				j += 1;
+				continue;
 			}
-		}
-		mutex_unlock(&adapter->e56_lock);
-		/*if can't link with no fec, try fec */
-		if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
-			for (i = 0; i < 2; i++) {
-				msleep(500);
-				TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
-				if (link_up)
+			/*if in fec auto mode, try another fec mode after no link in 1s*/
+			if (adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO && need_check_link) {
+				if (speed == TXGBE_LINK_SPEED_25GB_FULL)
 					goto out;
+				for (i = 0; i < 4; i++) {
+					msleep(250);
+					TCALL(hw, mac.ops.check_link,
+					&link_speed, &link_up, false);
+					if (link_up)
+						goto out;
+				}
 			}
+			/*now only 25G support fec auto try*/
+			if (speed == TXGBE_LINK_SPEED_25GB_FULL)
+				adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
+			else
+				adapter->cur_fec_link = 0;
+			need_check_link += 1;
+
 			mutex_lock(&adapter->e56_lock);
-			adapter->fec_retry = 1;
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 
 			if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
@@ -5890,7 +5884,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 				}
 			}
 			mutex_unlock(&adapter->e56_lock);
-		}
+			j += 1;
+		} while (j < 3); /*try three fec mode(off rs base-r) to link */
 		goto out;
 	}
 

@@ -7752,6 +7752,8 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->num_vmdqs = 1;
 	set_bit(0, &adapter->fwd_bitmask);
 	set_bit(__TXGBE_DOWN, &adapter->state);
+
+	adapter->fec_link_mode = TXGBE_PHY_FEC_AUTO;
 out:
 	return err;
 }
@@ -9079,7 +9081,6 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 link_speed = adapter->link_speed;
 	bool flow_rx, flow_tx;
-	bool fec = 0;
 #ifdef HAVE_VIRTUAL_STATION
 	struct net_device *upper;
 	struct list_head *iter;
@@ -9110,9 +9111,6 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		break;
 	}
 
-	if (hw->mac.type == txgbe_mac_aml)
-		fec = txgbe_rd32_epcs(hw, 0x100ab) & BIT(0);
-
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s%s\n",
 	       (link_speed == TXGBE_LINK_SPEED_40GB_FULL ?
 	       "40 Gbps" :
@@ -9131,7 +9129,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	       (flow_rx ? "RX" :
 	       (flow_tx ? "TX" : "None"))),
 	       ((hw->mac.type == txgbe_mac_aml && link_speed == TXGBE_LINK_SPEED_25GB_FULL) ?
-		(fec ? ", FEC: ON" : ", FEC: OFF") : ""));
+		((adapter->cur_fec_link == TXGBE_PHY_FEC_BASER) ? ", FEC: BASE-R" :\
+		 (adapter->cur_fec_link == TXGBE_PHY_FEC_RS) ? ", FEC: RS" : ", FEC: OFF") : ""));
 
 	netif_carrier_on(netdev);
 	txgbe_check_vf_rate_limit(adapter);

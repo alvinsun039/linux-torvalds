@@ -38,6 +38,7 @@
 #include "txgbe_hw.h"
 #if defined(ETHTOOL_GMODULEINFO)||defined(HAVE_ETHTOOL_SET_PHYS_ID)
 #include "txgbe_phy.h"
+#include "txgbe_e56.h"
 #endif
 #ifdef HAVE_ETHTOOL_GET_TS_INFO
 #include <linux/net_tstamp.h>
@@ -1317,7 +1318,100 @@ static int txgbe_set_settings(struct net_device *netdev,
 	return err;
 }
 #endif /* !ETHTOOL_GLINKSETTINGS */
+#ifdef ETHTOOL_GFECPARAM
+static int txgbe_get_fec_param(struct net_device *netdev,
+			      struct ethtool_fecparam *fecparam)
+{
+	int err = 0;
+	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 supported_link = 0;
+	bool autoneg = false;
 
+	TCALL(hw, mac.ops.get_link_capabilities, &supported_link, &autoneg);
+
+	if (hw->mac.type != txgbe_mac_aml ||
+	    !(supported_link & TXGBE_LINK_SPEED_25GB_FULL)) {
+		err = -EAGAIN;
+		goto done;
+	}
+
+	fecparam->fec = 0;
+	if (adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO)
+		fecparam->fec |= ETHTOOL_FEC_AUTO;
+	else if (adapter->fec_link_mode & TXGBE_PHY_FEC_BASER)
+		fecparam->fec |= ETHTOOL_FEC_BASER;
+	else if (adapter->fec_link_mode & TXGBE_PHY_FEC_RS)
+		fecparam->fec |= ETHTOOL_FEC_RS;
+	else
+		fecparam->fec |= ETHTOOL_FEC_OFF;
+
+	switch (adapter->cur_fec_link) {
+	case TXGBE_PHY_FEC_BASER:
+		fecparam->active_fec = ETHTOOL_FEC_BASER;
+		break;
+	case TXGBE_PHY_FEC_RS:
+		fecparam->active_fec = ETHTOOL_FEC_RS;
+		break;
+	case TXGBE_PHY_FEC_OFF:
+		fecparam->active_fec = ETHTOOL_FEC_OFF;
+		break;
+	default:
+		fecparam->active_fec = ETHTOOL_FEC_OFF;
+		break;
+	}
+done:
+	return err;
+}
+
+static int txgbe_set_fec_param(struct net_device *netdev,
+			      struct ethtool_fecparam *fecparam)
+{
+	int err = 0;
+	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	struct txgbe_hw *hw = &adapter->hw;
+	u8 cur_fec_mode = adapter->fec_link_mode;
+	bool autoneg = false;
+	u32 supported_link = 0;
+
+	TCALL(hw, mac.ops.get_link_capabilities, &supported_link, &autoneg);
+
+	if (hw->mac.type != txgbe_mac_aml) {
+		err = -EAGAIN;
+		goto done;
+	}
+
+	switch (fecparam->fec) {
+	case ETHTOOL_FEC_AUTO:
+		adapter->fec_link_mode = TXGBE_PHY_FEC_AUTO;
+		break;
+	case ETHTOOL_FEC_BASER:
+		adapter->fec_link_mode = TXGBE_PHY_FEC_BASER;
+		break;
+	case ETHTOOL_FEC_OFF:
+	case ETHTOOL_FEC_NONE:
+		adapter->fec_link_mode = TXGBE_PHY_FEC_OFF;
+		break;
+	case ETHTOOL_FEC_RS:
+		adapter->fec_link_mode = TXGBE_PHY_FEC_RS;
+		break;
+	default:
+		e_warn(drv, "Unsupported FEC mode: %d",
+			 fecparam->fec);
+		err = -EINVAL;
+		goto done;
+	}
+	if (cur_fec_mode != adapter->fec_link_mode) {
+		/* reset link */
+		if (netif_running(netdev))
+			txgbe_reinit_locked(adapter);
+		else
+			txgbe_reset(adapter);
+	}
+done:
+	return err;
+}
+#endif /* ETHTOOL_GFECPARAM */
 static void txgbe_get_pauseparam(struct net_device *netdev,
 				 struct ethtool_pauseparam *pause)
 {
@@ -5270,6 +5364,10 @@ static struct ethtool_ops txgbe_ethtool_ops = {
 	.get_settings		= txgbe_get_settings,
 	.set_settings		= txgbe_set_settings,
 #endif
+#ifdef ETHTOOL_GFECPARAM
+	.get_fecparam = txgbe_get_fec_param,
+	.set_fecparam = txgbe_set_fec_param,
+#endif /* ETHTOOL_GFECPARAM */
 	.get_drvinfo            = txgbe_get_drvinfo,
 	.get_regs_len           = txgbe_get_regs_len,
 	.get_regs               = txgbe_get_regs,

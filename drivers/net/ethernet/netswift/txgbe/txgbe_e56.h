@@ -95,6 +95,7 @@ typedef union {
 
 #define E56G_CMS_ANA_OVRDVAL_0_ADDR 0xcb0
 /* AMLITE ETH PHY Registers */
+#define SR_PMA_KR_FEC_CTRL 0x100ab
 #define SR_AN_CTRL 0x70000
 #define VR_PCS_DIG_CTRL1 0x38000
 #define SR_PCS_CTRL1 0x30000
