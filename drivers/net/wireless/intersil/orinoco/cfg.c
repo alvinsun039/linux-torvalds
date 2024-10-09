@@ -162,6 +162,7 @@ static int orinoco_scan(struct wiphy *wiphy,
 }
 
 static int orinoco_set_monitor_channel(struct wiphy *wiphy,
+				       struct net_device *dev,
 				       struct cfg80211_chan_def *chandef)
 {
 	struct orinoco_private *priv = wiphy_priv(wiphy);
