@@ -1774,7 +1774,7 @@ static void txgbe_lro_receive(struct txgbe_q_vector *q_vector,
 static void txgbe_set_rsc_gso_size(struct txgbe_ring __maybe_unused *ring,
 				   struct sk_buff *skb)
 {
-	u16 hdr_len = eth_get_headlen(skb->dev, skb->data, skb_headlen(skb));
+	u16 hdr_len = skb_headlen(skb);
 
 	/* set gso_size to avoid messing up TCP MSS */
 	skb_shinfo(skb)->gso_size = DIV_ROUND_UP((skb->len - hdr_len),
