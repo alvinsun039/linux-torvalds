@@ -1403,10 +1403,8 @@ static int txgbe_set_fec_param(struct net_device *netdev,
 	}
 	if (cur_fec_mode != adapter->fec_link_mode) {
 		/* reset link */
-		if (netif_running(netdev))
-			txgbe_reinit_locked(adapter);
-		else
-			txgbe_reset(adapter);
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+		txgbe_service_event_schedule(adapter);
 	}
 done:
 	return err;

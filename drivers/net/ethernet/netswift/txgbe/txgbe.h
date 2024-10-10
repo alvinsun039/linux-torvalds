@@ -1380,6 +1380,7 @@ void txgbe_assign_netdev_ops(struct net_device *netdev);
 extern char txgbe_driver_name[];
 extern const char txgbe_driver_version[];
 
+void txgbe_service_event_schedule(struct txgbe_adapter *adapter);
 void txgbe_irq_disable(struct txgbe_adapter *adapter);
 void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush);
 int txgbe_open(struct net_device *netdev);

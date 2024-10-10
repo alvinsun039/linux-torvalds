@@ -306,7 +306,7 @@ static inline int txgbe_enumerate_functions(struct txgbe_adapter *adapter)
 	return physfns;
 }
 
-static void txgbe_service_event_schedule(struct txgbe_adapter *adapter)
+void txgbe_service_event_schedule(struct txgbe_adapter *adapter)
 {
 	if (!test_bit(__TXGBE_DOWN, &adapter->state) &&
 	    !test_bit(__TXGBE_REMOVING, &adapter->state) &&

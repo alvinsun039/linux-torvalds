@@ -5847,7 +5847,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			}
 			/*if in fec auto mode, try another fec mode after no link in 1s*/
 			if (adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO && need_check_link) {
-				if (speed == TXGBE_LINK_SPEED_25GB_FULL)
+				if (speed != TXGBE_LINK_SPEED_25GB_FULL)
 					goto out;
 				for (i = 0; i < 4; i++) {
 					msleep(250);
