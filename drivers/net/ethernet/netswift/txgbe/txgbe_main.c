@@ -13711,6 +13711,7 @@ static void __devexit txgbe_remove(struct pci_dev *pdev)
 
 	set_bit(__TXGBE_REMOVING, &adapter->state);
 	cancel_work_sync(&adapter->service_task);
+	cancel_work_sync(&adapter->temp_task);
 
 #if IS_ENABLED(CONFIG_TPH)
 	if (adapter->flags & TXGBE_FLAG_TPH_ENABLED) {
