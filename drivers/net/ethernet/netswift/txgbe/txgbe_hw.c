@@ -5797,6 +5797,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	u32 curr_autoneg = 2;
 	s32 ret_status = 0;
 	int i = 0, j = 0, need_check_link = 0;
+	u8 old_fec = adapter->cur_fec_link;
 
 	/* Check to see if speed passed in is supported. */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -5841,7 +5842,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			return 0;
 		}
 		do {
-			if (!(adapter->fec_link_mode & BIT(j))) {
+			if (!(adapter->fec_link_mode & BIT(j)) &&
+			   !((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
 				j += 1;
 				continue;
 			}
@@ -5859,7 +5861,11 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			}
 			/*now only 25G support fec auto try*/
 			if (speed == TXGBE_LINK_SPEED_25GB_FULL)
-				adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
+				/*revert to old fec mode if all fec mode cannot link when auto try*/
+				if ((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))
+					adapter->cur_fec_link = old_fec;
+				else
+					adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
 			else
 				adapter->cur_fec_link = 0;
 			need_check_link += 1;
@@ -5885,7 +5891,9 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			}
 			mutex_unlock(&adapter->e56_lock);
 			j += 1;
-		} while (j < 3); /*try three fec mode(off rs base-r) to link */
+		} while (j < 4);
+		/*try three fec mode(off rs base-r) to link ,
+		  if cannot link in all fec mode,revert to old fec mode*/
 		goto out;
 	}
 
