@@ -742,6 +742,8 @@ static int xsc_pci_probe(struct pci_dev *pci_dev,
 		return -ENOMEM;
 #endif
 
+	mark_partner_supported_module_once("Yunsilicon Technology", THIS_MODULE);
+
 	xdev->pdev = pci_dev;
 	xdev->device = &pci_dev->dev;
 	priv = &xdev->priv;

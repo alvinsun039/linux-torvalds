@@ -1003,7 +1003,8 @@ static void *xsc_add(struct xsc_core_device *xpdev)
 	struct xsc_ib_dev *m_ibdev = NULL;
 	int ret = -1;
 
-	pr_err("add rdma driver\n");
+	pr_info("add rdma driver\n");
+	mark_partner_supported_module_once("Yunsilicon Technology", THIS_MODULE);
 
 	ret = init_one(xpdev, &m_ibdev);
 	if (ret) {
@@ -1016,7 +1017,7 @@ static void *xsc_add(struct xsc_core_device *xpdev)
 
 static void xsc_remove(struct xsc_core_device *xpdev, void *context)
 {
-	pr_err("remove rdma driver\n");
+	pr_info("remove rdma driver\n");
 	remove_one(xpdev, context);
 }
 
