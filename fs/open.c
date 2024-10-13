@@ -968,6 +968,10 @@ static int do_dentry_open(struct file *f,
 	 * pseudo file, this call will not change the mode.
 	 */
 	file_set_fsnotify_mode_from_watchers(f);
+	error = fsnotify_open_perm(f);
+	if (error)
+		goto cleanup_all;
+
 	error = break_lease(file_inode(f), f->f_flags);
 	if (error)
 		goto cleanup_all;
