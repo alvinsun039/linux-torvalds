@@ -207,7 +207,7 @@ static inline void set_p4d(p4d_t *p4dp, p4d_t p4d)
 #define _PAGE_CHG_MASK	(_PFN_MASK | __DIRTY_BITS | __ACCESS_BITS | _PAGE_SPECIAL | _PAGE_LEAF | _PAGE_CONT)
 
 #define _PAGE_P(x)	_PAGE_NORMAL((x) | _PAGE_FOW)
-#define _PAGE_S(x)	_PAGE_NORMAL(x)
+#define _PAGE_S(x)	_PAGE_NORMAL((x) | _PAGE_FOW)
 
 /*
  * pgprot_noncached() is only for infiniband pci support, and a real
@@ -290,6 +290,8 @@ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
 #define pud_pfn(pud)		((pud_val(pud) & _PFN_MASK) >> _PFN_SHIFT)
 #define pmd_pfn(pmd)		((pmd_val(pmd) & _PFN_MASK) >> _PFN_SHIFT)
 #define pte_pfn(pte)		((pte_val(pte) & _PFN_MASK) >> _PFN_SHIFT)
+#define pmd_leaf(pmd)		(!pmd_none(pmd) && (pmd_val(pmd) & (_PAGE_PRESENT|_PAGE_LEAF)) != _PAGE_PRESENT)
+#define pud_leaf(pud)		(!pud_none(pud) && (pud_val(pud) & (_PAGE_PRESENT|_PAGE_LEAF)) != _PAGE_PRESENT)
 
 #define p4d_page(p4d)		pfn_to_page(p4d_pfn(p4d))
 #define pud_page(pud)		pfn_to_page(pud_pfn(pud))
