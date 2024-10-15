@@ -37,8 +37,9 @@ Build-Depends:
  curl <!stage1>,
  zstd [amd64 s390x] <!stage1>,
  dwarves (>= 1.21) [amd64 arm64 armhf ppc64el s390x riscv64] | pahole [amd64 arm64 armhf ppc64el s390x riscv64] <!stage1>,
- clang [loong64] <!stage1>,
- libtraceevent-dev [loong64] <!stage1>,
+ clang <!stage1>,
+ libtraceevent-dev <!stage1>,
+ python3-dev <!stage1>,
 Build-Depends-Indep:
  xmlto <!stage1>,
  docbook-utils <!stage1>,
