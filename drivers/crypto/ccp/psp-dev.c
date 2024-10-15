@@ -307,6 +307,11 @@ void psp_pci_init(void);
 
 int psp_dev_suspend(struct sp_device *sp)
 {
+	struct psp_device *psp = psp_master;
+
+	if (!psp)
+		return 0;
+
 	psp_pci_exit();
 
 	return 0;
@@ -314,10 +319,12 @@ int psp_dev_suspend(struct sp_device *sp)
 
 int psp_dev_resume(struct sp_device *sp)
 {
-	struct psp_device *psp;
+	struct psp_device *psp = psp_master;
+
+	if (!psp)
+		return 0;
 
 	/* re-enable interrupt */
-	psp = sp->psp_data;
 	iowrite32(-1, psp->io_regs + psp->vdata->inten_reg);
 
 	psp_pci_init();
