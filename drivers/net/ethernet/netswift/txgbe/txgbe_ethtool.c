@@ -682,6 +682,20 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		cmd->base.duplex = -1;
 	}
 
+#ifdef ETHTOOL_GFECPARAM
+	if (hw->mac.type == txgbe_mac_aml) {
+		ethtool_link_ksettings_add_link_mode(cmd, supported, FEC_NONE);
+		ethtool_link_ksettings_add_link_mode(cmd, supported, FEC_RS);
+		ethtool_link_ksettings_add_link_mode(cmd, supported, FEC_BASER);
+		if (adapter->fec_link_mode & TXGBE_PHY_FEC_OFF)
+			ethtool_link_ksettings_add_link_mode(cmd, advertising, FEC_NONE);
+		if (adapter->fec_link_mode & TXGBE_PHY_FEC_RS)
+			ethtool_link_ksettings_add_link_mode(cmd, advertising, FEC_RS);
+		if (adapter->fec_link_mode & TXGBE_PHY_FEC_BASER)
+			ethtool_link_ksettings_add_link_mode(cmd, advertising, FEC_BASER);
+	}
+#endif
+
 	if (!adapter->autoneg)
 		ethtool_link_ksettings_del_link_mode(cmd, advertising, Autoneg);
 	else
