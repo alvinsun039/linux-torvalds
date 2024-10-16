@@ -984,7 +984,7 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_DMA_RESET_REQUESTED          (1U << 2)
 
 #define TXGBE_FLAG3_PHY_EVENT                   (1U << 0)
-
+#define TXGBE_FLAG3_FEC_CHANGE			(1U << 1)
 
 #define TXGBE_SET_FLAG(_input, _flag, _result) \
 	((_flag <= _result) ? \
@@ -998,9 +998,9 @@ enum txgbe_isb_idx {
 	TXGBE_ISB_VEC1,
 	TXGBE_ISB_MAX
 };
-#define TXGBE_PHY_FEC_OFF	(1U)
+#define TXGBE_PHY_FEC_RS	(1U)
 #define TXGBE_PHY_FEC_BASER	(1U << 1)
-#define TXGBE_PHY_FEC_RS	(1U << 2)
+#define TXGBE_PHY_FEC_OFF	(1U << 2)
 #define TXGBE_PHY_FEC_AUTO (TXGBE_PHY_FEC_OFF | TXGBE_PHY_FEC_BASER |\
 			   TXGBE_PHY_FEC_RS)
 

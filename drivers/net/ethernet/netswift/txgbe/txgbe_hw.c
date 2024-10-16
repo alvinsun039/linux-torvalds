@@ -5828,7 +5828,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
 			(adapter->autoneg != curr_autoneg)) &&
-			(speed != TXGBE_LINK_SPEED_25GB_FULL)) { /*25GB not skip to update fec mode*/
+			!(adapter->flags3 & TXGBE_FLAG3_FEC_CHANGE)) {
 				goto out;
 		}
 	}
@@ -5841,9 +5841,12 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			mutex_unlock(&adapter->e56_lock);
 			return 0;
 		}
+
+		adapter->flags3 &= ~TXGBE_FLAG3_FEC_CHANGE;
+
 		do {
 			if (!(adapter->fec_link_mode & BIT(j)) &&
-			   !((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
+			    !((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
 				j += 1;
 				continue;
 			}

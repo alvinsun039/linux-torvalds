@@ -1422,6 +1422,7 @@ static int txgbe_set_fec_param(struct net_device *netdev,
 	}
 	if (cur_fec_mode != adapter->fec_link_mode) {
 		/* reset link */
+		adapter->flags3 |= TXGBE_FLAG3_FEC_CHANGE; /*FORCE SETUP LINK*/
 		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 		txgbe_service_event_schedule(adapter);
 	}
