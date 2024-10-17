@@ -80,13 +80,13 @@ static const char ngbe_driver_string[] =
 #define RELEASE_TAG
 
 #if defined(NGBE_SUPPORT_KYLIN)
-#define DRV_VERSION     __stringify(1.2.6.2-kylin)
+#define DRV_VERSION     __stringify(1.2.6.3-kylin)
 #elif defined(CONFIG_EULER_KERNEL)
-#define DRV_VERSION     __stringify(1.2.6.2-kylin)
+#define DRV_VERSION     __stringify(1.2.6.3-kylin)
 #elif defined(CONFIG_UOS_KERNEL)
-#define DRV_VERSION     __stringify(1.2.6.2-kylin)
+#define DRV_VERSION     __stringify(1.2.6.3-kylin)
 #else
-#define DRV_VERSION     __stringify(1.2.6.2-kylin)
+#define DRV_VERSION     __stringify(1.2.6.3-kylin)
 #endif
 const char ngbe_driver_version[32] = DRV_VERSION;
 static const char ngbe_copyright[] =
