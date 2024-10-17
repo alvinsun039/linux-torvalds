@@ -984,7 +984,6 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_DMA_RESET_REQUESTED          (1U << 2)
 
 #define TXGBE_FLAG3_PHY_EVENT                   (1U << 0)
-#define TXGBE_FLAG3_FEC_CHANGE			(1U << 1)
 
 #define TXGBE_SET_FLAG(_input, _flag, _result) \
 	((_flag <= _result) ? \

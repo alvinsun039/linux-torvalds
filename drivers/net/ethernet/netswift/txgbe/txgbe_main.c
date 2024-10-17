@@ -7760,6 +7760,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	set_bit(__TXGBE_DOWN, &adapter->state);
 
 	adapter->fec_link_mode = TXGBE_PHY_FEC_AUTO;
+	adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 out:
 	return err;
 }
