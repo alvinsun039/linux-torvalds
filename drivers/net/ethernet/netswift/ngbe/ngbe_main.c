@@ -8207,6 +8207,7 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 	u32 type_tucmd;
 
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
+csum_failed:
 		if (!(first->tx_flags & NGBE_TX_FLAGS_HW_VLAN) &&
 		    !(first->tx_flags & NGBE_TX_FLAGS_CC))
 			return;
@@ -8334,7 +8335,8 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 					NGBE_TXD_L4LEN_SHIFT;
 			break;
 		default:
-			break;
+			skb_checksum_help(skb);
+			goto csum_failed;
 		}
 
 		/* update TX checksum flag */
