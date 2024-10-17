@@ -316,6 +316,7 @@ int ngbe_disable_sriov(struct ngbe_adapter *adapter)
 	msleep(100);
 
 	adapter->flags &= ~NGBE_FLAG_SRIOV_ENABLED;
+	adapter->flags &= ~NGBE_FLAG_SRIOV_L2SWITCH_ENABLE;
 
 	/* Disable VMDq flag so device will be set in VM mode */
 	if (adapter->ring_feature[RING_F_VMDQ].limit == 1) {
