@@ -9880,10 +9880,7 @@ static int __devinit ngbe_probe(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	/* errata 16 */
-	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
-		PCI_EXP_DEVCTL_READRQ,
-		0x1000);
+	pcie_set_readrq(pdev, 128);
 
 #ifdef HAVE_TX_MQ
 	netdev = alloc_etherdev_mq(sizeof(struct ngbe_adapter), NGBE_MAX_TX_QUEUES);
