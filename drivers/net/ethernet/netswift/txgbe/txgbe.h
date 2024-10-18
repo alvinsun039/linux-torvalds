@@ -1168,6 +1168,7 @@ struct txgbe_adapter {
 	u8 fec_link_mode;
 	u8 cur_fec_link;
 	u32 phy_retry;
+	bool phy_tx_ready;
 	char eeprom_id[32];
 	char fl_version[16];
 	char fw_version[64];
