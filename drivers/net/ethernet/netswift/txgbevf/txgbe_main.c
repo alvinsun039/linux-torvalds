@@ -1793,7 +1793,12 @@ void txgbe_write_eitr(struct txgbe_q_vector *q_vector)
 	struct txgbe_adapter *adapter = q_vector->adapter;
 	struct txgbe_hw *hw = &adapter->hw;
 	int v_idx = q_vector->v_idx;
-	u32 itr_reg = TXGBE_VXITR_INTERVAL(q_vector->itr);
+	u32 itr_reg;
+
+	if (hw->mac.type == txgbe_mac_aml)
+		itr_reg = TXGBE_AMLITE_INTERVAL(q_vector->itr);
+	else
+		itr_reg = TXGBE_VXITR_INTERVAL(q_vector->itr);
 
 	/*
 	 * set the WDIS bit to not clear the timer bits and cause an

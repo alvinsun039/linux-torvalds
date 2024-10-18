@@ -87,6 +87,8 @@
 #define TXGBE_VXLLI                 0x00118
 #define TXGBE_VXITR(i)               0x00200 + (4 * (i)) /* i=[0,1] */
 #define   TXGBE_VXITR_INTERVAL(f)    ((0x1FF & (f)) << 3)
+#define TXGBE_AMLITE_INTERVAL(f)     (0xFFF & (f))
+
 #define   TXGBE_VXITR_LLI            ((0x1) << 15)
 #define   TXGBE_VXITR_LLI_CREDIT(f)  ((0x1F & (f)) << 16)
 #define   TXGBE_VXITR_CNT(f)         ((0x7F & (f)) << 21)
