@@ -130,7 +130,7 @@ s32 txgbe_check_for_rst(struct txgbe_hw *hw, u16 mbx_id)
  *
  *  returns SUCCESS if it successfully received a message notification
  **/
-s32 txgbe_poll_for_msg(struct txgbe_hw *hw, u16 mbx_id)
+static s32 txgbe_poll_for_msg(struct txgbe_hw *hw, u16 mbx_id)
 {
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	int countdown = mbx->timeout;
@@ -160,7 +160,7 @@ out:
  *
  *  returns SUCCESS if it successfully received a message acknowledgement
  **/
-s32 txgbe_poll_for_ack(struct txgbe_hw *hw, u16 mbx_id)
+static s32 txgbe_poll_for_ack(struct txgbe_hw *hw, u16 mbx_id)
 {
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	int countdown = mbx->timeout;
@@ -257,7 +257,7 @@ void txgbe_init_mbx_ops_generic(struct txgbe_hw *hw)
  *  This function is used to read the v2p mailbox without losing the read to
  *  clear status bits.
  **/
-u32 txgbe_read_v2p_mailbox(struct txgbe_hw *hw)
+static u32 txgbe_read_v2p_mailbox(struct txgbe_hw *hw)
 {
 	u32 v2p_mailbox = rd32(hw, TXGBE_VXMAILBOX);
 
@@ -278,7 +278,7 @@ u32 txgbe_read_v2p_mailbox(struct txgbe_hw *hw)
  *  This function is used to check for the read to clear bits within
  *  the V2P mailbox.
  **/
-s32 txgbe_check_for_bit_vf(struct txgbe_hw *hw, u32 mask)
+static s32 txgbe_check_for_bit_vf(struct txgbe_hw *hw, u32 mask)
 {
 	u32 mailbox = txgbe_read_v2p_mailbox(hw);
 
@@ -294,7 +294,7 @@ s32 txgbe_check_for_bit_vf(struct txgbe_hw *hw, u32 mask)
  *
  *  returns SUCCESS if the PF has set the Status bit or else ERR_MBX
  **/
-s32 txgbe_check_for_msg_vf(struct txgbe_hw *hw, u16 mbx_id)
+static s32 txgbe_check_for_msg_vf(struct txgbe_hw *hw, u16 mbx_id)
 {
 	s32 err = TXGBE_ERR_MBX;
 
@@ -316,7 +316,7 @@ s32 txgbe_check_for_msg_vf(struct txgbe_hw *hw, u16 mbx_id)
  *
  *  returns SUCCESS if the PF has set the ACK bit or else ERR_MBX
  **/
-s32 txgbe_check_for_ack_vf(struct txgbe_hw *hw, u16 mbx_id)
+static s32 txgbe_check_for_ack_vf(struct txgbe_hw *hw, u16 mbx_id)
 {
 	s32 err = TXGBE_ERR_MBX;
 
@@ -338,7 +338,7 @@ s32 txgbe_check_for_ack_vf(struct txgbe_hw *hw, u16 mbx_id)
  *
  *  returns true if the PF has set the reset done bit or else false
  **/
-s32 txgbe_check_for_rst_vf(struct txgbe_hw *hw, u16 mbx_id)
+static s32 txgbe_check_for_rst_vf(struct txgbe_hw *hw, u16 mbx_id)
 {
 	s32 err = TXGBE_ERR_MBX;
 
@@ -358,7 +358,7 @@ s32 txgbe_check_for_rst_vf(struct txgbe_hw *hw, u16 mbx_id)
  *
  *  return SUCCESS if we obtained the mailbox lock
  **/
-s32 txgbe_obtain_mbx_lock_vf(struct txgbe_hw *hw)
+static s32 txgbe_obtain_mbx_lock_vf(struct txgbe_hw *hw)
 {
 	s32 err = TXGBE_ERR_MBX;
 	struct txgbe_mbx_info *mbx = &hw->mbx;
@@ -396,7 +396,7 @@ s32 txgbe_obtain_mbx_lock_vf(struct txgbe_hw *hw)
  *
  *  returns SUCCESS if it successfully copied message into the buffer
  **/
-s32 txgbe_write_mbx_vf(struct txgbe_hw *hw, u32 *msg, u16 size,
+static s32 txgbe_write_mbx_vf(struct txgbe_hw *hw, u32 *msg, u16 size,
 			      u16 mbx_id)
 {
 	s32 err;
@@ -436,7 +436,7 @@ out_no_write:
  *
  *  returns SUCCESS if it successfuly read message from buffer
  **/
-s32 txgbe_read_mbx_vf(struct txgbe_hw *hw, u32 *msg, u16 size,
+static s32 txgbe_read_mbx_vf(struct txgbe_hw *hw, u32 *msg, u16 size,
 			     u16 mbx_id)
 {
 	s32 err = 0;
@@ -494,7 +494,7 @@ void txgbe_init_mbx_params_vf(struct txgbe_hw *hw)
 	mbx->stats.rsts = 0;
 }
 
-s32 txgbe_check_for_bit_pf(struct txgbe_hw *hw, u32 mask, s32 index)
+static s32 txgbe_check_for_bit_pf(struct txgbe_hw *hw, u32 mask, s32 index)
 {
 	u32 mbvficr = rd32(hw, TXGBE_MBVFICR(index));
 	s32 err = TXGBE_ERR_MBX;
@@ -514,7 +514,7 @@ s32 txgbe_check_for_bit_pf(struct txgbe_hw *hw, u32 mask, s32 index)
  *
  *  returns SUCCESS if the VF has set the Status bit or else ERR_MBX
  **/
-s32 txgbe_check_for_msg_pf(struct txgbe_hw *hw, u16 vf)
+static s32 txgbe_check_for_msg_pf(struct txgbe_hw *hw, u16 vf)
 {
 	s32 err = TXGBE_ERR_MBX;
 	s32 index = TXGBE_MBVFICR_INDEX(vf);
@@ -536,7 +536,7 @@ s32 txgbe_check_for_msg_pf(struct txgbe_hw *hw, u16 vf)
  *
  *  returns SUCCESS if the VF has set the Status bit or else ERR_MBX
  **/
-s32 txgbe_check_for_ack_pf(struct txgbe_hw *hw, u16 vf)
+static s32 txgbe_check_for_ack_pf(struct txgbe_hw *hw, u16 vf)
 {
 	s32 err = TXGBE_ERR_MBX;
 	s32 index = TXGBE_MBVFICR_INDEX(vf);
@@ -558,7 +558,7 @@ s32 txgbe_check_for_ack_pf(struct txgbe_hw *hw, u16 vf)
  *
  *  returns SUCCESS if the VF has set the Status bit or else ERR_MBX
  **/
-s32 txgbe_check_for_rst_pf(struct txgbe_hw *hw, u16 vf)
+static s32 txgbe_check_for_rst_pf(struct txgbe_hw *hw, u16 vf)
 {
 	u32 reg_offset = (vf < 32) ? 0 : 1;
 	u32 vf_shift = vf % 32;
@@ -583,7 +583,7 @@ s32 txgbe_check_for_rst_pf(struct txgbe_hw *hw, u16 vf)
  *
  *  return SUCCESS if we obtained the mailbox lock
  **/
-s32 txgbe_obtain_mbx_lock_pf(struct txgbe_hw *hw, u16 vf)
+static s32 txgbe_obtain_mbx_lock_pf(struct txgbe_hw *hw, u16 vf)
 {
 	s32 err = TXGBE_ERR_MBX;
 	u32 mailbox;
@@ -617,7 +617,7 @@ s32 txgbe_obtain_mbx_lock_pf(struct txgbe_hw *hw, u16 vf)
  *
  *  returns SUCCESS if it successfully copied message into the buffer
  **/
-s32 txgbe_write_mbx_pf(struct txgbe_hw *hw, u32 *msg, u16 size,
+static s32 txgbe_write_mbx_pf(struct txgbe_hw *hw, u32 *msg, u16 size,
 			      u16 vf)
 {
 	s32 err;
@@ -660,7 +660,7 @@ out_no_write:
  *  memory buffer.  The presumption is that the caller knows that there was
  *  a message due to a VF request so no polling for message is needed.
  **/
-s32 txgbe_read_mbx_pf(struct txgbe_hw *hw, u32 *msg, u16 size,
+static s32 txgbe_read_mbx_pf(struct txgbe_hw *hw, u32 *msg, u16 size,
 			     u16 vf)
 {
 	s32 err;
