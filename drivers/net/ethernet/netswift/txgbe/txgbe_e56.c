@@ -3385,11 +3385,11 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status = 0;
 	u32 reset = 0;
-	struct txgbe_adapter *adapter = hw->back;
 
 	if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK) ==
 	    TXGBE_EPHY_STAT_PPL_LOCK) {
