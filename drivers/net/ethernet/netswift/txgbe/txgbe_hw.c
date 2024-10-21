@@ -47,7 +47,7 @@ STATIC s32 txgbe_get_san_mac_addr_offset(struct txgbe_hw *hw,
 STATIC s32 txgbe_setup_copper_link(struct txgbe_hw *hw,
 					 u32 speed,
 					 bool autoneg_wait_to_complete);
-s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
+s32 txgbe_check_mac_link_sp(struct txgbe_hw *hw, u32 *speed,
 				  bool *link_up, bool link_up_wait_to_complete);
 
 
@@ -4334,7 +4334,7 @@ txgbe_dptype txgbe_ptype_lookup[256] = {
 };
 
 
-void txgbe_init_mac_link_ops(struct txgbe_hw *hw)
+void txgbe_init_mac_link_ops_sp(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
 
@@ -4351,11 +4351,11 @@ void txgbe_init_mac_link_ops(struct txgbe_hw *hw)
 	if (hw->phy.multispeed_fiber) {
 		/* Set up dual speed SFP+ support */
 		mac->ops.setup_link = txgbe_setup_mac_link_multispeed_fiber;
-		mac->ops.setup_mac_link = txgbe_setup_mac_link;
+		mac->ops.setup_mac_link = txgbe_setup_mac_link_sp;
 		mac->ops.set_rate_select_speed =
 					       txgbe_set_hard_rate_select_speed;
 	} else {
-		mac->ops.setup_link = txgbe_setup_mac_link;
+		mac->ops.setup_link = txgbe_setup_mac_link_sp;
 		mac->ops.set_rate_select_speed =
 					       txgbe_set_hard_rate_select_speed;
 	}
@@ -4370,25 +4370,18 @@ void txgbe_init_mac_link_ops(struct txgbe_hw *hw)
  *  not known.  Perform the SFP init if necessary.
  *
  **/
-s32 txgbe_init_phy_ops(struct txgbe_hw *hw)
+s32 txgbe_init_phy_ops_sp(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
-	struct txgbe_adapter *adapter = hw->back;
 	s32 ret_val = 0;
 
-	/* amlite TODO*/
-	txgbe_init_i2c(hw);
-	if (hw->mac.type == txgbe_mac_aml  || hw->mac.type == txgbe_mac_aml40)
-		wr32(hw, 0x11220, 0xF);
-
-	mutex_init(&adapter->e56_lock);
 	/* Identify the PHY or SFP module */
 	ret_val = TCALL(hw, phy.ops.identify);
 	if (ret_val == TXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto init_phy_ops_out;
 
 	/* Setup function pointers based on detected SFP module and speeds */
-	txgbe_init_mac_link_ops(hw);
+	txgbe_init_mac_link_ops_sp(hw);
 	if (hw->phy.sfp_type != txgbe_sfp_type_unknown)
 		hw->phy.ops.reset = NULL;
 
@@ -4406,16 +4399,111 @@ init_phy_ops_out:
 	return ret_val;
 }
 
+s32 txgbe_setup_sfp_modules_sp(struct txgbe_hw *hw)
+{
+	s32 ret_val = 0;
+
+	DEBUGFUNC("txgbe_setup_sfp_modules_sp");
+
+	if (hw->phy.sfp_type != txgbe_sfp_type_unknown) {
+		txgbe_init_mac_link_ops_sp(hw);
+	}
+
+	return ret_val;
+}
+
 
 /**
- *  txgbe_init_ops - Inits func ptrs and MAC type
+ *  txgbe_init_ops_sp - Inits func ptrs and MAC type
  *  @hw: pointer to hardware structure
  *
  *  Initialize the function pointers and assign the MAC type for sapphire.
  *  Does not touch the hardware.
  **/
 
-s32 txgbe_init_ops(struct txgbe_hw *hw)
+s32 txgbe_init_ops_sp(struct txgbe_hw *hw)
+{
+	struct txgbe_mac_info *mac = &hw->mac;
+	struct txgbe_phy_info *phy = &hw->phy;
+	s32 ret_val = 0;
+
+	ret_val = txgbe_init_ops_generic(hw);
+
+	/* PHY */
+	phy->ops.init = txgbe_init_phy_ops_sp;
+
+	/* MAC */
+	mac->ops.get_media_type = txgbe_get_media_type_sp;
+	mac->ops.setup_sfp = txgbe_setup_sfp_modules_sp;
+
+	/* LINK */
+	mac->ops.get_link_capabilities = txgbe_get_link_capabilities_sp;
+	mac->ops.setup_link = txgbe_setup_mac_link_sp;
+	mac->ops.check_link = txgbe_check_mac_link_sp;
+
+	return ret_val;
+}
+
+static void txgbe_set_mac_type(struct txgbe_hw *hw)
+{
+	switch (hw->device_id) {
+	case TXGBE_DEV_ID_SP1000:
+	case TXGBE_DEV_ID_WX1820:
+		hw->mac.type = txgbe_mac_sp;
+		break;
+	case TXGBE_DEV_ID_AML:
+	case TXGBE_DEV_ID_AML5025:
+	case TXGBE_DEV_ID_AML5125:
+		hw->mac.type = txgbe_mac_aml;
+		break;
+	case TXGBE_DEV_ID_AML5040:
+	case TXGBE_DEV_ID_AML5140:
+		hw->mac.type = txgbe_mac_aml40;
+		break;
+	default:
+		hw->mac.type = txgbe_mac_unknown;
+		break;
+	}
+}
+
+/**
+ *  txgbe_init_shared_code - Initialize the shared code
+ *  @hw: pointer to hardware structure
+ *
+ *  This will assign function pointers and assign the MAC type and PHY code.
+ *  Does not touch the hardware. This function must be called prior to any
+ *  other function in the shared code. The txgbe_hw structure should be
+ *  memset to 0 prior to calling this function.  The following fields in
+ *  hw structure should be filled in prior to calling this function:
+ *  hw_addr, back, device_id, vendor_id, subsystem_device_id,
+ *  subsystem_vendor_id, and revision_id
+ **/
+int txgbe_init_shared_code(struct txgbe_hw *hw)
+{
+	s32 status;
+
+	txgbe_set_mac_type(hw);
+
+	switch (hw->mac.type) {
+	case txgbe_mac_sp:
+		status = txgbe_init_ops_sp(hw);
+		break;
+	case txgbe_mac_aml:
+		status = txgbe_init_ops_aml(hw);
+		break;
+	case txgbe_mac_aml40:
+		status = txgbe_init_ops_aml40(hw);
+		break;
+	default:
+		status = TXGBE_ERR_DEVICE_NOT_SUPPORTED;
+		break;
+	}
+
+	return status;
+}
+
+
+s32 txgbe_init_ops_generic(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
 	struct txgbe_phy_info *phy = &hw->phy;
@@ -4443,7 +4531,6 @@ s32 txgbe_init_ops(struct txgbe_hw *hw)
 	phy->sfp_type = txgbe_sfp_type_unknown;
 	phy->ops.check_overtemp = txgbe_tn_check_overtemp;
 	phy->ops.identify = txgbe_identify_phy;
-	phy->ops.init = txgbe_init_phy_ops;
 
 	/* MAC */
 	mac->ops.init_hw = txgbe_init_hw;
@@ -4455,7 +4542,7 @@ s32 txgbe_init_ops(struct txgbe_hw *hw)
 	mac->ops.acquire_swfw_sync = txgbe_acquire_swfw_sync;
 	mac->ops.release_swfw_sync = txgbe_release_swfw_sync;
 	mac->ops.reset_hw = txgbe_reset_hw;
-	mac->ops.get_media_type = txgbe_get_media_type;
+	mac->ops.get_media_type = NULL;
 	mac->ops.disable_sec_rx_path = txgbe_disable_sec_rx_path;
 	mac->ops.enable_sec_rx_path = txgbe_enable_sec_rx_path;
 	mac->ops.disable_sec_tx_path = txgbe_disable_sec_tx_path;
@@ -4499,8 +4586,8 @@ s32 txgbe_init_ops(struct txgbe_hw *hw)
 	mac->ops.setup_fc = txgbe_setup_fc;
 
 	/* Link */
-	mac->ops.get_link_capabilities = txgbe_get_link_capabilities;
-	mac->ops.check_link = txgbe_check_mac_link;
+	mac->ops.get_link_capabilities = NULL;
+	mac->ops.check_link = NULL;
 	mac->ops.setup_rxpba = txgbe_set_rxpba;
 	mac->mcft_size          = TXGBE_SP_MC_TBL_SIZE;
 	mac->vft_size           = TXGBE_SP_VFT_TBL_SIZE;
@@ -4551,7 +4638,7 @@ s32 txgbe_init_ops(struct txgbe_hw *hw)
  *
  *  Determines the link capabilities by reading the AUTOC register.
  **/
-s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
+s32 txgbe_get_link_capabilities_sp(struct txgbe_hw *hw,
 				      u32 *speed,
 				      bool *autoneg)
 {
@@ -4560,31 +4647,13 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	u32 sr_an_mmd_adv_reg2;
 
 	if (hw->phy.multispeed_fiber) {
-		if (hw->mac.type == txgbe_mac_aml)
-			*speed = TXGBE_LINK_SPEED_10GB_FULL |
-				  TXGBE_LINK_SPEED_25GB_FULL;
-		else
-			*speed = TXGBE_LINK_SPEED_10GB_FULL |
-				  TXGBE_LINK_SPEED_1GB_FULL;
+		*speed = TXGBE_LINK_SPEED_10GB_FULL |
+			  TXGBE_LINK_SPEED_1GB_FULL;
 		*autoneg = true;
-	} else if (hw->phy.sfp_type == txgbe_sfp_type_40g_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_40g_core1) {
-		*speed = TXGBE_LINK_SPEED_40GB_FULL;
-		*autoneg = false;
-	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_sr_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_lr_core1) {
-		*speed = TXGBE_LINK_SPEED_25GB_FULL;
-		*autoneg = false;
-	} else if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_fcpi4_lmt_core1) {
-		*speed = TXGBE_LINK_SPEED_25GB_FULL;
-		*autoneg = false;
+	} else if (hw->dac_sfp) {
+		*autoneg = true;
+		hw->phy.link_mode = TXGBE_PHYSICAL_LAYER_10GBASE_KR;
+		*speed = TXGBE_LINK_SPEED_10GB_FULL;
 	} else if (hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_1g_lx_core0 ||
@@ -4596,17 +4665,12 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 		*autoneg = true;
 	}
 	/* SFP */
-	else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
-		if (hw->mac.type == txgbe_mac_aml40) {
-			*speed = TXGBE_LINK_SPEED_40GB_FULL;
-		} else if (hw->mac.type == txgbe_mac_aml && hw->phy.sfp_type == txgbe_sfp_type_not_present)
-			*speed = TXGBE_LINK_SPEED_25GB_FULL;
-		else
-			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+	else if (TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) {
+		*speed = TXGBE_LINK_SPEED_10GB_FULL;
 		*autoneg = true;
 	}
 	/* XAUI */
-	else if ((txgbe_get_media_type(hw) == txgbe_media_type_copper) &&
+	else if ((TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_copper) &&
 			 ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_XAUI ||
 			 (hw->subsystem_device_id & 0xF0) == TXGBE_ID_SFI_XAUI)) {
 		*speed = TXGBE_LINK_SPEED_10GB_FULL;
@@ -4705,21 +4769,15 @@ out:
 }
 
 /**
- *  txgbe_get_media_type - Get media type
+ *  txgbe_get_media_type_sp - Get media type
  *  @hw: pointer to hardware structure
  *
  *  Returns the media type (fiber, copper, backplane)
  **/
-enum txgbe_media_type txgbe_get_media_type(struct txgbe_hw *hw)
+enum txgbe_media_type txgbe_get_media_type_sp(struct txgbe_hw *hw)
 {
 	enum txgbe_media_type media_type;
 	u8 device_type = hw->subsystem_device_id & 0xF0;
-
-	if (hw->mac.type == txgbe_mac_aml40)
-		return txgbe_media_type_fiber;
-
-	if (hw->mac.type == txgbe_mac_aml)
-		return txgbe_media_type_fiber;
 
 	/* Detect if there is a copper PHY attached. */
 	switch (hw->phy.type) {
@@ -4918,7 +4976,7 @@ s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw)
 	/* for sgmii + external phy, set to 0x0105 (phy sgmii mode) */
 	/* for sgmii direct link, set to 0x010c (mac sgmii mode) */
 	if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_MAC_SGMII ||
-		txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
+		TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) {
 		txgbe_wr32_epcs(hw, TXGBE_SR_MII_MMD_AN_CTL, 0x010c);
 	} else if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_SGMII ||
 				(hw->subsystem_device_id & 0xF0) == TXGBE_ID_XAUI) {
@@ -5784,7 +5842,7 @@ out:
  *
  *  Set the link speed in the AUTOC register and restarts link.
  **/
-s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
+s32 txgbe_setup_mac_link_sp(struct txgbe_hw *hw,
 			       u32 speed,
 			       bool autoneg_wait_to_complete)
 {
@@ -5795,9 +5853,6 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	bool link_up = false;
 	u32 curr_autoneg = 2;
-	s32 ret_status = 0;
-	int i = 0, j = 0;
-	u32 value = 0;
 
 	/* Check to see if speed passed in is supported. */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -5814,7 +5869,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 
 	if (!(((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4) ||
 			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_XAUI) ||
-			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_SGMII))) {
+			((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_SGMII) ||
+			hw->dac_sfp)) {
 		status = TCALL(hw, mac.ops.check_link,
 				&link_speed, &link_up, false);
 
@@ -5834,124 +5890,8 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		}
 	}
 
-	if (hw->mac.type == txgbe_mac_aml) {
-		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1) {
-			mutex_lock(&adapter->e56_lock);
-			txgbe_e56_set_link_to_kr(adapter, 25, 0);
-			mutex_unlock(&adapter->e56_lock);
-			return 0;
-		}
-
-		mutex_lock(&adapter->e56_lock);
-		if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
-			ret_status = txgbe_set_link_to_amlite(hw, speed);
-			adapter->tx_speed = speed;
-		}
-		mutex_unlock(&adapter->e56_lock);
-
-		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
-				TCALL(hw, mac.ops.check_link,
-						&link_speed, &link_up, false);
-				if (link_up)
-					goto out;
-
-				mutex_lock(&adapter->e56_lock);
-				/* this ret_status for workaorund not return to upper*/
-				ret_status = txgbe_e56_reconfig_rx(hw, speed);
-				mutex_unlock(&adapter->e56_lock);
-
-				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-					goto out;
-		}
-
-		do {
-			if (!(adapter->fec_link_mode & BIT(j)) &&
-				!((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
-				j += 1;
-				continue;
-			}
-			/*now only 25G support fec auto try*/
-			if (speed == TXGBE_LINK_SPEED_25GB_FULL)
-				/*revert to old fec mode if all fec mode cannot link when auto try*/
-				if ((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))
-					adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
-				else
-					adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
-			else
-				adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
-
-			/*if in fec auto mode, try another fec mode after no link in 1s*/
-			/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
-			mutex_lock(&adapter->e56_lock);
-			if (adapter->cur_fec_link  & TXGBE_PHY_FEC_RS) {
-				//disable BASER FEC
-				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-				SetFields(&value, 0, 0, 0);
-				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-
-				//enable RS FEC
-				txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
-				txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
-				txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
-				txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
-
-				txgbe_wr32_epcs(hw, 0x38018, 1024);
-				value = txgbe_rd32_epcs(hw, 0x100c8);
-				SetFields(&value, 2, 2, 1);
-				txgbe_wr32_epcs(hw, 0x100c8, value);
-			} else if (adapter->cur_fec_link & TXGBE_PHY_FEC_BASER) {
-				//disable RS FEC
-				txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
-				txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
-				txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
-				txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
-				txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
-				value = txgbe_rd32_epcs(hw, 0x100c8);
-				SetFields(&value, 2, 2, 0);
-				txgbe_wr32_epcs(hw, 0x100c8, value);
-
-				//enable BASER FEC
-				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-				SetFields(&value, 0, 0, 1);
-				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-			} else {
-				//disable RS FEC
-				txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
-				txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
-				txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
-				txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
-				txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
-				value = txgbe_rd32_epcs(hw, 0x100c8);
-				SetFields(&value, 2, 2, 0);
-				txgbe_wr32_epcs(hw, 0x100c8, value);
-
-				//disable BASER FEC
-				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-				SetFields(&value, 0, 0, 0);
-				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-			}
-			mutex_unlock(&adapter->e56_lock);
-
-			if (speed != TXGBE_LINK_SPEED_25GB_FULL)
-				goto out;
-
-			for (i = 0; i < 4; i++) {
-				TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
-				if (link_up)
-					goto out;
-				msleep(250);
-			}
-
-			j += 1;
-		} while (j < 4);
-		/*try three fec mode(off rs base-r) to link ,
-		  if cannot link in all fec mode,revert to old fec mode*/
-		goto out;
-	}
-
-	if ((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4) {
+	if ((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4 ||
+		hw->dac_sfp) {
 		txgbe_set_link_to_kr(hw, autoneg);
 #if 0
 		if (!autoneg) {
@@ -5977,7 +5917,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_XAUI) ||
 		(hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_SGMII || 
 		((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_MAC_SGMII) ||
-		(txgbe_get_media_type(hw) == txgbe_media_type_copper && 
+		(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_copper &&
 		(hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_SFI_XAUI)) {
 		if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
 			txgbe_set_link_to_kx4(hw, 0);
@@ -5986,7 +5926,7 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 				txgbe_set_sgmii_an37_ability(hw);
 				hw->phy.autoneg_advertised |= speed;
 			}
-		} else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
+		} else if (TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) {
 			if (!((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP &&
 				(hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core0 ||
 				hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1))) {
@@ -6000,7 +5940,9 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		}
 out:
 	return status;
+
 }
+
 
 /**
  *  txgbe_setup_copper_link - Set the PHY autoneg advertised field
@@ -6023,7 +5965,7 @@ STATIC s32 txgbe_setup_copper_link(struct txgbe_hw *hw,
 	
 	if (link_speed != TXGBE_LINK_SPEED_UNKNOWN)
 		/* Set up MAC */
-		status = txgbe_setup_mac_link(hw, link_speed, autoneg_wait_to_complete);
+		status = txgbe_setup_mac_link_sp(hw, link_speed, autoneg_wait_to_complete);
 	else {
 		status = 0;
 	}
@@ -7131,7 +7073,8 @@ s32 txgbe_identify_phy(struct txgbe_hw *hw)
 		txgbe_get_phy_id(hw);
 		hw->phy.type = txgbe_get_phy_type_from_id(hw);
 		status = 0;
-	} else if (media_type == txgbe_media_type_fiber) {
+	} else if (media_type == txgbe_media_type_fiber ||
+		media_type == txgbe_media_type_fiber_qsfp) {
 		status = txgbe_identify_module(hw);
 	} else {
 		hw->phy.type = txgbe_phy_none;
@@ -7874,7 +7817,7 @@ s32 txgbe_update_flash(struct txgbe_hw *hw)
  *
  *  Reads the links register to determine if link is up and the current speed
  **/
-s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
+s32 txgbe_check_mac_link_sp(struct txgbe_hw *hw, u32 *speed,
 				bool *link_up, bool link_up_wait_to_complete)
 {
 	u32 links_reg = 0;
@@ -7887,11 +7830,10 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 				 ((hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)) {
 				/* read ext phy link status */
 				txgbe_read_mdio(&hw->phy_dev, hw->phy.addr, 0x03, 0x8008, &value);
-				if (value & 0x400) {
+				if (value & 0x400)
 					*link_up = true;
-				} else {
+				else
 					*link_up = false;
-				}
 			} else {
 				*link_up = true;
 			}
@@ -7913,21 +7855,19 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 			 ((hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)) {
 			/* read ext phy link status */
 			txgbe_read_mdio(&hw->phy_dev, hw->phy.addr, 0x03, 0x8008, &value);
-			if (value & 0x400) {
+			if (value & 0x400)
 				*link_up = true;
-			} else {
+			else
 				*link_up = false;
-			}
 		} else {
 			*link_up = true;
 		}
 		if (*link_up) {
 			links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
-			if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
+			if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP)
 				*link_up = true;
-			} else {
+			else
 				*link_up = false;
-			}
 		}
 	}
 	
@@ -7941,60 +7881,42 @@ s32 txgbe_check_mac_link(struct txgbe_hw *hw, u32 *speed,
 		(hw->phy.sfp_type == txgbe_sfp_type_10g_cu_core1)) {
 		*link_up = hw->f2c_mod_status;
 
-		if (*link_up) {	
+		if (*link_up)
 			/* recover led configure when link up */
 			wr32(hw, TXGBE_CFG_LED_CTL, 0);
-		} else {			
+		else
 			/* over write led when link down */
-			if (hw->mac.type == txgbe_mac_aml)
-				TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_AMLITE_LED_LINK_25G |
-					TXGBE_AMLITE_LED_LINK_10G | TXGBE_AMLITE_LED_LINK_ACTIVE);
-			else
-				TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_LED_LINK_10G |
-									   TXGBE_LED_LINK_1G | TXGBE_LED_LINK_ACTIVE);
-		}			
+			TCALL(hw, mac.ops.led_off, TXGBE_LED_LINK_UP | TXGBE_LED_LINK_10G |
+								   TXGBE_LED_LINK_1G | TXGBE_LED_LINK_ACTIVE);
 	}
 
 	if (*link_up) {
 		if (TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_copper  &&
 				 ((hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)) {
-			if ((value & 0xc000) == 0xc000) {
+			if ((value & 0xc000) == 0xc000)
 				*speed = TXGBE_LINK_SPEED_10GB_FULL;
-			} else if ((value & 0xc000) == 0x8000) {
+			else if ((value & 0xc000) == 0x8000)
 				*speed = TXGBE_LINK_SPEED_1GB_FULL;
-			} else if ((value & 0xc000) == 0x4000) {
+			else if ((value & 0xc000) == 0x4000)
 				*speed = TXGBE_LINK_SPEED_100_FULL;
-			} else if ((value & 0xc000) == 0x0000) {
+			else if ((value & 0xc000) == 0x0000)
 				*speed = TXGBE_LINK_SPEED_10_FULL;
-			}
 		} else {
-			if (hw->mac.type == txgbe_mac_aml40) {
-				if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==
-						TXGBE_CFG_PORT_ST_AML_LINK_40G)
-					*speed = TXGBE_LINK_SPEED_40GB_FULL;
-			} else if (hw->mac.type == txgbe_mac_aml) {
-				 if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) ==
-						TXGBE_CFG_PORT_ST_AML_LINK_25G) {
-					*speed = TXGBE_LINK_SPEED_25GB_FULL;
-				} else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_10G) ==
-						TXGBE_CFG_PORT_ST_AML_LINK_10G)
-					*speed = TXGBE_LINK_SPEED_10GB_FULL;
-			} else {
-				if ((links_reg & TXGBE_CFG_PORT_ST_LINK_10G) ==
-						TXGBE_CFG_PORT_ST_LINK_10G) {
-					*speed = TXGBE_LINK_SPEED_10GB_FULL;
-				} else if ((links_reg & TXGBE_CFG_PORT_ST_LINK_1G) ==
-						TXGBE_CFG_PORT_ST_LINK_1G){
-					*speed = TXGBE_LINK_SPEED_1GB_FULL;
-				} else if ((links_reg & TXGBE_CFG_PORT_ST_LINK_100M) ==
-						TXGBE_CFG_PORT_ST_LINK_100M){
-					*speed = TXGBE_LINK_SPEED_100_FULL;
-				} else
-					*speed = TXGBE_LINK_SPEED_10_FULL;
-			}
+			if ((links_reg & TXGBE_CFG_PORT_ST_LINK_10G) ==
+					TXGBE_CFG_PORT_ST_LINK_10G)
+				*speed = TXGBE_LINK_SPEED_10GB_FULL;
+			else if ((links_reg & TXGBE_CFG_PORT_ST_LINK_1G) ==
+					TXGBE_CFG_PORT_ST_LINK_1G)
+				*speed = TXGBE_LINK_SPEED_1GB_FULL;
+			else if ((links_reg & TXGBE_CFG_PORT_ST_LINK_100M) ==
+						TXGBE_CFG_PORT_ST_LINK_100M)
+				*speed = TXGBE_LINK_SPEED_100_FULL;
+			else
+				*speed = TXGBE_LINK_SPEED_10_FULL;
 		}
-	} else
+	} else {
 		*speed = TXGBE_LINK_SPEED_UNKNOWN;
+	}
 
 	return 0;
 }

@@ -499,13 +499,12 @@ s32 txgbe_identify_module(struct txgbe_hw *hw)
 	s32 status = TXGBE_ERR_SFP_NOT_PRESENT;
 
 	switch (TCALL(hw, mac.ops.get_media_type)) {
-	case txgbe_media_type_fiber:
-		if (hw->mac.type == txgbe_mac_aml40)
-			status = txgbe_identify_qsfp_module(hw);
-		else
-			status = txgbe_identify_sfp_module(hw);
+	case txgbe_media_type_fiber_qsfp:
+		status = txgbe_identify_qsfp_module(hw);
 		break;
-
+	case txgbe_media_type_fiber:
+		status = txgbe_identify_sfp_module(hw);
+		break;
 	default:
 		hw->phy.sfp_type = txgbe_sfp_type_not_present;
 		status = TXGBE_ERR_SFP_NOT_PRESENT;

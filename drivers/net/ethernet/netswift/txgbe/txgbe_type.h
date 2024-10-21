@@ -3005,6 +3005,7 @@ enum txgbe_sfp_type {
 enum txgbe_media_type {
 	txgbe_media_type_unknown = 0,
 	txgbe_media_type_fiber,
+	txgbe_media_type_fiber_qsfp,
 	txgbe_media_type_copper,
 	txgbe_media_type_backplane,
 	txgbe_media_type_virtual,
@@ -3213,6 +3214,7 @@ struct txgbe_mac_operations {
 	s32 (*stop_adapter)(struct txgbe_hw *);
 	s32 (*get_bus_info)(struct txgbe_hw *);
 	void (*set_lan_id)(struct txgbe_hw *);
+	s32 (*setup_sfp)(struct txgbe_hw *);
 	s32 (*enable_rx_dma)(struct txgbe_hw *, u32);
 	s32 (*disable_sec_rx_path)(struct txgbe_hw *);
 	s32 (*enable_sec_rx_path)(struct txgbe_hw *);
@@ -3281,6 +3283,7 @@ struct txgbe_mac_operations {
 struct txgbe_phy_operations {
 	s32 (*identify)(struct txgbe_hw *);
 	s32 (*identify_sfp)(struct txgbe_hw *);
+	s32 (*setup_sfp)(struct txgbe_hw *);
 	s32 (*init)(struct txgbe_hw *);
 	s32 (*reset)(struct txgbe_hw *);
 	s32 (*read_reg)(struct txgbe_hw *, u32, u32, u16 *);

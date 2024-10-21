@@ -255,22 +255,23 @@ void txgbe_atr_compute_perfect_hash(union txgbe_atr_input *input,
 u32 txgbe_atr_compute_sig_hash(union txgbe_atr_hash_dword input,
 				     union txgbe_atr_hash_dword common);
 
-s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
+s32 txgbe_get_link_capabilities_sp(struct txgbe_hw *hw,
 				      u32 *speed, bool *autoneg);
-enum txgbe_media_type txgbe_get_media_type(struct txgbe_hw *hw);
+enum txgbe_media_type txgbe_get_media_type_sp(struct txgbe_hw *hw);
 void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw);
 void txgbe_enable_tx_laser_multispeed_fiber(struct txgbe_hw *hw);
 void txgbe_flap_tx_laser_multispeed_fiber(struct txgbe_hw *hw);
 void txgbe_set_hard_rate_select_speed(struct txgbe_hw *hw,
 					u32 speed);
-s32 txgbe_setup_mac_link(struct txgbe_hw *hw, u32 speed,
+int txgbe_init_shared_code(struct txgbe_hw *hw);
+s32 txgbe_setup_mac_link_sp(struct txgbe_hw *hw, u32 speed,
 			       bool autoneg_wait_to_complete);
-void txgbe_init_mac_link_ops(struct txgbe_hw *hw);
+void txgbe_init_mac_link_ops_sp(struct txgbe_hw *hw);
 s32 txgbe_reset_hw(struct txgbe_hw *hw);
 s32 txgbe_identify_phy(struct txgbe_hw *hw);
-s32 txgbe_init_phy_ops(struct txgbe_hw *hw);
+s32 txgbe_init_phy_ops_sp(struct txgbe_hw *hw);
 s32 txgbe_enable_rx_dma(struct txgbe_hw *hw, u32 regval);
-s32 txgbe_init_ops(struct txgbe_hw *hw);
+s32 txgbe_init_ops_generic(struct txgbe_hw *hw);
 s32 txgbe_setup_eee(struct txgbe_hw *hw, bool enable_eee);
 
 s32 txgbe_init_flash_params(struct txgbe_hw *hw);
@@ -321,5 +322,8 @@ int txgbe_is_lldp(struct txgbe_hw *hw);
 s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw);
 int txgbe_set_pps(struct txgbe_hw *hw, bool enable, u64 nsec, u64 cycles);
 s32 txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg);
+
+extern s32 txgbe_init_ops_aml(struct txgbe_hw *hw);
+extern s32 txgbe_init_ops_aml40(struct txgbe_hw *hw);
 
 #endif /* _TXGBE_HW_H_ */

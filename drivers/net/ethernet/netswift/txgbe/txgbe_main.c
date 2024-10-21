@@ -7538,23 +7538,6 @@ void txgbe_down(struct txgbe_adapter *adapter)
 }
 
 /**
- *  txgbe_init_shared_code - Initialize the shared code
- *  @hw: pointer to hardware structure
- *
- *  This will assign function pointers and assign the MAC type and PHY code.
- *  Does not touch the hardware. This function must be called prior to any
- *  other function in the shared code. The txgbe_hw structure should be
- *  memset to 0 prior to calling this function.  The following fields in
- *  hw structure should be filled in prior to calling this function:
- *  hw_addr, back, device_id, vendor_id, subsystem_device_id,
- *  subsystem_vendor_id, and revision_id
- **/
-static int txgbe_init_shared_code(struct txgbe_hw *hw)
-{
-	return txgbe_init_ops(hw);
-}
-
-/**
  * txgbe_sw_init - Initialize general software structures (struct txgbe_adapter)
  * @adapter: board private structure to initialize
  *
@@ -7567,28 +7550,6 @@ static const u32 def_rss_key[10] = {
 	0xA54F2BEC, 0xEA49AF7C, 0xE214AD3D, 0xB855AABE,
 	0x6A3E67EA, 0x14364D17, 0x3BED200D
 };
-
-static void txgbe_init_type_code(struct txgbe_hw *hw)
-{
-	switch (hw->device_id) {
-	case TXGBE_DEV_ID_SP1000:
-	case TXGBE_DEV_ID_WX1820:
-		hw->mac.type = txgbe_mac_sp;
-		break;
-	case TXGBE_DEV_ID_AML:
-	case TXGBE_DEV_ID_AML5025:
-	case TXGBE_DEV_ID_AML5125:
-		hw->mac.type = txgbe_mac_aml;
-		break;
-	case TXGBE_DEV_ID_AML5040:
-	case TXGBE_DEV_ID_AML5140:
-		hw->mac.type = txgbe_mac_aml40;
-		break;
-	default:
-		hw->mac.type = txgbe_mac_unknown;
-		break;
-	}
-}
 
 static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 {
@@ -7694,7 +7655,6 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->dcb_cfg.num_tcs.pg_tcs = 8;
 	adapter->dcb_cfg.num_tcs.pfc_tcs = 8;
 
-	txgbe_init_type_code(hw);
 
 	/* Configure DCB traffic classes */
 	bwg_pct = 100 / adapter->dcb_cfg.num_tcs.pg_tcs;
@@ -9438,7 +9398,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	struct txgbe_mac_info *mac = &hw->mac;
 	u32 value = 0;
 	s32 err;
 
@@ -9499,17 +9458,7 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 
 	adapter->flags2 &= ~TXGBE_FLAG2_SFP_NEEDS_RESET;
 
-	if (hw->phy.multispeed_fiber) {
-		/* Set up dual speed SFP+ support */
-		mac->ops.setup_link = txgbe_setup_mac_link_multispeed_fiber;
-		mac->ops.setup_mac_link = txgbe_setup_mac_link;
-		mac->ops.set_rate_select_speed =
-					       txgbe_set_hard_rate_select_speed;
-	} else {
-		mac->ops.setup_link = txgbe_setup_mac_link;
-		mac->ops.set_rate_select_speed =
-					       txgbe_set_hard_rate_select_speed;
-	}
+	err = hw->mac.ops.setup_sfp(hw);
 
 	hw->phy.autoneg_advertised = 0;
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
@@ -9558,7 +9507,7 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 	}
 
 	if (device_type == TXGBE_ID_MAC_XAUI ||
-	   (txgbe_get_media_type(hw) == txgbe_media_type_copper &&
+	   (TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_copper &&
 	   device_type == TXGBE_ID_SFI_XAUI)) {
 		speed = TXGBE_LINK_SPEED_10GB_FULL;
 	} else if (device_type == TXGBE_ID_MAC_SGMII) {
