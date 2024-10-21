@@ -3687,15 +3687,11 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	status = txgbe_e56_config_rx(hw, speed);
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-		value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
-		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
-		SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
-		txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, value);
-	}
+
+	value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
+	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
+	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
+	txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, value);
 
 	if (hw->mac.type == txgbe_mac_aml40) {
 		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR,

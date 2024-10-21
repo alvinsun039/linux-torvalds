@@ -5848,19 +5848,16 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 
 		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
-			adapter->phy_retry = 3;
-			for (i = 0; i < adapter->phy_retry; i++) {
 				TCALL(hw, mac.ops.check_link,
 						&link_speed, &link_up, false);
 				if (link_up)
-					break;
+					goto out;
 
 				/* this ret_status for workaorund not return to upper*/
 				ret_status = txgbe_e56_reconfig_rx(hw, speed);
 
 				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-					break;
-			}
+					goto out;
 		}
 		mutex_unlock(&adapter->e56_lock);
 
