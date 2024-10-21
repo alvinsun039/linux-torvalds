@@ -374,6 +374,8 @@ __cold int io_uring_mmap(struct file *file, struct vm_area_struct *vma)
 	long offset = vma->vm_pgoff << PAGE_SHIFT;
 	void *ptr;
 
+	guard(mutex)(&ctx->resize_lock);
+
 	ptr = io_uring_validate_mmap_request(file, vma->vm_pgoff, sz);
 	if (IS_ERR(ptr))
 		return PTR_ERR(ptr);
@@ -397,6 +399,7 @@ unsigned long io_uring_get_unmapped_area(struct file *filp, unsigned long addr,
 					 unsigned long len, unsigned long pgoff,
 					 unsigned long flags)
 {
+	struct io_ring_ctx *ctx = filp->private_data;
 	void *ptr;
 
 	/*
@@ -406,6 +409,8 @@ unsigned long io_uring_get_unmapped_area(struct file *filp, unsigned long addr,
 	 */
 	if (addr)
 		return -EINVAL;
+
+	guard(mutex)(&ctx->resize_lock);
 
 	ptr = io_uring_validate_mmap_request(filp, pgoff, len);
 	if (IS_ERR(ptr))
@@ -452,7 +457,10 @@ unsigned long io_uring_get_unmapped_area(struct file *file, unsigned long addr,
 					 unsigned long len, unsigned long pgoff,
 					 unsigned long flags)
 {
+	struct io_ring_ctx *ctx = file->private_data;
 	void *ptr;
+
+	guard(mutex)(&ctx->resize_lock);
 
 	ptr = io_uring_validate_mmap_request(file, pgoff, len);
 	if (IS_ERR(ptr))
