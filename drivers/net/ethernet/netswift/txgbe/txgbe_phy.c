@@ -623,6 +623,11 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.sfp_type =
 						     txgbe_sfp_type_da_cu_core1;
 
+				if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+					hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+					hw->dac_sfp = true;
+				}
+
 				if (comp_codes_25g == TXGBE_SFF_25GBASECR_91FEC ||
 					comp_codes_25g == TXGBE_SFF_25GBASECR_74FEC ||
 					comp_codes_25g == TXGBE_SFF_25GBASECR_NOFEC) {
@@ -643,6 +648,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					}
 				}
 			} else if (cable_tech & TXGBE_SFF_DA_ACTIVE_CABLE) {
+				hw->dac_sfp = false;
 				TCALL(hw, phy.ops.read_i2c_eeprom,
 						TXGBE_SFF_CABLE_SPEC_COMP,
 						&cable_spec);

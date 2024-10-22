@@ -3721,16 +3721,8 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		if (hw->mac.type == txgbe_mac_aml) {
 			txgbe_service_event_schedule(adapter);
 		} else {
-			if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
-				value = txgbe_rd32_epcs(hw, 0x78002);
-				value = value & 0x4;
-				if (value == 0x4) {
-					if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
-						adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-						txgbe_service_event_schedule(adapter);
-					}
-				}
-			}
+			if (adapter->backplane_an == 1 && (KR_POLLING == 0))
+				txgbe_service_event_schedule(adapter);
 		}
 	}
 
@@ -4043,12 +4035,8 @@ static irqreturn_t txgbe_intr(int __always_unused irq, void *data)
 	
 	eicr_misc = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
 	if (eicr_misc & TXGBE_PX_MISC_IC_ETH_AN) {
-		if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
-			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
-				adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-				txgbe_service_event_schedule(adapter);
-			}
-		}
+		if (adapter->backplane_an == 1 && (KR_POLLING == 0))
+			txgbe_service_event_schedule(adapter);
 	}
 
 	if(BOND_CHECK_LINK_MODE == 1){
@@ -9146,18 +9134,18 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	adapter->link_up = false;
 	adapter->link_speed = 0;
 
-	if ( hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
-	    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
-	    hw->dac_sfp) {
-		txgbe_bp_down_event(adapter);
-	}
+	if (hw->mac.type == txgbe_mac_sp)
+		if (hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
+		    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
+		    hw->dac_sfp)
+			txgbe_bp_down_event(adapter);
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
-		txgbe_e65_bp_down_event(adapter);
-	}
+	if (hw->mac.type == txgbe_mac_aml)
+		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1)
+			txgbe_e65_bp_down_event(adapter);
 
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
@@ -9312,17 +9300,17 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	    test_bit(__TXGBE_RESETTING, &adapter->state))
 		return;
 
-	if (hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
-	    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
-	    hw->dac_sfp) {
-		txgbe_bp_watchdog_event(adapter);
-	}
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
-		txgbe_e56_bp_watchdog_event(adapter);
-	}
+	if (hw->mac.type == txgbe_mac_sp)
+		if (hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
+		    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
+		    hw->dac_sfp)
+			txgbe_bp_watchdog_event(adapter);
+	if (hw->mac.type == txgbe_mac_sp)
+		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1)
+			txgbe_e56_bp_watchdog_event(adapter);
 
 #ifndef POLL_LINK_STATUS
 	if(BOND_CHECK_LINK_MODE == 1){

@@ -5027,6 +5027,7 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
 		value = txgbe_rd32_epcs(hw, TXGBE_PHY_TX_EQ_CTL1);
 		value &= ~0x40;
+		value |= BIT(8);
 		txgbe_wr32_epcs(hw, 0x18037, value);
 	} else {
 		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x0);
