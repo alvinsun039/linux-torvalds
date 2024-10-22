@@ -1068,8 +1068,9 @@ static int txgbe_update_vf_xcast_mode(struct txgbe_adapter *adapter,
 		enable = TXGBE_PSR_VM_L2CTL_BAM | TXGBE_PSR_VM_L2CTL_ROMPE;
 		break;
 	case TXGBEVF_XCAST_MODE_ALLMULTI:
-		disable = TXGBE_PSR_VM_L2CTL_UPE | TXGBE_PSR_VM_L2CTL_VPE;
-		enable = TXGBE_PSR_VM_L2CTL_BAM | TXGBE_PSR_VM_L2CTL_ROMPE | TXGBE_PSR_VM_L2CTL_MPE;
+		disable = TXGBE_PSR_VM_L2CTL_UPE;
+		enable = TXGBE_PSR_VM_L2CTL_BAM | TXGBE_PSR_VM_L2CTL_ROMPE |
+			 TXGBE_PSR_VM_L2CTL_MPE | TXGBE_PSR_VM_L2CTL_VPE;
 		break;
 	case TXGBEVF_XCAST_MODE_PROMISC:
 		disable = 0;
