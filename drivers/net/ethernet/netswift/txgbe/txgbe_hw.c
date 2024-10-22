@@ -5844,8 +5844,11 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 		}
 
 		mutex_lock(&adapter->e56_lock);
-		if (speed != link_speed || !adapter->phy_tx_ready)
+		if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
+			adapter->tx_speed = speed;
+		}
+		mutex_unlock(&adapter->e56_lock);
 
 		if (ret_status != TXGBE_ERR_PHY_INIT_NOT_DONE) {
 				TCALL(hw, mac.ops.check_link,
@@ -5853,13 +5856,14 @@ s32 txgbe_setup_mac_link(struct txgbe_hw *hw,
 				if (link_up)
 					goto out;
 
+				mutex_lock(&adapter->e56_lock);
 				/* this ret_status for workaorund not return to upper*/
 				ret_status = txgbe_e56_reconfig_rx(hw, speed);
+				mutex_unlock(&adapter->e56_lock);
 
 				if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
 					goto out;
 		}
-		mutex_unlock(&adapter->e56_lock);
 
 		do {
 			if (!(adapter->fec_link_mode & BIT(j)) &&
