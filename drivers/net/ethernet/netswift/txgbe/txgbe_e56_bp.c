@@ -2399,27 +2399,16 @@ static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter)
 	rdata = txgbe_rd32_epcs(hw, 0x70014);
 	kr_dbg(KR_MODE, "read 70014 data %0x\n", rdata);
 	rdata = txgbe_rd32_epcs(hw, 0x70015);
-	switch (rdata) {
-	case TXGBE_10G_FEC_ABL:
-		adapter->fec_mode = TXGBE_10G_FEC_ABL;
-		break;
-	case TXGBE_25G_BASE_FEC_REQ:
-		adapter->fec_mode = TXGBE_25G_BASE_FEC_REQ;
-		break;
-	case TXGBE_25G_RS_FEC_REQ:
-		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ;
-		break;
-	case TXGBE_25G_BASE_FEC_REQ | TXGBE_25G_RS_FEC_REQ:
-		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ |
-				    TXGBE_25G_BASE_FEC_REQ;
-		break;
-	case TXGBE_10G_FEC_ABL | TXGBE_25G_RS_FEC_REQ:
-		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ | TXGBE_10G_FEC_ABL;
-		break;
-	default:
-		adapter->fec_mode = 0;
-		break;
-	}
+
+	adapter->fec_mode = 0;
+	if (rdata & TXGBE_25G_RS_FEC_REQ)
+		adapter->fec_mode |= TXGBE_25G_RS_FEC_REQ;
+	if (rdata & TXGBE_25G_BASE_FEC_REQ)
+		adapter->fec_mode |= TXGBE_25G_BASE_FEC_REQ;
+	if (rdata & TXGBE_10G_FEC_ABL)
+		adapter->fec_mode |= TXGBE_10G_FEC_ABL;
+	if (rdata & TXGBE_10G_FEC_REQ)
+		adapter->fec_mode |= TXGBE_10G_FEC_REQ;
 
 	kr_dbg(KR_MODE, "read 70015 data %0x\n", rdata);
 	rdata = txgbe_rd32_epcs(hw, 0x70016);
@@ -2517,16 +2506,8 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 
 	/* wait rx/tx/cm powerdn_st */
 	msleep(20);
-	switch (adapter->fec_mode) {
-	case TXGBE_25G_BASE_FEC_REQ:
-		/* FEC: FC-FEC/BASE-R */
-		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
-		e_dev_info("Advertised FEC modes : %s\n", "BASE-R");
-		break;
-	case TXGBE_10G_FEC_ABL | TXGBE_25G_RS_FEC_REQ:
-	case TXGBE_25G_BASE_FEC_REQ | TXGBE_25G_RS_FEC_REQ:
-	case TXGBE_25G_RS_FEC_REQ:
+
+	if (adapter->fec_mode & TXGBE_25G_RS_FEC_REQ) {
 		txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a3,
 		       0x68c1);
@@ -2549,10 +2530,16 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100c8,
 		       rdata);
 		e_dev_info("Advertised FEC modes : %s\n", "RS-FEC");
-		break;
-	default:
+		adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
+	} else if (adapter->fec_mode & TXGBE_25G_BASE_FEC_REQ) {
+		/* FEC: FC-FEC/BASE-R */
+		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
+		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
+		e_dev_info("Advertised FEC modes : %s\n", "BASE-R");
+		adapter->cur_fec_link = TXGBE_PHY_FEC_BASER;
+	} else {
 		e_dev_info("Advertised FEC modes : %s\n", "NONE");
-		break;
+		adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 	}
 
 	kr_dbg(KR_MODE, "2.3 Wait 25G KR phy mode init ....\n");
