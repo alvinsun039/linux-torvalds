@@ -8794,6 +8794,14 @@ void txgbe_update_stats(struct txgbe_adapter *adapter)
 	bprc = rd32(hw, TXGBE_RX_BC_FRAMES_GOOD_LOW);
 	hwstats->bprc += bprc;
 	hwstats->mprc = 0;
+	hwstats->rdpc += rd32(hw, TXGBE_RDB_PKT_CNT);
+	hwstats->rddc += rd32(hw, TXGBE_RDB_DRP_CNT);
+	hwstats->psrpc += rd32(hw, TXGBE_PSR_PKT_CNT);
+	hwstats->psrdc += rd32(hw, TXGBE_PSR_DBG_DRP_CNT);
+	hwstats->untag += rd32(hw, TXGBE_RSEC_LSEC_UNTAG_PKT);
+	hwstats->tdmpc += rd32(hw, TXGBE_TDM_PKT_CNT);
+	hwstats->tdmdc += rd32(hw, TXGBE_TDM_DRP_CNT);
+	hwstats->tdbpc += rd32(hw, TXGBE_TDB_OUT_PKT_CNT);
 
 	for (i = 0; i < 128; i++)
 		hwstats->mprc += rd32(hw, TXGBE_PX_MPRC(i));

@@ -915,6 +915,7 @@ struct txgbe_thermal_sensor_data {
 /* etag */
 #define TXGBE_TDM_ETAG_INS(_i)  (0x18700 + ((_i) * 4)) /* 64 of these 0 - 63 */
 /* statistic */
+#define TXGBE_TDM_DRP_CNT       0x18300
 #define TXGBE_TDM_SEC_DRP       0x18304
 #define TXGBE_TDM_PKT_CNT       0x18308
 #define TXGBE_TDM_OS2BMC_CNT    0x18314
@@ -1023,6 +1024,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_RDB_FCRE_TBL_RING(_v) (((_v) & 0x7F)) /* output queue number */
 /* statistic */
 #define TXGBE_RDB_MPCNT(_i)         (0x19040 + ((_i) * 4)) /* 8 of 3FA0-3FBC*/
+#define TXGBE_RDB_PKT_CNT           0x19060
+#define TXGBE_RDB_DRP_CNT           0x19068
 #define TXGBE_RDB_LXONTXC           0x1921C
 #define TXGBE_RDB_LXOFFTXC          0x19218
 #define TXGBE_RDB_PXON2OFFCNT(_i)   (0x19280 + ((_i) * 4)) /* 8 of these */
@@ -1202,6 +1205,8 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_PSR_CTL                   0x15000
 #define TXGBE_PSR_VLAN_CTL              0x15088
 #define TXGBE_PSR_VM_CTL                0x151B0
+#define TXGBE_PSR_PKT_CNT               0x151B8
+#define TXGBE_PSR_DBG_DRP_CNT           0x151C0
 /* Header split receive */
 #define TXGBE_PSR_CTL_SW_EN             0x00040000U
 #define TXGBE_PSR_CTL_RSC_DIS           0x00010000U
@@ -1460,6 +1465,9 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_TXPKT_SIZE_MAX    0xA /* Max Tx Packet size */
 #define TXGBE_MAX_PB            8
 
+/* statistic */
+#define TXGBE_TDB_OUT_PKT_CNT           0x1CF00
+
 /****************************** TSEC *****************************************/
 /* Security Control Registers */
 #define TXGBE_TSC_CTL                   0x1D000
@@ -1580,8 +1588,8 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_RSC_LSEC_PKNUM1           0x1721C
 #define TXGBE_RSC_LSEC_KEY0(_n)         0x17220
 #define TXGBE_RSC_LSEC_KEY1(_n)         0x17230
-#define TXGBE_RSC_LSEC_UNTAG_PKT        0x17240
-#define TXGBE_RSC_LSEC_DEC_OCTET        0x17244
+#define TXGBE_RSEC_LSEC_UNTAG_PKT        0x17240
+#define TXGBE_RSC_LSEC_DEC_OCTET       0x17244
 #define TXGBE_RSC_LSEC_VLD_OCTET        0x17248
 #define TXGBE_RSC_LSEC_BAD_PKT          0x1724C
 #define TXGBE_RSC_LSEC_NOSCI_PKT        0x17250
@@ -3123,6 +3131,14 @@ struct txgbe_hw_stats {
 	u64 gprc;
 	u64 bprc;
 	u64 mprc;
+	u64 rdpc;
+	u64 rddc;
+	u64 psrpc;
+	u64 psrdc;
+	u64 untag;
+	u64 tdmpc;
+	u64 tdmdc;
+	u64 tdbpc;
 	u64 gptc;
 	u64 gorc;
 	u64 gotc;
