@@ -96,7 +96,7 @@ int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 	return 0;
 }
 
-u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
+static u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 {
 	u32 addr;
 	u32 rdata = 0;
@@ -1882,7 +1882,7 @@ static int compare(const void *a, const void *b)
 		return 0;
 	}
 }
-int E56phyRxRdSecondCode40g(struct txgbe_hw *hw, int *SECOND_CODE, int lane)
+static int E56phyRxRdSecondCode40g(struct txgbe_hw *hw, int *SECOND_CODE, int lane)
 {
 	int status = 0, i, N, median;
 	unsigned int rdata;

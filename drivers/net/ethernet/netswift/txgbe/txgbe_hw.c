@@ -4399,7 +4399,7 @@ init_phy_ops_out:
 	return ret_val;
 }
 
-s32 txgbe_setup_sfp_modules_sp(struct txgbe_hw *hw)
+static s32 txgbe_setup_sfp_modules_sp(struct txgbe_hw *hw)
 {
 	s32 ret_val = 0;
 
@@ -4421,7 +4421,7 @@ s32 txgbe_setup_sfp_modules_sp(struct txgbe_hw *hw)
  *  Does not touch the hardware.
  **/
 
-s32 txgbe_init_ops_sp(struct txgbe_hw *hw)
+static s32 txgbe_init_ops_sp(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
 	struct txgbe_phy_info *phy = &hw->phy;

@@ -13,7 +13,7 @@
  *
  *  Returns the media type (fiber, copper, backplane)
  **/
-enum txgbe_media_type txgbe_get_media_type_aml(struct txgbe_hw *hw)
+static enum txgbe_media_type txgbe_get_media_type_aml(struct txgbe_hw *hw)
 {
 	return txgbe_media_type_fiber;
 }
@@ -26,7 +26,7 @@ enum txgbe_media_type txgbe_get_media_type_aml(struct txgbe_hw *hw)
  *
  *  Set the link speed in the AUTOC register and restarts link.
  **/
-s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
+static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 			       u32 speed,
 			       bool autoneg_wait_to_complete)
 {
@@ -193,7 +193,7 @@ out:
  *
  *  Determines the link capabilities by reading the AUTOC register.
  **/
-s32 txgbe_get_link_capabilities_aml(struct txgbe_hw *hw,
+static s32 txgbe_get_link_capabilities_aml(struct txgbe_hw *hw,
 				      u32 *speed,
 				      bool *autoneg)
 {
@@ -242,7 +242,7 @@ s32 txgbe_get_link_capabilities_aml(struct txgbe_hw *hw,
  *
  *  Reads the links register to determine if link is up and the current speed
  **/
-s32 txgbe_check_mac_link_aml(struct txgbe_hw *hw, u32 *speed,
+static s32 txgbe_check_mac_link_aml(struct txgbe_hw *hw, u32 *speed,
 				bool *link_up, bool link_up_wait_to_complete)
 {
 	u32 links_reg = 0;
@@ -305,7 +305,7 @@ s32 txgbe_check_mac_link_aml(struct txgbe_hw *hw, u32 *speed,
  *
  *  Set the link speed in the MAC and/or PHY register and restarts link.
  **/
-s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
+static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 					  u32 speed,
 					  bool autoneg_wait_to_complete)
 {
@@ -439,7 +439,7 @@ out:
 }
 
 
-void txgbe_init_mac_link_ops_aml(struct txgbe_hw *hw)
+static void txgbe_init_mac_link_ops_aml(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
 
@@ -464,7 +464,7 @@ void txgbe_init_mac_link_ops_aml(struct txgbe_hw *hw)
 	}
 }
 
-s32 txgbe_setup_sfp_modules_aml(struct txgbe_hw *hw)
+static s32 txgbe_setup_sfp_modules_aml(struct txgbe_hw *hw)
 {
 	s32 ret_val = 0;
 
@@ -488,7 +488,7 @@ s32 txgbe_setup_sfp_modules_aml(struct txgbe_hw *hw)
  *  not known.  Perform the SFP init if necessary.
  *
  **/
-s32 txgbe_init_phy_ops_aml(struct txgbe_hw *hw)
+static s32 txgbe_init_phy_ops_aml(struct txgbe_hw *hw)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	s32 ret_val = 0;

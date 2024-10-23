@@ -3688,7 +3688,7 @@ static void txgbe_tx_ring_recovery(struct txgbe_adapter *adapter)
 		}
 	}
 }
-
+#if 0 //fix compile warnning, unused code now
 void txgbe_dev_save_tx_queue(struct txgbe_hw *hw, uint16_t tx_queue_id)
 {
 	u32 *reg = &hw->q_tx_regs[tx_queue_id * 8];
@@ -3706,7 +3706,7 @@ void txgbe_dev_store_tx_queue(struct txgbe_hw *hw, uint16_t tx_queue_id)
 	wr32(hw, TXGBE_PX_TR_BAH(tx_queue_id), *(reg++));
 	wr32(hw, TXGBE_PX_TR_CFG(tx_queue_id), *(reg++) & ~TXGBE_PX_TR_CFG_ENABLE);
 }
-
+#endif
 static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 {
 	struct txgbe_adapter *adapter = data;
