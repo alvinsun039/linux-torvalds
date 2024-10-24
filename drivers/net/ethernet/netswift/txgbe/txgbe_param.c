@@ -831,7 +831,8 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 			.arg  = { .r = { .min = 0,
 					 .max = 1} }
 		};
-		u32 rss = RSS[bd];
+		u32 rss = min_t(int, txgbe_max_rss_indices(adapter),
+				    num_online_cpus());
 		/* adjust Max allowed RSS queues based on MAC type */
 		opt.arg.r.max = min_t(int, txgbe_max_rss_indices(adapter),
 						     num_online_cpus());
@@ -839,6 +840,7 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 #ifdef module_param_array
 		if (num_RSS > bd) {
 #endif
+			rss = RSS[bd];
 			txgbe_validate_option(&rss, &opt);
 			/* base it off num_online_cpus() with hardware limit */
 			if (!rss)
