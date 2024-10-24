@@ -1956,7 +1956,7 @@ int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE)
 //ious time this sequence was run. It is recommended to call this sequence periodically (eg: once every 100ms) or trigger
 // sequence if the temperature drifts by >=5degC. Temperature must be read from an on-die temperature sensor.
 //--------------------------------------------------------------
-static int E56phyRxsPostCdrLockTempTrackSeq40G(struct txgbe_hw *hw, u32 speed)
+int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0;
 	unsigned int rdata;
@@ -2176,7 +2176,7 @@ static int E56phyRxsPostCdrLockTempTrackSeq40G(struct txgbe_hw *hw, u32 speed)
 //ious time this sequence was run. It is recommended to call this sequence periodically (eg: once every 100ms) or trigger
 // sequence if the temperature drifts by >=5degC. Temperature must be read from an on-die temperature sensor.
 //--------------------------------------------------------------
-static int E56phyRxsPostCdrLockTempTrackSeq(struct txgbe_hw *hw, u32 speed)
+int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed)
 {
 	int status = 0;
 	unsigned int rdata;
@@ -3294,7 +3294,7 @@ static int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed)
 	E56phySetRxsUfineLeMax40G(hw, speed);
 
 	//2.3.4 RXS post CDR lock temperature tracking sequence
-	E56phyRxsPostCdrLockTempTrackSeq40G(hw, speed);
+	txgbe_temp_track_seq_40g(hw, speed);
 
 	return 0;
 }
@@ -3311,7 +3311,7 @@ static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 	E56phySetRxsUfineLeMax(hw, speed);
 
 	//2.3.4 RXS post CDR lock temperature tracking sequence
-	E56phyRxsPostCdrLockTempTrackSeq(hw, speed);
+	txgbe_temp_track_seq(hw, speed);
 
 	return 0;
 }
@@ -3427,6 +3427,8 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	value = txgbe_rd32_epcs(hw, SR_AN_CTRL);
 	SetFields(&value, 12, 12, 0);
 	txgbe_wr32_epcs(hw, SR_AN_CTRL, value);
+
+	adapter->aml_temp_speed = speed;
 
 	if (speed == TXGBE_LINK_SPEED_40GB_FULL) {
 		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL1);

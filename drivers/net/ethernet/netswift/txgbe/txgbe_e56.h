@@ -1637,5 +1637,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
 u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw);
 int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed);
+int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed);
+int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed);
 
 #endif /* _TXGBE_E56_H_ */

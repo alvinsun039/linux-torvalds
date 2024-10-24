@@ -9689,12 +9689,16 @@ static void txgbe_amlit_temp_work(struct work_struct *work)
 	if (status)
 		temp = DEFAULT_TEMP;
 
-	if (!(temp - adapter->amlite_temp > 5 ||
-		adapter->amlite_temp - temp > 5))
+	if (!(temp - adapter->amlite_temp > 4 ||
+		adapter->amlite_temp - temp > 4))
 		return;
 
+	adapter->amlite_temp = temp;
 	mutex_lock(&adapter->e56_lock);
-	txgbe_e56_cfg_temp(hw);
+	if (hw->mac.type == txgbe_mac_aml)
+		txgbe_temp_track_seq(hw, adapter->aml_temp_speed);
+	else if (hw->mac.type == txgbe_mac_aml40)
+		txgbe_temp_track_seq_40g(hw, adapter->aml_temp_speed);
 	mutex_unlock(&adapter->e56_lock);
 
 }
