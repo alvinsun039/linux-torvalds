@@ -155,7 +155,7 @@ static void hns_roce_mr_free(struct hns_roce_dev *hr_dev, struct hns_roce_mr *mr
 					      (hr_dev->caps.num_mtpts - 1));
 		if (ret)
 			ibdev_warn_ratelimited(ibdev, "failed to destroy mpt, ret = %d.\n",
-				   ret);
+					       ret);
 		if (ret == -EBUSY)
 			mr->delayed_destroy_flag = true;
 	}
