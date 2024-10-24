@@ -726,6 +726,115 @@ typedef union {
 //-----MACRO defines for Register:E56G__RXS0_ANA_OVRDEN_2
 #define E56G__RXS0_ANA_OVRDEN_2_ADDR (E56G__BASEADDR + 0x94)
 
+//-----Access structure typedef for Register:E56G__RXS0_ANA_OVRDEN_3
+typedef union {
+	struct {
+		u32 ovrd_en_ana_adc_offset_i : 1;
+		u32 ovrd_en_ana_adc_slice_addr_i : 1;
+		u32 ovrd_en_ana_slice_wr_i : 1;
+		u32 ovrd_en_ana_test_adc_i : 1;
+		u32 ovrd_en_ana_test_adc_o : 1;
+		u32 ovrd_en_ana_spare_o : 8;
+		u32 ovrd_en_ana_sel_lpbk_i : 1;
+		u32 ovrd_en_ana_ana_debug_sel_i : 1;
+		u32 ovrd_en_ana_anabs_config_i : 1;
+		u32 ovrd_en_ana_en_anabs_i : 1;
+		u32 ovrd_en_ana_anabs_rxn_o : 1;
+		u32 ovrd_en_ana_anabs_rxp_o : 1;
+		u32 ovrd_en_ana_dser_clk_en_i : 1;
+		u32 ovrd_en_ana_dser_clk_config_i : 1;
+		u32 ovrd_en_ana_en_mmcdr_clk_obs_i : 1;
+		u32 ovrd_en_ana_skew_coarse0_fine1_i : 1;
+		u32 ovrd_en_ana_vddinoff_acore_dig_o : 1;
+		u32 ovrd_en_ana_vddinoff_dcore_dig_o : 1;
+		u32 ovrd_en_ana_vga2_boost_cstm_i : 1;
+		u32 ovrd_en_ana_adc_sel_vbgr_bias_i : 1;
+		u32 ovrd_en_ana_adc_nbuf_cnfg_i : 1;
+		u32 ovrd_en_ana_adc_pbuf_cnfg_i : 1;
+		u32 rsvd0 : 3;
+	};
+	u32 reg;
+} E56G__RXS0_ANA_OVRDEN_3;
+//-----MACRO defines for Register:E56G__RXS0_ANA_OVRDEN_3
+#define E56G__RXS0_ANA_OVRDEN_3_NUM 1
+#define E56G__RXS0_ANA_OVRDEN_3_ADDR (E56G__BASEADDR + 0x98)
+
+//-----Access structure typedef for Register:E56G__RXS0_RXS_CFG_0
+typedef union {
+	struct {
+		u32 pam4_ab_swap_en : 1;
+		u32 dser_data_sel : 1;
+		u32 signal_type : 1;
+		u32 precode_en : 1;
+		u32 train_clk_gate_bypass_en : 14;
+		u32 rsvd0 : 14;
+	};
+	u32 reg;
+} E56G__RXS0_RXS_CFG_0;
+//-----MACRO defines for Register:E56G__RXS0_RXS_CFG_0
+#define E56G__RXS0_RXS_CFG_0_NUM 1
+#define E56G__RXS0_RXS_CFG_0_ADDR (E56G__BASEADDR + 0x0)
+
+//-----Access structure typedef for Register:E56G__PMD_BASER_PMD_CONTROL
+typedef union {
+	struct {
+		u32 restart_training_ln0 : 1;
+		u32 training_enable_ln0 : 1;
+		u32 restart_training_ln1 : 1;
+		u32 training_enable_ln1 : 1;
+		u32 restart_training_ln2 : 1;
+		u32 training_enable_ln2 : 1;
+		u32 restart_training_ln3 : 1;
+		u32 training_enable_ln3 : 1;
+		u32 rsvd0 : 24;
+	};
+	u32 reg;
+} E56G__PMD_BASER_PMD_CONTROL;
+//-----MACRO defines for Register:E56G__PMD_BASER_PMD_CONTROL
+#define E56G__PMD_BASER_PMD_CONTROL_NUM 1
+#define E56G__PMD_BASER_PMD_CONTROL_ADDR (E56G__BASEADDR + 0x1640)
+
+//-----Access structure typedef for Register:E56G__PMD_PMD_CFG_5
+typedef union {
+	struct {
+		u32 rx_to_tx_lpbk_en : 4;
+		u32 sel_wp_pmt_out : 4;
+		u32 sel_wp_pmt_clkout : 4;
+		u32 use_recent_marker_offset : 1;
+		u32 interrupt_debug_mode : 1;
+		u32 rsvd0 : 2;
+		u32 tx_ffe_coeff_update : 4;
+		u32 rsvd1 : 12;
+	};
+	u32 reg;
+} E56G__PMD_PMD_CFG_5;
+//-----MACRO defines for Register:E56G__PMD_PMD_CFG_5
+#define E56G__PMD_PMD_CFG_5_NUM 1
+#define E56G__PMD_PMD_CFG_5_ADDR (E56G__BASEADDR + 0x1414)
+
+//-----Access structure typedef for Register:E56G__PMD_PMD_CFG_0
+typedef union {
+	struct {
+		u32 soft_reset : 1;
+		u32 pmd_en : 1;
+		u32 rsvd0 : 2;
+		u32 pll_refclk_sel : 2;
+		u32 rsvd1 : 2;
+		u32 pmd_mode : 1;
+		u32 rsvd2 : 3;
+		u32 tx_en_cfg : 4;
+		u32 rx_en_cfg : 4;
+		u32 pll_en_cfg : 2;
+		u32 rsvd3 : 2;
+		u32 pam4_precode_no_krt_en : 4;
+		u32 rsvd4 : 4;
+	};
+	u32 reg;
+} E56G__PMD_PMD_CFG_0;
+//-----MACRO defines for Register:E56G__PMD_PMD_CFG_0
+#define E56G__PMD_PMD_CFG_0_NUM 1
+#define E56G__PMD_PMD_CFG_0_ADDR (E56G__BASEADDR + 0x1400)
+
 //-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_2
 typedef union {
 	struct {
@@ -1378,6 +1487,68 @@ typedef union {
 //-----MACRO defines for Register:E56G__RXS3_ANA_OVRDVAL_3
 #define E56G__RXS3_ANA_OVRDVAL_3_ADDR (E56G__BASEADDR + 0x6ac)
 
+//-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_0
+typedef union {
+	struct {
+		u32 ovrd_en_rxs0_rx0_rstn_i : 1;
+		u32 ovrd_en_rxs0_rx0_bitclk_divctrl_i : 1;
+		u32 ovrd_en_rxs0_rx0_bitclk_rate_i : 1;
+		u32 ovrd_en_rxs0_rx0_symdata_width_i : 1;
+		u32 ovrd_en_rxs0_rx0_symdata_o : 1;
+		u32 ovrd_en_rxs0_rx0_precode_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_signal_type_i : 1;
+		u32 ovrd_en_rxs0_rx0_sync_detect_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_sync_o : 1;
+		u32 ovrd_en_rxs0_rx0_rate_select_i : 1;
+		u32 ovrd_en_rxs0_rx0_rterm_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_bias_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ldo_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ldo_rdy_i : 1;
+		u32 ovrd_en_rxs0_rx0_blwc_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ctle_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_vga_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_osc_sel_i : 1;
+		u32 ovrd_en_rxs0_rx0_osc_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_clkgencdr_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_ctlecdr_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_samp_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_osc_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_osc_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_osc_freq_error_o : 1;
+		u32 ovrd_en_rxs0_rx0_samp_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_samp_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_samp_cal_err_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_ofst_cal_en_i : 1;
+		u32 ovrd_en_rxs0_rx0_adc_ofst_cal_done_o : 1;
+		u32 ovrd_en_rxs0_rx0_adc_ofst_cal_error_o : 1;
+	};
+	u32 reg;
+} E56G__PMD_RXS0_OVRDEN_0;
+//-----MACRO defines for Register:E56G__PMD_RXS0_OVRDEN_0
+#define E56G__PMD_RXS0_OVRDEN_0_NUM 1
+#define E56G__PMD_RXS0_OVRDEN_0_ADDR (E56G__BASEADDR + 0x1530)
+
+//-----Access structure typedef for Register:E56G__RXS0_DFT_1
+typedef union {
+	struct {
+		u32 ber_en : 1;
+		u32 rsvd0 : 3;
+		u32 read_mode_en : 1;
+		u32 rsvd1 : 3;
+		u32 err_cnt_mode_all0_one1 : 1;
+		u32 rsvd2 : 3;
+		u32 init_lfsr_mode_continue0_restart1 : 1;
+		u32 rsvd3 : 3;
+		u32 pattern_sel : 4;
+		u32 rsvd4 : 12;
+	};
+	u32 reg;
+} E56G__RXS0_DFT_1;
+//-----MACRO defines for Register:E56G__RXS0_DFT_1
+#define E56G__RXS0_DFT_1_NUM 1
+#define E56G__RXS0_DFT_1_ADDR (E56G__BASEADDR + 0xec)
+
 //-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_1
 typedef union {
 	struct {
@@ -1419,6 +1590,44 @@ typedef union {
 //-----MACRO defines for Register:E56G__PMD_RXS0_OVRDEN_1
 #define E56G__PMD_RXS0_OVRDEN_1_NUM 1
 #define E56G__PMD_RXS0_OVRDEN_1_ADDR (E56G__BASEADDR + 0x1534)
+
+//-----Access structure typedef for Register:E56G__PMD_RXS0_OVRDEN_3
+typedef union {
+	struct {
+		u32 ovrd_en_rxs0_rx0_sparein_i : 8;
+		u32 ovrd_en_rxs0_rx0_spareout_o : 8;
+		u32 rsvd0 : 16;
+	};
+	u32 reg;
+} E56G__PMD_RXS0_OVRDEN_3;
+//-----MACRO defines for Register:E56G__PMD_RXS0_OVRDEN_3
+#define E56G__PMD_RXS0_OVRDEN_3_NUM 1
+#define E56G__PMD_RXS0_OVRDEN_3_ADDR (E56G__BASEADDR + 0x153c)
+
+//-----Access structure typedef for Register:E56G__RXS0_DIG_OVRDEN_1
+typedef union {
+	struct {
+		u32 vco_code_cont_adj_done_ovrd_en : 1;
+		u32 dfe_coeffl_ovrd_en : 1;
+		u32 dfe_coeffh_ovrd_en : 1;
+		u32 rsvd0 : 1;
+		u32 top_comp_th_ovrd_en : 1;
+		u32 mid_comp_th_ovrd_en : 1;
+		u32 bot_comp_th_ovrd_en : 1;
+		u32 rsvd1 : 1;
+		u32 level_target_ovrd_en : 4;
+		u32 ffe_coeff_c0to3_ovrd_en : 4;
+		u32 ffe_coeff_c4to7_ovrd_en : 4;
+		u32 ffe_coeff_c8to11_ovrd_en : 4;
+		u32 ffe_coeff_c12to15_ovrd_en : 4;
+		u32 ffe_coeff_update_ovrd_en : 1;
+		u32 rsvd2 : 3;
+	};
+	u32 reg;
+} E56G__RXS0_DIG_OVRDEN_1;
+//-----MACRO defines for Register:E56G__RXS0_DIG_OVRDEN_1
+#define E56G__RXS0_DIG_OVRDEN_1_NUM 1
+#define E56G__RXS0_DIG_OVRDEN_1_ADDR (E56G__BASEADDR + 0x160)
 
 //-----Access structure typedef for Register:E56G__PMD_RXS1_OVRDEN_1
 typedef union {

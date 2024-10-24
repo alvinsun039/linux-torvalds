@@ -1882,7 +1882,8 @@ static int compare(const void *a, const void *b)
 		return 0;
 	}
 }
-static int E56phyRxRdSecondCode40g(struct txgbe_hw *hw, int *SECOND_CODE, int lane)
+static int E56phyRxRdSecondCode40g(struct txgbe_hw *hw, int *SECOND_CODE,
+				   int lane)
 {
 	int status = 0, i, N, median;
 	unsigned int rdata;
@@ -2888,6 +2889,7 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
+		msleep(350);
 		rdata = rd32(hw, TXGBE_GPIO_EXT);
 		if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {
 			return TXGBE_ERR_PHY_INIT_NOT_DONE;
@@ -3316,49 +3318,153 @@ static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 	return 0;
 }
 
-int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
+//--------------------------------------------------------------
+//2.2.10 SEQ::RX_DISABLE
+//Use PDIG::PMD_CFG[0]::rx_en_cfg[<lane no.>] = 0b0 to powerdown specific RXS lanes.
+//Completion of RXS powerdown can be confirmed by observing ALIAS::PDIG::CTRL_FSM_RX_ST = POWERDN_ST
+//--------------------------------------------------------------
+static int txgbe_e56_disable_rx(struct txgbe_hw *hw)
 {
-	u32 addr;
-	u32 rdata;
-	u32 timer;
 	int status = 0;
+	unsigned int rdata, timer;
+	unsigned int addr, temp;
 
-	wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE, ~TXGBE_MAC_TX_CFG_TE);
-	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, ~TXGBE_MAC_RX_CFG_RE);
+	//1. Disable OVERRIDE on below aliases
+	//a. ALIAS::RXS::RANGE_SEL
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_0,
+			      ovrd_en_ana_bbcdr_osc_range_sel_i, 0);
 
-	TCALL(hw, mac.ops.disable_sec_tx_path);
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-	}
+	EPHY_RREG(E56G__RXS0_ANA_OVRDEN_1);
+	//b. ALIAS::RXS::COARSE
+	EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1, ovrd_en_ana_bbcdr_coarse_i) = 0;
+	//c. ALIAS::RXS::FINE
+	EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1, ovrd_en_ana_bbcdr_fine_i) = 0;
+	//d. ALIAS::RXS::ULTRAFINE
+	EPHY_XFLD(E56G__RXS0_ANA_OVRDEN_1, ovrd_en_ana_bbcdr_ultrafine_i) = 0;
+	EPHY_WREG(E56G__RXS0_ANA_OVRDEN_1);
 
-	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
-	//and confirm its value is POWERDN_ST
-	rdata = 0;
-	addr = E56PHY_PMD_CFG_0_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
-	txgbe_wr32_ephy(hw, addr, rdata);
+	//e. ALIAS::RXS::SAMP_CAL_DONE
+	txgbe_e56_ephy_config(E56G__PMD_RXS0_OVRDEN_0,
+			      ovrd_en_rxs0_rx0_samp_cal_done_o, 0);
 
+	EPHY_RREG(E56G__PMD_RXS0_OVRDEN_2);
+	//f. ALIAS::RXS::ADC_OFST_ADAPT_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_2,
+		  ovrd_en_rxs0_rx0_adc_ofst_adapt_en_i) = 0;
+	//g. ALIAS::RXS::ADC_GAIN_ADAPT_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_2,
+		  ovrd_en_rxs0_rx0_adc_gain_adapt_en_i) = 0;
+	//j. ALIAS::RXS::ADC_INTL_ADAPT_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_2,
+		  ovrd_en_rxs0_rx0_adc_intl_adapt_en_i) = 0;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDEN_2);
+
+	EPHY_RREG(E56G__PMD_RXS0_OVRDEN_1);
+	//h. ALIAS::RXS::ADC_INTL_CAL_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_adc_intl_cal_en_i) =
+		0;
+	//i. ALIAS::RXS::ADC_INTL_CAL_DONE
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1,
+		  ovrd_en_rxs0_rx0_adc_intl_cal_done_o) = 0;
+	//k. ALIAS::RXS::CDR_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_cdr_en_i) = 0;
+	//l. ALIAS::RXS::VGA_TRAIN_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_vga_train_en_i) = 0;
+	//m. ALIAS::RXS::CTLE_TRAIN_EN
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1, ovrd_en_rxs0_rx0_ctle_train_en_i) =
+		0;
+	//p. ALIAS::RXS::RX_FETX_TRAIN_DONE
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1,
+		  ovrd_en_rxs0_rx0_txffe_train_done_o) = 0;
+	//r. ALIAS::RXS::RX_TXFFE_COEFF_CHANGE
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1,
+		  ovrd_en_rxs0_rx0_txffe_coeff_change_o) = 0;
+	//s. ALIAS::RXS::RX_TXFFE_TRAIN_ENACK
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_1,
+		  ovrd_en_rxs0_rx0_txffe_train_enack_o) = 0;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDEN_1);
+
+	EPHY_RREG(E56G__PMD_RXS0_OVRDEN_3);
+	//n. ALIAS::RXS::RX_FETX_MOD_TYPE
+	//o. ALIAS::RXS::RX_FETX_MOD_TYPE_UPDATE
+	temp = EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_3, ovrd_en_rxs0_rx0_spareout_o);
+	EPHY_XFLD(E56G__PMD_RXS0_OVRDEN_3, ovrd_en_rxs0_rx0_spareout_o) = temp &
+									  0x8F;
+	EPHY_WREG(E56G__PMD_RXS0_OVRDEN_3);
+
+	//q. ALIAS::RXS::SLICER_THRESHOLD_OVRD_EN
+	EPHY_RREG(E56G__RXS0_DIG_OVRDEN_1);
+	EPHY_XFLD(E56G__RXS0_DIG_OVRDEN_1, top_comp_th_ovrd_en) = 0;
+	EPHY_XFLD(E56G__RXS0_DIG_OVRDEN_1, mid_comp_th_ovrd_en) = 0;
+	EPHY_XFLD(E56G__RXS0_DIG_OVRDEN_1, bot_comp_th_ovrd_en) = 0;
+	EPHY_WREG(E56G__RXS0_DIG_OVRDEN_1);
+
+	//2. Disable pattern checker �C
+	txgbe_e56_ephy_config(E56G__RXS0_DFT_1, ber_en, 0);
+
+	//3. Disable internal serial loopback mode �C
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_3, ovrd_en_ana_sel_lpbk_i,
+			      0);
+	txgbe_e56_ephy_config(E56G__RXS0_ANA_OVRDEN_2,
+			      ovrd_en_ana_en_adccal_lpbk_i, 0);
+
+	//4. Enable bypass of clock gates in RXS -
+	txgbe_e56_ephy_config(E56G__RXS0_RXS_CFG_0, train_clk_gate_bypass_en,
+			      0x1FFF);
+
+	//5. Disable KR training mode �C
+	//a. ALIAS::PDIG::KR_TRAINING_MODE = 0b0
+	txgbe_e56_ephy_config(E56G__PMD_BASER_PMD_CONTROL, training_enable_ln0,
+			      0);
+
+	//6. Disable RX to TX parallel loopback �C
+	//a. ALIAS::PDIG::RX_TO_TX_LPBK_EN = 0b0
+	txgbe_e56_ephy_config(E56G__PMD_PMD_CFG_5, rx_to_tx_lpbk_en, 0);
+
+	//The FSM to disable RXS is present in PDIG. The FSM disables the RXS when �C
+	//PDIG::PMD_CFG[0]::rx_en_cfg[<lane no.>] = 0b0
+	txgbe_e56_ephy_config(E56G__PMD_PMD_CFG_0, rx_en_cfg, 0);
+
+	//Wait RX FSM to be POWERDN_ST
 	timer = 0;
 	while (1) {
-		udelay(500);
 		rdata = 0;
 		addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
 		rdata = rd32_ephy(hw, addr);
 		if ((rdata & 0x3f) == 0x21) {
 			break;
 		}
+		udelay(100);
 		if (timer++ > PHYINIT_TIMEOUT) {
 			printk("ERROR: Wait E56PHY_CTRL_FSM_RX_STAT_0_ADDR Timeout!!!\n");
 			break;
 		}
 	}
 
-	status = txgbe_e56_config_rx(hw, speed);
+	return status;
+}
+
+int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
+{
+	u32 addr;
+	int status = 0;
+
+	wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE, ~TXGBE_MAC_TX_CFG_TE);
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, ~TXGBE_MAC_RX_CFG_RE);
+
+	TCALL(hw, mac.ops.disable_sec_tx_path);
+
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
+
+	//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
+	//and confirm its value is POWERDN_ST
+	txgbe_e56_disable_rx(hw);
+
+	if (hw->mac.type == txgbe_mac_aml40)
+		status = txgbe_e56_config_rx_40G(hw, speed);
+	else
+		status = txgbe_e56_config_rx(hw, speed);
 
 	addr = E56PHY_INTR_0_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_0_IDLE_ENTRY1);
@@ -3366,15 +3472,10 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 	addr = E56PHY_INTR_1_ADDR;
 	txgbe_wr32_ephy(hw, addr, E56PHY_INTR_1_IDLE_EXIT1);
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
-				E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
-				E56PHY_INTR_1_IDLE_EXIT1);
-	}
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+			E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+			E56PHY_INTR_1_IDLE_EXIT1);
 
 	TCALL(hw, mac.ops.enable_sec_tx_path);
 	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
@@ -3687,24 +3788,17 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 	adapter->phy_tx_ready = true;
 
-	status = txgbe_e56_config_rx(hw, speed);
-
-
 	value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
 	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
 	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
 	txgbe_wr32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR, value);
 
-	if (hw->mac.type == txgbe_mac_aml40) {
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR,
-				E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR,
-				E56PHY_INTR_1_IDLE_EXIT1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
-				E56PHY_INTR_0_IDLE_ENTRY1);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
-				E56PHY_INTR_1_IDLE_EXIT1);
-	}
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ADDR, E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ADDR, E56PHY_INTR_1_IDLE_EXIT1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR,
+			E56PHY_INTR_0_IDLE_ENTRY1);
+	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
+			E56PHY_INTR_1_IDLE_EXIT1);
 
 	if (status)
 		goto out;

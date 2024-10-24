@@ -3556,8 +3556,14 @@ static void txgbe_check_sfp_event(struct txgbe_adapter *adapter, u32 eicr)
 
 static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 {
+	struct txgbe_hw *hw = &adapter->hw;
+
 	adapter->lsc_int++;
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+
 	adapter->link_check_timeout = jiffies;
 	if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
 		txgbe_service_event_schedule(adapter);
@@ -9353,20 +9359,6 @@ static void txgbe_phy_event_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	adapter->flags3 &= ~TXGBE_FLAG3_PHY_EVENT;
-
-	if (!(hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
-		hw->mac.type == txgbe_mac_aml40)) {
-		mutex_lock(&adapter->e56_lock);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
-		txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
-		mutex_unlock(&adapter->e56_lock);
-		return;
-	}
 
 	mutex_lock(&adapter->e56_lock);
 	rdata = rd32_ephy(hw, E56PHY_INTR_0_ADDR);
