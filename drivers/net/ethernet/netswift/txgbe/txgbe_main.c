@@ -1,5 +1,5 @@
 /*
- * WangXun 25/10 Gigabit PCI Express Linux driver
+ * WangXun 40/25/10 Gigabit PCI Express Linux driver
  * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -86,7 +86,7 @@
 
 char txgbe_driver_name[32] = TXGBE_NAME;
 static const char txgbe_driver_string[] =
-			"WangXun 25/10 Gigabit PCI Express Network Driver";
+			"WangXun 40/25/10 Gigabit PCI Express Network Driver";
 
 #define DRV_HW_PERF
 
@@ -99,13 +99,13 @@ static const char txgbe_driver_string[] =
 #define RELEASE_TAG
 
 #if (defined(TXGBE_SUPPORT_KYLIN_FT) || defined(TXGBE_SUPPORT_KYLIN_LX))
-#define DRV_VERSION     __stringify(2.0.0-kylin)
+#define DRV_VERSION     __stringify(2.1.0rc0-kylin)
 #elif defined(CONFIG_EULER_KERNEL)
-#define DRV_VERSION     __stringify(2.0.0-kylin)
+#define DRV_VERSION     __stringify(2.1.0rc0-kylin)
 #elif defined(CONFIG_UOS_KERNEL)
-#define DRV_VERSION     __stringify(2.0.0-kylin)
+#define DRV_VERSION     __stringify(2.1.0rc0-kylin)
 #else
-#define DRV_VERSION     __stringify(2.0.0-kylin)
+#define DRV_VERSION     __stringify(2.1.0rc0-kylin)
 #endif
 const char txgbe_driver_version[32] = DRV_VERSION;
 static const char txgbe_copyright[] =
