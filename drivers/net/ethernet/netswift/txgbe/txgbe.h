@@ -1268,7 +1268,6 @@ struct txgbe_adapter {
 	u8 swfw_index;
 
 	int amlite_temp;
-	u32 aml_temp_speed;
 };
 
 static inline u32 txgbe_misc_isb(struct txgbe_adapter *adapter,

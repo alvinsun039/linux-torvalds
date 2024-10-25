@@ -9684,9 +9684,9 @@ static void txgbe_amlit_temp_work(struct work_struct *work)
 	adapter->amlite_temp = temp;
 	mutex_lock(&adapter->e56_lock);
 	if (hw->mac.type == txgbe_mac_aml)
-		txgbe_temp_track_seq(hw, adapter->aml_temp_speed);
+		txgbe_temp_track_seq(hw, adapter->tx_speed);
 	else if (hw->mac.type == txgbe_mac_aml40)
-		txgbe_temp_track_seq_40g(hw, adapter->aml_temp_speed);
+		txgbe_temp_track_seq_40g(hw, adapter->tx_speed);
 	mutex_unlock(&adapter->e56_lock);
 
 }

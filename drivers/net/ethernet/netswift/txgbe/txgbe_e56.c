@@ -3529,8 +3529,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	SetFields(&value, 12, 12, 0);
 	txgbe_wr32_epcs(hw, SR_AN_CTRL, value);
 
-	adapter->aml_temp_speed = speed;
-
 	if (speed == TXGBE_LINK_SPEED_40GB_FULL) {
 		value = txgbe_rd32_epcs(hw, SR_PCS_CTRL1);
 		SetFields(&value, 5, 2, 0x3);
