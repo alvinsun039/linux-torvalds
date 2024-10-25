@@ -885,7 +885,7 @@ s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw)
 	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
 		return TXGBE_ERR_SWFW_SYNC;
 
-	if (TCALL(hw, mac.ops.get_media_type) != txgbe_media_type_fiber) {
+	if (TCALL(hw, mac.ops.get_media_type) != txgbe_media_type_fiber_qsfp) {
 		hw->phy.sfp_type = txgbe_sfp_type_not_present;
 		status = TXGBE_ERR_SFP_NOT_PRESENT;
 		goto out;

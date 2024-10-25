@@ -6740,6 +6740,7 @@ static void txgbe_configure(struct txgbe_adapter *adapter)
 static bool txgbe_is_sfp(struct txgbe_hw *hw)
 {
 	switch (TCALL(hw, mac.ops.get_media_type)) {
+	case txgbe_media_type_fiber_qsfp:
 	case txgbe_media_type_fiber:
 		return true;
 	default:
@@ -6889,7 +6890,8 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	 */
 	if (!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
 		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
-		if (hw->phy.media_type == txgbe_media_type_fiber)
+		if (hw->phy.media_type == txgbe_media_type_fiber ||
+			hw->phy.media_type == txgbe_media_type_fiber_qsfp)
 			TCALL(hw, mac.ops.enable_tx_laser);
 		else if (hw->phy.media_type == txgbe_media_type_copper &&
 				(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
@@ -7512,7 +7514,8 @@ void txgbe_down(struct txgbe_adapter *adapter)
 
 	if(!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
 		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
-		if (hw->phy.media_type == txgbe_media_type_fiber)
+		if (hw->phy.media_type == txgbe_media_type_fiber ||
+			hw->phy.media_type == txgbe_media_type_fiber_qsfp)
 			TCALL(hw, mac.ops.disable_tx_laser);
 		else if (hw->phy.media_type == txgbe_media_type_copper &&
 				(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
@@ -8248,7 +8251,8 @@ static void txgbe_close_suspend(struct txgbe_adapter *adapter)
 	/* power down the optics for SFP+ fiber or mv phy */
 	if(!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
 			adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
-		if (hw->phy.media_type == txgbe_media_type_fiber)
+		if (hw->phy.media_type == txgbe_media_type_fiber ||
+			hw->phy.media_type == txgbe_media_type_fiber_qsfp)
 			TCALL(hw, mac.ops.disable_tx_laser);
 		else if (hw->phy.media_type == txgbe_media_type_copper &&
 			(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
@@ -13443,7 +13447,9 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	if(!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
 			adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP))
 		/* power down the optics for SFP+ fiber */
-		TCALL(hw, mac.ops.disable_tx_laser);
+		if (hw->phy.media_type == txgbe_media_type_fiber ||
+			hw->phy.media_type == txgbe_media_type_fiber_qsfp)
+			TCALL(hw, mac.ops.disable_tx_laser);
 
 	/* carrier off reporting is important to ethtool even BEFORE open */
 	netif_carrier_off(netdev);

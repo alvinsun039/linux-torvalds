@@ -384,11 +384,11 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		if (supported_link & TXGBE_LINK_SPEED_10_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 								 10baseT_Full);
-	} else if (hw->phy.media_type == txgbe_media_type_fiber) {
+	} else if (hw->phy.media_type == txgbe_media_type_fiber_qsfp) {
 		if (supported_link & TXGBE_LINK_SPEED_40GB_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 					 40000baseSR4_Full);
-
+	} else if (hw->phy.media_type == txgbe_media_type_fiber) {
 		if (supported_link & TXGBE_LINK_SPEED_25GB_FULL)
 			ethtool_link_ksettings_add_link_mode(cmd, supported,
 					 25000baseSR_Full);

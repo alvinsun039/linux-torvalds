@@ -327,6 +327,7 @@ bool txgbe_device_supports_autoneg_fc(struct txgbe_hw *hw)
 	u8 device_type = hw->subsystem_device_id & 0xF0;
 
 	switch (hw->phy.media_type) {
+	case txgbe_media_type_fiber_qsfp:
 	case txgbe_media_type_fiber:
 		TCALL(hw, mac.ops.check_link, &speed, &link_up, false);
 		/* if link is down, assume supported */
@@ -4845,7 +4846,8 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 	u32 esdp_reg = rd32(hw, TXGBE_GPIO_DR);
 
 
-	if (!(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber))
+	if (!((TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) ||
+		(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber_qsfp)))
 		return;
 	/* Blocked by MNG FW so bail */
 	txgbe_check_reset_blocked(hw);
@@ -4885,7 +4887,8 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
  **/
 void txgbe_enable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 {
-	if (!(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber))
+	if (!((TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) ||
+		(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber_qsfp)))
 		return;
 	if (txgbe_open_notify(hw))
 		/* recover led configure when ifconfig up */
@@ -4917,7 +4920,8 @@ void txgbe_enable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
  **/
 void txgbe_flap_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 {
-	if (!(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber))
+	if (!((TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber) ||
+		(TCALL(hw, mac.ops.get_media_type) == txgbe_media_type_fiber_qsfp)))
 		return;
 
 	/* Blocked by MNG FW so bail */
