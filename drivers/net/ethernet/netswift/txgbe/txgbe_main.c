@@ -2292,12 +2292,12 @@ static void txgbe_put_rx_buffer(struct txgbe_ring *rx_ring,
 		/* hand second half of page back to the ring */
 		txgbe_reuse_rx_page(rx_ring, rx_buffer);
 	} else {
-		if (!IS_ERR(skb) && TXGBE_CB(skb)->dma == rx_buffer->dma) {
+		if (!IS_ERR(skb) && TXGBE_CB(skb)->dma == rx_buffer->page_dma) {
 			/* the page has been released from the ring */
 			TXGBE_CB(skb)->page_released = true;
 		} else {
 			/* we are not reusing the buffer so unmap it */
-			dma_unmap_page_attrs(rx_ring->dev, rx_buffer->dma,
+			dma_unmap_page_attrs(rx_ring->dev, rx_buffer->page_dma,
 					     txgbe_rx_pg_size(rx_ring),
 					     DMA_FROM_DEVICE,
 #if defined(HAVE_STRUCT_DMA_ATTRS) && defined(HAVE_SWIOTLB_SKIP_CPU_SYNC)
@@ -2492,7 +2492,7 @@ static struct txgbe_rx_buffer *txgbe_get_rx_buffer(struct txgbe_ring *rx_ring,
 
 	/* we are reusing so sync this buffer for CPU use */
 	dma_sync_single_range_for_cpu(rx_ring->dev,
-				      rx_buffer->dma,
+				      rx_buffer->page_dma,
 				      rx_buffer->page_offset,
 				      size,
 				      DMA_FROM_DEVICE);
@@ -2544,7 +2544,7 @@ static struct sk_buff *txgbe_build_skb(struct txgbe_ring *rx_ring,
 
 	/* record DMA address if this is the start of a chain of buffers */
 	if (!txgbe_test_staterr(rx_desc, TXGBE_RXD_STAT_EOP))
-		TXGBE_CB(skb)->dma = rx_buffer->dma;
+		TXGBE_CB(skb)->dma = rx_buffer->page_dma;
 
 	/* update buffer offset */
 #if (PAGE_SIZE < 8192)
@@ -2599,7 +2599,7 @@ static struct sk_buff *txgbe_construct_skb(struct txgbe_ring *rx_ring,
 
 	if (size > TXGBE_RX_HDR_SIZE) {
 		if (!txgbe_test_staterr(rx_desc, TXGBE_RXD_STAT_EOP))
-			TXGBE_CB(skb)->dma = rx_buffer->dma;
+			TXGBE_CB(skb)->dma = rx_buffer->page_dma;
 
 		skb_add_rx_frag(skb, 0, rx_buffer->page,
 				xdp->data - page_address(rx_buffer->page),
@@ -4836,8 +4836,9 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 	ring->next_to_use = 0;
 #ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
 	ring->next_to_alloc = 0;
-#endif
 	ring->rx_offset = txgbe_rx_offset(ring);
+#endif
+
 	txgbe_configure_srrctl(adapter, ring);
 	/* In ESX, RSCCTL configuration is done by on demand */
 	txgbe_configure_rscctl(adapter, ring);
@@ -7228,15 +7229,6 @@ void txgbe_clean_rx_ring(struct txgbe_ring *rx_ring)
 		if (rx_buffer->skb) {
 			struct sk_buff *skb = rx_buffer->skb;
 #ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
-			if (TXGBE_CB(skb)->dma_released) {
-				dma_unmap_single(dev,
-						TXGBE_CB(skb)->dma,
-						rx_ring->rx_buf_len,
-						DMA_FROM_DEVICE);
-				TXGBE_CB(skb)->dma = 0;
-				TXGBE_CB(skb)->dma_released = false;
-			}
-
 			if (TXGBE_CB(skb)->page_released)
 				dma_unmap_page_attrs(rx_ring->dev,
 						     TXGBE_CB(skb)->dma,
@@ -7269,13 +7261,13 @@ void txgbe_clean_rx_ring(struct txgbe_ring *rx_ring)
 		 * device so that we avoid corrupting memory.
 		 */
 		dma_sync_single_range_for_cpu(rx_ring->dev,
-					      rx_buffer->dma,
+					      rx_buffer->page_dma,
 					      rx_buffer->page_offset,
 					      txgbe_rx_bufsz(rx_ring),
 					      DMA_FROM_DEVICE);
 
 		/* free resources associated with mapping */
-		dma_unmap_page_attrs(rx_ring->dev, rx_buffer->dma,
+		dma_unmap_page_attrs(rx_ring->dev, rx_buffer->page_dma,
 				     txgbe_rx_pg_size(rx_ring),
 				     DMA_FROM_DEVICE,
 #if defined(HAVE_STRUCT_DMA_ATTRS) && defined(HAVE_SWIOTLB_SKIP_CPU_SYNC)

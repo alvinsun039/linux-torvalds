@@ -612,19 +612,11 @@ static inline unsigned int txgbe_rx_bufsz(struct txgbe_ring __maybe_unused *ring
 #if MAX_SKB_FRAGS < 8
 	return ALIGN(TXGBE_MAX_RXBUFFER / MAX_SKB_FRAGS, 1024);
 #else
-#if IS_ENABLED(CONFIG_FCOE)
-	if (test_bit(__TXGBE_RX_FCOE, &ring->state))
-		return (PAGE_SIZE < 8192) ? TXGBE_RXBUFFER_4K :
-					    TXGBE_RXBUFFER_3K;
-#endif
-
 	if (test_bit(__TXGBE_RX_3K_BUFFER, &ring->state))
 		return TXGBE_RXBUFFER_3K;
-#if 0
 #if (PAGE_SIZE < 8192)
 	if (ring_uses_build_skb(ring))
 		return TXGBE_MAX_2K_FRAME_BUILD_SKB;
-#endif
 #endif
 	return TXGBE_RXBUFFER_2K;
 #endif
@@ -632,10 +624,6 @@ static inline unsigned int txgbe_rx_bufsz(struct txgbe_ring __maybe_unused *ring
 
 static inline unsigned int txgbe_rx_pg_order(struct txgbe_ring __maybe_unused *ring)
 {
-#if IS_ENABLED(CONFIG_FCOE)
-	if (test_bit(__TXGBE_RX_FCOE, &ring->state))
-		return (PAGE_SIZE < 8192) ? 1 : 0;
-#endif
 #if (PAGE_SIZE < 8192)
 	if (test_bit(__TXGBE_RX_3K_BUFFER, &ring->state))
 		return 1;
