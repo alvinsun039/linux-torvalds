@@ -1808,10 +1808,10 @@ typedef union {
 #define S10G_TX_FFE_CFG_PRE1 0x0
 #define S10G_TX_FFE_CFG_PRE2 0x0
 #define S10G_TX_FFE_CFG_POST 0x0
-#define S25G_TX_FFE_CFG_MAIN 0x3f3f3f3f
-#define S25G_TX_FFE_CFG_PRE1 0x0
-#define S25G_TX_FFE_CFG_PRE2 0x0
-#define S25G_TX_FFE_CFG_POST 0x0
+#define S25G_TX_FFE_CFG_MAIN 49
+#define S25G_TX_FFE_CFG_PRE1 4
+#define S25G_TX_FFE_CFG_PRE2 1
+#define S25G_TX_FFE_CFG_POST 9
 
 /* for dac test*/
 #define S25G_TX_FFE_CFG_DAC_MAIN 0x2a2a2a2a
