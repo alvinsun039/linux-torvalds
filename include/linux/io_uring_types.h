@@ -55,8 +55,13 @@ struct io_wq_work {
 	int cancel_seq;
 };
 
+struct io_rsrc_data {
+	unsigned int			nr;
+	struct io_rsrc_node		**nodes;
+};
+
 struct io_file_table {
-	struct io_rsrc_node **nodes;
+	struct io_rsrc_data data;
 	unsigned long *bitmap;
 	unsigned int alloc_hint;
 };
@@ -271,9 +276,7 @@ struct io_ring_ctx {
 		 */
 		atomic_t		cancel_seq;
 		struct io_file_table	file_table;
-		struct io_rsrc_node	**user_bufs;
-		unsigned		nr_user_files;
-		unsigned		nr_user_bufs;
+		struct io_rsrc_data	buf_table;
 
 		struct io_submit_state	submit_state;
 
@@ -383,10 +386,6 @@ struct io_ring_ctx {
 	/* Keep this last, we don't need it for the fast path */
 	struct wait_queue_head		poll_wq;
 	struct io_restriction		restrictions;
-
-	/* slow path rsrc auxilary data, used by update/register */
-	struct io_rsrc_data		*file_data;
-	struct io_rsrc_data		*buf_data;
 
 	/* hashed buffered write serialization */
 	struct io_wq_hash		*hash_map;
