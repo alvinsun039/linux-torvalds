@@ -2,6 +2,8 @@
 #ifndef IOU_RSRC_H
 #define IOU_RSRC_H
 
+#include <linux/nospec.h>
+
 enum {
 	IORING_RSRC_FILE		= 0,
 	IORING_RSRC_BUFFER		= 1,
@@ -63,6 +65,14 @@ int io_register_rsrc(struct io_ring_ctx *ctx, void __user *arg,
 
 extern const struct io_rsrc_node empty_node;
 #define rsrc_empty_node	(struct io_rsrc_node *) &empty_node
+
+static inline struct io_rsrc_node *io_rsrc_node_lookup(struct io_rsrc_data *data,
+						       int index)
+{
+	if (index < data->nr)
+		return data->nodes[array_index_nospec(index, data->nr)];
+	return NULL;
+}
 
 static inline void io_put_rsrc_node(struct io_rsrc_node *node)
 {
