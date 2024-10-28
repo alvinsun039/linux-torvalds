@@ -2256,7 +2256,7 @@ static int txgbe_set_priv_flags(struct net_device *dev, u32 flags)
 
 		/* If this is a read-only flag, it can't be changed */
 		if (priv_flags->read_only &&
-		    ((orig_flags ^ new_flags) & ~BIT(i)))
+		    ((orig_flags ^ new_flags) & BIT(i)))
 			return -EOPNOTSUPP;
 	}
 	
