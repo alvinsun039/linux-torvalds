@@ -1083,6 +1083,8 @@ enum {
 /* Immediate Interrupt Rx (A.K.A. Low Latency Interrupt) */
 #define TXGBE_RDB_5T_CTL1_SIZE_BP       0x00001000U /* Packet size bypass */
 #define TXGBE_RDB_5T_CTL1_LLI           0x00100000U /* Enables low latency Int */
+#define TXGBE_RDB_5T_CTL1_RING_MASK     0x0FE00000U /* Rx queue index mask */
+#define TXGBE_RDB_5T_CTL1_RING_SHIFT    21
 #define TXGBE_RDB_LLI_THRE_PRIORITY_MASK 0x00070000U /* VLAN priority mask */
 #define TXGBE_RDB_LLI_THRE_PRIORITY_EN  0x00080000U /* VLAN priority enable */
 #define TXGBE_RDB_LLI_THRE_CMN_EN       0x00100000U /* cmn packet receiveed */
@@ -2579,6 +2581,11 @@ struct txgbe_etype_filter_info {
 	u8 ethertype_mask;  /* Bit mask for every used ethertype filter */
 	/* store used ethertype filters */
 	struct txgbe_ethertype_filter etype_filters[TXGBE_MAX_PSR_ETYPE_SWC_FILTERS];
+};
+
+/* Structure to store 5-tuple filters' info. */
+struct txgbe_5tuple_filter_info {
+	u32 fivetuple_mask[4]; /* Bit mask for max 128 filters */
 };
 
 /****************** Manageablility Host Interface defines ********************/

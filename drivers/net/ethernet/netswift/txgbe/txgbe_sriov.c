@@ -615,6 +615,7 @@ static int txgbe_negotiate_vf_api(struct txgbe_adapter *adapter,
 	case txgbe_mbox_api_11:
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
+	case txgbe_mbox_api_21:
 		adapter->vfinfo[vf].vf_api = api;
 		return 0;
 	default:
@@ -636,6 +637,7 @@ static int txgbe_get_vf_queues(struct txgbe_adapter *adapter,
 
 	/* verify the PF is supporting the correct APIs */
 	switch (adapter->vfinfo[vf].vf_api) {
+	case txgbe_mbox_api_21:
 	case txgbe_mbox_api_20:
 	case txgbe_mbox_api_13:
 	case txgbe_mbox_api_12:
@@ -1044,6 +1046,8 @@ static int txgbe_update_vf_xcast_mode(struct txgbe_adapter *adapter,
 			return -EOPNOTSUPP;
 		/* Fall threw */
 	case txgbe_mbox_api_13:
+	case txgbe_mbox_api_20:
+	case txgbe_mbox_api_21:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1103,6 +1107,7 @@ static int txgbe_get_vf_link_state(struct txgbe_adapter *adapter,
 	switch (adapter->vfinfo[vf].vf_api) {
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
+	case txgbe_mbox_api_21:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1123,6 +1128,7 @@ static int txgbe_get_fw_version(struct txgbe_adapter *adapter,
 	switch (adapter->vfinfo[vf].vf_api) {
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
+	case txgbe_mbox_api_21:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1131,6 +1137,89 @@ static int txgbe_get_fw_version(struct txgbe_adapter *adapter,
 	*fw_version = simple_strtoul(adapter->eeprom_id, &end, 16);
 	if (adapter->eeprom_id == end || strlen(end))
 		return -EOPNOTSUPP;
+
+	return 0;
+}
+
+static int txgbe_add_5tuple_filter_vf(struct txgbe_adapter *adapter,
+				      u32 *msgbuf, u32 vf)
+{
+	struct txgbe_5tuple_filter_info *filter = &adapter->ft_filter_info;
+	struct txgbe_hw *hw = &adapter->hw;
+	u16 index, sw_idx, i, j;
+
+	/*
+	 * look for an unused 5tuple filter index,
+	 * and insert the filter to list.
+	 */
+	for (sw_idx = 0; sw_idx < TXGBE_MAX_RDB_5T_CTL0_FILTERS; sw_idx++) {
+		i = sw_idx / (sizeof(uint32_t) * 8);
+		j = sw_idx % (sizeof(uint32_t) * 8);
+		if (!(filter->fivetuple_mask[i] & (1 << j))) {
+			filter->fivetuple_mask[i] |= 1 << j;
+			break;
+		}
+	}
+	if (sw_idx >= TXGBE_MAX_RDB_5T_CTL0_FILTERS) {
+		e_err(drv, "5tuple filters are full.\n");
+		return -ENOSYS;
+	}
+
+	/* convert filter index on each vf to the global index */
+	index = msgbuf[TXGBEVF_5T_CMD] & 0xFFFF;
+	adapter->vfinfo[vf].ft_filter_idx[index] = sw_idx;
+
+	/* pool index */
+	msgbuf[TXGBEVF_5T_CTRL0] |= vf << TXGBE_RDB_5T_CTL0_POOL_SHIFT;
+	/* compute absolute queue index */
+	msgbuf[TXGBEVF_5T_CTRL1] += (vf * adapter->num_rx_queues_per_pool) <<
+				    TXGBE_RDB_5T_CTL1_RING_SHIFT;
+
+	wr32(hw, TXGBE_RDB_5T_CTL0(sw_idx), msgbuf[TXGBEVF_5T_CTRL0]);
+	wr32(hw, TXGBE_RDB_5T_CTL1(sw_idx), msgbuf[TXGBEVF_5T_CTRL1]);
+	wr32(hw, TXGBE_RDB_5T_SDP(sw_idx), msgbuf[TXGBEVF_5T_PORT]);
+	wr32(hw, TXGBE_RDB_5T_DA(sw_idx), msgbuf[TXGBEVF_5T_DA]);
+	wr32(hw, TXGBE_RDB_5T_SA(sw_idx), msgbuf[TXGBEVF_5T_SA]);
+
+	return 0;
+}
+
+static void txgbe_del_5tuple_filter_vf(struct txgbe_adapter *adapter,
+				       u32 cmd, u32 vf)
+{
+	struct txgbe_5tuple_filter_info *filter = &adapter->ft_filter_info;
+	struct txgbe_hw *hw = &adapter->hw;
+	u16 index, sw_idx;
+
+	/* convert the global index to filter index on each vf */
+	index = cmd & 0xFFFF;
+	sw_idx = adapter->vfinfo[vf].ft_filter_idx[index];
+
+	filter->fivetuple_mask[sw_idx / (sizeof(uint32_t) * 8)] &=
+		~(1 << (sw_idx % (sizeof(uint32_t) * 8)));
+
+	wr32(hw, TXGBE_RDB_5T_CTL0(sw_idx), 0);
+	wr32(hw, TXGBE_RDB_5T_CTL1(sw_idx), 0);
+	wr32(hw, TXGBE_RDB_5T_SDP(sw_idx), 0);
+	wr32(hw, TXGBE_RDB_5T_DA(sw_idx), 0);
+	wr32(hw, TXGBE_RDB_5T_SA(sw_idx), 0);
+}
+
+static int txgbe_set_5tuple_filter_vf(struct txgbe_adapter *adapter,
+				      u32 *msgbuf, u32 vf)
+{
+	u32 cmd = msgbuf[TXGBEVF_5T_CMD];
+	bool add;
+
+	/* verify the PF is supporting the correct API */
+	if (adapter->vfinfo[vf].vf_api < txgbe_mbox_api_21)
+		return -EOPNOTSUPP;
+
+	add = !!(cmd & BIT(TXGBEVF_5T_ADD_SHIFT));
+	if (add)
+		return txgbe_add_5tuple_filter_vf(adapter, msgbuf, vf);
+
+	txgbe_del_5tuple_filter_vf(adapter, cmd, vf);
 
 	return 0;
 }
@@ -1204,6 +1293,9 @@ static int txgbe_rcv_msg_from_vf(struct txgbe_adapter *adapter, u16 vf)
 		break;
 	case TXGBE_VF_GET_FW_VERSION:
 		retval = txgbe_get_fw_version(adapter, msgbuf, vf);
+		break;
+	case TXGBE_VF_SET_5TUPLE:
+		retval = txgbe_set_5tuple_filter_vf(adapter, msgbuf, vf);
 		break;
 	case TXGBE_VF_BACKUP:
 #ifdef CONFIG_PCI_IOV

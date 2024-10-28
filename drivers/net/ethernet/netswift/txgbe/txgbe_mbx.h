@@ -97,6 +97,7 @@ enum txgbe_pfvf_api_rev {
 	txgbe_mbox_api_12,      /* API version 1.2, linux/freebsd VF driver */
 	txgbe_mbox_api_13,	/* API version 1.3, linux/freebsd VF driver */
 	txgbe_mbox_api_20,      /* API version 2.0, solaris Phase1 VF driver */
+	txgbe_mbox_api_21,      /* API version 2.1 */
 	txgbe_mbox_api_unknown, /* indicates that API version is not known */
 };
 
@@ -120,6 +121,10 @@ enum txgbe_pfvf_api_rev {
 #define TXGBE_VF_UPDATE_XCAST_MODE	0x0c
 #define TXGBE_VF_GET_LINK_STATE 0x10 /* get vf link state */
 #define TXGBE_VF_GET_FW_VERSION 0x11 /* get fw version */
+
+/* mailbox API, version 2.1 VF requests */
+#define TXGBE_VF_SET_5TUPLE	0x20 /* VF request PF for 5-tuple filter */
+
 #define TXGBE_VF_BACKUP		0x8001 /* VF requests backup */
 
 /* mode choices for TXGBE_VF_UPDATE_XCAST_MODE */
@@ -129,6 +134,19 @@ enum txgbevf_xcast_modes {
 	TXGBEVF_XCAST_MODE_ALLMULTI,
 	TXGBEVF_XCAST_MODE_PROMISC,
 };
+
+enum txgbevf_5tuple_msg {
+	TXGBEVF_5T_REQ = 0,
+	TXGBEVF_5T_CMD,
+	TXGBEVF_5T_CTRL0,
+	TXGBEVF_5T_CTRL1,
+	TXGBEVF_5T_PORT,
+	TXGBEVF_5T_DA,
+	TXGBEVF_5T_SA,
+	TXGBEVF_5T_MAX, /* must be last */
+};
+
+#define TXGBEVF_5T_ADD_SHIFT	31
 
 /* GET_QUEUES return data indices within the mailbox */
 #define TXGBE_VF_TX_QUEUES      1       /* number of Tx queues supported */

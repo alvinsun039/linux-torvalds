@@ -8313,6 +8313,8 @@ int txgbe_close(struct net_device *netdev)
 	txgbe_free_all_tx_resources(adapter);
 
 	txgbe_fdir_filter_exit(adapter);
+	memset(&adapter->ft_filter_info, 0,
+		sizeof(struct txgbe_5tuple_filter_info));
 
 	txgbe_release_hw_control(adapter);
 
@@ -13350,6 +13352,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	txgbe_mac_set_default_filter(adapter, hw->mac.perm_addr);
 	memset(&adapter->etype_filter_info, 0,
 		sizeof(struct txgbe_etype_filter_info));
+	memset(&adapter->ft_filter_info, 0,
+		sizeof(struct txgbe_5tuple_filter_info));
 
 	timer_setup(&adapter->service_timer, txgbe_service_timer, 0);
 	

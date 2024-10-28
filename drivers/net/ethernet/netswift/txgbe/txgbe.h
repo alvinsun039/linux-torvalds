@@ -235,6 +235,7 @@ struct vf_data_storage {
 	u8 trusted;
 	int xcast_mode;
 	unsigned int vf_api;
+	u16 ft_filter_idx[TXGBE_MAX_RDB_5T_CTL0_FILTERS];
 };
 
 struct vf_macvlans {
@@ -1142,6 +1143,7 @@ struct txgbe_adapter {
 	spinlock_t fdir_perfect_lock;
 
 	struct txgbe_etype_filter_info etype_filter_info;
+	struct txgbe_5tuple_filter_info ft_filter_info;
 
 #if IS_ENABLED(CONFIG_FCOE)
 	struct txgbe_fcoe fcoe;
