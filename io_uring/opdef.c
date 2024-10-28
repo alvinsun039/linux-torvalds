@@ -617,6 +617,7 @@ const struct io_cold_def io_cold_defs[] = {
 	},
 	[IORING_OP_SPLICE] = {
 		.name			= "SPLICE",
+		.cleanup		= io_splice_cleanup,
 	},
 	[IORING_OP_PROVIDE_BUFFERS] = {
 		.name			= "PROVIDE_BUFFERS",
@@ -626,6 +627,7 @@ const struct io_cold_def io_cold_defs[] = {
 	},
 	[IORING_OP_TEE] = {
 		.name			= "TEE",
+		.cleanup		= io_splice_cleanup,
 	},
 	[IORING_OP_SHUTDOWN] = {
 		.name			= "SHUTDOWN",
