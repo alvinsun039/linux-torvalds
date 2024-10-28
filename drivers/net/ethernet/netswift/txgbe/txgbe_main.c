@@ -6946,6 +6946,7 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 			}
 		}
 
+		wr32(hw, TXGBE_GPIO_INT_POLARITY, 0x0);
 		wr32(hw, TXGBE_GPIO_DDR,
 			 TXGBE_GPIO_DDR_0 | TXGBE_GPIO_DDR_1 | TXGBE_GPIO_DDR_4 | TXGBE_GPIO_DDR_5);
 		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_4 | TXGBE_GPIO_DR_5);
