@@ -478,13 +478,11 @@ static s32 txgbe_setup_sfp_modules_aml(struct txgbe_hw *hw)
  **/
 static s32 txgbe_init_phy_ops_aml(struct txgbe_hw *hw)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	s32 ret_val = 0;
 
 	txgbe_init_i2c(hw);
 	wr32(hw, 0x11220, 0xF);
 
-	mutex_init(&adapter->e56_lock);
 	/* Identify the PHY or SFP module */
 	ret_val = TCALL(hw, phy.ops.identify);
 	if (ret_val == TXGBE_ERR_SFP_NOT_SUPPORTED)

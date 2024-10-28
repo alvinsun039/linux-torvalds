@@ -7639,6 +7639,8 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	/* n-tuple support exists, always init our spinlock */
 	spin_lock_init(&adapter->fdir_perfect_lock);
 
+	mutex_init(&adapter->e56_lock);
+
 #if IS_ENABLED(CONFIG_DCB)
 
 	adapter->dcb_cfg.num_tcs.pg_tcs = 8;
