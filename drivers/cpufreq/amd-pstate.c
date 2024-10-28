@@ -1456,6 +1456,8 @@ static int amd_pstate_epp_cpu_init(struct cpufreq_policy *policy)
 	}
 	amd_pstate_boost_init(cpudata);
 
+	current_pstate_driver->adjust_perf = NULL;
+
 	return 0;
 
 free_cpudata1:
@@ -1817,8 +1819,6 @@ static int __init amd_pstate_init(void)
 	/* capability check */
 	if (cpu_feature_enabled(X86_FEATURE_CPPC)) {
 		pr_debug("AMD CPPC MSR based functionality is supported\n");
-		if (cppc_state != AMD_PSTATE_ACTIVE)
-			current_pstate_driver->adjust_perf = amd_pstate_adjust_perf;
 	} else {
 		pr_debug("AMD CPPC shared memory based functionality is supported\n");
 		static_call_update(amd_pstate_cppc_enable, shmem_cppc_enable);
