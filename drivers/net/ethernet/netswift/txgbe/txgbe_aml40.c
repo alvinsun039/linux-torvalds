@@ -262,7 +262,7 @@ static s32 txgbe_setup_sfp_modules_aml40(struct txgbe_hw *hw)
 
 	return ret_val;
 }
-#if 0 //fix compile warnning, unused now
+
 /**
  *  txgbe_init_phy_ops - PHY/SFP specific init
  *  @hw: pointer to hardware structure
@@ -274,13 +274,11 @@ static s32 txgbe_setup_sfp_modules_aml40(struct txgbe_hw *hw)
  **/
 s32 txgbe_init_phy_ops_aml40(struct txgbe_hw *hw)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	s32 ret_val = 0;
 
 	txgbe_init_i2c(hw);
 	wr32(hw, 0x11220, 0xF);
 
-	mutex_init(&adapter->e56_lock);
 	/* Identify the PHY or SFP module */
 	ret_val = TCALL(hw, phy.ops.identify);
 	if (ret_val == TXGBE_ERR_SFP_NOT_SUPPORTED)
@@ -294,13 +292,17 @@ s32 txgbe_init_phy_ops_aml40(struct txgbe_hw *hw)
 init_phy_ops_out:
 	return ret_val;
 }
-#endif
+
 s32 txgbe_init_ops_aml40(struct txgbe_hw *hw)
 {
 	struct txgbe_mac_info *mac = &hw->mac;
+	struct txgbe_phy_info *phy = &hw->phy;
 	s32 ret_val = 0;
 
 	ret_val = txgbe_init_ops_generic(hw);
+
+	/* PHY */
+	phy->ops.init = txgbe_init_phy_ops_aml40;
 
 	/* MAC */
 	mac->ops.get_media_type = txgbe_get_media_type_aml40;
