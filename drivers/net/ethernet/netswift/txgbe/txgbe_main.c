@@ -11104,7 +11104,7 @@ static void txgbe_del_udp_tunnel_port(struct net_device *dev,
 		if (!(adapter->flags & TXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 			return;
 
-		if (adapter->vxlan_port != ti->port) {
+		if (adapter->vxlan_port != ntohs(ti->port)) {
 			netdev_info(dev, "VXLAN port %d not found\n",
 				    ntohs(ti->port));
 			return;
@@ -11117,7 +11117,7 @@ static void txgbe_del_udp_tunnel_port(struct net_device *dev,
 //		if (!(adapter->flags & TXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
 //			return;
 
-		if (adapter->geneve_port != ti->port) {
+		if (adapter->geneve_port != ntohs(ti->port)) {
 			netdev_info(dev, "GENEVE port %d not found\n",
 				    ntohs(ti->port));
 			return;
