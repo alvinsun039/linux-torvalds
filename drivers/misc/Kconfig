@@ -466,6 +466,15 @@ config PCI_ENDPOINT_TEST
 	   Enable this configuration option to enable the host side test driver
 	   for PCI Endpoint.
 
+config FT_LPC
+	bool "select LPC for phytium platform"
+	depends on ARCH_PHYTIUM
+	default y
+	select IRQ_DOMAIN
+	select GENERIC_IRQ_CHIP
+	help
+	  This option enables LPC for phytium platform.
+
 config XILINX_SDFEC
 	tristate "Xilinx SDFEC 16"
 	depends on HAS_IOMEM

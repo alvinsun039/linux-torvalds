@@ -54,4 +54,12 @@
 #define PHYTIUM_CPU_E2000		0x000700
 #define PHYTIUM_CPU_D3000		0x000900
 
+#define PHYTIUM_LPC_SIRQ_BIT_KBD	1
+#define PHYTIUM_LPC_SIRQ_BIT_EC		11
+#define PHYTIUM_LPC_SIRQ_BIT_AUX	12
+
+u8 ft_lpc_read(u8 addr);
+u8 ft_lpc_write(u8 value, u8 addr);
+int phytium_lpc_irq_find_mapping(u32 offset);
+
 #endif // __PHYTIUM_PLATFORM_H_

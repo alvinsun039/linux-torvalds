@@ -11,6 +11,7 @@ menuconfig ACPI
 	depends on ARCH_SUPPORTS_ACPI
 	select PNP
 	select NLS
+	select FT_LPC if ARCH_PHYTIUM
 	select CRC32
 	default y if X86
 	help
