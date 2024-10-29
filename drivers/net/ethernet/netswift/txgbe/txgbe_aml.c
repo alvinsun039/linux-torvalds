@@ -38,6 +38,7 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 	bool link_up = false;
 	s32 ret_status = 0;
 	int i = 0, j = 0;
+	int config_retry;
 	u32 value = 0;
 
 	/* Check to see if speed passed in is supported. */
@@ -76,99 +77,102 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		return 0;
 	}
 
-	if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
-		mutex_lock(&adapter->e56_lock);
-		ret_status = txgbe_set_link_to_amlite(hw, speed);
-		mutex_unlock(&adapter->e56_lock);
-		adapter->tx_speed = speed;
-	} else {
-		mutex_lock(&adapter->e56_lock);
-		/* this ret_status for workaorund not return to upper*/
-		ret_status = txgbe_e56_reconfig_rx(hw, speed);
-		mutex_unlock(&adapter->e56_lock);
-	}
+	for (config_retry = 0; config_retry < 2; config_retry++) {
+		if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
+			mutex_lock(&adapter->e56_lock);
+			ret_status = txgbe_set_link_to_amlite(hw, speed);
+			mutex_unlock(&adapter->e56_lock);
+			adapter->tx_speed = speed;
+		} else {
+			mutex_lock(&adapter->e56_lock);
+			/* this ret_status for workaorund not return to upper*/
+			ret_status = txgbe_e56_reconfig_rx(hw, speed);
+			mutex_unlock(&adapter->e56_lock);
+		}
 
-	if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-		goto out;
-
-	do {
-		if (speed != TXGBE_LINK_SPEED_25GB_FULL)
+		if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
 			goto out;
 
-		if (!(adapter->fec_link_mode & BIT(j)) &&
-			!((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
-			j += 1;
-			continue;
-		}
-
-		/*revert to rs fec mode if all fec mode cannot link when auto try*/
-		if ((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))
-			adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
-		else
-			adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
-
-		/*if in fec auto mode, try another fec mode after no link in 1s*/
-		/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
-		mutex_lock(&adapter->e56_lock);
-		if (adapter->cur_fec_link  & TXGBE_PHY_FEC_RS) {
-			//disable BASER FEC
-			value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-			SetFields(&value, 0, 0, 0);
-			txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-
-			//enable RS FEC
-			txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
-			txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
-			txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
-			txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
-
-			txgbe_wr32_epcs(hw, 0x38018, 1024);
-			value = txgbe_rd32_epcs(hw, 0x100c8);
-			SetFields(&value, 2, 2, 1);
-			txgbe_wr32_epcs(hw, 0x100c8, value);
-		} else if (adapter->cur_fec_link & TXGBE_PHY_FEC_BASER) {
-			//disable RS FEC
-			txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
-			txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
-			txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
-			txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
-			txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
-			value = txgbe_rd32_epcs(hw, 0x100c8);
-			SetFields(&value, 2, 2, 0);
-			txgbe_wr32_epcs(hw, 0x100c8, value);
-
-			//enable BASER FEC
-			value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-			SetFields(&value, 0, 0, 1);
-			txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-		} else {
-			//disable RS FEC
-			txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
-			txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
-			txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
-			txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
-			txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
-			value = txgbe_rd32_epcs(hw, 0x100c8);
-			SetFields(&value, 2, 2, 0);
-			txgbe_wr32_epcs(hw, 0x100c8, value);
-
-			//disable BASER FEC
-			value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
-			SetFields(&value, 0, 0, 0);
-			txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
-		}
-		mutex_unlock(&adapter->e56_lock);
-
-		for (i = 0; i < 4; i++) {
-			msleep(250);
-			TCALL(hw, mac.ops.check_link,
-			&link_speed, &link_up, false);
-			if (link_up)
+		do {
+			if (speed != TXGBE_LINK_SPEED_25GB_FULL)
 				goto out;
-		}
-		j += 1;
-	} while (j < 4);
 
+			if (!(adapter->fec_link_mode & BIT(j)) &&
+				!((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
+				j += 1;
+				continue;
+			}
+
+			/*revert to rs fec mode if all fec mode cannot link when auto try*/
+			if ((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))
+				adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
+			else
+				adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
+
+			/*if in fec auto mode, try another fec mode after no link in 1s*/
+			/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
+			mutex_lock(&adapter->e56_lock);
+			if (adapter->cur_fec_link  & TXGBE_PHY_FEC_RS) {
+				//disable BASER FEC
+				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+				SetFields(&value, 0, 0, 0);
+				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+
+				//enable RS FEC
+				txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
+				txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
+				txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
+				txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
+
+				txgbe_wr32_epcs(hw, 0x38018, 1024);
+				value = txgbe_rd32_epcs(hw, 0x100c8);
+				SetFields(&value, 2, 2, 1);
+				txgbe_wr32_epcs(hw, 0x100c8, value);
+			} else if (adapter->cur_fec_link & TXGBE_PHY_FEC_BASER) {
+				//disable RS FEC
+				txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
+				txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
+				txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
+				txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
+				txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
+				value = txgbe_rd32_epcs(hw, 0x100c8);
+				SetFields(&value, 2, 2, 0);
+				txgbe_wr32_epcs(hw, 0x100c8, value);
+
+				//enable BASER FEC
+				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+				SetFields(&value, 0, 0, 1);
+				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+			} else {
+				//disable RS FEC
+				txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
+				txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
+				txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
+				txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
+				txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
+				value = txgbe_rd32_epcs(hw, 0x100c8);
+				SetFields(&value, 2, 2, 0);
+				txgbe_wr32_epcs(hw, 0x100c8, value);
+
+				//disable BASER FEC
+				value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+				SetFields(&value, 0, 0, 0);
+				txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+			}
+			mutex_unlock(&adapter->e56_lock);
+
+			for (i = 0; i < 4; i++) {
+				msleep(250);
+				TCALL(hw, mac.ops.check_link,
+				&link_speed, &link_up, false);
+				if (link_up)
+					goto out;
+			}
+			j += 1;
+		} while (j < 4);
+
+		adapter->phy_tx_ready = false;
+	}
 out:
 	return status;
 }

@@ -3502,6 +3502,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 
 		TCALL(hw, mac.ops.disable_sec_tx_path);
 	}
+	TCALL(hw, mac.ops.disable_tx_laser);
 
 	if (hw->bus.lan_id == 0) {
 		reset = TXGBE_MIS_RST_LAN0_EPHY_RST;
@@ -3807,6 +3808,7 @@ out:
 		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
 		      TXGBE_MAC_RX_CFG_RE);
 	}
+	TCALL(hw, mac.ops.enable_tx_laser);
 
 	return status;
 }

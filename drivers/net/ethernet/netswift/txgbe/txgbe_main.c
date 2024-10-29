@@ -3556,11 +3556,7 @@ static void txgbe_check_sfp_event(struct txgbe_adapter *adapter, u32 eicr)
 
 static void txgbe_check_lsc(struct txgbe_adapter *adapter)
 {
-	struct txgbe_hw *hw = &adapter->hw;
-
 	adapter->lsc_int++;
-	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
 
