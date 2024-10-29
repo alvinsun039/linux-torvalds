@@ -368,12 +368,14 @@
 #define TXGBE_MIS_RST_SW_RST            0x00000001U
 #define TXGBE_MIS_RST_LAN0_RST          0x00000002U
 #define TXGBE_MIS_RST_LAN1_RST          0x00000004U
+#define TXGBE_MIS_RST_MNG_RST           0x00000008U
 #define TXGBE_MIS_RST_LAN0_CHG_ETH_MODE 0x20000000U
 #define TXGBE_MIS_RST_LAN1_CHG_ETH_MODE 0x40000000U
 #define TXGBE_MIS_RST_GLOBAL_RST        0x80000000U
 #define TXGBE_MIS_RST_MASK      (TXGBE_MIS_RST_SW_RST | \
 				 TXGBE_MIS_RST_LAN0_RST | \
 				 TXGBE_MIS_RST_LAN1_RST)
+
 #define TXGBE_MIS_PWR_LAN_ID(_r)        ((0xC0000000U & (_r)) >> 30)
 #define TXGBE_MIS_PWR_LAN_ID_0          (1)
 #define TXGBE_MIS_PWR_LAN_ID_1          (2)
@@ -3073,6 +3075,7 @@ struct txgbe_hw {
 		? (hw)->func((hw), ##args) : TXGBE_NOT_IMPLEMENTED)
 
 /* Error Codes */
+#define TXGBE_SUCCESS                            0
 #define TXGBE_ERR                                100
 #define TXGBE_NOT_IMPLEMENTED                    0x7FFFFFFF
 /* (-TXGBE_ERR, TXGBE_ERR): reserved for non-txgbe defined error code */
@@ -3123,6 +3126,7 @@ struct txgbe_hw {
 #define TXGBE_ERR_REGISTER                      -(TXGBE_ERR+45)
 #define TXGBE_ERR_MBX                           -(TXGBE_ERR+46)
 #define TXGBE_ERR_MNG_ACCESS_FAILED             -(TXGBE_ERR+47)
+#define TXGBE_ERR_ARP_DISABLE_FAILED            -(TXGBE_ERR+48)
 
 /**
  * register operations

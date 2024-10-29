@@ -7489,3 +7489,57 @@ int txgbe_is_lldp(struct txgbe_hw *hw)
 
 	return 0;
 }
+
+int txgbe_fw_quirks(struct txgbe_hw *hw)
+{
+	u32 fw_version = 0;
+	u32 arp = 0;
+	u32 rst_delay = 0;
+	u32 reset_status = 0;
+	u32 i = 0;
+	u32 oem_flag = 0;
+	int status = 0;
+
+	txgbe_flash_read_dword(hw, 0x13a, &fw_version);
+
+	if (fw_version == 0x5042000f) {
+		txgbe_flash_read_dword(hw, 0xFF010, &arp);
+		if (arp == 0xffffffff) {
+			status = fmgr_usr_cmd_op(hw, 0x6);	/* write enable*/
+			status = fmgr_usr_cmd_op(hw, 0x98); /* global protection un-lock*/
+			txgbe_flash_write_unlock(hw);
+			msleep(1000);
+
+			/* disable arp */
+			txgbe_flash_write_dword(hw, 0xFF010, 0xe);
+
+			/* write oem_flag */
+			txgbe_flash_write_dword(hw, 0xFF000, 0x2055aa);
+
+			txgbe_flash_read_dword(hw, 0xFF010, &arp);
+			txgbe_flash_read_dword(hw, 0xFF000, &oem_flag);
+			if (arp != 0xe || oem_flag != 0x2055aa)
+				return TXGBE_ERR_ARP_DISABLE_FAILED;
+
+			wr32(hw, TXGBE_MIS_RST,
+				TXGBE_MIS_RST_MNG_RST | rd32(hw, TXGBE_MIS_RST));
+			TXGBE_WRITE_FLUSH(hw);
+
+			rst_delay = (rd32(hw, TXGBE_MIS_RST_ST) &
+			TXGBE_MIS_RST_ST_RST_INIT) >>
+			TXGBE_MIS_RST_ST_RST_INI_SHIFT;
+
+			for (i = 0; i < rst_delay + 20; i++) {
+				reset_status = rd32(hw, TXGBE_MIS_RST_ST);
+				if (!(reset_status & TXGBE_MIS_RST_ST_DEV_RST_ST_MASK))
+					break;
+				mdelay(100);
+			}
+
+			if (i == (rst_delay + 20))
+				return TXGBE_ERR_ARP_DISABLE_FAILED;
+		}
+	}
+
+	return TXGBE_SUCCESS;
+}
