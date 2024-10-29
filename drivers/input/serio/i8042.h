@@ -21,6 +21,8 @@
 #include "i8042-sparcio.h"
 #elif defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(CONFIG_LOONGARCH)
 #include "i8042-acpipnpio.h"
+#elif defined(CONFIG_ARM64)
+#include "i8042-phytiumio.h"
 #else
 #include "i8042-io.h"
 #endif

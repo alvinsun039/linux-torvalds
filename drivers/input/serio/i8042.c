@@ -758,6 +758,7 @@ static irqreturn_t i8042_aux_test_irq(int irq, void *dev_id)
 	int ret = 0;
 
 	spin_lock_irqsave(&i8042_lock, flags);
+
 	str = i8042_read_status();
 	if (str & I8042_STR_OBF) {
 		data = i8042_read_data();
@@ -1517,6 +1518,7 @@ static int i8042_setup_kbd(void)
 	free_irq(I8042_KBD_IRQ, i8042_platform_device);
  err_free_port:
 	i8042_free_kbd_port();
+
 	return error;
 }
 
