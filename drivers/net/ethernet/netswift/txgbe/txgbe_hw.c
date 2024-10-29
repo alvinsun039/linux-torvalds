@@ -4624,7 +4624,7 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 
 	txgbe_wr32_epcs(hw, 0x78002, 0x0);
 	txgbe_wr32_epcs(hw, 0x78001, 0x7);
-	if (AN73_TRAINNING_MODE == 1)
+	if (AN73_TRAINNING_MODE == 1 || AN73_TRAINNING_MODE == 2)
 		txgbe_wr32_epcs(hw, 0x78003, 0x1);
 
 	/* 2. Disable xpcs AN-73 */

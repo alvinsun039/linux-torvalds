@@ -116,7 +116,7 @@ void txgbe_bp_down_event(struct txgbe_adapter *adapter)
 		txgbe_wr32_epcs(hw, 0x78001, 0x0007);
 		break;
 	default:
-		if (AN73_TRAINNING_MODE == 1)
+		if (AN73_TRAINNING_MODE == 1 || AN73_TRAINNING_MODE == 2)
 			msleep(100);
 		else
 			msleep(1000);
@@ -546,7 +546,7 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 	}
 	e_dev_info("Trainning failure\n");
 
-	if (AN73_TRAINNING_MODE == 0)
+	if (AN73_TRAINNING_MODE == 0 || AN73_TRAINNING_MODE == 2)
 		status |= en_cl72_krtr(1, adapter);
 
 	return status;
