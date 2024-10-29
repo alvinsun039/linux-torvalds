@@ -8597,9 +8597,9 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 		mac->ops.setup_link = txgbe_setup_mac_link;
 		mac->ops.set_rate_select_speed =
 					       txgbe_set_hard_rate_select_speed;
-		hw->phy.autoneg_advertised = 0;
 	}
 
+	hw->phy.autoneg_advertised = 0;
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 	e_info(probe, "detected SFP+: %d\n", hw->phy.sfp_type);
 
