@@ -4258,9 +4258,13 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 			     struct txgbe_ring *ring)
 {
 	struct txgbe_hw *hw = &adapter->hw;
+	struct net_device *netdev = adapter->netdev;
 	u64 rdba = ring->dma;
 	u32 rxdctl;
 	u16 reg_idx = ring->reg_idx;
+#if defined(NETIF_F_HW_VLAN_CTAG_FILTER) || defined(NETIF_F_HW_VLAN_STAG_FILTER) || defined(NETIF_F_HW_VLAN_FILTER)
+		netdev_features_t features = netdev->features;
+#endif
 
 	/* disable queue to avoid issues while updating state */
 	rxdctl = rd32(hw, TXGBE_PX_RR_CFG(reg_idx));
@@ -4297,6 +4301,17 @@ void txgbe_configure_rx_ring(struct txgbe_adapter *adapter,
 		rxdctl |= 0 << TXGBE_PX_RR_CFG_RR_SIZE_SHIFT;
 	else
 		rxdctl |= (ring->count / 128) << TXGBE_PX_RR_CFG_RR_SIZE_SHIFT;
+
+#if (defined NETIF_F_HW_VLAN_CTAG_RX)
+			if (features & NETIF_F_HW_VLAN_CTAG_RX)
+#elif (defined NETIF_F_HW_VLAN_STAG_RX)
+			if (features & NETIF_F_HW_VLAN_STAG_RX)
+#else
+			if (features & NETIF_F_HW_VLAN_RX)
+#endif
+				rxdctl |= TXGBE_PX_RR_CFG_VLAN;
+			else
+				rxdctl &= ~TXGBE_PX_RR_CFG_VLAN;
 
 	rxdctl |= 0x1 << TXGBE_PX_RR_CFG_RR_THER_SHIFT;
 	wr32(hw, TXGBE_PX_RR_CFG(reg_idx), rxdctl);
@@ -5417,30 +5432,6 @@ void txgbe_set_rx_mode(struct net_device *netdev)
 //	wr32(hw, TXGBE_PSR_VLAN_CTL, vlnctrl);
 	wr32(hw, TXGBE_PSR_CTL, fctrl);
 	wr32(hw, TXGBE_PSR_VM_L2CTL(VMDQ_P(0)), vmolr);
-
-#if (defined NETIF_F_HW_VLAN_CTAG_RX) && (defined NETIF_F_HW_VLAN_STAG_RX)
-	if ((features & NETIF_F_HW_VLAN_CTAG_RX) &&
-		(features & NETIF_F_HW_VLAN_STAG_RX))
-#elif (defined NETIF_F_HW_VLAN_CTAG_RX)
-	if (features & NETIF_F_HW_VLAN_CTAG_RX)
-#elif (defined NETIF_F_HW_VLAN_STAG_RX)
-	if (features & NETIF_F_HW_VLAN_STAG_RX)
-#else
-	if (features & NETIF_F_HW_VLAN_RX)
-#endif
-		txgbe_vlan_strip_enable(adapter);
-	else
-		txgbe_vlan_strip_disable(adapter);
-
-#if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
-	if (netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER) {
-#if defined(NETIF_F_HW_VLAN_STAG_FILTER)
-		netdev->features |= NETIF_F_HW_VLAN_STAG_FILTER;
-	} else {
-		netdev->features &= ~NETIF_F_HW_VLAN_STAG_FILTER;
-#endif
-	}
-#endif
 
 #if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
 		if (features & NETIF_F_HW_VLAN_CTAG_FILTER)
@@ -10893,6 +10884,17 @@ static netdev_features_t txgbe_fix_features(struct net_device *netdev,
 			features &= ~NETIF_F_LRO;
 		}
 	}
+
+#if defined(NETIF_F_HW_VLAN_CTAG_FILTER)
+		if (features & NETIF_F_HW_VLAN_CTAG_FILTER) {
+#if defined(NETIF_F_HW_VLAN_STAG_FILTER)
+			features |= NETIF_F_HW_VLAN_STAG_FILTER;
+		} else {
+			features &= ~NETIF_F_HW_VLAN_STAG_FILTER;
+#endif
+		}
+#endif
+
 #if (defined NETIF_F_HW_VLAN_CTAG_RX) && (defined NETIF_F_HW_VLAN_STAG_RX)
 	if (!(features & NETIF_F_HW_VLAN_CTAG_RX))
 		features &= ~NETIF_F_HW_VLAN_STAG_RX;
@@ -11005,16 +11007,23 @@ static int txgbe_set_features(struct net_device *netdev,
 
 	netdev->features = features;
 
+#ifdef NETIF_F_HW_VLAN_CTAG_FILTER
+		if (changed & NETIF_F_HW_VLAN_CTAG_RX)
+			need_reset = true;
+#endif
+#ifdef NETIF_F_HW_VLAN_FILTER
+		if (changed & NETIF_F_HW_VLAN_RX)
+			need_reset = true;
+#endif
+
 	if (need_reset)
 		txgbe_do_reset(netdev);
 #ifdef NETIF_F_HW_VLAN_CTAG_FILTER
-	else if (changed & (NETIF_F_HW_VLAN_CTAG_RX |
-				NETIF_F_HW_VLAN_CTAG_FILTER))
+	else if (changed & NETIF_F_HW_VLAN_CTAG_FILTER)
 		txgbe_set_rx_mode(netdev);
 #endif
 #ifdef NETIF_F_HW_VLAN_FILTER
-	else if (changed & (NETIF_F_HW_VLAN_RX |
-				NETIF_F_HW_VLAN_FILTER))
+	else if (changed & NETIF_F_HW_VLAN_FILTER)
 		txgbe_set_rx_mode(netdev);
 #endif
 	return 0;
@@ -12043,9 +12052,9 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 			    NETIF_F_HW_VLAN_CTAG_RX;
 #endif
 
-#ifdef NETIF_F_HW_VLAN_STAG_TX
-	netdev->features |= NETIF_F_HW_VLAN_STAG_TX |
-			    NETIF_F_HW_VLAN_STAG_RX;
+#ifdef NETIF_F_HW_VLAN_CTAG_TX
+	/* set this bit last since it cannot be part of hw_features */
+	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 #endif
 
 #ifdef NETIF_F_HW_VLAN_TX
@@ -12083,10 +12092,11 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 #endif
 #endif /* HAVE_NDO_SET_FEATURES */
 
-#ifdef NETIF_F_HW_VLAN_CTAG_TX
-	/* set this bit last since it cannot be part of hw_features */
-	netdev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
+#ifdef NETIF_F_HW_VLAN_STAG_TX
+	netdev->features |= NETIF_F_HW_VLAN_STAG_TX |
+			    NETIF_F_HW_VLAN_STAG_RX;
 #endif
+
 #ifdef NETIF_F_HW_VLAN_STAG_TX
 	netdev->features |= NETIF_F_HW_VLAN_STAG_FILTER;
 #endif
