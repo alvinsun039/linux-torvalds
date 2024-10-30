@@ -4500,7 +4500,7 @@ static unsigned int txgbe_max_channels(struct txgbe_adapter *adapter)
 		max_combined = 1;
 	} else if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED) {
 		/* SR-IOV currently only allows one queue on the PF */
-		max_combined = 1;
+		max_combined = adapter->ring_feature[RING_F_RSS].mask + 1;
 	} else if (tcs > 1) {
 		/* For DCB report channels per traffic class */
 		if (tcs > 4) {
