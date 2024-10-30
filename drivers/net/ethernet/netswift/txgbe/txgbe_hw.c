@@ -4932,7 +4932,8 @@ s32 txgbe_set_link_to_kx(struct txgbe_hw *hw,
 	struct txgbe_adapter *adapter = hw->back;
 
 	/* check link status, if already set, skip setting it again */
-	if (hw->link_status == TXGBE_LINK_STATUS_KX) {
+	if (hw->link_status == TXGBE_LINK_STATUS_KX &&
+		(hw->subsystem_device_id & 0xF0) != TXGBE_ID_MAC_SGMII) {
 		goto out;
 	}
 	e_dev_info("It is set to kx. speed =0x%x\n", speed);
