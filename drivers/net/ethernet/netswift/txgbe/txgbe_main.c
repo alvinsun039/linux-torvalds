@@ -4546,9 +4546,9 @@ static void txgbe_set_rx_buffer_len(struct txgbe_adapter *adapter)
 	 */
 	for (i = 0; i < adapter->num_rx_queues; i++) {
 		rx_ring = adapter->rx_ring[i];
-		
+#ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
 		clear_bit(__TXGBE_RX_3K_BUFFER, &rx_ring->state);
-
+#endif
 		if (adapter->flags & TXGBE_FLAG_RX_HS_ENABLED) {
 			rx_ring->rx_buf_len = TXGBE_RX_HDR_SIZE;
 			set_ring_hs_enabled(rx_ring);
