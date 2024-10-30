@@ -3147,6 +3147,15 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	u32 serial_num_dword0_t, serial_num_dword1_t, serial_num_dword2_t;
 	u8 status = 0, skip = 0, flash_vendor = 0;
 	u32 sector_num = 0, read_data = 0, i = 0;
+	u32 sn[24];
+	u8 sn_str[40];
+	u8 sn_is_str = true;
+	u8 vpd_tend[256];
+	u32 curadr = 0;
+	u32 vpdadr = 0;
+	u8 id_str_len, pn_str_len, sn_str_len, rv_str_len;
+	u16 vpd_ro_len;
+	u32 chksum = 0;
 
 	read_data = rd32(hw, 0x10200);
 	if (read_data & 0x80000000) {
@@ -3194,6 +3203,12 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	txgbe_flash_read_dword(hw, MAC_ADDR1_WORD1_OFFSET_1G, &mac_addr1_dword1_t);
 	mac_addr1_dword1_t = mac_addr1_dword1_t & U16_MAX;
 
+	for (i = 0; i < 24; i++)
+		txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4 * i, &sn[i]);
+
+	if (sn[23] == U32_MAX)
+		sn_is_str = false;
+
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G, &serial_num_dword0_t);
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4, &serial_num_dword1_t);
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, &serial_num_dword2_t);
@@ -3205,7 +3220,70 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	status = fmgr_usr_cmd_op(hw, 0x98); /* global protection un-lock*/
 	txgbe_flash_write_unlock(hw);
 	msleep(1000);
-	
+
+	//rebuild vpd
+	memset(vpd_tend, 0xff, sizeof(vpd_tend));
+	curadr = TXGBE_VPD_OFFSET + 1;
+	id_str_len = data[curadr] | data[curadr + 1] << 8;
+	curadr += (7 + id_str_len);
+	pn_str_len = data[curadr];
+	curadr += 1 + pn_str_len;
+
+	for (i = 0; i < curadr - TXGBE_VPD_OFFSET; i++)
+		vpd_tend[i] = data[TXGBE_VPD_OFFSET + i];
+
+	memset(sn_str, 0x0, sizeof(sn_str));
+	if (sn_is_str) {
+		for (i = 0; i < 24; i++)
+			sn_str[i] = sn[23-i];
+
+		sn_str_len = strlen(sn_str);
+	} else {
+		sn_str_len = 0x12;
+		sprintf(sn_str, "%02x%08x%08x", (serial_num_dword2_t & 0xff), serial_num_dword1_t, serial_num_dword0_t);
+	}
+
+	vpdadr = curadr - TXGBE_VPD_OFFSET;
+
+	if (data[curadr] == 'S' && data[curadr + 1] == 'N') {
+		if (data[curadr + 2]) {
+			for (i = sn_str_len; i < data[curadr + 2]; i++)
+				sn_str[i] = 0x20;
+			sn_str_len = data[curadr + 2];
+		}
+		curadr += 3 + data[curadr + 2];
+		rv_str_len = data[2 + curadr];
+	} else {
+		rv_str_len = data[2 + curadr];
+	}
+
+	vpd_tend[vpdadr] = 'S';
+	vpd_tend[vpdadr + 1] = 'N';
+	vpd_tend[vpdadr + 2] = sn_str_len;
+
+	for (i = 0; i < sn_str_len; i++)
+		vpd_tend[vpdadr + 3 + i] = sn_str[i];
+
+	vpdadr = vpdadr + 3 + sn_str_len;
+
+	for (i = 0; i < 3; i++)
+		vpd_tend[vpdadr + i] = data[curadr + i];
+
+	vpdadr += 3;
+	for (i = 0; i < rv_str_len; i++)
+		vpd_tend[vpdadr + i] = 0x0;
+
+	vpdadr += rv_str_len;
+	vpd_ro_len = pn_str_len + sn_str_len + rv_str_len + 9;
+	vpd_tend[4 + id_str_len] = vpd_ro_len & 0xff;
+	vpd_tend[5 + id_str_len] = (vpd_ro_len >> 8) & 0xff;
+
+	for (i = 0; i < vpdadr; i++)
+		chksum += vpd_tend[i];
+	chksum = ~(chksum & 0xff) + 1;
+	vpd_tend[vpdadr - rv_str_len] = chksum;
+	vpd_tend[vpdadr] = 0x78;
+
 	/*Note: for Spanish FLASH, first 8 sectors (4KB) in sector0 (64KB) 
 	need to use a special erase command (4K sector erase)*/
 	if (flash_vendor == 1) {
@@ -3239,7 +3317,9 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		read_data = __le32_to_cpu(read_data);
 		skip = ((i * 4 == MAC_ADDR0_WORD0_OFFSET_1G) || (i * 4 == MAC_ADDR0_WORD1_OFFSET_1G) ||
 			(i * 4 == MAC_ADDR1_WORD0_OFFSET_1G) || (i * 4 == MAC_ADDR1_WORD1_OFFSET_1G) ||
-			(i * 4 >= PRODUCT_SERIAL_NUM_OFFSET_1G && i * 4 <= PRODUCT_SERIAL_NUM_OFFSET_1G + 8));
+			(i * 4 >= PRODUCT_SERIAL_NUM_OFFSET_1G && i * 4 <= PRODUCT_SERIAL_NUM_OFFSET_1G + 92) ||
+			(i * 4 >= TXGBE_VPD_OFFSET && i * 4 < TXGBE_VPD_END) ||
+			(i * 4 == 0x15c));
 		if (read_data != U32_MAX && !skip) {
 			status = txgbe_flash_write_dword(hw, i * 4, read_data);
 			if (status) {
@@ -3254,13 +3334,46 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		}
 	}
 
+	for (i = 0; i < 256 / 4; i++) {
+		read_data = vpd_tend[4 * i + 3] << 24 | vpd_tend[4 * i + 2] << 16 | vpd_tend[4 * i + 1] << 8 | vpd_tend[4 * i];
+		read_data = __le32_to_cpu(read_data);
+		if (read_data != U32_MAX) {
+			status = txgbe_flash_write_dword(hw, TXGBE_VPD_OFFSET + i * 4, read_data);
+			if (status) {
+				printk("ERROR: Program 0x%08x @addr: 0x%08x is failed !!\n", read_data, i * 4);
+				txgbe_flash_read_dword(hw, i * 4, &read_data);
+				printk("		 Read data from Flash is: 0x%08x\n", read_data);
+				return 1;
+			}
+		}
+	}
+
+	chksum = 0;
+	for (i = 0; i < 0x1000; i += 2) {
+		if (i >= TXGBE_VPD_OFFSET && i < TXGBE_VPD_END)
+			chksum += (vpd_tend[i - TXGBE_VPD_OFFSET + 1] << 8 | vpd_tend[i - TXGBE_VPD_OFFSET]);
+		else if (i == 0x15e)
+			continue;
+		else
+			chksum += (data[i + 1] << 8 | data[i]);
+	}
+	chksum = 0xbaba - chksum;
+	chksum &= 0xffff;
+	status = txgbe_flash_write_dword(hw, 0x15e, 0xffff0000 | chksum);
+
 	txgbe_flash_write_dword(hw, MAC_ADDR0_WORD0_OFFSET_1G, mac_addr0_dword0_t);
 	txgbe_flash_write_dword(hw, MAC_ADDR0_WORD1_OFFSET_1G, (mac_addr0_dword1_t | 0x80000000));//lan0
 	txgbe_flash_write_dword(hw, MAC_ADDR1_WORD0_OFFSET_1G, mac_addr1_dword0_t);
 	txgbe_flash_write_dword(hw, MAC_ADDR1_WORD1_OFFSET_1G, (mac_addr1_dword1_t | 0x80000000));//lan1
-	txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G, serial_num_dword0_t);
-	txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4, serial_num_dword1_t);
-	txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, serial_num_dword2_t);
+	if (sn_is_str) {
+		for (i = 0; i < 24; i++) {
+			txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4 * i, sn[i]);
+		}
+	} else {
+		txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G, serial_num_dword0_t);
+		txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4, serial_num_dword1_t);
+		txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, serial_num_dword2_t);
+	}
 
 	wr32(hw, 0x10200, rd32(hw, 0x10200) | 0x80000000);
 
