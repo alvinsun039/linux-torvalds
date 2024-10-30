@@ -517,6 +517,9 @@ static int txgbe_set_vf_lpe(struct txgbe_adapter *adapter, u32 max_frame,
 		break;
 	}
 
+	if (max_frame > (pf_max_frame + ETH_FCS_LEN))
+		err = -EINVAL;
+
 	/* determine VF receive enable location */
 	vf_shift = vf % 32;
 	reg_offset = vf / 32;
