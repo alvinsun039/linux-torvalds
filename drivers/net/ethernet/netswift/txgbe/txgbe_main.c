@@ -4360,7 +4360,7 @@ static void txgbe_configure_tx(struct txgbe_adapter *adapter)
 
 	/* enable mac transmitter */
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-		wr32(hw, TXGBE_TSC_CTL, 0);
+		TCALL(hw, mac.ops.enable_sec_tx_path);
 
 	/* enable mac transmitter */
 	wr32m(hw, TXGBE_MAC_TX_CFG,

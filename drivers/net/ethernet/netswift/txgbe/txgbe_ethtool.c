@@ -2823,12 +2823,19 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 
 	txgbe_configure_tx_ring(adapter, tx_ring);
 	/* enable mac transmitter */
+
 	if (hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
 				~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
 				TXGBE_MAC_TX_CFG_AML_SPEED_40G);
 	} else if (hw->mac.type == txgbe_mac_aml) {
-		wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
+		if ((rd32(hw, TXGBE_CFG_PORT_ST) & TXGBE_CFG_PORT_ST_AML_LINK_10G) ==
+						TXGBE_CFG_PORT_ST_AML_LINK_10G)
+			wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
+					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
+					TXGBE_MAC_TX_CFG_AML_SPEED_10G);
+		else
+			wr32(hw, TXGBE_MAC_TX_CFG, (rd32(hw, TXGBE_MAC_TX_CFG) &
 					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
 					TXGBE_MAC_TX_CFG_AML_SPEED_25G);
 	} else {
@@ -2842,6 +2849,7 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
 				TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
 	}
+
 	/* Setup Rx Descriptor ring and Rx buffers */
 	rx_ring->count = TXGBE_DEFAULT_RXD;
 	rx_ring->queue_index = 0;
@@ -2899,7 +2907,9 @@ static int txgbe_setup_config(struct txgbe_adapter *adapter)
 
 	/* enable mac transmitter */
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
-		wr32(hw, TXGBE_TSC_CTL, 0);
+		wr32m(hw, TXGBE_TSC_CTL,
+			TXGBE_TSC_CTL_TX_DIS | TXGBE_TSC_MACTX_AFIFO_RD_WTRMRK, 0xd0000);
+
 		wr32m(hw, TXGBE_RSC_CTL,
 			TXGBE_RSC_CTL_RX_DIS, 0);
 	}
@@ -2922,6 +2932,8 @@ static int txgbe_setup_mac_loopback_test(struct txgbe_adapter *adapter)
 
 static void txgbe_mac_loopback_cleanup(struct txgbe_adapter *adapter)
 {
+	wr32m(&adapter->hw, TXGBE_TSC_CTL,
+		TXGBE_TSC_MACTX_AFIFO_RD_WTRMRK, 0x20000);
 	wr32m(&adapter->hw, TXGBE_MAC_RX_CFG,
 		TXGBE_MAC_RX_CFG_LM, ~TXGBE_MAC_RX_CFG_LM);
 	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
@@ -3279,8 +3291,6 @@ skip_loopback:
 		clear_bit(__TXGBE_TESTING, &adapter->state);
 		if (if_running)
 			txgbe_open(netdev);
-		else
-			TCALL(hw, mac.ops.disable_tx_laser);
 	} else {
 		e_info(hw, "online testing starting\n");
 

@@ -1484,6 +1484,7 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_TSC_ST_SECTX_RDY          0x00000001U
 #define TXGBE_TSC_ST_OFF_DIS            0x00000002U
 #define TXGBE_TSC_ST_ECC_TXERR          0x00000004U
+#define TXGBE_TSC_MACTX_AFIFO_RD_WTRMRK 0x000f0000U
 
 /* LinkSec (MacSec) Registers */
 #define TXGBE_TSC_LSEC_CAP              0x1D200
