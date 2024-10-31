@@ -2246,18 +2246,15 @@ union txgbe_atr_hash_dword {
 
 struct txgbe_ethertype_filter {
 	u16 rule_idx;
+	u64 action;
 	u16 ethertype;
 	u32 etqf;
 	u32 etqs;
-	/**
-	 * If this filter is added by configuration,
-	 * it should not be removed.
-	 */
-	bool conf;
 };
 
 /* Structure to store ethertype filters' info. */
 struct txgbe_etype_filter_info {
+	int count;
 	u8 ethertype_mask;  /* Bit mask for every used ethertype filter */
 	/* store used ethertype filters */
 	struct txgbe_ethertype_filter etype_filters[TXGBE_MAX_PSR_ETYPE_SWC_FILTERS];
