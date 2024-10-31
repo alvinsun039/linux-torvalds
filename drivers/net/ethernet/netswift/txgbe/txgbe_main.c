@@ -4014,7 +4014,7 @@ void txgbe_store_reta(struct txgbe_adapter *adapter)
 	}
 }
 
-static void txgbe_setup_reta(struct txgbe_adapter *adapter)
+void txgbe_setup_reta(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 i, j;

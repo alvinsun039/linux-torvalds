@@ -1410,6 +1410,7 @@ void txgbe_dbg_init(void);
 void txgbe_dbg_exit(void);
 #endif /* HAVE_TXGBE_DEBUG_FS */
 void txgbe_dump(struct txgbe_adapter *adapter);
+void txgbe_setup_reta(struct txgbe_adapter *adapter);
 
 static inline struct netdev_queue *txring_txq(const struct txgbe_ring *ring)
 {

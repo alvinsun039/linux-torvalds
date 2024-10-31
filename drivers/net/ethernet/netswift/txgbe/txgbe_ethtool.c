@@ -4436,7 +4436,7 @@ static int txgbe_set_rxfh(struct net_device *netdev, const u32 *indir,
 	if (key)
 		memcpy(adapter->rss_key, key, txgbe_get_rxfh_key_size(netdev));
 
-	txgbe_store_reta(adapter);
+	txgbe_setup_reta(adapter);
 
 	return 0;
 }
