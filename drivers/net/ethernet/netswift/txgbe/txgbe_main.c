@@ -594,10 +594,6 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	u32 value2 = 0, value3 = 0;
 	u32 head, tail;
 	u16 vid = 0;
-	u32 value_uncor = 0;
-	u32 value_cor = 0;
-	int pos;
-	bool ims_status =false;
 
 #define TX_TIMEO_LIMIT 16000
 	for (i = 0; i < adapter->num_tx_queues; i++) {
@@ -639,29 +635,9 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"PX_IMS0 value is 0x%08x, PX_IMS1 value is 0x%08x\n", value2, value3);
 
-	pos = pci_find_ext_capability(adapter->pdev, PCI_EXT_CAP_ID_ERR);
-	if (!pos)
-		return;
-
-	pci_read_config_dword(adapter->pdev, pos + PCI_ERR_UNCOR_STATUS, &value_uncor);
-	pci_read_config_dword(adapter->pdev, pos + PCI_ERR_COR_STATUS, &value_cor);
-
-	if (adapter->num_tx_queues <= 32)
-		ims_status = (value2 != TXGBE_FAILED_READ_CFG_DWORD) ? true : false;
-	else
-		ims_status = ((value2 != TXGBE_FAILED_READ_CFG_DWORD) &&
-					 (value3 != TXGBE_FAILED_READ_CFG_DWORD)) ?
-					 true : false;
-
-	/* only ims is not equal to zero,
-	 * can access pcie configuration space,
-	 * and aer error is not detected,
-	 * lan reset or do recovery can be skipped.
-	 */
 	if ((value2 || value3) &&
-		ims_status &&
-		!value_uncor &&
-		!value_cor) {
+		(value2 != TXGBE_FAILED_READ_CFG_DWORD) &&
+		(value3 != TXGBE_FAILED_READ_CFG_DWORD)) {
 		ERROR_REPORT1(TXGBE_ERROR_POLLING, "clear interrupt mask.\n");
 		wr32(&adapter->hw, TXGBE_PX_ICS(0), value2);
 		wr32(&adapter->hw, TXGBE_PX_IMC(0), value2);
