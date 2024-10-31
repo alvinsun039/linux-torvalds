@@ -587,43 +587,58 @@ static void ngbe_tx_timeout_reset(struct ngbe_adapter *adapter)
 {
 	struct ngbe_adapter *adapter = netdev_priv(netdev);
 	struct ngbe_hw *hw = &adapter->hw;
+	bool tdm_desc_fatal = false;
+	u16 vid, pci_cmd;	u32 head, tail;
+	u32 value = 0;
 	int i;
-	u16 vid = 0;
-	u16 cmd = 0;
-	u32 reg32 = 0;
-	u32 head, tail;
 
 	pci_read_config_word(adapter->pdev, PCI_VENDOR_ID, &vid);
 	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci vendor id is 0x%x\n", vid);
 
-	pci_read_config_word(adapter->pdev, PCI_COMMAND, &cmd);
-	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", cmd);
-
-	reg32 = rd32(&adapter->hw, 0x10000);
-	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", reg32);
+	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", pci_cmd);
+	value = rd32(&adapter->hw, 0x10000);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d0);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d0 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d4);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d4 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d8);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d8 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180dc);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180dc value is 0x%08x\n", value);
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		head = rd32(&adapter->hw, NGBE_PX_TR_RP(adapter->tx_ring[i]->reg_idx));
 		tail = rd32(&adapter->hw, NGBE_PX_TR_WP(adapter->tx_ring[i]->reg_idx));
 
 		ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"tx ring %d next_to_use is %d, next_to_clean is %d\n", 
-			i, adapter->tx_ring[i]->next_to_use, adapter->tx_ring[i]->next_to_clean);
+			      "tx ring %d next_to_use is %d, next_to_clean is %d\n",
+			      i, adapter->tx_ring[i]->next_to_use,
+			      adapter->tx_ring[i]->next_to_clean);
 		ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"tx ring %d hw rp is 0x%x, wp is 0x%x\n", i, head, tail);
+			      "tx ring %d hw rp is 0x%x, wp is 0x%x\n",
+			      i, head, tail);
 	}
 
-	reg32 = rd32(&adapter->hw, NGBE_PX_IMS);
+	value = rd32(&adapter->hw, NGBE_PX_IMS);
 	ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"PX_IMS value is 0x%08x\n", reg32);
-	if (reg32 && reg32 != NGBE_FAILED_READ_CFG_DWORD) {
+		      "PX_IMS value is 0x%08x\n", value);
+
+	if (value && value != NGBE_FAILED_READ_CFG_DWORD) {
 		ERROR_REPORT1(NGBE_ERROR_POLLING, "clear interrupt mask.\n");
-		wr32(&adapter->hw, NGBE_PX_ICS, reg32);
-		wr32(&adapter->hw, NGBE_PX_IMC, reg32);
+		wr32(&adapter->hw, NGBE_PX_ICS, value);
+		wr32(&adapter->hw, NGBE_PX_IMC, value);
 	}
+
+	/* only check pf queue tdm desc error : [0,7] is valid */
+	if (rd32(&adapter->hw, NGBE_TDM_DESC_FATAL) & GENMASK(7, 0))
+		tdm_desc_fatal = true;
 
 	if (NGBE_RECOVER_CHECK == 1) {
-		if (vid == NGBE_FAILED_READ_CFG_WORD) {
+		if (vid == NGBE_FAILED_READ_CFG_WORD ||
+		    tdm_desc_fatal ||
+		    !(pci_cmd & BIT(1))) {
 			ngbe_tx_timeout_dorecovery(adapter);
 		} else {
 			ngbe_print_tx_hang_status(adapter);
@@ -5674,6 +5689,7 @@ void ngbe_reset(struct ngbe_adapter *adapter)
 		break;
 	case NGBE_ERR_MASTER_REQUESTS_PENDING:
 		e_dev_err("master disable timed out\n");
+		ngbe_tx_timeout_dorecovery(adapter);
 		break;
 	case NGBE_ERR_EEPROM_VERSION:
 		/* We are running on a pre-production device, log a warning */
