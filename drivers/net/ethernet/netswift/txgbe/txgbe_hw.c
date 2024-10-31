@@ -5710,13 +5710,6 @@ int txgbe_reset_misc(struct txgbe_hw *hw)
 	wr32m(hw, TXGBE_MIS_RST_ST,
 		TXGBE_MIS_RST_ST_RST_INIT, 0xA00);
 
-	/* errata 4: initialize mng flex tbl and wakeup flex tbl*/
-	wr32(hw, TXGBE_PSR_MNG_FLEX_SEL, 0);
-	for (i = 0; i < 16; i++) {
-		wr32(hw, TXGBE_PSR_MNG_FLEX_DW_L(i), 0);
-		wr32(hw, TXGBE_PSR_MNG_FLEX_DW_H(i), 0);
-		wr32(hw, TXGBE_PSR_MNG_FLEX_MSK(i), 0);
-	}
 	wr32(hw, TXGBE_PSR_LAN_FLEX_SEL, 0);
 	for (i = 0; i < 16; i++) {
 		wr32(hw, TXGBE_PSR_LAN_FLEX_DW_L(i), 0);

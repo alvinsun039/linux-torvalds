@@ -12222,7 +12222,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		&adapter->eeprom_cap);
 
 	if((hw->subsystem_device_id & TXGBE_WOL_MASK) == TXGBE_WOL_SUP &&
-		hw->bus.lan_id == 0) {
+		txgbe_wol_supported(adapter)) {
 		adapter->wol = TXGBE_PSR_WKUP_CTL_MAG;
 		wr32(hw, TXGBE_PSR_WKUP_CTL, adapter->wol);
 	}
