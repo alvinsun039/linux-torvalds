@@ -13644,6 +13644,8 @@ static void __devexit txgbe_remove(struct pci_dev *pdev)
 	if (!adapter)
 		return;
 
+	mutex_destroy(&adapter->e56_lock);
+
 	hw = &adapter->hw;
 	txgbe_mac_set_default_filter(adapter, hw->mac.perm_addr);
 
