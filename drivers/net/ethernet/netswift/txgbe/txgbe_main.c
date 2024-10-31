@@ -635,16 +635,12 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"PX_IMS0 value is 0x%08x, PX_IMS1 value is 0x%08x\n", value2, value3);
 
-	if ((value2 || value3) &&
-		(value2 != TXGBE_FAILED_READ_CFG_DWORD) &&
-		(value3 != TXGBE_FAILED_READ_CFG_DWORD)) {
+	if (value2 || value3) {
 		ERROR_REPORT1(TXGBE_ERROR_POLLING, "clear interrupt mask.\n");
 		wr32(&adapter->hw, TXGBE_PX_ICS(0), value2);
 		wr32(&adapter->hw, TXGBE_PX_IMC(0), value2);
 		wr32(&adapter->hw, TXGBE_PX_ICS(1), value3);
 		wr32(&adapter->hw, TXGBE_PX_IMC(1), value3);
-
-		goto out;
 	}
 
 	if (TXGBE_RECOVER_CHECK == 1) {
@@ -658,7 +654,6 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 		txgbe_tx_timeout_dorecovery(adapter);
 	}
 
-out:
 	return;
 }
 
@@ -2616,7 +2611,6 @@ static int txgbe_clean_rx_irq(struct txgbe_q_vector *q_vector,
 		 * descriptor has been written back
 		 */
 		dma_rmb();
-
 
 		if (adapter->xdp_prog) {
 			prefetchw(rx_buffer->page);
