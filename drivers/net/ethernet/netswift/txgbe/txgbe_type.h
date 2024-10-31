@@ -1020,7 +1020,7 @@ enum txgbe_fdir_pballoc_type {
 /* etype switcher 1st stage */
 #define TXGBE_PSR_ETYPE_SWC(_i) (0x15128 + ((_i) * 4)) /* EType Queue Filter */
 /* ETYPE Queue Filter/Select Bit Masks */
-#define TXGBE_MAX_PSR_ETYPE_SWC_FILTERS         8
+#define TXGBE_MAX_PSR_ETYPE_SWC_FILTERS         2 /* now only support 2 custom filters */
 #define TXGBE_PSR_ETYPE_SWC_FCOE                0x08000000U /* bit 27 */
 #define TXGBE_PSR_ETYPE_SWC_TX_ANTISPOOF        0x20000000U /* bit 29 */
 #define TXGBE_PSR_ETYPE_SWC_1588                0x40000000U /* bit 30 */
@@ -2244,6 +2244,24 @@ union txgbe_atr_hash_dword {
 	__be32 dword;
 };
 
+struct txgbe_ethertype_filter {
+	u16 rule_idx;
+	u16 ethertype;
+	u32 etqf;
+	u32 etqs;
+	/**
+	 * If this filter is added by configuration,
+	 * it should not be removed.
+	 */
+	bool conf;
+};
+
+/* Structure to store ethertype filters' info. */
+struct txgbe_etype_filter_info {
+	u8 ethertype_mask;  /* Bit mask for every used ethertype filter */
+	/* store used ethertype filters */
+	struct txgbe_ethertype_filter etype_filters[TXGBE_MAX_PSR_ETYPE_SWC_FILTERS];
+};
 
 /****************** Manageablility Host Interface defines ********************/
 #define TXGBE_HI_MAX_BLOCK_BYTE_LENGTH  256 /* Num of bytes in range */

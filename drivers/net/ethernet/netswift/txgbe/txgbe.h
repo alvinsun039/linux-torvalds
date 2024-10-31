@@ -1109,6 +1109,8 @@ struct txgbe_adapter {
 	u32 atr_sample_rate;
 	spinlock_t fdir_perfect_lock;
 
+	struct txgbe_etype_filter_info etype_filter_info;
+
 #if IS_ENABLED(CONFIG_FCOE)
 	struct txgbe_fcoe fcoe;
 #endif /* CONFIG_FCOE */
@@ -1245,7 +1247,7 @@ struct txgbe_fdir_filter {
 	struct  hlist_node fdir_node;
 	union txgbe_atr_input filter;
 	u16 sw_idx;
-	u16 action;
+	u64 action;
 };
 
 enum txgbe_state_t {

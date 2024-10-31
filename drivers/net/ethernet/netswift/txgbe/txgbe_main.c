@@ -5794,6 +5794,23 @@ static void txgbe_configure_pb(struct txgbe_adapter *adapter)
 	txgbe_pbthresh_setup(adapter);
 }
 
+static void txgbe_ethertype_filter_restore(struct txgbe_adapter *adapter)
+{
+	struct txgbe_etype_filter_info *filter_info = &adapter->etype_filter_info;
+	struct txgbe_hw *hw = &adapter->hw;
+	int i;
+
+	for (i = 0; i < TXGBE_MAX_PSR_ETYPE_SWC_FILTERS; i++) {
+		if (filter_info->ethertype_mask & (1 << i)) {
+			wr32(hw, TXGBE_PSR_ETYPE_SWC(i),
+					filter_info->etype_filters[i].etqf);
+			wr32(hw, TXGBE_RDB_ETYPE_CLS(i),
+					filter_info->etype_filters[i].etqs);
+			TXGBE_WRITE_FLUSH(hw);
+		}
+	}
+}
+
 static void txgbe_fdir_filter_restore(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
@@ -6110,6 +6127,7 @@ static void txgbe_configure(struct txgbe_adapter *adapter)
 
 	TCALL(hw, mac.ops.disable_sec_rx_path);
 
+	txgbe_ethertype_filter_restore(adapter);
 	if (adapter->flags & TXGBE_FLAG_FDIR_HASH_CAPABLE) {
 		txgbe_init_fdir_signature(&adapter->hw,
 						   adapter->fdir_pballoc);
@@ -12195,6 +12213,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	}
 
 	txgbe_mac_set_default_filter(adapter, hw->mac.perm_addr);
+	memset(&adapter->etype_filter_info, 0,
+		sizeof(struct txgbe_etype_filter_info));
 
 	timer_setup(&adapter->service_timer, txgbe_service_timer, 0);
 	
