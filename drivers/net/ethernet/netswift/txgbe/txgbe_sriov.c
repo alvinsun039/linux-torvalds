@@ -1750,12 +1750,11 @@ void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state)
 		break;
 	}
 
-	txgbe_set_vf_rx_tx(adapter, vf);
-
 	/* restart the VF */
 	adapter->vfinfo[vf].clear_to_send = false;
 	txgbe_ping_vf(adapter, vf);
 
+	txgbe_set_vf_rx_tx(adapter, vf);
 }
 
 #ifdef HAVE_NDO_SET_VF_LINK_STATE
