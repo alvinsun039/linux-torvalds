@@ -889,7 +889,7 @@ enum {
 #define TXGBE_RDB_PB_CTL_DISABLED       0x1
 
 #define TXGBE_RDB_RA_CTL_RSS_EN         0x00000004U /* RSS Enable */
-//#define TXGBE_RDB_RA_CTL_MULTI_RSS    0x00000001U /* VF RSS Hash Rule Enable */
+#define TXGBE_RDB_RA_CTL_MULTI_RSS      0x00000001U /* VF RSS Hash Rule Enable */
 #define TXGBE_RDB_RA_CTL_RSS_MASK       0xFFFF0000U
 #define TXGBE_RDB_RA_CTL_RSS_IPV4_TCP   0x00010000U
 #define TXGBE_RDB_RA_CTL_RSS_IPV4       0x00020000U

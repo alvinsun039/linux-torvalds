@@ -4075,8 +4075,8 @@ static void txgbe_setup_mrqc(struct txgbe_adapter *adapter)
 	
 	txgbe_setup_reta(adapter);
 
-	/* Consistent with the X710 that vf do not make its own receive-hash rules */
-	//rss_field |= TXGBE_RDB_RA_CTL_MULTI_RSS;
+	/* Enable VF RSS mode */
+	rss_field |= TXGBE_RDB_RA_CTL_MULTI_RSS;
 
 	if (adapter->flags2 & TXGBE_FLAG2_RSS_ENABLED)
 		rss_field |= TXGBE_RDB_RA_CTL_RSS_EN;
