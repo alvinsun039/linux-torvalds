@@ -4408,6 +4408,7 @@ static int txgbe_set_rxfh(struct net_device *netdev, const u32 *indir,
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	int i;
 	u32 reta_entries = txgbe_rss_indir_tbl_entries(adapter);
+	struct txgbe_hw *hw = &adapter->hw;
 
 #ifdef HAVE_RXFH_HASHFUNC
 	if (hfunc)
@@ -4431,12 +4432,17 @@ static int txgbe_set_rxfh(struct net_device *netdev, const u32 *indir,
 
 		for (i = 0; i < reta_entries; i++)
 			adapter->rss_indir_tbl[i] = indir[i];
+
+		txgbe_store_reta(adapter);
 	}
 
-	if (key)
+	if (key) {
 		memcpy(adapter->rss_key, key, txgbe_get_rxfh_key_size(netdev));
 
-	txgbe_setup_reta(adapter);
+		/* Fill out hash function seeds */
+		for (i = 0; i < 10; i++)
+			wr32(hw, TXGBE_RDB_RSSRK(i), adapter->rss_key[i]);
+	}
 
 	return 0;
 }
