@@ -4014,6 +4014,24 @@ void txgbe_store_reta(struct txgbe_adapter *adapter)
 	}
 }
 
+static void txgbe_store_vfreta(struct txgbe_adapter *adapter)
+{
+	unsigned int pf_pool = adapter->num_vfs;
+	u8 *indir_tbl = adapter->rss_indir_tbl;
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 reta = 0;
+	u32 i;
+
+	/* Write redirection table to HW */
+	for (i = 0; i < 64; i++) {
+		reta |= indir_tbl[i] << (i & 0x3) * 8;
+		if ((i & 3) == 3) {
+			wr32(hw, TXGBE_RDB_VMRSSTBL(i >> 2, pf_pool), reta);
+			reta = 0;
+		}
+	}
+}
+
 void txgbe_setup_reta(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
@@ -4046,6 +4064,27 @@ void txgbe_setup_reta(struct txgbe_adapter *adapter)
 	txgbe_store_reta(adapter);
 }
 
+static void txgbe_setup_vfreta(struct txgbe_adapter *adapter)
+{
+	u16 rss_i = adapter->ring_feature[RING_F_RSS].indices;
+	unsigned int pf_pool = adapter->num_vfs;
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 i, j;
+
+	/* Fill out hash function seeds */
+	for (i = 0; i < 10; i++)
+		wr32(hw, TXGBE_RDB_VMRSSRK(i, pf_pool), *(adapter->rss_key + i));
+
+	for (i = 0, j = 0; i < 64; i++, j++) {
+		if (j == rss_i)
+			j = 0;
+
+		adapter->rss_indir_tbl[i] = j;
+	}
+
+	txgbe_store_vfreta(adapter);
+}
+
 static void txgbe_setup_mrqc(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
@@ -4072,11 +4111,24 @@ static void txgbe_setup_mrqc(struct txgbe_adapter *adapter)
 		rss_field |= TXGBE_RDB_RA_CTL_RSS_IPV6_UDP;
 
 	netdev_rss_key_fill(adapter->rss_key, sizeof(adapter->rss_key));
-	
-	txgbe_setup_reta(adapter);
 
-	/* Enable VF RSS mode */
-	rss_field |= TXGBE_RDB_RA_CTL_MULTI_RSS;
+	if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED) {
+		unsigned int pool = adapter->num_vfs;
+		u32 vfmrqc;
+
+		/* Setup RSS through the VF registers */
+		txgbe_setup_vfreta(adapter);
+
+		vfmrqc = rd32(hw, TXGBE_RDB_PL_CFG(pool));
+		vfmrqc &= ~TXGBE_RDB_PL_CFG_RSS_MASK;
+		vfmrqc |= rss_field | TXGBE_RDB_PL_CFG_RSS_EN;
+		wr32(hw, TXGBE_RDB_PL_CFG(pool), vfmrqc);
+
+		/* Enable VF RSS mode */
+		rss_field |= TXGBE_RDB_RA_CTL_MULTI_RSS;
+	} else {
+		txgbe_setup_reta(adapter);
+	}
 
 	if (adapter->flags2 & TXGBE_FLAG2_RSS_ENABLED)
 		rss_field |= TXGBE_RDB_RA_CTL_RSS_EN;

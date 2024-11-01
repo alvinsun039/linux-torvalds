@@ -818,6 +818,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_RDB_PL_CFG_TUN_TUNHDR     0x10
 #define TXGBE_RDB_PL_CFG_RSS_PL_MASK    0x7
 #define TXGBE_RDB_PL_CFG_RSS_PL_SHIFT   29
+#define TXGBE_RDB_PL_CFG_RSS_EN         0x1000000
+#define TXGBE_RDB_PL_CFG_RSS_MASK       0xFF0000
 /* RQTC Bit Masks and Shifts */
 #define TXGBE_RDB_RSS_TC_SHIFT_TC(_i)   ((_i) * 4)
 #define TXGBE_RDB_RSS_TC_TC0_MASK       (0x7 << 0)
