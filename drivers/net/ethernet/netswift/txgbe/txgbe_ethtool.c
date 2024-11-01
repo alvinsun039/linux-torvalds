@@ -4005,13 +4005,20 @@ static int txgbe_add_ethertype_filter(struct txgbe_adapter *adapter,
 	else
 		queue = ((vf - 1) * adapter->num_rx_queues_per_pool) + ring;
 
-	etqf = TXGBE_PSR_ETYPE_SWC_FILTER_EN | ethertype;
-	if (vf) {
-		etqf |= TXGBE_PSR_ETYPE_SWC_POOL_ENABLE;
-		etqf |= vf << TXGBE_PSR_ETYPE_SWC_POOL_SHIFT;
-	}
 	etqs |= queue << TXGBE_RDB_ETYPE_CLS_RX_QUEUE_SHIFT;
 	etqs |= TXGBE_RDB_ETYPE_CLS_QUEUE_EN;
+	etqf = TXGBE_PSR_ETYPE_SWC_FILTER_EN | ethertype;
+	if (adapter->num_vfs) {
+		u8 pool;
+
+		if (!vf)
+			pool = adapter->num_vfs;
+		else
+			pool = vf - 1;
+
+		etqf |= TXGBE_PSR_ETYPE_SWC_POOL_ENABLE;
+		etqf |= pool << TXGBE_PSR_ETYPE_SWC_POOL_SHIFT;
+	}
 
 	etype_filter.ethertype = ethertype;
 	etype_filter.etqf = etqf;
