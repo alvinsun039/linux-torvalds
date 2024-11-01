@@ -3732,7 +3732,7 @@ static int txgbe_get_etype_rule(struct txgbe_adapter *adapter,
 	ether_addr_copy(fsp->m_u.ether_spec.h_dest, mask);
 	ether_addr_copy(fsp->h_u.ether_spec.h_source, mac);
 	ether_addr_copy(fsp->m_u.ether_spec.h_source, mask);
-	fsp->h_u.ether_spec.h_proto = ef_info->etype_filters[ef_idx].ethertype;
+	fsp->h_u.ether_spec.h_proto = htons(ef_info->etype_filters[ef_idx].ethertype);
 	fsp->m_u.ether_spec.h_proto = 0xFFFF;
 	fsp->ring_cookie = ef_info->etype_filters[ef_idx].action;
 
