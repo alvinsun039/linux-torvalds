@@ -969,7 +969,7 @@ int bch2_fs_btree_key_cache_init(struct btree_key_cache *bc)
 
 	bc->table_init_done = true;
 
-	shrink = shrinker_alloc(0, "%s/btree_key_cache", c->name);
+	shrink = shrinker_alloc(0, "%s-btree_key_cache", c->name);
 	if (!shrink)
 		return -BCH_ERR_ENOMEM_fs_btree_cache_init;
 	bc->shrink = shrink;

@@ -564,10 +564,9 @@ int bch2_fs_btree_cache_init(struct bch_fs *c)
 
 	mutex_init(&c->verify_lock);
 
-	shrink = shrinker_alloc(0, "%s/btree_cache", c->name);
+	shrink = shrinker_alloc(0, "%s-btree_cache", c->name);
 	if (!shrink)
 		goto err;
-
 	bc->shrink = shrink;
 	shrink->count_objects	= bch2_btree_cache_count;
 	shrink->scan_objects	= bch2_btree_cache_scan;
