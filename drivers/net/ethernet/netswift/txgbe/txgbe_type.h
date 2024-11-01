@@ -144,12 +144,18 @@
 #define TXGBE_MDIO_PHY_XS_DEV_TYPE             0x4 /* PHY Extender Sublayer */
 #define TXGBE_MDIO_AUTO_NEG_DEV_TYPE           0x7 /* Auto-Negotiation */
 #define TXGBE_MDIO_VENDOR_SPECIFIC_1_DEV_TYPE  0x1E /* Vendor specific 1 */
+#define TXGBE_MDIO_VENDOR_SPECIFIC_2_DEV_TYPE  0x1F /* Vendor specific 2 */
 
 /* phy register definitions */
 /* VENDOR_SPECIFIC_1_DEV regs */
 #define TXGBE_MDIO_VENDOR_SPECIFIC_1_STATUS             0x1 /* VS1 Status Reg */
 #define TXGBE_MDIO_VENDOR_SPECIFIC_1_LINK_STATUS        0x0008 /* 1 = Link Up */
 #define TXGBE_MDIO_VENDOR_SPECIFIC_1_SPEED_STATUS       0x0010 /* 0-10G, 1-1G */
+
+/* VENDOR_SPECIFIC_2_DEV regs */
+#define TXGBE_MDIO_VENDOR_SPECIFIC_2_PORT_CTRL          0xF001
+#define TXGBE_MDIO_VENDOR_SPECIFIC_2_SW_RST             BIT(15)
+#define TXGBE_MDIO_VENDOR_SPECIFIC_2_POWER              BIT(11)
 
 /* AUTO_NEG_DEV regs */
 #define TXGBE_MDIO_AUTO_NEG_CONTROL              0x0  /* AUTO_NEG Control Reg */

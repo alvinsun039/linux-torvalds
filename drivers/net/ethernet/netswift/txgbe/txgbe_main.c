@@ -6365,8 +6365,15 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	else
 		txgbe_configure_msi_and_legacy(adapter);
 
-	/* enable the optics for SFP+ fiber */
-	TCALL(hw, mac.ops.enable_tx_laser);
+	/* enable the optics for SFP+ fiber
+	 * or power up mv phy
+	 */
+	if (hw->phy.media_type == txgbe_media_type_fiber)
+		TCALL(hw, mac.ops.enable_tx_laser);
+	else if (hw->phy.media_type == txgbe_media_type_copper &&
+			(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
+		txgbe_external_phy_resume(hw);
+
 	smp_mb__before_atomic();
 	clear_bit(__TXGBE_DOWN, &adapter->state);
 	txgbe_napi_enable_all(adapter);
@@ -6858,9 +6865,13 @@ void txgbe_down(struct txgbe_adapter *adapter)
 		txgbe_reset(adapter);
 
 	if(!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
-		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP))
-		/* power down the optics for SFP+ fiber */
-		TCALL(&adapter->hw, mac.ops.disable_tx_laser);
+		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
+		if (hw->phy.media_type == txgbe_media_type_fiber)
+			TCALL(hw, mac.ops.disable_tx_laser);
+		else if (hw->phy.media_type == txgbe_media_type_copper &&
+				(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
+			txgbe_external_phy_suspend(hw);
+	}
 
 	txgbe_clean_all_tx_rings(adapter);
 	txgbe_clean_all_rx_rings(adapter);
@@ -7563,9 +7574,17 @@ static void txgbe_close_suspend(struct txgbe_adapter *adapter)
 	txgbe_ptp_suspend(adapter);
 #endif
 	txgbe_disable_device(adapter);
+
+	/* power down the optics for SFP+ fiber or mv phy */
 	if(!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
-		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP))
-		TCALL(hw, mac.ops.disable_tx_laser);
+			adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
+		if (hw->phy.media_type == txgbe_media_type_fiber)
+			TCALL(hw, mac.ops.disable_tx_laser);
+		else if (hw->phy.media_type == txgbe_media_type_copper &&
+			(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
+			txgbe_external_phy_suspend(hw);
+	}
+
 	txgbe_clean_all_tx_rings(adapter);
 	txgbe_clean_all_rx_rings(adapter);
 

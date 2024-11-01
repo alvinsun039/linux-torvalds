@@ -1240,3 +1240,51 @@ s32 txgbe_get_lp_advertised_pause(struct txgbe_hw *hw, u8 *pause_bit)
 {
 	return mtdGetLPAdvertisedPause(&hw->phy_dev, hw->phy.addr, pause_bit);
 }
+
+s32 txgbe_external_phy_suspend(struct txgbe_hw *hw)
+{
+	s32 status = 0;
+	u16 value = 0;
+
+	status = mtdHwXmdioRead(&hw->phy_dev, hw->phy.addr,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_DEV_TYPE,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_PORT_CTRL, &value);
+
+	if (status)
+		goto out;
+
+	value |= TXGBE_MDIO_VENDOR_SPECIFIC_2_POWER;
+
+	status = mtdHwXmdioWrite(&hw->phy_dev, hw->phy.addr,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_DEV_TYPE,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_PORT_CTRL, value);
+
+out:
+	return status;
+}
+
+s32 txgbe_external_phy_resume(struct txgbe_hw *hw)
+{
+	s32 status = 0;
+	u16 value = 0;
+
+	status = mtdHwXmdioRead(&hw->phy_dev, hw->phy.addr,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_DEV_TYPE,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_PORT_CTRL, &value);
+
+	if (status)
+		goto out;
+
+	if (!(value & ~TXGBE_MDIO_VENDOR_SPECIFIC_2_POWER))
+		goto out;
+
+	value |= TXGBE_MDIO_VENDOR_SPECIFIC_2_SW_RST;
+	value &= ~TXGBE_MDIO_VENDOR_SPECIFIC_2_POWER;
+
+	status = mtdHwXmdioWrite(&hw->phy_dev, hw->phy.addr,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_DEV_TYPE,
+				TXGBE_MDIO_VENDOR_SPECIFIC_2_PORT_CTRL, value);
+
+out:
+	return status;
+}

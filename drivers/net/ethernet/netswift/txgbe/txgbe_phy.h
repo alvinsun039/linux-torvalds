@@ -194,6 +194,8 @@ s32 txgbe_uninit_external_phy(struct txgbe_hw *hw);
 s32 txgbe_set_phy_pause_advertisement(struct txgbe_hw *hw, u32 pause_bit);
 s32 txgbe_get_phy_advertised_pause(struct txgbe_hw *hw, u8 *pause_bit);
 s32 txgbe_get_lp_advertised_pause(struct txgbe_hw *hw, u8 *pause_bit);
+s32 txgbe_external_phy_suspend(struct txgbe_hw *hw);
+s32 txgbe_external_phy_resume(struct txgbe_hw *hw);
 
 MTD_STATUS txgbe_read_mdio(
 						MTD_DEV * dev,
