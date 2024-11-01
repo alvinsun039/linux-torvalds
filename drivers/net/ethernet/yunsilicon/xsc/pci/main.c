@@ -37,6 +37,7 @@ static bool xsc_hw_reset;
 
 #define DRIVER_NAME			"xsc_pci"
 #define DRIVER_VERSION			"0.1.0"
+#define ETH_DRIVER_NAME			"xsc_eth"
 
 static const struct pci_device_id xsc_pci_id_table[] = {
 	{ PCI_DEVICE(XSC_PCI_VENDOR_ID, XSC_PF1_DEVICE_ID_OBSOLETE) },
@@ -792,6 +793,8 @@ static int xsc_pci_probe(struct pci_dev *pci_dev,
 		xsc_core_err(xdev, "xsc_load_one failed %d\n", err);
 		goto err_load;
 	}
+
+	request_module_nowait(ETH_DRIVER_NAME);
 
 	return 0;
 
