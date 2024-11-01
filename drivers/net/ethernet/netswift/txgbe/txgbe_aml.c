@@ -78,6 +78,7 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 	}
 
 	for (config_retry = 0; config_retry < 2; config_retry++) {
+		j = 0;
 		if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
 			mutex_lock(&adapter->e56_lock);
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
