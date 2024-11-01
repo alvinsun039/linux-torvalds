@@ -1250,6 +1250,9 @@ const char * const vmstat_text[] = {
 	"pgdemote_kswapd",
 	"pgdemote_direct",
 	"pgdemote_khugepaged",
+#ifdef CONFIG_HUGETLB_PAGE
+	"nr_hugetlb",
+#endif
 
 	/* enum writeback_stat_item counters */
 	"nr_dirty_threshold",
