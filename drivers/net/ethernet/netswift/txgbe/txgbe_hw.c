@@ -1310,11 +1310,13 @@ s32 txgbe_disable_mc(struct txgbe_hw *hw)
  **/
 s32 txgbe_fc_enable(struct txgbe_hw *hw)
 {
+	u32 mflcn_reg = 0;
+	u32 fccfg_reg = 0;
 	s32 ret_val = 0;
-	u32 mflcn_reg, fccfg_reg;
-	u32 reg;
-	u32 fcrtl, fcrth;
-	int i;
+	u32 fcrtl = 0;
+	u32 fcrth = 0;
+	u32 reg = 0;
+	int i = 0;
 
 	/* Validate the water mark configuration */
 	if (!hw->fc.pause_time) {
@@ -1403,8 +1405,8 @@ s32 txgbe_fc_enable(struct txgbe_hw *hw)
 	for (i = 0; i < TXGBE_DCB_MAX_TRAFFIC_CLASS; i++) {
 		if ((hw->fc.current_mode & txgbe_fc_tx_pause) &&
 		    hw->fc.high_water[i]) {
-			fcrtl = (hw->fc.low_water[i] << 10) |
-				TXGBE_RDB_RFCL_XONE;
+				fcrtl = (hw->fc.low_water[i] << 10);
+
 			wr32(hw, TXGBE_RDB_RFCL(i), fcrtl);
 			fcrth = (hw->fc.high_water[i] << 10) |
 				TXGBE_RDB_RFCH_XOFFE;
