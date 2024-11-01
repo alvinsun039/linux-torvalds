@@ -2022,10 +2022,7 @@ static int txgbe_get_sset_count(struct net_device *netdev, int sset)
 static u32 txgbe_get_priv_flags(struct net_device *dev)
 {
 	struct txgbe_adapter *adapter = netdev_priv(dev);
-	struct txgbe_hw *hw = &adapter->hw;
 	u32 i , ret_flags = 0;
-	if(txgbe_is_lldp(hw))
-		e_err(drv, "Can not get lldp flags from flash\n");
 
 	for (i = 0; i < TXGBE_PRIV_FLAGS_STR_LEN; i++) {
 		const struct txgbe_priv_flags *priv_flags;

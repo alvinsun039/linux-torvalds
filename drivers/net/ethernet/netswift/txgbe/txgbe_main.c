@@ -6542,8 +6542,6 @@ void txgbe_reset(struct txgbe_adapter *adapter)
 	hw->mac.dmac_config.link_speed = 0;
 	hw->mac.dmac_config.fcoe_tc = 0;
 	hw->mac.dmac_config.num_tcs = 0;
-	if (txgbe_is_lldp(hw))
-		e_dev_err("Can not get lldp flags from flash\n");
 
 #ifdef HAVE_PTP_1588_CLOCK
 	if (test_bit(__TXGBE_PTP_RUNNING, &adapter->state))

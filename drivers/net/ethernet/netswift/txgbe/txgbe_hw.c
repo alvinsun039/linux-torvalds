@@ -7574,25 +7574,52 @@ s32 txgbe_hic_write_lldp(struct txgbe_hw *hw,u32 open)
 	
 }
 
+int txgbe_hic_get_lldp(struct txgbe_hw *hw)
+{
+	int status;
+	struct txgbe_hic_write_lldp buffer;
+
+	buffer.hdr.cmd = 0xf2;
+	buffer.hdr.buf_len = 0x1;
+	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
+	buffer.hdr.checksum = FW_DEFAULT_CHECKSUM;
+	buffer.func = hw->bus.lan_id;
+
+	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
+					     sizeof(buffer), 5000, true);
+	if (buffer.hdr.cmd_or_resp.ret_status != FW_CEM_RESP_STATUS_SUCCESS)
+		return -1;
+	else
+		return (int)buffer.func;
+}
+
 int txgbe_is_lldp(struct txgbe_hw *hw)
 {
 	u32 tmp = 0, lldp_flash_data = 0, i = 0;
 	struct txgbe_adapter *adapter = hw->back;
 	s32 status = 0;
 
-	for (; i < 0x1000 / sizeof(u32); i++) {
-		status = txgbe_flash_read_dword(hw, TXGBE_LLDP_REG + i * 4, &tmp);
+	status = txgbe_hic_get_lldp(hw);
+	if (status != -1) {
 		if(status)
-			return status;
-		if (tmp == U32_MAX)
-			break;
-		lldp_flash_data = tmp;
-
+			adapter->eth_priv_flags |= TXGBE_ETH_PRIV_FLAG_LLDP;
+		else
+			adapter->eth_priv_flags &= ~TXGBE_ETH_PRIV_FLAG_LLDP;
+		return 0;
+	} else {
+		for (; i < 0x1000 / sizeof(u32); i++) {
+			status = txgbe_flash_read_dword(hw, TXGBE_LLDP_REG + i * 4, &tmp);
+			if (status)
+				return status;
+			if (tmp == U32_MAX)
+				break;
+			lldp_flash_data = tmp;
+		}
+		if (lldp_flash_data & BIT(hw->bus.lan_id))
+			adapter->eth_priv_flags |= TXGBE_ETH_PRIV_FLAG_LLDP;
+		else
+			adapter->eth_priv_flags &= ~TXGBE_ETH_PRIV_FLAG_LLDP;
 	}
-	if (lldp_flash_data & BIT(hw->bus.lan_id))
-		adapter->eth_priv_flags |= TXGBE_ETH_PRIV_FLAG_LLDP;
-	else
-		adapter->eth_priv_flags &= ~TXGBE_ETH_PRIV_FLAG_LLDP;
 
 	return 0;
 }
