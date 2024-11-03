@@ -316,7 +316,7 @@ static void io_req_task_link_timeout(struct io_kiocb *req, struct io_tw_state *t
 {
 	struct io_timeout *timeout = io_kiocb_to_cmd(req, struct io_timeout);
 	struct io_kiocb *prev = timeout->prev;
-	int ret = -ENOENT;
+	int ret;
 
 	if (prev) {
 		if (!io_should_terminate_tw()) {
@@ -325,7 +325,9 @@ static void io_req_task_link_timeout(struct io_kiocb *req, struct io_tw_state *t
 				.data		= prev->cqe.user_data,
 			};
 
-			ret = io_try_cancel(req->task->io_uring, &cd, 0);
+			ret = io_try_cancel(req->tctx, &cd, 0);
+		} else {
+			ret = -ECANCELED;
 		}
 		io_req_set_res(req, ret ?: -ETIME, 0);
 		io_req_task_complete(req, ts);
@@ -660,7 +662,7 @@ static bool io_match_task(struct io_kiocb *head, struct io_uring_task *tctx,
 {
 	struct io_kiocb *req;
 
-	if (tctx && head->task->io_uring != tctx)
+	if (tctx && head->tctx != tctx)
 		return false;
 	if (cancel_all)
 		return true;
