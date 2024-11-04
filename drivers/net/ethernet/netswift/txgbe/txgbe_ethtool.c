@@ -2629,11 +2629,15 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 		TXGBE_TDM_CTL_TE, TXGBE_TDM_CTL_TE);
 
 	txgbe_configure_tx_ring(adapter, tx_ring);
-
 	/* enable mac transmitter */
-	wr32m(hw, TXGBE_MAC_TX_CFG,
-		TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
-		TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
+	if (txgbe_check_reset_blocked(hw) && hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL)
+		wr32m(hw, TXGBE_MAC_TX_CFG,
+			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
+			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_1G);
+	else
+		wr32m(hw, TXGBE_MAC_TX_CFG,
+			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
+			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_10G);
 
 	/* Setup Rx Descriptor ring and Rx buffers */
 	rx_ring->count = TXGBE_DEFAULT_RXD;
@@ -2914,11 +2918,6 @@ static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 	/* Let firmware know the driver has taken over */
 	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
 			TXGBE_CFG_PORT_CTL_DRV_LOAD, TXGBE_CFG_PORT_CTL_DRV_LOAD);
-
-	*data = txgbe_setup_desc_rings(adapter);
-	if (*data)
-		goto out;
-
 	*data = txgbe_setup_config(adapter);
 	if (*data)
 		goto err_loopback;
@@ -2926,6 +2925,9 @@ static int txgbe_loopback_test(struct txgbe_adapter *adapter, u64 *data)
 	*data = txgbe_setup_phy_loopback_test(adapter);
 	if (*data)
 			goto err_loopback;
+	*data = txgbe_setup_desc_rings(adapter);
+	if (*data)
+		goto out;
 	*data = txgbe_run_loopback_test(adapter);
 	if (*data)
 			e_info(hw, "phy loopback testing failed\n");
@@ -3016,8 +3018,7 @@ static void txgbe_diag_test(struct net_device *netdev,
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
 		if (((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
-		    ((hw->subsystem_device_id & TXGBE_WOL_MASK) == TXGBE_WOL_SUP) ||
-		    (adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)){
+		    ((hw->subsystem_device_id & TXGBE_WOL_MASK) == TXGBE_WOL_SUP)) {
 			e_info(hw, "skip MAC loopback diagnostic when veto set\n");
 			data[3] = 0;
 			goto skip_loopback;
