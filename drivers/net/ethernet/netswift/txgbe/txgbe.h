@@ -1153,6 +1153,7 @@ struct txgbe_adapter {
 
 	DECLARE_BITMAP(active_vfs, TXGBE_MAX_VF_FUNCTIONS);
 	unsigned int num_vfs;
+	unsigned int max_vfs;
 	struct vf_data_storage *vfinfo;
 	struct vf_macvlans vf_mvs;
 	struct vf_macvlans *mv_list;

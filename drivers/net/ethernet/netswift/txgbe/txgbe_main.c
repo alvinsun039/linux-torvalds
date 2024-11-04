@@ -12030,13 +12030,13 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 
 #ifdef CONFIG_PCI_IOV
 #ifdef HAVE_SRIOV_CONFIGURE
-	if (adapter->num_vfs > 0) {
+	if (adapter->max_vfs > 0) {
 		e_dev_warn("Enabling SR-IOV VFs using the max_vfs module "
 			   "parameter is deprecated.\n");
 		e_dev_warn("Please use the pci sysfs interface instead. Ex:\n");
 		e_dev_warn("echo '%d' > /sys/bus/pci/devices/%04x:%02x:%02x.%1x"
 			   "/sriov_numvfs\n",
-			   adapter->num_vfs,
+			   adapter->max_vfs,
 			   pci_domain_nr(pdev->bus),
 			   pdev->bus->number,
 			   PCI_SLOT(pdev->devfn),

@@ -937,7 +937,7 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 					"Disabling SR-IOV.\n");
 			}
 
-			adapter->num_vfs = vfs;
+			adapter->max_vfs = vfs;
 
 			if (vfs)
 				*aflags |= TXGBE_FLAG_SRIOV_ENABLED;
@@ -946,10 +946,10 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 #ifdef module_param_array
 		} else {
 			if (opt.def == OPTION_DISABLED) {
-				adapter->num_vfs = 0;
+				adapter->max_vfs = 0;
 				*aflags &= ~TXGBE_FLAG_SRIOV_ENABLED;
 			} else {
-				adapter->num_vfs = opt.def;
+				adapter->max_vfs = opt.def;
 				*aflags |= TXGBE_FLAG_SRIOV_ENABLED;
 			}
 		}
@@ -962,14 +962,14 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 					"IOV is not supported on this "
 					"hardware.  Disabling IOV.\n");
 				*aflags &= ~TXGBE_FLAG_SRIOV_ENABLED;
-				adapter->num_vfs = 0;
+				adapter->max_vfs = 0;
 			} else if (!(*aflags & TXGBE_FLAG_MQ_CAPABLE)) {
 				DPRINTK(PROBE, INFO,
 					"IOV is not supported while multiple "
 					"queues are disabled.  "
 					"Disabling IOV.\n");
 				*aflags &= ~TXGBE_FLAG_SRIOV_ENABLED;
-				adapter->num_vfs = 0;
+				adapter->max_vfs = 0;
 			}
 		}
 	}

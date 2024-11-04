@@ -41,7 +41,8 @@ static void txgbe_set_vf_rx_tx(struct txgbe_adapter *adapter, int vf);
 
 
 #ifdef CONFIG_PCI_IOV
-static int __txgbe_enable_sriov(struct txgbe_adapter *adapter)
+static int __txgbe_enable_sriov(struct txgbe_adapter *adapter,
+										unsigned int num_vfs)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	int num_vf_macvlans, i;
@@ -49,9 +50,9 @@ static int __txgbe_enable_sriov(struct txgbe_adapter *adapter)
 	u32 value = 0;
 
 	adapter->flags |= TXGBE_FLAG_SRIOV_ENABLED;
-	e_dev_info("SR-IOV enabled with %d VFs\n", adapter->num_vfs);
+	e_dev_info("SR-IOV enabled with %d VFs\n", num_vfs);
 
-	if (adapter->num_vfs != 1) {
+	if (num_vfs != 1) {
 		if (adapter->ring_feature[RING_F_RSS].indices == 4)
 			value = TXGBE_CFG_PORT_CTL_NUM_VT_32;
 		else /* adapter->ring_feature[RING_F_RSS].indices <= 2 */
@@ -65,10 +66,10 @@ static int __txgbe_enable_sriov(struct txgbe_adapter *adapter)
 	adapter->flags |= TXGBE_FLAG_VMDQ_ENABLED;
 	if (!adapter->ring_feature[RING_F_VMDQ].limit)
 		adapter->ring_feature[RING_F_VMDQ].limit = 1;
-	adapter->ring_feature[RING_F_VMDQ].offset = adapter->num_vfs;
+	adapter->ring_feature[RING_F_VMDQ].offset = num_vfs;
 
 	num_vf_macvlans = hw->mac.num_rar_entries -
-		(TXGBE_MAX_PF_MACVLANS + 1 + adapter->num_vfs);
+		(TXGBE_MAX_PF_MACVLANS + 1 + num_vfs);
 
 	adapter->mv_list = mv_list = kcalloc(num_vf_macvlans,
 					     sizeof(struct vf_macvlans),
@@ -91,10 +92,12 @@ static int __txgbe_enable_sriov(struct txgbe_adapter *adapter)
 	/* If call to enable VFs succeeded then allocate memory
 	 * for per VF control structures.
 	 */
-	adapter->vfinfo = kcalloc(adapter->num_vfs,
+	adapter->vfinfo = kcalloc(num_vfs,
 			sizeof(struct vf_data_storage), GFP_KERNEL);
 	if (!adapter->vfinfo)
 		return -ENOMEM;
+
+	adapter->num_vfs = num_vfs;
 
 	/* enable L2 switch and replication */
 	adapter->flags |= TXGBE_FLAG_SRIOV_L2SWITCH_ENABLE |
@@ -255,9 +258,10 @@ static void txgbe_put_vfs(struct txgbe_adapter *adapter)
 void txgbe_enable_sriov(struct txgbe_adapter *adapter)
 {
 	int pre_existing_vfs = 0;
+	unsigned int num_vfs;
 
 	pre_existing_vfs = pci_num_vf(adapter->pdev);
-	if (!pre_existing_vfs && !adapter->num_vfs)
+	if (!pre_existing_vfs && !adapter->max_vfs)
 		return;
 
 	/* If there are pre-existing VFs then we have to force
@@ -267,7 +271,7 @@ void txgbe_enable_sriov(struct txgbe_adapter *adapter)
 	 * have been created via the new PCI SR-IOV sysfs interface.
 	 */
 	if (pre_existing_vfs) {
-		adapter->num_vfs = pre_existing_vfs;
+		num_vfs = pre_existing_vfs;
 		dev_warn(&adapter->pdev->dev,
 			 "Virtual Functions already enabled for this device -"
 			 "Please reload all VF drivers to avoid spoofed packet "
@@ -281,10 +285,10 @@ void txgbe_enable_sriov(struct txgbe_adapter *adapter)
 		 * physical function.  If the user requests greater thn
 		 * 63 VFs then it is an error - reset to default of zero.
 		 */
-		adapter->num_vfs = min_t(unsigned int, adapter->num_vfs,
+		num_vfs = min_t(unsigned int, adapter->max_vfs,
 					 TXGBE_MAX_VFS_DRV_LIMIT);
 
-		err = pci_enable_sriov(adapter->pdev, adapter->num_vfs);
+		err = pci_enable_sriov(adapter->pdev, num_vfs);
 		if (err) {
 			e_err(probe, "Failed to enable PCI sriov: %d\n", err);
 			adapter->num_vfs = 0;
@@ -292,7 +296,7 @@ void txgbe_enable_sriov(struct txgbe_adapter *adapter)
 		}
 	}
 
-	if (!__txgbe_enable_sriov(adapter)) {
+	if (!__txgbe_enable_sriov(adapter, num_vfs)) {
 		txgbe_get_vfs(adapter);
 		return;
 	}
@@ -1396,9 +1400,7 @@ static int txgbe_pci_sriov_enable(struct pci_dev __maybe_unused *dev,
 		goto err_out;
 	}
 
-	adapter->num_vfs = num_vfs;
-
-	err = __txgbe_enable_sriov(adapter);
+	err = __txgbe_enable_sriov(adapter, num_vfs);
 	if (err)
 		goto err_out;
 
