@@ -486,43 +486,8 @@ static int txgbe_set_vf_lpe(struct txgbe_adapter *adapter, u32 max_frame,
 	 * for all cases we have several special exceptions to take into
 	 * account before we can enable the VF for receive
 	 */
-	struct net_device *dev = adapter->netdev;
-	int pf_max_frame = dev->mtu + ETH_HLEN;
 	u32 reg_offset, vf_shift, vfre;
 	s32 err = 0;
-
-#if IS_ENABLED(CONFIG_FCOE)
-	if (dev->features & NETIF_F_FCOE_MTU)
-		pf_max_frame = max_t(int, pf_max_frame,
-				     TXGBE_FCOE_JUMBO_FRAME_SIZE);
-#endif /* CONFIG_FCOE */
-
-	switch (adapter->vfinfo[vf].vf_api) {
-	case txgbe_mbox_api_11:
-	case txgbe_mbox_api_12:
-	case txgbe_mbox_api_13:
-		/*
-		 * Version 1.1 supports jumbo frames on VFs if PF has
-		 * jumbo frames enabled which means legacy VFs are
-		 * disabled
-		 */
-		if (pf_max_frame > ETH_FRAME_LEN)
-			break;
-		fallthrough;
-	default:
-		/*
-		 * If the PF or VF are running w/ jumbo frames enabled
-		 * we need to shut down the VF Rx path as we cannot
-		 * support jumbo frames on legacy VFs
-		 */
-		if ((pf_max_frame > ETH_FRAME_LEN) ||
-		    (max_frame > (ETH_FRAME_LEN + ETH_FCS_LEN)))
-			err = -EINVAL;
-		break;
-	}
-
-	if (max_frame > (pf_max_frame + ETH_FCS_LEN))
-		err = -EINVAL;
 
 	/* determine VF receive enable location */
 	vf_shift = vf % 32;
@@ -536,9 +501,10 @@ static int txgbe_set_vf_lpe(struct txgbe_adapter *adapter, u32 max_frame,
 		vfre |= 1 << vf_shift;
 	wr32(hw, TXGBE_RDM_VF_RE(reg_offset), vfre);
 
-	if (err) {
-		e_err(drv, "VF max_frame %d out of range\n", max_frame);
-		return err;
+	/* pull current max frame size from hardware */
+	max_frs = rd32(hw, TXGBE_PSR_MAX_SZ);
+	if (max_frs < max_frame) {
+		wr32(hw, TXGBE_PSR_MAX_SZ, max_frame);
 	}
 
 	/* pull current max frame size from hardware */
