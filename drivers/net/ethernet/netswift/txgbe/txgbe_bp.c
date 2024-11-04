@@ -41,7 +41,7 @@ int txgbe_bp_mode_setting(struct txgbe_adapter *adapter)
 		adapter->an37 = 0;
 	}
 
-	if (adapter->ffe_set == 0)
+	if ((adapter->ffe_set == 0) && (KR_SET == 0))
 		return 0;
 
 	if (KR_SET == 1) {
@@ -116,22 +116,41 @@ void txgbe_bp_down_event(struct txgbe_adapter *adapter)
 		txgbe_wr32_epcs(hw, 0x78001, 0x0007);
 		break;
 	default:
-		if (AN73_TRAINNING_MODE == 1 || AN73_TRAINNING_MODE == 2)
-			msleep(100);
-		else
-			msleep(1000);
 		val = txgbe_rd32_epcs(hw, 0x78002);
 		val1 = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_CTL);
-		if ((val & BIT(2)) == BIT(2)) {
-			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
-				adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-		} else {
+		kr_dbg(KR_MODE, "AN INT : %x - AN CTL : %x - PL : %x\n", val, val1, txgbe_rd32_epcs(hw, 0x70012));
+		switch (AN73_TRAINNING_MODE) {
+		case 0:
+			msleep(1000);
+			if ((val & BIT(2)) == BIT(2)) {
+				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
+					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+			} else {
+				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+			}
+			break;
+		case 1:
+			msleep(100);
 			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
 			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
 			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+			break;
+		case 2:
+			msleep(100);
+			if ((val & BIT(2)) == BIT(2)) {
+				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
+					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+			} else {
+				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+			}
+			break;
+		default:
+			break;
 		}
-		kr_dbg(KR_MODE, "0x78002 : %x - 0x70000 : %x\n", val, val1);
-		kr_dbg(KR_MODE, "0x70012 : %x\n", txgbe_rd32_epcs(hw, 0x70012));
 		break;
 	}
 }
@@ -470,10 +489,6 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 
 	tBkpAn73Ability.currentLinkMode = bp_link_mode;
 
-	if (AN73_TRAINNING_MODE == 1) {
-		round = 2;
-		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
-	}
 	kr_dbg(KR_MODE, "HandleBkpAn73Flow().\n");
 	kr_dbg(KR_MODE, "---------------------------------\n");
 
@@ -512,6 +527,11 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 		e_dev_info("KR FEC is disabled.\n");
 	}
 	kr_dbg(KR_MODE, "\n<3.4>. Check the CL72 KR Training for KR mode ...\n");
+
+	if (AN73_TRAINNING_MODE == 1) {
+		round = 2;
+		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+	}
 
 	for (k = 0; k < round; k++) {
 		status |= en_cl72_krtr(3, adapter);
