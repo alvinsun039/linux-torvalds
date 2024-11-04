@@ -63,6 +63,9 @@ static void io_uring_cmd_work(struct io_kiocb *req, struct io_tw_state *ts)
 	struct io_uring_cmd *ioucmd = io_kiocb_to_cmd(req, struct io_uring_cmd);
 	unsigned issue_flags = ts->locked ? 0 : IO_URING_F_UNLOCKED;
 
+	if (current->flags & (PF_EXITING | PF_KTHREAD))
+		issue_flags |= IO_URING_F_TASK_DEAD;
+
 	ioucmd->task_work_cb(ioucmd, issue_flags);
 }
 
