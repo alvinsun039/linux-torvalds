@@ -946,11 +946,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 flags = adapter->flagsd;
 
-	/* Consistent with the X710 that the hash rules are the same as PF driver
-		In fact, VF can use its own independent rules, And the interface is
-		already implemented, but need to set TXGBE_RDB_RA_CTL bit0 on pf driver*/
-	return -EOPNOTSUPP;
-
 	/*
 	 * RSS does not support anything other than hashing
 	 * to queues on src and dst IPs and ports
@@ -1050,11 +1045,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 static int txgbe_get_rss_hash_opts(struct txgbe_adapter *adapter,
 				   struct ethtool_rxnfc *cmd)
 {
-	/* Consistent with the X710 that the hash rules are the same as PF driver and not support get
-		In fact, VF can use its own independent rules, And the interface is
-		already implemented, but need to set TXGBE_RDB_RA_CTL bit0 on pf driver*/
-	return -EOPNOTSUPP;
-
 	cmd->data = 0;
 
 	/* Report default options for RSS on txgbevf */
