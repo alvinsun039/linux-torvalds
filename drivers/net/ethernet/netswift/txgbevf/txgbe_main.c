@@ -6375,6 +6375,7 @@ err_alloc_etherdev:
 	pci_release_regions(pdev);
 err_pci_reg:
 err_dma:
+	pdev->dev_flags &= ~PCI_DEV_FLAGS_ASSIGNED;
 	if (!adapter || disable_dev)
 		pci_disable_device(pdev);
 	return err;
