@@ -66,7 +66,7 @@
 #define       TXGBE_VXMRQC_RSS_ALG_IPV4_UDP   ((0x1) << 6)
 #define       TXGBE_VXMRQC_RSS_ALG_IPV6_UDP   ((0x1) << 7)
 #define     TXGBE_VXMRQC_RSS_EN         ((0x1) << 8)
-#define     TXGBE_VXMRQC_RSS_HASH(f)    ((0x7 & (f)) << 29)
+#define     TXGBE_VXMRQC_RSS_HASH(f)    ((0x7 & (f)) << 13)
 #define TXGBE_VXRSSRK(i)        0x00080 + ((i) * 4) /* i=[0,9] */
 #define TXGBE_VXRETA(i)         0x000C0 + ((i) * 4) /* i=[0,15] */
 #define TXGBE_VXICR                 0x00100
