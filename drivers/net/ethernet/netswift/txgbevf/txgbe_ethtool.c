@@ -1014,7 +1014,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 	/* if we changed something we need to update flags */
 	if (flags != adapter->flagsd) {
 		u32 vfmrqc = 0;
-		u32 vf_reg_mrqc = 0;
 
 		if ((flags & UDP_RSS_FLAGS) &&
 		    !(adapter->flagsd & UDP_RSS_FLAGS))
@@ -1022,12 +1021,15 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 
 		adapter->flagsd = flags;
 
-		vf_reg_mrqc = rd32(hw, TXGBE_VXMRQC);
+		vfmrqc = rd32(hw, TXGBE_VXMRQC) >> 16;
 		/* Perform hash on these packet types */
 		vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV4 |
 			  TXGBE_VXMRQC_RSS_ALG_IPV4_TCP |
 			  TXGBE_VXMRQC_RSS_ALG_IPV6 |
 			  TXGBE_VXMRQC_RSS_ALG_IPV6_TCP;
+
+		vfmrqc &= ~(TXGBE_VXMRQC_RSS_ALG_IPV4_UDP |
+			    TXGBE_VXMRQC_RSS_ALG_IPV6_UDP);
 
 		if (flags & TXGBE_F_ENA_RSS_IPV4UDP)
 			vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV4_UDP;
@@ -1036,7 +1038,7 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 			vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV6_UDP;
 
 		wr32m(hw, TXGBE_VXMRQC, TXGBE_VXMRQC_RSS(~0),
-			TXGBE_VXMRQC_RSS(vfmrqc) | vf_reg_mrqc);
+			TXGBE_VXMRQC_RSS(vfmrqc));
 	}
 
 	return 0;
