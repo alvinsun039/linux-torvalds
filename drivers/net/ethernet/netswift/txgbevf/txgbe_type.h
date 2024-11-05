@@ -74,6 +74,9 @@ struct txgbe_adv_tx_context_desc {
 };
 
 
+#define TXGBE_RXD_TPID_MASK             0x000001C0U
+#define TXGBE_RXD_TPID_SHIFT            6
+
 /*** @txgbe_rx_desc.rd.lower.pkt_addr ***/
 #define TXGBE_RXD_PKTADDR(v)       cpu_to_le64((v))
 

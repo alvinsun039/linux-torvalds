@@ -147,7 +147,8 @@ struct txgbe_hw {
 	bool adapter_stopped;
 
 	int api_version;
-	
+
+	u16 tpid[8];
 	u32 b4_buf[16];
 };
 

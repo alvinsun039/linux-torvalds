@@ -737,11 +737,17 @@ void txgbe_process_skb_fields(struct txgbe_ring *rx_ring,
 	txgbe_rx_vlan(rx_ring, rx_desc, skb);
 #else
 	if (TXGBE_RXD_STATUS(rx_desc) & TXGBE_RXD_STAT_VP) {
-		u16 vid = TXGBE_RXD_VLAN(rx_desc);
 		unsigned long *active_vlans = netdev_priv(rx_ring->netdev);
+		u16 vid = TXGBE_RXD_VLAN(rx_desc);
+		u16 ethertype;
+		u8 idx = 0;
+
+		idx = (le16_to_cpu(rx_desc->wb.lower.lo_dword.hs_rss.pkt_info) &
+		TXGBE_RXD_TPID_MASK) >> TXGBE_RXD_TPID_SHIFT;
+		ethertype = rx_ring->q_vector->adapter->hw.tpid[idx];
 
 		if (test_bit(vid & VLAN_VID_MASK, active_vlans))
-			__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), vid);
+			__vlan_hwaccel_put_tag(skb, htons(ethertype), vid);
 	}
 #endif
 
@@ -6167,6 +6173,7 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	const struct txgbe_info *ei = txgbe_info_tbl[ent->driver_data];
 	bool disable_dev = false;
 	u8 fea_flags = 0;
+	u8 i = 0;
 	int err;
 	static int cards_found;
 
@@ -6227,6 +6234,11 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	hw->mac.type = ei->mac;
 	adapter->flagsd = ei->flags;
 	adapter->msg_enable = DEFAULT_DEBUG_LEVEL;
+
+	adapter->hw.tpid[0] = ETH_P_8021Q;
+	adapter->hw.tpid[1] = ETH_P_8021AD;
+	for (i = 2; i < 8; i++)
+		adapter->hw.tpid[i] = ETH_P_8021Q;
 
 	/*
 	 * call save state here in standalone driver because it relies on
