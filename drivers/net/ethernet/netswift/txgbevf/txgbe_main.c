@@ -59,15 +59,15 @@
 #endif /* HAVE_XDP_SUPPORT */
 /*====================*/
 #if defined(TXGBE_SUPPORT_KYLIN)
-#define DRV_VERSION     __stringify(1.3.1-kylin)
+#define DRV_VERSION     __stringify(1.3.1rc0-kylin)
 #elif defined(CONFIG_EULER_KERNEL)
-#define DRV_VERSION     __stringify(1.3.1-kylin)
+#define DRV_VERSION     __stringify(1.3.1rc0-kylin)
 #elif defined(CONFIG_UOS_KERNEL)
-#define DRV_VERSION     __stringify(1.3.1-kylin)
+#define DRV_VERSION     __stringify(1.3.1rc0-kylin)
 #elif defined(TXGBE_SUPPORT_DEEPIN_SW)
-#define DRV_VERSION     __stringify(1.3.1-kylin)
+#define DRV_VERSION     __stringify(1.3.1rc0-kylin)
 #else
-#define DRV_VERSION     __stringify(1.3.1-kylin)
+#define DRV_VERSION     __stringify(1.3.1rc0-kylin)
 #endif
 /*====================*/
 
