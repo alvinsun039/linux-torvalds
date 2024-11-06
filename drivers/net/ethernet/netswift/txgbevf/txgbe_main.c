@@ -94,6 +94,8 @@ static struct pci_device_id txgbe_pci_tbl[] = {
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5024_VF), board_sp_vf },
 	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML5124_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML503F_VF), board_sp_vf },
+	{ PCI_VDEVICE(WANGXUN, TXGBE_DEV_ID_AML513F_VF), board_sp_vf },
 	{ .device = 0 } /* required last entry */
 };
 
@@ -3761,8 +3763,8 @@ static void txgbe_init_type_code(struct txgbe_hw *hw)
 	case TXGBE_DEV_ID_AML5124_VF:
 		hw->mac.type = txgbe_mac_aml;
 		break;
-	case TXGBE_DEV_ID_AML5039_VF:
-	case TXGBE_DEV_ID_AML5139_VF:
+	case TXGBE_DEV_ID_AML503F_VF:
+	case TXGBE_DEV_ID_AML513F_VF:
 		hw->mac.type = txgbe_mac_aml40;
 		break;
 	default:
