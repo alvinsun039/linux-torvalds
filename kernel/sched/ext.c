@@ -1837,11 +1837,11 @@ static void ops_dequeue(struct task_struct *p, u64 deq_flags)
 	}
 }
 
-static void dequeue_task_scx(struct rq *rq, struct task_struct *p, int deq_flags)
+static bool dequeue_task_scx(struct rq *rq, struct task_struct *p, int deq_flags)
 {
 	if (!(p->scx.flags & SCX_TASK_QUEUED)) {
 		WARN_ON_ONCE(task_runnable(p));
-		return;
+		return true;
 	}
 
 	ops_dequeue(p, deq_flags);
@@ -1876,6 +1876,7 @@ static void dequeue_task_scx(struct rq *rq, struct task_struct *p, int deq_flags
 	sub_nr_running(rq, 1);
 
 	dispatch_dequeue(rq, p);
+	return true;
 }
 
 static void yield_task_scx(struct rq *rq)
