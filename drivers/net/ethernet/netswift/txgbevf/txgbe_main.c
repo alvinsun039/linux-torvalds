@@ -3964,14 +3964,20 @@ void txgbe_reset_subtask(struct txgbe_adapter *adapter)
 
 	adapter->flagsd &= ~TXGBE_F_REQ_RESET;
 
+	rtnl_lock();
+
 	/* If we're already down or resetting, just bail */
 	if (test_bit(__TXGBE_DOWN, &adapter->state) ||
-	    test_bit(__TXGBE_RESETTING, &adapter->state))
+		test_bit(__TXGBE_REMOVING, &adapter->state) ||
+		test_bit(__TXGBE_RESETTING, &adapter->state)) {
+		rtnl_unlock();
 		return;
+	}
 
 	adapter->sw_stats.tx_timeout_count++;
 
 	txgbe_reinit_locked(adapter);
+	rtnl_unlock();
 }
 
 /* txgbe_check_hang_subtask - check for hung queues and dropped interrupts
