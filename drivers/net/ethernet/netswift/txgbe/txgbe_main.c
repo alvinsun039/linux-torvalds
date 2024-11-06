@@ -3455,6 +3455,9 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 			adapter->flags2 &= ~TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS;
 
 		e_crit(drv, "%s\n", txgbe_underheat_msg);
+		// re-enable over_heat misx itr
+		wr32m(&adapter->hw, TXGBE_PX_MISC_IEN, TXGBE_PX_MISC_IEN_OVER_HEAT,
+							TXGBE_PX_MISC_IEN_OVER_HEAT);
 		wr32m(&adapter->hw, TXGBE_RDB_PB_CTL,
 				TXGBE_RDB_PB_CTL_RXEN, TXGBE_RDB_PB_CTL_RXEN);
 		netif_carrier_on(adapter->netdev);
