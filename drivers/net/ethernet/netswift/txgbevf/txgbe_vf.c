@@ -173,7 +173,7 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 		txgbe_wr32(hw->b4_addr, i * 4, hw->b4_buf[i]);
 
 	/* amlite: bme */
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		wr32(hw, 0x4B8, 0x1);
 
 	if (!timeout)
@@ -785,7 +785,11 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 	}
 
 /* amlite: speed updates */
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml40) {
+		if (TXGBE_VXSTATUS_AML_SPEED(links_reg) ==
+						TXGBE_VXSTATUS_SPEED_AML_40G)
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+	} else if (hw->mac.type == txgbe_mac_aml) {
 		switch (TXGBE_VXSTATUS_AML_SPEED(links_reg)) {
 		case TXGBE_VXSTATUS_SPEED_AML_10G:
 			*speed = TXGBE_LINK_SPEED_10GB_FULL;

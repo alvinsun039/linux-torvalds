@@ -145,11 +145,16 @@ static int txgbe_get_settings(struct net_device *netdev,
 
 #ifdef ETHTOOL_GLINKSETTINGS
 	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported,
-					     10000baseT_Full);
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml40) {
 		ethtool_link_ksettings_add_link_mode(cmd, supported,
-						     25000baseSR_Full);
+				     40000baseSR4_Full);
+	} else {
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
+						     10000baseT_Full);
+		if (hw->mac.type == txgbe_mac_aml)
+			ethtool_link_ksettings_add_link_mode(cmd, supported,
+							     25000baseSR_Full);
+	}
 	cmd->base.autoneg = AUTONEG_DISABLE;
 	cmd->base.port = -1;
 #else

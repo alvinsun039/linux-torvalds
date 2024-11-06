@@ -72,7 +72,8 @@ struct txgbe_mac_operations {
 enum txgbe_mac_type {
 	txgbe_mac_unknown = 0,
 	txgbe_mac_sp,
-	txgbe_mac_aml
+	txgbe_mac_aml,
+	txgbe_mac_aml40
 };
 
 struct txgbe_mac_info {
