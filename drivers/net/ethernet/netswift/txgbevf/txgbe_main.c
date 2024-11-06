@@ -2565,7 +2565,6 @@ void txgbe_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
 	spin_unlock_bh(&adapter->mbx_lock);
 
 	if (err) {
-		printk(KERN_ERR "VF set VLAN failed\n");
 #ifdef HAVE_INT_NDO_VLAN_RX_ADD_VID
 		return -EIO;
 #endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
