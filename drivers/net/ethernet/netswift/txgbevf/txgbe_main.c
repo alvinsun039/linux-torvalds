@@ -3789,10 +3789,6 @@ int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 
 	spin_lock_init(&adapter->PCount_lock);
 
-	/*make sure PF is up*/
-	if (adapter->bd_number == 0)
-		msleep(1500);
-
 	err = TCALL(hw, mac.ops.reset_hw);
 	if (err) {
 		dev_info(pci_dev_to_dev(pdev),

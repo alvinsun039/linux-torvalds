@@ -175,10 +175,6 @@ s32 txgbe_poll_for_ack(struct txgbe_hw *hw, u16 mbx_id)
 		udelay(mbx->udelay);
 	}
 
-	if (countdown == 0)
-		ERROR_REPORT2(TXGBE_ERROR_POLLING,
-			     "Polling for VF%d mailbox ack timedout", mbx_id);
-
 out:
 	return countdown ? 0 : TXGBE_ERR_MBX;
 }
@@ -365,18 +361,28 @@ s32 txgbe_check_for_rst_vf(struct txgbe_hw *hw, u16 mbx_id)
 s32 txgbe_obtain_mbx_lock_vf(struct txgbe_hw *hw)
 {
 	s32 err = TXGBE_ERR_MBX;
+	struct txgbe_mbx_info *mbx = &hw->mbx;
+	int countdown = mbx->timeout;
 	u32 mailbox;
 
-	/* Take ownership of the buffer */
-	wr32(hw, TXGBE_VXMAILBOX, TXGBE_VXMAILBOX_VFU);
+	if (!mbx->timeout)
+		return TXGBE_ERR_CONFIG;
 
-	/* reserve mailbox for vf use */
-	mailbox = txgbe_read_v2p_mailbox(hw);
-	if (mailbox & TXGBE_VXMAILBOX_VFU)
-		err = 0;
-	else
+	while (countdown--) {
+		/* Take ownership of the buffer */
+		wr32(hw, TXGBE_VXMAILBOX, TXGBE_VXMAILBOX_VFU);
+
+		/* reserve mailbox for vf use */
+		mailbox = txgbe_read_v2p_mailbox(hw);
+		if (mailbox & TXGBE_VXMAILBOX_VFU) {
+			err = 0;
+			break;
+		}
+	}
+
+	if (err)
 		ERROR_REPORT2(TXGBE_ERROR_POLLING,
-			   "Failed to obtain mailbox lock for VF");
+				   "Failed to obtain mailbox lock for VF");
 
 	return err;
 }

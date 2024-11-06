@@ -160,7 +160,7 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 	wr32m(hw, TXGBE_VXCTRL, TXGBE_VXCTRL_RST, TXGBE_VXCTRL_RST);
 	txgbe_flush(hw);
 
-	msleep(50);
+	udelay(50);
 
 	/* we cannot reset while the RSTI / RSTD bits are asserted */
 	while (!mbx->ops.check_for_rst(hw, 0) && timeout) {
@@ -186,7 +186,7 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 	if (err)
 		return err;
 
-	msleep(10);
+	udelay(10);
 
 	/*
 	 * set our "perm_addr" based on info provided by PF
