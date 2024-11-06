@@ -426,7 +426,7 @@ struct cfs_bandwidth {
 struct task_group {
 	struct cgroup_subsys_state css;
 
-#ifdef CONFIG_FAIR_GROUP_SCHED
+#ifdef CONFIG_GROUP_SCHED_WEIGHT
 	/* schedulable entities of this group on each CPU */
 	struct sched_entity	**se;
 	/* runqueue "owned" by this group on each CPU */
@@ -577,6 +577,8 @@ extern void set_task_rq_fair(struct sched_entity *se,
 static inline void set_task_rq_fair(struct sched_entity *se,
 			     struct cfs_rq *prev, struct cfs_rq *next) { }
 #endif /* CONFIG_SMP */
+#else /* !CONFIG_FAIR_GROUP_SCHED */
+static inline int sched_group_set_shares(struct task_group *tg, unsigned long shares) { return 0; }
 #endif /* CONFIG_FAIR_GROUP_SCHED */
 
 #else /* CONFIG_CGROUP_SCHED */
