@@ -3147,48 +3147,50 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 {
 	u32 mac_addr0_dword0_t, mac_addr0_dword1_t, mac_addr1_dword0_t, mac_addr1_dword1_t;
 	u32 serial_num_dword0_t, serial_num_dword1_t, serial_num_dword2_t;
+	struct txgbe_adapter *adapter = hw->back;
 	u8 status = 0, skip = 0, flash_vendor = 0;
 	u32 sector_num = 0, read_data = 0, i = 0;
 	u32 sn[24];
-	u8 sn_str[40];
+	char sn_str[40];
 	u8 sn_is_str = true;
-	u8 vpd_tend[256];
+	u8 *vpd_tend = NULL;
 	u32 curadr = 0;
 	u32 vpdadr = 0;
 	u8 id_str_len, pn_str_len, sn_str_len, rv_str_len;
 	u16 vpd_ro_len;
 	u32 chksum = 0;
+	int err = 0;
 
-	read_data = rd32(hw, 0x10200);
+	read_data = rd32(hw, PRB_CTL);
 	if (read_data & 0x80000000) {
-		printk("The flash has been successfully upgraded once, please reboot to make it work.\n");
+		e_info(drv, "The flash has been successfully upgraded once, please reboot to make it work.\n");
 		return -EOPNOTSUPP;
 	}
 
 	/*check sub_id*/;
-	printk("Checking sub_id .......\n");
-	printk("The card's sub_id : %04x\n", hw->subsystem_device_id);
-	printk("The image's sub_id : %04x\n", data[0xfffdc] << 8  | data[0xfffdd]);
+	e_info(drv, "Checking sub_id .......\n");
+	e_info(drv, "The card's sub_id : %04x\n", hw->subsystem_device_id);
+	e_info(drv, "The image's sub_id : %04x\n", data[0xfffdc] << 8  | data[0xfffdd]);
 	if ((hw->subsystem_device_id & 0xfff) == 
 		((data[0xfffdc] << 8  | data[0xfffdd]) & 0xfff)){
-		printk("It is a right image\n");
+		e_info(drv, "It is a right image\n");
 	} else if (hw->subsystem_device_id == 0xffff){
-		printk("update anyway\n");
+		e_info(drv, "update anyway\n");
 	} else {
-		printk("====The Gigabit image is not match the Gigabit card====\n");
-		printk("====Please check your image====\n");
+		e_err(drv, "====The Gigabit image is not match the Gigabit card====\n");
+		e_err(drv, "====Please check your image====\n");
 		return -EOPNOTSUPP;
 	}
 	
 	/*check dev_id*/
-	printk("Checking dev_id .......\n");
-	printk("The image's dev_id : %04x\n", data[0xfffde] << 8  | data[0xfffdf]);
-	printk("The card's dev_id : %04x\n", hw->device_id);
+	e_info(drv, "Checking dev_id .......\n");
+	e_info(drv, "The image's dev_id : %04x\n", data[0xfffde] << 8  | data[0xfffdf]);
+	e_info(drv, "The card's dev_id : %04x\n", hw->device_id);
 	if (!((hw->device_id & 0xfff0) == ((data[0xfffde] << 8 | data[0xfffdf]) & 0xfff0)) &&
 	    !(hw->device_id == 0xffff))
 	{
-		printk("====The Gigabit image is not match the Gigabit card====\n");
-		printk("====Please check your image====\n");
+		e_err(drv, "====The Gigabit image is not match the Gigabit card====\n");
+		e_err(drv, "====Please check your image====\n");
 		return -EOPNOTSUPP;
 	}
 
@@ -3214,8 +3216,8 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G, &serial_num_dword0_t);
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4, &serial_num_dword1_t);
 	txgbe_flash_read_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, &serial_num_dword2_t);
-	printk("Old: MAC Address0 is: 0x%04x%08x\n", mac_addr0_dword1_t, mac_addr0_dword0_t);
-	printk("	 MAC Address1 is: 0x%04x%08x\n", mac_addr1_dword1_t, mac_addr1_dword0_t);
+	e_info(drv, "Old: MAC Address0 is: 0x%04x%08x\n", mac_addr0_dword1_t, mac_addr0_dword0_t);
+	e_info(drv, "     MAC Address1 is: 0x%04x%08x\n", mac_addr1_dword1_t, mac_addr1_dword0_t);
 
 	
 	status = fmgr_usr_cmd_op(hw, 0x6);	/* write enable*/
@@ -3224,7 +3226,12 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	msleep(1000);
 
 	//rebuild vpd
-	memset(vpd_tend, 0xff, sizeof(vpd_tend));
+	vpd_tend = kcalloc(256, sizeof(u8), GFP_KERNEL);
+	if (!vpd_tend)
+		return -ENOMEM;
+
+	memset(vpd_tend, 0xff, 256 * sizeof(u8));
+
 	curadr = TXGBE_VPD_OFFSET + 1;
 	id_str_len = data[curadr] | data[curadr + 1] << 8;
 	curadr += (7 + id_str_len);
@@ -3301,13 +3308,15 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	/* Winbond Flash, erase chip command is okay, but erase sector doestn't work*/
 	if (flash_vendor == 2) {
 		status = txgbe_flash_erase_chip(hw);
-		printk("Erase chip command, return status = %0d\n", status);
+		e_err(drv, "Erase chip command, return status = %0d\n", status);
 		msleep(1000);
 	} else {
 		wr32(hw, SPI_CMD_CFG1_ADDR, 0x0103c720);
 		for (i = 0; i < sector_num; i++) {
 			status = txgbe_flash_erase_sector(hw, i * SPI_SECTOR_SIZE);
-			printk("Erase sector[%2d] command, return status = %0d\n", i, status);
+			if (status)
+				e_err(drv, "Erase sector[%2d] command, return status = %0d\n",
+					   i, status);
 			msleep(50);
 		}
 		wr32(hw, SPI_CMD_CFG1_ADDR, 0x0103c7d8);
@@ -3325,14 +3334,14 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		if (read_data != U32_MAX && !skip) {
 			status = txgbe_flash_write_dword(hw, i * 4, read_data);
 			if (status) {
-				printk("ERROR: Program 0x%08x @addr: 0x%08x is failed !!\n", read_data, i * 4);
+				e_err(drv, "ERROR: Program 0x%08x @addr: 0x%08x is failed !!\n",
+					   read_data, i * 4);
 				txgbe_flash_read_dword(hw, i * 4, &read_data);
-				printk("		 Read data from Flash is: 0x%08x\n", read_data);
-				return 1;
+				e_err(drv, "		 Read data from Flash is: 0x%08x\n",
+					   read_data);
+				err = -EBUSY;
+				goto err_exit;
 			}
-		}
-		if (i % 1024 == 0) {
-			printk("\b\b\b\b%3d%%", (int)(i * 4 * 100 / size));
 		}
 	}
 
@@ -3342,10 +3351,13 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		if (read_data != U32_MAX) {
 			status = txgbe_flash_write_dword(hw, TXGBE_VPD_OFFSET + i * 4, read_data);
 			if (status) {
-				printk("ERROR: Program 0x%08x @addr: 0x%08x is failed !!\n", read_data, i * 4);
+				e_err(drv, "ERROR: Program 0x%08x @addr: 0x%08x is failed !!\n",
+					   read_data, i * 4);
 				txgbe_flash_read_dword(hw, i * 4, &read_data);
-				printk("		 Read data from Flash is: 0x%08x\n", read_data);
-				return 1;
+				e_err(drv, "		 Read data from Flash is: 0x%08x\n",
+					   read_data);
+				err = -EBUSY;
+				goto err_exit;
 			}
 		}
 	}
@@ -3377,9 +3389,11 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, serial_num_dword2_t);
 	}
 
-	wr32(hw, 0x10200, rd32(hw, 0x10200) | 0x80000000);
+	wr32(hw, PRB_CTL, rd32(hw, PRB_CTL) | 0x80000000);
 
-	return 0;
+err_exit:
+	kfree(vpd_tend);
+	return err;
 }
 
 

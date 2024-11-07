@@ -6826,11 +6826,7 @@ void txgbe_disable_device(struct txgbe_adapter *adapter)
 		for (i = 0 ; i < adapter->num_vfs; i++)
 			adapter->vfinfo[i].clear_to_send = 0;
 
-		/* ping all the active vfs to let them know we are going down */
-		//txgbe_ping_all_vfs(adapter);
-
 		/* Disable all VFTE/VFRE TX/RX */
-		//txgbe_disable_tx_rx(adapter);
 		txgbe_set_all_vfs(adapter);
 	}
 
