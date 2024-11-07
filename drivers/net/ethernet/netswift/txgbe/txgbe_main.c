@@ -12361,16 +12361,18 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 			 "0x%08x", etrack_id);
 	}
 
-	if (hw->bus.lan_id == 0) {
-		if (strcmp(adapter->eeprom_id, adapter->fl_version) == 0) {
+	if (strcmp(adapter->eeprom_id, adapter->fl_version) == 0) {
+		memcpy(adapter->fw_version, adapter->eeprom_id, sizeof(adapter->eeprom_id));
+
+		if (hw->bus.lan_id == 0)
 			e_dev_info("Running Firmware Version: %s\n", adapter->eeprom_id);
-			memcpy(adapter->fw_version, adapter->eeprom_id, sizeof(adapter->eeprom_id));
-		} else {
+	} else {
+		snprintf(adapter->fw_version, sizeof(adapter->fw_version), "%s,ACT.%s",
+					adapter->fl_version, adapter->eeprom_id);
+
+		if (hw->bus.lan_id == 0)
 			e_dev_info("Running Firmware Version: %s, Flash Firmware Version: %s\n",
-						adapter->eeprom_id, adapter->fl_version);
-			snprintf(adapter->fw_version, sizeof(adapter->fw_version), "%s,ACT.%s",
-						adapter->fl_version, adapter->eeprom_id);
-		}
+					adapter->eeprom_id, adapter->fl_version);
 	}
 
 	/* reset the hardware with the new settings */
