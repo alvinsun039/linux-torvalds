@@ -5226,7 +5226,6 @@ static void txgbe_vlan_promisc_enable(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl, i;
-	u32 vlvfb;
 	u32 vind;
 	u32 bits;
 
@@ -5254,7 +5253,6 @@ static void txgbe_vlan_promisc_enable(struct txgbe_adapter *adapter)
 	vind = VMDQ_P(0);
 	for (i = TXGBE_PSR_VLAN_SWC_ENTRIES; --i;) {
 		wr32(hw, TXGBE_PSR_VLAN_SWC_IDX, i);
-		vlvfb = rd32(hw, TXGBE_PSR_VLAN_SWC_IDX);
 
 		if (vind < 32) {
 			bits = rd32(hw,
@@ -5289,7 +5287,7 @@ static void txgbe_scrub_vfta(struct txgbe_adapter *adapter)
 
 	for (i = TXGBE_PSR_VLAN_SWC_ENTRIES; --i;) {
 		wr32(hw, TXGBE_PSR_VLAN_SWC_IDX, i);
-		vlvf = rd32(hw, TXGBE_PSR_VLAN_SWC_IDX);
+		vlvf = rd32(hw, TXGBE_PSR_VLAN_SWC);
 
 		/* pull VLAN ID from VLVF */
 		vid = vlvf & ~TXGBE_PSR_VLAN_SWC_VIEN;
