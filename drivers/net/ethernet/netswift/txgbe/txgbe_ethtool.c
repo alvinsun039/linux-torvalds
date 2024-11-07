@@ -3306,6 +3306,9 @@ static int txgbe_get_coalesce(struct net_device *netdev,
 	else
 		ec->rx_coalesce_usecs = adapter->rx_itr_setting >> 2;
 
+	if (adapter->rx_itr_setting == 1)
+		ec->use_adaptive_rx_coalesce = 1;
+
 	/* if in mixed tx/rx queues per vector mode, report only rx settings */
 	if (adapter->q_vector[0]->tx.count && adapter->q_vector[0]->rx.count)
 		return 0;
@@ -3372,13 +3375,6 @@ static int txgbe_set_coalesce(struct net_device *netdev,
 	u16  tx_itr_prev;
 	bool need_reset = false;
 
-	if(ec->tx_max_coalesced_frames_irq == adapter->tx_work_limit &&
-	   ((adapter->rx_itr_setting <= 1) ? (ec->rx_coalesce_usecs == adapter->rx_itr_setting) :
-	    (ec->rx_coalesce_usecs == adapter->rx_itr_setting >> 2))) {
-		e_info(probe, "no coalesce parameters changed, aborting\n");
-		return -EINVAL;
-	}
-
 	if (adapter->q_vector[0]->tx.count && adapter->q_vector[0]->rx.count) {
 		/* reject Tx specific changes in case of mixed RxTx vectors */
 		if (ec->tx_coalesce_usecs)
@@ -3388,12 +3384,34 @@ static int txgbe_set_coalesce(struct net_device *netdev,
 		tx_itr_prev = adapter->tx_itr_setting;
 	}
 
-	if (ec->tx_max_coalesced_frames_irq)
-		adapter->tx_work_limit = ec->tx_max_coalesced_frames_irq;
+	if (ec->tx_max_coalesced_frames_irq) {
+		if (ec->tx_max_coalesced_frames_irq <= TXGBE_MAX_TX_WORK)
+			adapter->tx_work_limit = ec->tx_max_coalesced_frames_irq;
+		else
+			return -EINVAL;
+	} else
+		return -EINVAL;
 
 	if ((ec->rx_coalesce_usecs > (TXGBE_MAX_EITR >> 2)) ||
 	    (ec->tx_coalesce_usecs > (TXGBE_MAX_EITR >> 2)))
 		return -EINVAL;
+
+	if (ec->use_adaptive_tx_coalesce)
+		return -EINVAL;
+
+	if (ec->use_adaptive_rx_coalesce) {
+		adapter->rx_itr_setting = 1;
+		return 0;
+	}
+
+	/* restore to default rxusecs value when adaptive itr turn off */
+	/* user shall turn off adaptive itr and set user-defined rx usecs value
+	 * in two cmds separately.
+	 */
+	if (adapter->rx_itr_setting == 1) {
+		adapter->rx_itr_setting = TXGBE_20K_ITR;
+		ec->rx_coalesce_usecs = adapter->rx_itr_setting >> 2;
+	}
 
 	if (ec->rx_coalesce_usecs > 1)
 		adapter->rx_itr_setting = ec->rx_coalesce_usecs << 2;
@@ -5086,6 +5104,12 @@ static struct ethtool_ops txgbe_ethtool_ops = {
 	.get_ethtool_stats      = txgbe_get_ethtool_stats,
 #ifdef HAVE_ETHTOOL_GET_PERM_ADDR
 	.get_perm_addr          = ethtool_op_get_perm_addr,
+#endif
+
+#ifdef HAVE_ETHTOOL_COALESCE_PARAMS_SUPPORT
+	.supported_coalesce_params = ETHTOOL_COALESCE_USECS |
+								 ETHTOOL_COALESCE_MAX_FRAMES_IRQ |
+								 ETHTOOL_COALESCE_USE_ADAPTIVE,
 #endif
 	.get_coalesce           = txgbe_get_coalesce,
 	.set_coalesce           = txgbe_set_coalesce,

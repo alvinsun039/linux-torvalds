@@ -91,6 +91,7 @@ DECLARE_STATIC_KEY_FALSE(txgbe_xdp_locking_key);
 #endif
 #define TXGBE_MAX_TXD                   8192
 #define TXGBE_MIN_TXD                   128
+#define TXGBE_MAX_TX_WORK               65535
 
 #if (PAGE_SIZE < 8192)
 #define TXGBE_DEFAULT_RXD               512
