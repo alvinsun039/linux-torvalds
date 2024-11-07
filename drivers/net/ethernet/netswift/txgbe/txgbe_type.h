@@ -680,6 +680,7 @@ struct txgbe_thermal_sensor_data {
 /* Per VF Port VLAN insertion rules */
 #define TXGBE_TDM_VLAN_INS_VLANA_DEFAULT 0x40000000U /*Always use default VLAN*/
 #define TXGBE_TDM_VLAN_INS_VLANA_NEVER   0x80000000U /* Never insert VLAN tag */
+#define TXGBE_TDM_VLAN_INS_TPID_SEL_SHIFT 24 /*Tag tpid sel*/
 
 #define TXGBE_TDM_RP_CTL        0x18400
 #define TXGBE_TDM_RP_CTL_RST    ((0x1) << 0)

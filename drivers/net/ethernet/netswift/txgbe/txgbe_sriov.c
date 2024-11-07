@@ -533,12 +533,14 @@ void txgbe_set_vmolr(struct txgbe_hw *hw, u16 vf, bool aupe)
 }
 
 static void txgbe_set_vmvir(struct txgbe_adapter *adapter,
-			    u16 vid, u16 qos, u16 vf)
+			    u16 vid, u16 qos, u16 vf, __be16 vlan_proto)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 vmvir = vid | (qos << VLAN_PRIO_SHIFT) |
 		TXGBE_TDM_VLAN_INS_VLANA_DEFAULT;
 
+	if (vlan_proto == htons(ETH_P_8021AD))
+		vmvir |= 1 << TXGBE_TDM_VLAN_INS_TPID_SEL_SHIFT;
 	wr32(hw, TXGBE_TDM_VLAN_INS(vf), vmvir);
 }
 
@@ -567,10 +569,10 @@ static inline void txgbe_vf_reset_event(struct txgbe_adapter *adapter, u16 vf)
 	} else {
 		if (vfinfo->pf_qos || !num_tcs)
 			txgbe_set_vmvir(adapter, vfinfo->pf_vlan,
-					vfinfo->pf_qos, vf);
+					vfinfo->pf_qos, vf, vfinfo->vlan_proto);
 		else
 			txgbe_set_vmvir(adapter, vfinfo->pf_vlan,
-					adapter->default_up, vf);
+					adapter->default_up, vf, vfinfo->vlan_proto);
 
 		if (vfinfo->spoofchk_enabled)
 			TCALL(hw, mac.ops.set_vlan_anti_spoofing, true, vf);
@@ -1471,15 +1473,18 @@ int txgbe_ndo_set_vf_mac(struct net_device *netdev, int vf, u8 *mac)
 }
 
 static int txgbe_enable_port_vlan(struct txgbe_adapter *adapter,
-				   int vf, u16 vlan, u8 qos)
+				   int vf, u16 vlan, u8 qos, __be16 vlan_proto)
 {
 	struct txgbe_hw *hw = &adapter->hw;
+#ifndef IFLA_VF_VLAN_INFO_MAX
+	__be16 vlan_proto = htons(ETH_P_8021Q);
+#endif
 	int err;
 
 	err = txgbe_set_vf_vlan(adapter, true, vlan, vf);
 	if (err)
 		goto out;
-	txgbe_set_vmvir(adapter, vlan, qos, vf);
+	txgbe_set_vmvir(adapter, vlan, qos, vf, vlan_proto);
 	txgbe_set_vmolr(hw, vf, false);
 	if (adapter->vfinfo[vf].spoofchk_enabled)
 		TCALL(hw, mac.ops.set_vlan_anti_spoofing, true, vf);
@@ -1489,6 +1494,7 @@ static int txgbe_enable_port_vlan(struct txgbe_adapter *adapter,
 	txgbe_write_hide_vlan(adapter, vf, 1);
 	adapter->vfinfo[vf].pf_vlan = vlan;
 	adapter->vfinfo[vf].pf_qos = qos;
+	adapter->vfinfo[vf].vlan_proto = vlan_proto;
 	dev_info(pci_dev_to_dev(adapter->pdev),
 		 "Setting VLAN %d, QOS 0x%x on VF %d\n", vlan, qos, vf);
 	if (test_bit(__TXGBE_DOWN, &adapter->state)) {
@@ -1520,6 +1526,7 @@ static int txgbe_disable_port_vlan(struct txgbe_adapter *adapter, int vf)
 	txgbe_write_hide_vlan(adapter, vf, 0);
 	adapter->vfinfo[vf].pf_vlan = 0;
 	adapter->vfinfo[vf].pf_qos = 0;
+	adapter->vfinfo[vf].vlan_proto = 0;
 
 	return err;
 }
@@ -1540,7 +1547,10 @@ int txgbe_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos)
 #ifdef IFLA_VF_VLAN_INFO_MAX
 	if (vlan_proto != htons(ETH_P_8021Q) && vlan_proto != htons(ETH_P_8021AD))
 		return -EPROTONOSUPPORT;
+#else
+	__be16 vlan_proto = htons(ETH_P_8021Q);
 #endif
+
 	if (vlan || qos) {
 		/*
 		 * Check if there is already a port VLAN set, if so
@@ -1554,8 +1564,7 @@ int txgbe_ndo_set_vf_vlan(struct net_device *netdev, int vf, u16 vlan, u8 qos)
 			err = txgbe_disable_port_vlan(adapter, vf);
 		if (err)
 			goto out;
-		err = txgbe_enable_port_vlan(adapter, vf, vlan, qos);
-
+		err = txgbe_enable_port_vlan(adapter, vf, vlan, qos, vlan_proto);
 	} else {
 		err = txgbe_disable_port_vlan(adapter, vf);
 	}
@@ -1817,6 +1826,9 @@ int txgbe_ndo_get_vf_config(struct net_device *netdev,
 
 	ivi->vlan = adapter->vfinfo[vf].pf_vlan;
 	ivi->qos = adapter->vfinfo[vf].pf_qos;
+#ifdef IFLA_VF_VLAN_INFO_MAX
+	ivi->vlan_proto = adapter->vfinfo[vf].vlan_proto;
+#endif
 #ifdef HAVE_VF_SPOOFCHK_CONFIGURE
 	ivi->spoofchk = adapter->vfinfo[vf].spoofchk_enabled;
 #endif

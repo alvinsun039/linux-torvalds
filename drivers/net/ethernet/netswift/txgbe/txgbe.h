@@ -220,6 +220,7 @@ struct vf_data_storage {
 	bool pf_set_mac;
 	u16 pf_vlan; /* When set, guest VLAN config not allowed. */
 	u16 pf_qos;
+	__be16 vlan_proto;
 	u16 min_tx_rate;
 	u16 max_tx_rate;
 	u16 vlan_count;
