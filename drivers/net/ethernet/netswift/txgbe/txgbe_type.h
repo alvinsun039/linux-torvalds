@@ -1904,6 +1904,7 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_RXD_STAT_FCSTAT_FCPRSP    0x00080000U /* 10: Recv. FCP_RSP */
 #define TXGBE_RXD_STAT_FCSTAT_DDP       0x000C0000U /* 11: Ctxt w/ DDP */
 
+#define TXGBE_RXD_IPV6EX                0x00001000U /* IPv6EX  */
 #define TXGBE_RXD_ERR_MASK              0xfff00000U /* RDESC.ERRORS mask */
 #define TXGBE_RXD_ERR_SHIFT             20         /* RDESC.ERRORS shift */
 #define TXGBE_RXD_ERR_FCEOFE            0x80000000U /* FCEOFe/IPE */
@@ -2040,9 +2041,6 @@ enum txgbe_l2_ptypes {
 #define TXGBE_PTYPE_PKT(_pt) ((_pt) & 0x30)
 #define TXGBE_PTYPE_TYP(_pt) ((_pt) & 0x0F)
 #define TXGBE_PTYPE_TYPL4(_pt) ((_pt) & 0x07)
-
-#define TXGBE_RXD_IPV6EX(_rxd) \
-	((le32_to_cpu((_rxd)->wb.lower.lo_dword.data) >> 6) & 0x1)
 
 /* Security Processing bit Indication */
 #define TXGBE_RXD_LNKSEC_STATUS_SECP            0x00020000U

@@ -947,7 +947,8 @@ static inline void txgbe_rx_checksum(struct txgbe_ring *ring,
 		return;
 
 	/*likely incorrect csum if IPv6 Dest Header found */
-	if (dptype.prot != TXGBE_DEC_PTYPE_PROT_SCTP && TXGBE_RXD_IPV6EX(rx_desc))
+	if (dptype.prot != TXGBE_DEC_PTYPE_PROT_SCTP &&
+		txgbe_test_staterr(rx_desc, TXGBE_RXD_IPV6EX))
 		return;
 
 	/* if L4 checksum error */
