@@ -414,16 +414,12 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 			} else {
 				switch (hw->phy.link_mode) {
 				case TXGBE_PHYSICAL_LAYER_10GBASE_KX4:
-					ethtool_link_ksettings_add_link_mode(cmd, supported,
+					ethtool_link_ksettings_add_link_mode(cmd, advertising,
 									10000baseKX4_Full);
 					break;
 				case TXGBE_PHYSICAL_LAYER_10GBASE_KR:
 					ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseKR_Full);
-					break;
-				case TXGBE_PHYSICAL_LAYER_1000BASE_KX:
-					ethtool_link_ksettings_add_link_mode(cmd, supported,
-									1000baseKX_Full);
 					break;
 				default:
 					ethtool_link_ksettings_add_link_mode(cmd, supported,
@@ -1195,7 +1191,8 @@ static int txgbe_set_settings(struct net_device *netdev,
 			txgbe_set_sgmii_an37_ability(hw);
 		}
 		if (err)
-			return -EACCES;
+			err = -EACCES;
+
 		return err;
 	} else {
 		/* in this case we currently only support 10Gb/FULL and 1Gb/FULL*/
