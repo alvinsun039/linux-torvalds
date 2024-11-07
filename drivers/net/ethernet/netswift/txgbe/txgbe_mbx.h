@@ -157,7 +157,7 @@ enum txgbevf_xcast_modes {
 #define TXGBE_PF_TRANSPARENT_VLAN       0x0101 /* enable transparent vlan */
 
 #define TXGBE_VF_MBX_INIT_TIMEOUT       2000 /* number of retries on mailbox */
-#define TXGBE_VF_MBX_INIT_DELAY         500  /* microseconds between retries */
+#define TXGBE_VF_MBX_INIT_DELAY         50  /* microseconds between retries */
 
 int txgbe_read_mbx(struct txgbe_hw *, u32 *, u16, u16);
 int txgbe_write_mbx(struct txgbe_hw *, u32 *, u16, u16);

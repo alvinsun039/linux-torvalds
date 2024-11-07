@@ -579,20 +579,29 @@ int txgbe_check_for_rst_pf(struct txgbe_hw *hw, u16 vf)
  **/
 int txgbe_obtain_mbx_lock_pf(struct txgbe_hw *hw, u16 vf)
 {
+	struct txgbe_mbx_info *mbx = &hw->mbx;
+	int countdown = mbx->timeout;
 	int err = TXGBE_ERR_MBX;
 	u32 mailbox;
 
-	/* Take ownership of the buffer */
-	wr32(hw, TXGBE_PXMAILBOX(vf), TXGBE_PXMAILBOX_PFU);
+	while (countdown--) {
+		/* Take ownership of the buffer */
+		wr32(hw, TXGBE_PXMAILBOX(vf), TXGBE_PXMAILBOX_PFU);
 
-	/* reserve mailbox for vf use */
-	mailbox = rd32(hw, TXGBE_PXMAILBOX(vf));
-	if (mailbox & TXGBE_PXMAILBOX_PFU)
-		err = 0;
-	else
+		/* reserve mailbox for vf use */
+		mailbox = rd32(hw, TXGBE_PXMAILBOX(vf));
+		if (mailbox & TXGBE_PXMAILBOX_PFU) {
+			err = 0;
+			break;
+		}
+
+		/* Wait a bit before trying again */
+		usec_delay(mbx->udelay);
+	}
+
+	if (err)
 		ERROR_REPORT2(TXGBE_ERROR_POLLING,
-			   "Failed to obtain mailbox lock for PF%d", vf);
-
+			"Failed to obtain mailbox lock for PF%d", vf);
 
 	return err;
 }
@@ -686,8 +695,8 @@ void txgbe_init_mbx_params_pf(struct txgbe_hw *hw)
 {
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 
-	mbx->timeout = 0;
-	mbx->udelay = 0;
+	mbx->timeout = TXGBE_VF_MBX_INIT_TIMEOUT;
+	mbx->udelay = TXGBE_VF_MBX_INIT_DELAY;
 
 	mbx->size = TXGBE_VXMAILBOX_SIZE;
 
