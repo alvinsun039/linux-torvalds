@@ -1123,7 +1123,8 @@ struct txgbe_adapter {
 	u16 bridge_mode;
 #endif
 
-	char eeprom_id[32];
+	char eeprom_id[16];
+	char fl_version[16];
 	char fw_version[32];
 	u16 eeprom_cap;
 	bool netdev_registered;

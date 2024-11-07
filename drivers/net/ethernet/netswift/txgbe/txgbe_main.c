@@ -6957,7 +6957,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	}
 
 	txgbe_flash_read_dword(hw, 0x13a, &fw_version);
-	snprintf(adapter->fw_version, sizeof(adapter->fw_version),
+	snprintf(adapter->fl_version, sizeof(adapter->fw_version),
 			 "0x%08x", fw_version);
 	
 
@@ -12361,8 +12361,17 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 			 "0x%08x", etrack_id);
 	}
 
-	if (hw->bus.lan_id == 0)
-		e_dev_info("Shadow Ram Firmware Version: %s\n", adapter->eeprom_id);
+	if (hw->bus.lan_id == 0) {
+		if (strcmp(adapter->eeprom_id, adapter->fl_version) == 0) {
+			e_dev_info("Running Firmware Version: %s\n", adapter->eeprom_id);
+			memcpy(adapter->fw_version, adapter->eeprom_id, sizeof(adapter->eeprom_id));
+		} else {
+			e_dev_info("Running Firmware Version: %s, Flash Firmware Version: %s\n",
+						adapter->eeprom_id, adapter->fl_version);
+			snprintf(adapter->fw_version, sizeof(adapter->fw_version), "%s,ACT.%s",
+						adapter->fl_version, adapter->eeprom_id);
+		}
+	}
 
 	/* reset the hardware with the new settings */
 	err = TCALL(hw, mac.ops.start_hw);
