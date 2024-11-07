@@ -3471,6 +3471,9 @@ int txgbe_poll(struct napi_struct *napi, int budget)
 #ifdef HAVE_NDO_BUSY_POLL
 	txgbe_qv_unlock_napi(q_vector);
 #endif
+	/* Exit if we are called by netpoll */
+	if (budget <= 0)
+		return budget;
 
 #ifndef HAVE_NETDEV_NAPI_LIST
 	if (!netif_running(adapter->netdev))
