@@ -7586,9 +7586,8 @@ int txgbe_hic_get_lldp(struct txgbe_hw *hw)
 	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
 	buffer.hdr.checksum = FW_DEFAULT_CHECKSUM;
 	buffer.func = hw->bus.lan_id;
-
 	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
-					     sizeof(buffer), 5000, true);
+					      sizeof(buffer), 5000, true);
 	if (buffer.hdr.cmd_or_resp.ret_status != FW_CEM_RESP_STATUS_SUCCESS)
 		return -1;
 	else

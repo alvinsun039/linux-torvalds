@@ -7001,8 +7001,6 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->flags2 |= TXGBE_FLAG2_TEMP_SENSOR_CAPABLE;
 	hw->phy.smart_speed = txgbe_smart_speed_off;
 	adapter->flags2 |= TXGBE_FLAG2_EEE_CAPABLE;
-	if(txgbe_is_lldp(hw)) 
-		e_dev_err("Can not get lldp flags from flash\n");
 
 #if IS_ENABLED(CONFIG_FCOE)
 	/* FCoE support exists, always init the FCoE lock */
@@ -12028,6 +12026,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 		goto err_sw_init;
 	}
 
+	if (txgbe_is_lldp(hw))
+		e_dev_err("Can not get lldp flags from flash\n");
 #ifdef CONFIG_PCI_IOV
 #ifdef HAVE_SRIOV_CONFIGURE
 	if (adapter->max_vfs > 0) {
