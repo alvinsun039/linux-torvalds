@@ -4638,18 +4638,30 @@ static int txgbe_set_rxfh(struct net_device *netdev, const u32 *indir,
 			if (indir[i] >= max_queues)
 				return -EINVAL;
 
-		for (i = 0; i < reta_entries; i++)
-			adapter->rss_indir_tbl[i] = indir[i];
-
-		txgbe_store_reta(adapter);
+		if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED) {
+			for (i = 0; i < reta_entries; i++)
+				adapter->rss_indir_tbl[i] = indir[i];
+			txgbe_store_vfreta(adapter);
+		} else {
+			for (i = 0; i < reta_entries; i++)
+				adapter->rss_indir_tbl[i] = indir[i];
+			txgbe_store_reta(adapter);
+		}
 	}
 
 	if (key) {
 		memcpy(adapter->rss_key, key, txgbe_get_rxfh_key_size(netdev));
 
-		/* Fill out hash function seeds */
-		for (i = 0; i < 10; i++)
-			wr32(hw, TXGBE_RDB_RSSRK(i), adapter->rss_key[i]);
+		if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED) {
+			unsigned int pf_pool = adapter->num_vfs;
+
+			for (i = 0; i < 10; i++)
+				wr32(hw, TXGBE_RDB_VMRSSRK(i, pf_pool), adapter->rss_key[i]);
+		} else {
+			/* Fill out hash function seeds */
+			for (i = 0; i < 10; i++)
+				wr32(hw, TXGBE_RDB_RSSRK(i), adapter->rss_key[i]);
+		}
 	}
 
 	return 0;

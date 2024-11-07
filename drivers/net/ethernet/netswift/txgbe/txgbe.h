@@ -1461,6 +1461,7 @@ void txgbe_set_rx_drop_en(struct txgbe_adapter *adapter);
 
 u32 txgbe_rss_indir_tbl_entries(struct txgbe_adapter *adapter);
 void txgbe_store_reta(struct txgbe_adapter *adapter);
+void txgbe_store_vfreta(struct txgbe_adapter *adapter);
 
 int txgbe_setup_isb_resources(struct txgbe_adapter *adapter);
 void txgbe_free_isb_resources(struct txgbe_adapter *adapter);

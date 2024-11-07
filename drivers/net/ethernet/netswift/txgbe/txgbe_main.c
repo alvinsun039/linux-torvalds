@@ -3986,7 +3986,10 @@ static void txgbe_configure_srrctl(struct txgbe_adapter *adapter,
  */
 u32 txgbe_rss_indir_tbl_entries(struct txgbe_adapter *adapter)
 {
-	return 128;
+	if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED)
+		return 64;
+	else
+		return 128;
 }
 
 /**
@@ -4017,8 +4020,9 @@ void txgbe_store_reta(struct txgbe_adapter *adapter)
 	}
 }
 
-static void txgbe_store_vfreta(struct txgbe_adapter *adapter)
+void txgbe_store_vfreta(struct txgbe_adapter *adapter)
 {
+	u32 reta_entries = txgbe_rss_indir_tbl_entries(adapter);
 	unsigned int pf_pool = adapter->num_vfs;
 	u8 *indir_tbl = adapter->rss_indir_tbl;
 	struct txgbe_hw *hw = &adapter->hw;
@@ -4026,7 +4030,7 @@ static void txgbe_store_vfreta(struct txgbe_adapter *adapter)
 	u32 i;
 
 	/* Write redirection table to HW */
-	for (i = 0; i < 64; i++) {
+	for (i = 0; i < reta_entries; i++) {
 		reta |= indir_tbl[i] << (i & 0x3) * 8;
 		if ((i & 3) == 3) {
 			wr32(hw, TXGBE_RDB_VMRSSTBL(i >> 2, pf_pool), reta);
@@ -4069,6 +4073,7 @@ void txgbe_setup_reta(struct txgbe_adapter *adapter)
 
 static void txgbe_setup_vfreta(struct txgbe_adapter *adapter)
 {
+	u32 reta_entries = txgbe_rss_indir_tbl_entries(adapter);
 	u16 rss_i = adapter->ring_feature[RING_F_RSS].indices;
 	unsigned int pf_pool = adapter->num_vfs;
 	struct txgbe_hw *hw = &adapter->hw;
@@ -4078,7 +4083,7 @@ static void txgbe_setup_vfreta(struct txgbe_adapter *adapter)
 	for (i = 0; i < 10; i++)
 		wr32(hw, TXGBE_RDB_VMRSSRK(i, pf_pool), *(adapter->rss_key + i));
 
-	for (i = 0, j = 0; i < 64; i++, j++) {
+	for (i = 0, j = 0; i < reta_entries; i++, j++) {
 		if (j == rss_i)
 			j = 0;
 
