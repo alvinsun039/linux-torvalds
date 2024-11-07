@@ -2627,7 +2627,9 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 
 	txgbe_configure_tx_ring(adapter, tx_ring);
 	/* enable mac transmitter */
-	if (txgbe_check_reset_blocked(hw) && hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL)
+	if (txgbe_check_reset_blocked(hw) &&
+	    (hw->phy.autoneg_advertised == TXGBE_LINK_SPEED_1GB_FULL ||
+	    adapter->link_speed == TXGBE_LINK_SPEED_1GB_FULL))
 		wr32m(hw, TXGBE_MAC_TX_CFG,
 			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_MASK,
 			TXGBE_MAC_TX_CFG_TE | TXGBE_MAC_TX_CFG_SPEED_1G);
