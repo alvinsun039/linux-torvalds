@@ -1476,9 +1476,6 @@ static int txgbe_enable_port_vlan(struct txgbe_adapter *adapter,
 				   int vf, u16 vlan, u8 qos, __be16 vlan_proto)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-#ifndef IFLA_VF_VLAN_INFO_MAX
-	__be16 vlan_proto = htons(ETH_P_8021Q);
-#endif
 	int err;
 
 	err = txgbe_set_vf_vlan(adapter, true, vlan, vf);
