@@ -17,3 +17,12 @@ bool is_vendor_hygon(void)
 
 	return boot_cpu_data.x86_vendor == X86_VENDOR_HYGON;
 }
+
+bool is_vendor_zhaoxin(void)
+{
+	if (!IS_BUILTIN(CONFIG_CPU_SUP_ZHAOXIN) && !IS_BUILTIN(CONFIG_CPU_SUP_CENTAUR))
+		return false;
+
+	return (boot_cpu_data.x86_vendor == X86_VENDOR_ZHAOXIN ||
+		boot_cpu_data.x86_vendor == X86_VENDOR_CENTAUR);
+}
