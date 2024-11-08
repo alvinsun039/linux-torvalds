@@ -104,7 +104,7 @@ void txgbe_txrx_ring_disable(struct txgbe_adapter *adapter, int ring)
 		txgbe_disable_txr(adapter, xdp_ring);
 	txgbe_disable_rxr_hw(adapter, rx_ring);
 
-	if (ring_is_xdp(tx_ring))
+	if (xdp_ring)
 		synchronize_rcu();
 
 	/* Rx/Tx/XDP Tx share the same napi context. */
@@ -146,7 +146,7 @@ void txgbe_txrx_ring_enable(struct txgbe_adapter *adapter, int ring)
 	txgbe_configure_rx_ring(adapter, rx_ring);
 
 	clear_bit(__TXGBE_TX_DISABLED, &tx_ring->state);
-	if (ring_is_xdp(tx_ring))
+	if (xdp_ring)
 		clear_bit(__TXGBE_TX_DISABLED, &xdp_ring->state);
 }
 
@@ -330,6 +330,9 @@ static int txgbe_xsk_umem_enable(struct txgbe_adapter *adapter,
 
 	if (if_running)
 		txgbe_txrx_ring_disable(adapter, qid);
+
+	/*to avoid xsk fd get issue in some kernel version*/
+	msleep(400);
 
 	set_bit(qid, adapter->af_xdp_zc_qps);
 	err = txgbe_add_xsk_umem(adapter, pool, qid);
