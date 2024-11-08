@@ -11147,9 +11147,6 @@ static void txgbe_add_udp_tunnel_port(struct net_device *dev,
 	struct txgbe_hw *hw = &adapter->hw;
 	u16 port = ntohs(ti->port);
 
-	if (ti->sa_family != AF_INET)
-		return;
-
 	switch (ti->type) {
 	case UDP_TUNNEL_TYPE_VXLAN:
 		if (!(adapter->flags & TXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
@@ -11208,9 +11205,6 @@ static void txgbe_del_udp_tunnel_port(struct net_device *dev,
 	    ti->type != UDP_TUNNEL_TYPE_GENEVE)
 		return;
 
-	if (ti->sa_family != AF_INET)
-		return;
-
 	switch (ti->type) {
 	case UDP_TUNNEL_TYPE_VXLAN:
 		if (!(adapter->flags & TXGBE_FLAG_VXLAN_OFFLOAD_CAPABLE))
@@ -11236,7 +11230,6 @@ static void txgbe_del_udp_tunnel_port(struct net_device *dev,
 		}
 
 		adapter->geneve_port = 0;
-		wr32(&adapter->hw, TXGBE_CFG_GENEVE, 0);
 		break;
 	default:
 		return;
@@ -11248,11 +11241,6 @@ static int txgbe_udp_tunnel_set(struct net_device *dev,
 				unsigned int table, unsigned int entry,
 				struct udp_tunnel_info *ti)
 {
-	const struct udp_tunnel_nic_info *tni = dev->udp_tunnel_nic_info;
-
-	if (tni->flags & UDP_TUNNEL_NIC_INFO_IPV4_ONLY)
-		ti->sa_family = AF_INET;
-
 	txgbe_add_udp_tunnel_port(dev, ti);
 	return 0;
 }
@@ -11261,11 +11249,6 @@ static int txgbe_udp_tunnel_unset(struct net_device *dev,
 				  unsigned int table, unsigned int entry,
 				  struct udp_tunnel_info *ti)
 {
-	const struct udp_tunnel_nic_info *tni = dev->udp_tunnel_nic_info;
-
-	if (tni->flags & UDP_TUNNEL_NIC_INFO_IPV4_ONLY)
-		ti->sa_family = AF_INET;
-
 	txgbe_del_udp_tunnel_port(dev, ti);
 
 	return 0;
@@ -11274,7 +11257,7 @@ static int txgbe_udp_tunnel_unset(struct net_device *dev,
 static const struct udp_tunnel_nic_info txgbe_udp_tunnels = {
 	.set_port       = txgbe_udp_tunnel_set,
 	.unset_port     = txgbe_udp_tunnel_unset,
-	.flags          = UDP_TUNNEL_NIC_INFO_IPV4_ONLY,
+	.flags          = UDP_TUNNEL_NIC_INFO_MAY_SLEEP,
 	.tables         = {
 		{ .n_entries = 1, .tunnel_types = UDP_TUNNEL_TYPE_VXLAN,  },
 		{ .n_entries = 1, .tunnel_types = UDP_TUNNEL_TYPE_GENEVE, },
