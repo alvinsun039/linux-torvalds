@@ -2307,6 +2307,8 @@ struct txgbe_etype_filter_info {
 #define FW_FLASH_UPGRADE_VERIFY_LEN     0x4
 #define FW_DW_OPEN_NOTIFY               0xE9
 #define FW_DW_CLOSE_NOTIFY              0xEA
+#define FW_AN_STA_CMD                   0xF3
+#define FW_AN_STA_LEN                   0x1
 
 #define TXGBE_CHECKSUM_CAP_ST_PASS      0x80658383
 #define TXGBE_CHECKSUM_CAP_ST_FAIL      0x70657376
@@ -2430,6 +2432,13 @@ struct txgbe_hic_write_lldp{
 	u8 func;
 	u8 pad2;
 	u16 pad3;
+};
+
+struct txgbe_hic_write_autoneg {
+	struct txgbe_hic_hdr hdr;
+	u8 lan_id;
+	bool autoneg;
+	u16 pad;
 };
 
 /* Number of 100 microseconds we wait for PCI Express master disable */

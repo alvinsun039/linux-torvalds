@@ -4403,7 +4403,7 @@ s32 txgbe_get_link_capabilities(struct txgbe_hw *hw,
 	/* SFP */
 	else if (txgbe_get_media_type(hw) == txgbe_media_type_fiber) {
 		*speed = TXGBE_LINK_SPEED_10GB_FULL;
-		*autoneg = false;
+		*autoneg = true;
 	}
 	/* XAUI */
 	else if ((txgbe_get_media_type(hw) == txgbe_media_type_copper) &&
@@ -7691,4 +7691,20 @@ int txgbe_fw_quirks(struct txgbe_hw *hw)
 	}
 
 	return TXGBE_SUCCESS;
+}
+
+s32 txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg)
+{
+	int status;
+	struct txgbe_hic_write_autoneg buffer;
+
+	buffer.hdr.cmd = FW_AN_STA_CMD;
+	buffer.hdr.buf_len = FW_AN_STA_LEN;
+	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
+	buffer.hdr.checksum = FW_DEFAULT_CHECKSUM;
+	buffer.lan_id = hw->bus.lan_id;
+	buffer.autoneg = autoneg;
+	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
+					      sizeof(buffer), 5000, false);
+	return status;
 }

@@ -316,5 +316,6 @@ s32 txgbe_hic_write_lldp(struct txgbe_hw *hw,u32 open);
 int txgbe_is_lldp(struct txgbe_hw *hw);
 int txgbe_fw_quirks(struct txgbe_hw *hw);
 s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw);
+s32 txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg);
 
 #endif /* _TXGBE_HW_H_ */

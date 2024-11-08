@@ -638,24 +638,27 @@ int txgbe_get_link_ksettings(struct net_device *netdev,
 	}
 	if(!(ethtool_link_ksettings_test_link_mode(cmd, advertising,
 					10000baseT_Full) ||
-	ethtool_link_ksettings_test_link_mode(cmd, advertising,
-					10000baseKR_Full)||
-	ethtool_link_ksettings_test_link_mode(cmd, advertising,
-					10000baseKX4_Full)||
-	ethtool_link_ksettings_test_link_mode(cmd, advertising,
-					10000baseLR_Full))&&
-	(ethtool_link_ksettings_test_link_mode(cmd, advertising,
-					1000baseT_Full) ||
-	ethtool_link_ksettings_test_link_mode(cmd, advertising,
-					1000baseKX_Full)||
-	ethtool_link_ksettings_test_link_mode(cmd, advertising, 
-					1000baseX_Full))
-	){
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						10000baseKR_Full) ||
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						10000baseKX4_Full) ||
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						10000baseLR_Full) ||
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						10000baseLR_Full)) &&
+		(ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						1000baseT_Full) ||
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						1000baseKX_Full) ||
+		ethtool_link_ksettings_test_link_mode(cmd, advertising,
+						1000baseX_Full))) {
 		if(!adapter->an37)
 			ethtool_link_ksettings_del_link_mode(cmd, advertising, Autoneg);
-		else ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
-		cmd->base.autoneg = adapter->an37;
-		}
+		else
+			ethtool_link_ksettings_add_link_mode(cmd, advertising, Autoneg);
+	}
+	cmd->base.autoneg = adapter->an37;
+
 	return 0;
 }
 #else /* !HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE */
@@ -989,6 +992,11 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			if (old == advertised && (curr_autoneg == adapter->an37))
 				return -EINVAL;
 		}
+
+		if (advertised == TXGBE_LINK_SPEED_10GB_FULL &&
+			cmd->base.autoneg == AUTONEG_DISABLE)
+			return -EINVAL;
+
 		/* this sets the link speed and restarts auto-neg */
 		while (test_and_set_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
 			usleep_range(1000, 2000);
@@ -1001,6 +1009,10 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		}
 		if ((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP)
 				TCALL(hw, mac.ops.flap_tx_laser);
+
+		/* notify fw autoneg status */
+		txgbe_hic_write_autoneg_status(hw, cmd->base.autoneg);
+
 		clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 	} else if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4 ||
 		   (hw->subsystem_device_id & 0xF0) == TXGBE_ID_MAC_SGMII) {
@@ -1032,21 +1044,28 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 	} else {
 		/* in this case we currently only support 10Gb/FULL */
 		u32 speed = cmd->base.speed;
-		if ((ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseT_Full) ||
-		     ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseKR_Full) ||
-		     ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseKX4_Full) ||
-		     ethtool_link_ksettings_test_link_mode(cmd, advertising, 10000baseLR_Full))) {
+		if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
+							   10000baseT_Full) ||
+		     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+							   10000baseKR_Full) ||
+		     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+							   10000baseKX4_Full) ||
+		     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+							   10000baseLR_Full) ||
+		     ethtool_link_ksettings_test_link_mode(cmd, advertising,
+							   10000baseSR_Full))) {
 			if ((cmd->base.autoneg == AUTONEG_ENABLE) ||
-			    (!ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								    10000baseT_Full)) ||
-			    (speed + cmd->base.duplex != SPEED_10000 + DUPLEX_FULL))
+			    (!ethtool_link_ksettings_test_link_mode(
+				    cmd, advertising, 10000baseT_Full)) ||
+			    (speed + cmd->base.duplex !=
+			     SPEED_10000 + DUPLEX_FULL))
 				return -EINVAL;
-		} else if ((ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								  1000baseT_Full) ||
-			    ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								  1000baseKX_Full) ||
-			    ethtool_link_ksettings_test_link_mode(cmd, advertising,
-								  1000baseX_Full))) {
+		} else if ((ethtool_link_ksettings_test_link_mode(
+				    cmd, advertising, 1000baseT_Full) ||
+			    ethtool_link_ksettings_test_link_mode(
+				    cmd, advertising, 1000baseKX_Full) ||
+			    ethtool_link_ksettings_test_link_mode(
+				    cmd, advertising, 1000baseX_Full))) {
 			memcpy(&temp_ks, cmd, sizeof(struct ethtool_link_ksettings));
 
 			if (ethtool_link_ksettings_test_link_mode(cmd, advertising,
@@ -1090,6 +1109,10 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			}
 			if ((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP)
 				TCALL(hw, mac.ops.flap_tx_laser);
+
+			/* notify fw autoneg status */
+			txgbe_hic_write_autoneg_status(hw, cmd->base.autoneg);
+
 			clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 		}
 	}
@@ -1155,6 +1178,11 @@ static int txgbe_set_settings(struct net_device *netdev,
 			if (old == advertised && (curr_autoneg == adapter->an37))
 				return err;
 		}
+
+		if (advertised == TXGBE_LINK_SPEED_10GB_FULL &&
+			ecmd->autoneg == AUTONEG_DISABLE)
+			return -EINVAL;
+
 		/* this sets the link speed and restarts auto-neg */
 		while (test_and_set_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
 			usleep_range(1000, 2000);
@@ -1168,6 +1196,10 @@ static int txgbe_set_settings(struct net_device *netdev,
 
 		if ((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP)
 				TCALL(hw, mac.ops.flap_tx_laser);
+
+		/* notify fw autoneg status */
+		txgbe_hic_write_autoneg_status(hw, ecmd->autoneg);
+
 		clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 	} else if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4 ||
 		   (hw->subsystem_device_id & 0xF0) == TXGBE_ID_MAC_SGMII) {
@@ -1231,6 +1263,11 @@ static int txgbe_set_settings(struct net_device *netdev,
 			}
 			if ((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP)
 				TCALL(hw, mac.ops.flap_tx_laser);
+
+			/* notify fw autoneg status */
+			pr_info("cmd->base.autoneg = %d\n", cmd->base.autoneg);
+			txgbe_hic_write_autoneg_status(hw, cmd->base.autoneg);
+
 			clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 		}
 	}
