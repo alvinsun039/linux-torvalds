@@ -7086,6 +7086,8 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	hw->fc.send_xon = true;
 	hw->fc.disable_fc_autoneg = false;
 
+	hw->dac_sfp = false;
+
 	/* set default ring sizes */
 	adapter->tx_ring_count = TXGBE_DEFAULT_TXD;
 	adapter->rx_ring_count = TXGBE_DEFAULT_RXD;
@@ -7635,7 +7637,8 @@ int txgbe_close(struct net_device *netdev)
 	struct txgbe_hw *hw = &adapter->hw;
 
 	if ( hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
-		hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ){
+	    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
+	    hw->dac_sfp) {
 		txgbe_bp_close_protect(adapter);
 	}
 
@@ -8428,7 +8431,8 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	adapter->link_speed = 0;
 
 	if ( hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
-		hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ){
+	    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
+	    hw->dac_sfp) {
 		txgbe_bp_down_event(adapter);
 	}
 
@@ -8584,8 +8588,9 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 	    test_bit(__TXGBE_RESETTING, &adapter->state))
 		return;
 
-	if ( hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
-		 hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ){
+	if (hw->subsystem_device_id == TXGBE_ID_WX1820_KR_KX_KX4 ||
+	    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
+	    hw->dac_sfp) {
 		txgbe_bp_watchdog_event(adapter);
 	}
 #ifndef POLL_LINK_STATUS
@@ -8781,7 +8786,8 @@ static void txgbe_service_timer(struct timer_list *t)
 
 	/* poll faster when waiting for link */
 	if (adapter->flags & TXGBE_FLAG_NEED_LINK_UPDATE) {
-		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4)
+		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4 ||
+		    hw->dac_sfp)
 			next_event_offset = HZ ;
 		else if (BOND_CHECK_LINK_MODE == 1)
 			next_event_offset = HZ / 100;

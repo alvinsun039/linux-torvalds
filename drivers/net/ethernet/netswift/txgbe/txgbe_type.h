@@ -3102,6 +3102,7 @@ struct txgbe_hw {
 	u16 oem_ssid;
 	u16 oem_svid;
 	bool f2c_mod_status;         /* fiber to copper modules internal phy link status */
+	bool dac_sfp;         /* force dac sfp to kr mode */
 };
 
 #define TCALL(hw, func, args...) (((hw)->func != NULL) \
