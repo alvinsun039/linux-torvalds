@@ -9309,7 +9309,7 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 		    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
 		    hw->dac_sfp)
 			txgbe_bp_watchdog_event(adapter);
-	if (hw->mac.type == txgbe_mac_sp)
+	if (hw->mac.type == txgbe_mac_aml)
 		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
 		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
 		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
