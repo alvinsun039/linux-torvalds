@@ -460,8 +460,11 @@ struct txgbe_ring {
 #endif
 	u16 rx_buf_len;
 	union {
-#ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
-		u16 next_to_alloc;
+#ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIs
+		union {
+			u16 next_to_alloc;
+			u16 next_rs_idx;
+		};
 #endif
 		struct {
 			u8 atr_sample_rate;
