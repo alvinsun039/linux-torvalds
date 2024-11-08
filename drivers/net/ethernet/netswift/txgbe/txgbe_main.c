@@ -11458,6 +11458,7 @@ static netdev_features_t
 txgbe_features_check(struct sk_buff *skb, struct net_device *dev,
 		     netdev_features_t features)
 {
+#ifndef HAVE_VLAN_NUM_ERROR
 	u32 vlan_num = 0;
 	u16 vlan_depth = skb->mac_len;
 	__be16 type = skb->protocol;
@@ -11478,12 +11479,12 @@ txgbe_features_check(struct sk_buff *skb, struct net_device *dev,
 		vh = (struct vlan_hdr *)(skb->data + vlan_depth);
 		type = vh->h_vlan_encapsulated_proto;
 		vlan_depth += VLAN_HLEN;
-
 	}
 
 	if (vlan_num > 2)
 		features &= ~(NETIF_F_HW_VLAN_CTAG_TX |
 			    NETIF_F_HW_VLAN_STAG_TX);
+#endif
 
 	if (skb->encapsulation) {
 		if (unlikely(skb_inner_mac_header(skb) -
