@@ -3299,9 +3299,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 
 	if (eicr & TXGBE_PX_MISC_IC_ETH_AN) {
 		if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
-			value = txgbe_rd32_epcs(hw, 0x78002);
-			value = value & 0x4;
-			if (value == 0x4) {
+			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
 				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
 					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
 					txgbe_service_event_schedule(adapter);
@@ -3582,7 +3580,7 @@ static irqreturn_t txgbe_intr(int __always_unused irq, void *data)
 	struct txgbe_q_vector *q_vector = adapter->q_vector[0];
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 eicr_misc;
-	u32 value ;
+	u32 value;
 	u16 pci_value;
 	
 	if (!(adapter->flags & TXGBE_FLAG_MSI_ENABLED)) {
@@ -3595,13 +3593,9 @@ static irqreturn_t txgbe_intr(int __always_unused irq, void *data)
 	eicr_misc = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
 	if (eicr_misc & TXGBE_PX_MISC_IC_ETH_AN) {
 		if (adapter->backplane_an == 1 && (KR_POLLING == 0)) {
-			value = txgbe_rd32_epcs(hw, 0x78002);
-			value = value & 0x4;
-			if (value == 0x4) {
-				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
-					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-					txgbe_service_event_schedule(adapter);
-				}
+			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
+				adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+				txgbe_service_event_schedule(adapter);
 			}
 		}
 	}

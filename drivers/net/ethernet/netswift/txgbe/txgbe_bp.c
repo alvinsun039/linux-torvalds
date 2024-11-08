@@ -69,6 +69,7 @@ void txgbe_bp_watchdog_event(struct txgbe_adapter *adapter)
 	u32 value = 0;
 	struct txgbe_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
+	int ret = 0;
 	
 	/* only continue if link is down */
 	if (netif_carrier_ok(netdev))
@@ -84,8 +85,10 @@ void txgbe_bp_watchdog_event(struct txgbe_adapter *adapter)
 	} else {
 		if(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING){
 			e_dev_info("Enter training\n");
-			handle_bkp_an73_flow(0, adapter);
+			ret = handle_bkp_an73_flow(0, adapter);
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
+			if (ret)
+				txgbe_set_link_to_kr(hw, 1);
 		}
 	}
 }
@@ -144,6 +147,15 @@ void txgbe_bp_down_event(struct txgbe_adapter *adapter)
 					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
 			} else {
 				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+			}
+			break;
+		case 3:
+			if ((val & BIT(2)) == BIT(2)) {
+				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
+					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+			} else {
 				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
 				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
 			}
@@ -433,10 +445,12 @@ int chk_cl72_krtr_status(struct txgbe_adapter *adapter)
 	struct txgbe_hw *hw = &adapter->hw;
 	unsigned int rdata = 0, rdata1;
 	int status = 0;
+	//int count = 0;
 
 	status = read_poll_timeout(txgbe_rd32_epcs, rdata1, (rdata1 & 0x9), 1000,
 				   400000, false, hw, 0x10097);
 	if (!status) {
+	//for (count = 0; count < 20; count++) {
 		//Get the latest received coefficient update or status
 		rdata = txgbe_rd32_epcs(hw, 0x010098);
 		kr_dbg(KR_MODE, "SR PMA MMD 10GBASE-KR LP Coefficient Update Register: 0x%x\n",
@@ -471,11 +485,88 @@ int chk_cl72_krtr_status(struct txgbe_adapter *adapter)
 			read_phy_lane_txeq(0, adapter);
 			return status;
 		}
+		//msleep(20);
 	}
 
 	kr_dbg(KR_MODE, "ERROR: Check Clause 72 KR Training Complete Timeout!!!\n");
 
 	return status;
+}
+
+static void txgbe_bp_print_page_status(struct txgbe_adapter *adapter)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 rdata = 0;
+
+	rdata = txgbe_rd32_epcs(hw, 0x70010);
+	kr_dbg(KR_MODE, "read 70010 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70011);
+	kr_dbg(KR_MODE, "read 70011 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70012);
+	kr_dbg(KR_MODE, "read 70012 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70013);
+	kr_dbg(KR_MODE, "read 70013 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70014);
+	kr_dbg(KR_MODE, "read 70014 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70015);
+	kr_dbg(KR_MODE, "read 70015 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70016);
+	kr_dbg(KR_MODE, "read 70016 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70017);
+	kr_dbg(KR_MODE, "read 70017 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70018);
+	kr_dbg(KR_MODE, "read 70018 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70019);
+	kr_dbg(KR_MODE, "read 70019 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70020);
+	kr_dbg(KR_MODE, "read 70020 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, 0x70021);
+	kr_dbg(KR_MODE, "read 70021 data %0x\n", rdata);
+}
+
+static void txgbe_bp_exchange_page(struct txgbe_adapter *adapter)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 an_int, base_page = 0;
+	int count = 0;
+
+	an_int = txgbe_rd32_epcs(hw, 0x78002);
+	/* 500ms timeout */
+	for (count = 0; count < 5000; count++) {
+		kr_dbg(KR_MODE, "-----count----- %d\n", count);
+		if (an_int & BIT(2)) {
+			u8 next_page = 0;
+			u32 rdata, addr;
+
+			txgbe_bp_print_page_status(adapter);
+			addr = base_page == 0 ? 0x70013 : 0x70019;
+			rdata = txgbe_rd32_epcs(hw, addr);
+			if (rdata & BIT(14)) {
+				if (rdata & BIT(15)) {
+					/* always set null message */
+					txgbe_wr32_epcs(hw, 0x70016, 0x2001);
+					kr_dbg(KR_MODE, "write 70016 0x%0x\n",
+					       0x2001);
+					rdata = txgbe_rd32_epcs(hw, 0x70010);
+					txgbe_wr32_epcs(hw, 0x70010,
+							rdata | BIT(15));
+					kr_dbg(KR_MODE, "write 70010 0x%0x\n",
+					       rdata);
+					next_page = 1;
+				} else {
+					next_page = 0;
+				}
+				base_page = 1;
+			}
+			/* clear an pacv int */
+			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+			kr_dbg(KR_MODE, "write 78002 0x%0x\n", 0x0000);
+			usec_delay(100);
+			if (next_page == 0)
+				return;
+		}
+		usec_delay(100);
+	}
 }
 
 int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapter)
@@ -497,8 +588,6 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 	get_bkp_an73_ability(&tBkpAn73Ability, 0, adapter);
 	/*2. Check the AN73 Interrupt Status*/
 	kr_dbg(KR_MODE, "<2>. Check the AN73 Interrupt Status ...\n");
-	/*3.Clear the AN_PG_RCV interrupt*/
-	clr_bkp_an73_int(2, 0x0, adapter);
 
 	/*3.1. Get the link partner AN73 Base Page Ability*/
 	kr_dbg(KR_MODE, "<3.1>. Get the link partner AN73 Base Page Ability ...\n");
@@ -510,14 +599,19 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 	kr_dbg(KR_MODE, "  Link Partner Link Ability: 0x%x\n", tLpBkpAn73Ability.linkAbility);
 
 	chk_bkp_an73_ability(tBkpAn73Ability, tLpBkpAn73Ability, adapter);
+	kr_dbg(KR_MODE, "<3.2.1> Wait 10G page changed ....\n");
+	txgbe_bp_exchange_page(adapter);
+	/*3.Clear the AN_PG_RCV interrupt*/
+	clr_bkp_an73_int(2, 0x0, adapter);
+	kr_dbg(KR_MODE, "<3.2.2> Wait 10G page changed ..done..\n");
 
 	/*Check the FEC and KR Training for KR mode*/
 	/* FEC handling */
 	kr_dbg(KR_MODE, "<3.3>. Check the FEC for KR mode ...\n");
-	tBkpAn73Ability.fecAbility = 0x3;
-	tLpBkpAn73Ability.fecAbility = 0x3;
-	if (((tBkpAn73Ability.fecAbility & tLpBkpAn73Ability.fecAbility) == 0x03)
-		&& (KR_FEC == 1)) {
+	//tBkpAn73Ability.fecAbility = 0x3;
+	//tLpBkpAn73Ability.fecAbility = 0x3;
+	if (((tBkpAn73Ability.fecAbility & tLpBkpAn73Ability.fecAbility) >= 0x01) &&
+	    (KR_FEC == 1)) {
 		e_dev_info("Enable KR FEC ...\n");
 		//Write 1 to SR_PMA_KR_FEC_CTRL bit0 to enable the FEC
 		data = 1;
@@ -525,11 +619,16 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 		txgbe_wr32_epcs(hw, addr, data);
 	} else {
 		e_dev_info("KR FEC is disabled.\n");
+		data = 0;
+		addr = 0x100ab; //SR_PMA_KR_FEC_CTRL
+		txgbe_wr32_epcs(hw, addr, data);
 	}
 	kr_dbg(KR_MODE, "\n<3.4>. Check the CL72 KR Training for KR mode ...\n");
 
 	if (AN73_TRAINNING_MODE == 1) {
 		round = 2;
+		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+	} else if (AN73_TRAINNING_MODE == 3) {
 		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
 	}
 
@@ -566,8 +665,8 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 	}
 	e_dev_info("Trainning failure\n");
 
-	if (AN73_TRAINNING_MODE == 0 || AN73_TRAINNING_MODE == 2)
-		status |= en_cl72_krtr(1, adapter);
+	if (AN73_TRAINNING_MODE == 0 || AN73_TRAINNING_MODE == 2 ||  AN73_TRAINNING_MODE == 3)
+		en_cl72_krtr(1, adapter);
 
-	return status;
+	return -1;
 }
