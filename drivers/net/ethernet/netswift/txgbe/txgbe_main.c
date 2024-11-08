@@ -6567,11 +6567,14 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	/* enable the optics for SFP+ fiber
 	 * or power up mv phy
 	 */
-	if (hw->phy.media_type == txgbe_media_type_fiber)
-		TCALL(hw, mac.ops.enable_tx_laser);
-	else if (hw->phy.media_type == txgbe_media_type_copper &&
-			(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
-		txgbe_external_phy_resume(hw);
+	if (!(((hw->subsystem_device_id & TXGBE_NCSI_MASK) == TXGBE_NCSI_SUP) ||
+		adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LLDP)) {
+		if (hw->phy.media_type == txgbe_media_type_fiber)
+			TCALL(hw, mac.ops.enable_tx_laser);
+		else if (hw->phy.media_type == txgbe_media_type_copper &&
+				(hw->subsystem_device_id & 0xF0) != TXGBE_ID_SFI_XAUI)
+			txgbe_external_phy_resume(hw);
+	}
 
 	smp_mb__before_atomic();
 	clear_bit(__TXGBE_DOWN, &adapter->state);
