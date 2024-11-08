@@ -79,12 +79,12 @@ void txgbe_bp_watchdog_event(struct txgbe_adapter *adapter)
 		value = txgbe_rd32_epcs(hw, 0x78002);
 		value = value & 0x4;
 		if (value == 0x4) {
-			e_dev_info("Enter training\n");
+			e_info(hw, "Enter training\n");
 			handle_bkp_an73_flow(0, adapter);
 		}
 	} else {
 		if(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING){
-			e_dev_info("Enter training\n");
+			e_info(hw, "Enter training\n");
 			ret = handle_bkp_an73_flow(0, adapter);
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 			if (ret)
@@ -481,7 +481,7 @@ int chk_cl72_krtr_status(struct txgbe_adapter *adapter)
 		/*If bit0 is set, Receiver trained and ready to receive data*/
 		if ((rdata1 >> 0) & 0x01) {
 			kr_dbg(KR_MODE, "Receiver trained and ready to receive data ^_^\n");
-			e_dev_info("Receiver ready.\n");
+			e_info(hw, "Receiver ready.\n");
 			read_phy_lane_txeq(0, adapter);
 			return status;
 		}
@@ -612,13 +612,13 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 	//tLpBkpAn73Ability.fecAbility = 0x3;
 	if (((tBkpAn73Ability.fecAbility & tLpBkpAn73Ability.fecAbility) >= 0x01) &&
 	    (KR_FEC == 1)) {
-		e_dev_info("Enable KR FEC ...\n");
+		e_info(hw, "Enable KR FEC ...\n");
 		//Write 1 to SR_PMA_KR_FEC_CTRL bit0 to enable the FEC
 		data = 1;
 		addr = 0x100ab; //SR_PMA_KR_FEC_CTRL 
 		txgbe_wr32_epcs(hw, addr, data);
 	} else {
-		e_dev_info("KR FEC is disabled.\n");
+		e_info(hw, "KR FEC is disabled.\n");
 		data = 0;
 		addr = 0x100ab; //SR_PMA_KR_FEC_CTRL
 		txgbe_wr32_epcs(hw, addr, data);
@@ -648,7 +648,7 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 		if (lpld_all_rd) {
 			rdata = rd32_ephy(hw, 0x100E);
 			rdata1 = rd32_ephy(hw, 0x100F);
-			e_dev_info("Lp and Ld all Ready, FFE : %d-%d-%d.\n",
+			e_info(hw, "Lp and Ld all Ready, FFE : %d-%d-%d.\n",
 				   (rdata >> 6) & 0x3F, rdata1 & 0x3F, (rdata1 >> 6) & 0x3F);
 			clr_bkp_an73_int(2, 0, adapter);
 			clr_bkp_an73_int(1, 0, adapter);
@@ -656,14 +656,14 @@ int handle_bkp_an73_flow(unsigned char bp_link_mode, struct txgbe_adapter *adapt
 			status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & 0x1000), 1000,
 						   100000, false, hw, 0x30020);
 			if (!status)
-				e_dev_info("INT_AN_INT_CMPLT =1, AN73 Done Success.\n");
+				e_info(hw, "INT_AN_INT_CMPLT =1, AN73 Done Success.\n");
 			return 0;
 		}
 		clr_bkp_an73_int(2, 0, adapter);
 		clr_bkp_an73_int(1, 0, adapter);
 		clr_bkp_an73_int(0, 0, adapter);
 	}
-	e_dev_info("Trainning failure\n");
+	e_info(hw, "Trainning failure\n");
 
 	if (AN73_TRAINNING_MODE == 0 || AN73_TRAINNING_MODE == 2 ||  AN73_TRAINNING_MODE == 3)
 		en_cl72_krtr(1, adapter);

@@ -4749,7 +4749,7 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 		status = TXGBE_ERR_XPCS_POWER_UP_FAILED;
 		goto out;
 	}
-	e_dev_info("It is set to kr.\n");
+	e_info(hw, "It is set to kr.\n");
 
 	txgbe_wr32_epcs(hw, 0x78002, 0x0);
 	txgbe_wr32_epcs(hw, 0x78001, 0x7);
@@ -4816,7 +4816,7 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 	}
 
 	if ((KR_SET == 1) || (adapter->ffe_set == TXGBE_BP_M_KR)) {
-		e_dev_info("Set KR TX_EQ MAIN:%d PRE:%d POST:%d\n",
+		e_info(hw, "Set KR TX_EQ MAIN:%d PRE:%d POST:%d\n",
 				adapter->ffe_main,adapter->ffe_pre,adapter->ffe_post);
 		value = (0x1804 & ~0x3F3F);
 		value |= adapter->ffe_main << 8 | adapter->ffe_pre;
@@ -5919,7 +5919,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 	}
 
 	if (KR_SET == 1 || adapter->ffe_set == TXGBE_BP_M_KR) {
-		e_dev_info("Set KR TX_EQ MAIN:%d PRE:%d POST:%d\n",
+		e_info(hw, "Set KR TX_EQ MAIN:%d PRE:%d POST:%d\n",
 				adapter->ffe_main,adapter->ffe_pre,adapter->ffe_post);
 		value = (0x1804 & ~0x3F3F);
 		value |= adapter->ffe_main << 8 | adapter->ffe_pre;
