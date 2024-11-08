@@ -1501,6 +1501,7 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_PX_MISC_IC_ETH_AN         0x00080000U /* link auto-nego done */
 #define TXGBE_PX_MISC_IC_INT_ERR        0x00100000U /* integrity error */
 #define TXGBE_PX_MISC_IC_SPI            0x00200000U /* SPI interface */
+#define TXGBE_PX_MISC_IC_TXDESC         0x00400000U /* tx desc error */
 #define TXGBE_PX_MISC_IC_VF_MBOX        0x00800000U /* VF-PF message box */
 #define TXGBE_PX_MISC_IC_GPIO           0x04000000U /* GPIO interrupt */
 #define TXGBE_PX_MISC_IC_PCIE_REQ_ERR   0x08000000U /* pcie request error int */
@@ -1545,6 +1546,7 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_PX_MISC_IEN_ETH_AN        0x00080000U
 #define TXGBE_PX_MISC_IEN_INT_ERR       0x00100000U
 #define TXGBE_PX_MISC_IEN_SPI           0x00200000U
+#define TXGBE_PX_MISC_IEN_TXDESC        0x00400000U
 #define TXGBE_PX_MISC_IEN_VF_MBOX       0x00800000U
 #define TXGBE_PX_MISC_IEN_GPIO          0x04000000U
 #define TXGBE_PX_MISC_IEN_PCIE_REQ_ERR  0x08000000U
@@ -1612,6 +1614,10 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_PX_RR_WP(_i)              (0x01008 + ((_i) * 0x40))
 #define TXGBE_PX_RR_RP(_i)              (0x0100C + ((_i) * 0x40))
 #define TXGBE_PX_RR_CFG(_i)             (0x01010 + ((_i) * 0x40))
+
+#define TXGBE_TDM_DESC_CHK(i)		(0x0180B0 + (i) * 4) /*0-3*/
+#define TXGBE_TDM_DESC_NONFATAL(i)	(0x0180C0 + (i) * 4) /*0-3*/
+#define TXGBE_TDM_DESC_FATAL(i)		(0x0180D0 + (i) * 4) /*0-3*/
 /* PX_RR_CFG bit definitions */
 #define TXGBE_PX_RR_CFG_RR_SIZE_SHIFT           1
 #define TXGBE_PX_RR_CFG_BSIZEPKT_SHIFT          2 /* so many KBs */
@@ -3103,6 +3109,7 @@ struct txgbe_hw {
 	u16 oem_svid;
 	bool f2c_mod_status;         /* fiber to copper modules internal phy link status */
 	bool dac_sfp;         /* force dac sfp to kr mode */
+	u32 q_tx_regs[512];
 };
 
 #define TCALL(hw, func, args...) (((hw)->func != NULL) \

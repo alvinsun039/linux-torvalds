@@ -1056,6 +1056,7 @@ static void txgbe_clean_xdp_tx_buffer(struct txgbe_ring *tx_ring,
 			 dma_unmap_addr(tx_bi, dma),
 			 dma_unmap_len(tx_bi, len), DMA_TO_DEVICE);
 	dma_unmap_len_set(tx_bi, len, 0);
+	tx_bi->va = NULL;
 }
 
 bool txgbe_clean_xdp_tx_irq(struct txgbe_q_vector *q_vector,

@@ -307,6 +307,7 @@ struct txgbe_tx_buffer {
 	__be16 protocol;
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	DEFINE_DMA_UNMAP_LEN(len);
+	void *va;
 	u32 tx_flags;
 };
 
@@ -953,7 +954,7 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_KR_PRO_REINIT               (1U << 28)
 #define TXGBE_FLAG2_ECC_ERR_RESET               (1U << 29)
 #define TXGBE_FLAG2_PCIE_NEED_RECOVER           (1U << 31)
-
+#define TXGBE_FLAG2_PCIE_NEED_Q_RESET           (1U << 30)
 
 
 
