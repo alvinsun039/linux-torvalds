@@ -673,6 +673,8 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_TDM_TCP_FLG_L     0x18078
 #define TXGBE_TDM_TCP_FLG_H     0x1807C
 #define TXGBE_TDM_VLAN_INS(_i)  (0x18100 + ((_i) * 4)) /* 64 of these 0 - 63 */
+#define TXGBE_TDM_DESC_FATAL(i) (0x0180D0 + (i) * 4) /*0-3*/
+
 /* TDM CTL BIT */
 #define TXGBE_TDM_CTL_TE        0x1 /* Transmit Enable */
 #define TXGBE_TDM_CTL_PADDING   0x2 /* Padding byte number for ipsec ESP */

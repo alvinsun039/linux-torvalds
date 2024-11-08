@@ -588,12 +588,13 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct txgbe_hw *hw = &adapter->hw;
-	bool real_tx_hang = false;
-	int i;
-	u16 value = 0;
+	bool tdm_desc_fatal = false;
 	u32 value2 = 0, value3 = 0;
+	bool real_tx_hang = false;
+	u16 pci_cmd = 0;
 	u32 head, tail;
 	u16 vid = 0;
+	int i;
 
 #define TX_TIMEO_LIMIT 16000
 	for (i = 0; i < adapter->num_tx_queues; i++) {
@@ -605,8 +606,8 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	pci_read_config_word(adapter->pdev, PCI_VENDOR_ID, &vid);
 	ERROR_REPORT1(TXGBE_ERROR_POLLING, "pci vendor id is 0x%x\n", vid);
 
-	pci_read_config_word(adapter->pdev, PCI_COMMAND, &value);
-	ERROR_REPORT1(TXGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", value);
+	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
+	ERROR_REPORT1(TXGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", pci_cmd);
 
 	value2 = rd32(&adapter->hw,0x10000);
 	ERROR_REPORT1(TXGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value2);
@@ -635,16 +636,16 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"PX_IMS0 value is 0x%08x, PX_IMS1 value is 0x%08x\n", value2, value3);
 
-	if (value2 || value3) {
-		ERROR_REPORT1(TXGBE_ERROR_POLLING, "clear interrupt mask.\n");
-		wr32(&adapter->hw, TXGBE_PX_ICS(0), value2);
-		wr32(&adapter->hw, TXGBE_PX_IMC(0), value2);
-		wr32(&adapter->hw, TXGBE_PX_ICS(1), value3);
-		wr32(&adapter->hw, TXGBE_PX_IMC(1), value3);
-	}
+	/* only check pf queue tdm desc error */
+	if ((rd32(&adapter->hw, TXGBE_TDM_DESC_FATAL(0)) & 0xffffffff) ||
+		(rd32(&adapter->hw, TXGBE_TDM_DESC_FATAL(1)) & 0xffffffff))
+		tdm_desc_fatal = true;
 
+	/* PCIe link loss, tdm desc fatal error or memory space can't access */
 	if (TXGBE_RECOVER_CHECK == 1) {
-		if (vid == TXGBE_FAILED_READ_CFG_WORD) {
+		if (vid == TXGBE_FAILED_READ_CFG_WORD ||
+			tdm_desc_fatal ||
+			!(pci_cmd & 0x2)) {
 			txgbe_tx_timeout_dorecovery(adapter);
 		} else {
 			txgbe_print_tx_hang_status(adapter);
@@ -6548,6 +6549,7 @@ void txgbe_reset(struct txgbe_adapter *adapter)
 		break;
 	case TXGBE_ERR_MASTER_REQUESTS_PENDING:
 		e_dev_err("master disable timed out\n");
+		txgbe_tx_timeout_dorecovery(adapter);
 		break;
 	case TXGBE_ERR_EEPROM_VERSION:
 		/* We are running on a pre-production device, log a warning */
