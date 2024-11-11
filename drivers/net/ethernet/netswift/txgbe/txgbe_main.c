@@ -5094,6 +5094,7 @@ static void txgbe_set_rx_buffer_len(struct txgbe_adapter *adapter)
 #endif
 #else /* !HAVE_SWIOTLB_SKIP_CPU_SYNC */
 		adapter->flags2 |= TXGBE_FLAG2_RX_LEGACY;
+		adapter->eth_priv_flags |= TXGBE_ETH_PRIV_FLAG_LEGACY_RX;
 #endif /* !HAVE_SWIOTLB_SKIP_CPU_SYNC */
 #else /* CONFIG_TXGBE_DISABLE_PACKET_SPLIT */
 

@@ -225,7 +225,7 @@ struct txgbe_priv_flags {
 static const struct txgbe_priv_flags txgbe_gstrings_priv_flags[] = {
 	TXGBE_PRIV_FLAG("lldp", TXGBE_ETH_PRIV_FLAG_LLDP, 0),
 #ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
-	TXGBE_PRIV_FLAG("legacy-rx", TXGBE_ETH_PRIV_FLAG_LEGACY_RX, 1),
+	TXGBE_PRIV_FLAG("legacy-rx", TXGBE_ETH_PRIV_FLAG_LEGACY_RX, 0),
 #endif
 };
 
@@ -2267,11 +2267,22 @@ static int txgbe_set_priv_flags(struct net_device *dev, u32 flags)
 	if (changed_flags & TXGBE_ETH_PRIV_FLAG_LLDP)
 		reset_needed = 1;
 
-	if (changed_flags & TXGBE_ETH_PRIV_FLAG_LLDP)
+	if (changed_flags & TXGBE_ETH_PRIV_FLAG_LLDP) {
 		status = txgbe_hic_write_lldp(&adapter->hw, (u32)(new_flags & TXGBE_ETH_PRIV_FLAG_LLDP));
+		if (!status)
+			adapter->eth_priv_flags = new_flags;
+	}
 
-	if(!status)
+#ifdef HAVE_SWIOTLB_SKIP_CPU_SYNC
+	if (changed_flags & TXGBE_ETH_PRIV_FLAG_LEGACY_RX) {
 		adapter->eth_priv_flags = new_flags;
+
+		if (adapter->eth_priv_flags & TXGBE_ETH_PRIV_FLAG_LEGACY_RX)
+			adapter->flags2 |= TXGBE_FLAG2_RX_LEGACY;
+		else
+			adapter->flags2 &= ~TXGBE_FLAG2_RX_LEGACY;
+	}
+#endif
 
 
 	return status;
