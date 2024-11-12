@@ -1328,6 +1328,9 @@ const struct dc_plane_status *dc_plane_get_status(
 void dc_plane_state_retain(struct dc_plane_state *plane_state);
 void dc_plane_state_release(struct dc_plane_state *plane_state);
 
+void dc_plane_force_update_for_panic(struct dc_plane_state *plane_state,
+				     bool clear_tiling);
+
 void dc_gamma_retain(struct dc_gamma *dc_gamma);
 void dc_gamma_release(struct dc_gamma **dc_gamma);
 struct dc_gamma *dc_create_gamma(void);
