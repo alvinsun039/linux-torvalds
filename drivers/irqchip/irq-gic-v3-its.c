@@ -36,6 +36,7 @@
 
 #include <asm/cputype.h>
 #include <asm/exception.h>
+#include <linux/machine_t.h>
 
 #include "irq-gic-common.h"
 
@@ -3083,7 +3084,7 @@ static void its_cpu_init_lpis(void)
 	phys_addr_t paddr;
 	u64 val, tmp;
 
-	if (gic_data_rdist()->flags & RD_LOCAL_LPI_ENABLED)
+	if ((gic_data_rdist()->flags & RD_LOCAL_LPI_ENABLED) && !is_cpu_ft2000pc())
 		return;
 
 	val = readl_relaxed(rbase + GICR_CTLR);
