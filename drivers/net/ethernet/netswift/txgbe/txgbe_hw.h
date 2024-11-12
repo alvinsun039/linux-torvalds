@@ -53,6 +53,12 @@
 #define MAC_ADDR0_WORD1_OFFSET_1G    0x0060014
 #define MAC_ADDR1_WORD0_OFFSET_1G    0x007000c  // MAC Address for LAN1, stored in external FLASH
 #define MAC_ADDR1_WORD1_OFFSET_1G    0x0070014
+
+#define AMLITE_MAC_ADDR0_WORD0_OFFSET 0x00f010c // MAC Address for LAN0, stored in external FLASH
+#define AMLITE_MAC_ADDR0_WORD1_OFFSET 0x00f0114
+#define AMLITE_MAC_ADDR1_WORD0_OFFSET 0x00f020c // MAC Address for LAN1, stored in external FLASH
+#define AMLITE_MAC_ADDR1_WORD1_OFFSET 0x00f0214
+
 #define PRODUCT_SERIAL_NUM_OFFSET_1G    0x00f0000  // Product Serial Number, stored in external FLASH last sector
 #define TXGBE_VPD_OFFSET    0x500
 #define TXGBE_VPD_END    0x600

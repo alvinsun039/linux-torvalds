@@ -3231,6 +3231,8 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	u32 curadr = 0;
 	u32 vpdadr = 0;
 	u8 id_str_len, pn_str_len, sn_str_len, rv_str_len;
+	u32 mac_addr0_dword0_addr, mac_addr0_dword1_addr;
+	u32 mac_addr1_dword0_addr, mac_addr1_dword1_addr;
 	u16 vpd_ro_len;
 	u32 chksum = 0;
 	int err = 0;
@@ -3274,11 +3276,29 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 
 	msleep(1000);
 
-	txgbe_flash_read_dword(hw, MAC_ADDR0_WORD0_OFFSET_1G, &mac_addr0_dword0_t);
-	txgbe_flash_read_dword(hw, MAC_ADDR0_WORD1_OFFSET_1G, &mac_addr0_dword1_t);
+	switch (hw->mac.type) {
+	case txgbe_mac_sp:
+		mac_addr0_dword0_addr = MAC_ADDR0_WORD0_OFFSET_1G;
+		mac_addr0_dword1_addr = MAC_ADDR0_WORD1_OFFSET_1G;
+		mac_addr1_dword0_addr = MAC_ADDR1_WORD0_OFFSET_1G;
+		mac_addr1_dword1_addr = MAC_ADDR1_WORD1_OFFSET_1G;
+		break;
+	case txgbe_mac_aml:
+		mac_addr0_dword0_addr = AMLITE_MAC_ADDR0_WORD0_OFFSET;
+		mac_addr0_dword1_addr = AMLITE_MAC_ADDR0_WORD1_OFFSET;
+		mac_addr1_dword0_addr = AMLITE_MAC_ADDR1_WORD0_OFFSET;
+		mac_addr1_dword1_addr = AMLITE_MAC_ADDR1_WORD1_OFFSET;
+		break;
+	default:
+		e_err(drv, "====Error mac type====\n");
+		return -EOPNOTSUPP;
+	}
+
+	txgbe_flash_read_dword(hw, mac_addr0_dword0_addr, &mac_addr0_dword0_t);
+	txgbe_flash_read_dword(hw, mac_addr0_dword1_addr, &mac_addr0_dword1_t);
 	mac_addr0_dword1_t = mac_addr0_dword1_t & U16_MAX;
-	txgbe_flash_read_dword(hw, MAC_ADDR1_WORD0_OFFSET_1G, &mac_addr1_dword0_t);
-	txgbe_flash_read_dword(hw, MAC_ADDR1_WORD1_OFFSET_1G, &mac_addr1_dword1_t);
+	txgbe_flash_read_dword(hw, mac_addr1_dword0_addr, &mac_addr1_dword0_t);
+	txgbe_flash_read_dword(hw, mac_addr1_dword1_addr, &mac_addr1_dword1_t);
 	mac_addr1_dword1_t = mac_addr1_dword1_t & U16_MAX;
 
 	for (i = 0; i < 24; i++)
@@ -3400,8 +3420,8 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	for (i = 0; i < size / 4; i++) {
 		read_data = data[4 * i + 3] << 24 | data[4 * i + 2] << 16 | data[4 * i + 1] << 8 | data[4 * i];
 		read_data = __le32_to_cpu(read_data);
-		skip = ((i * 4 == MAC_ADDR0_WORD0_OFFSET_1G) || (i * 4 == MAC_ADDR0_WORD1_OFFSET_1G) ||
-			(i * 4 == MAC_ADDR1_WORD0_OFFSET_1G) || (i * 4 == MAC_ADDR1_WORD1_OFFSET_1G) ||
+		skip = ((i * 4 == mac_addr0_dword0_addr) || (i * 4 == mac_addr0_dword1_addr) ||
+			(i * 4 == mac_addr1_dword0_addr) || (i * 4 == mac_addr1_dword1_addr) ||
 			(i * 4 >= PRODUCT_SERIAL_NUM_OFFSET_1G && i * 4 <= PRODUCT_SERIAL_NUM_OFFSET_1G + 92) ||
 			(i * 4 >= TXGBE_VPD_OFFSET && i * 4 < TXGBE_VPD_END) ||
 			(i * 4 == 0x15c));
@@ -3436,23 +3456,10 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		}
 	}
 
-	chksum = 0;
-	for (i = 0; i < 0x1000; i += 2) {
-		if (i >= TXGBE_VPD_OFFSET && i < TXGBE_VPD_END)
-			chksum += (vpd_tend[i - TXGBE_VPD_OFFSET + 1] << 8 | vpd_tend[i - TXGBE_VPD_OFFSET]);
-		else if (i == 0x15e)
-			continue;
-		else
-			chksum += (data[i + 1] << 8 | data[i]);
-	}
-	chksum = 0xbaba - chksum;
-	chksum &= 0xffff;
-	status = txgbe_flash_write_dword(hw, 0x15e, 0xffff0000 | chksum);
-
-	txgbe_flash_write_dword(hw, MAC_ADDR0_WORD0_OFFSET_1G, mac_addr0_dword0_t);
-	txgbe_flash_write_dword(hw, MAC_ADDR0_WORD1_OFFSET_1G, (mac_addr0_dword1_t | 0x80000000));//lan0
-	txgbe_flash_write_dword(hw, MAC_ADDR1_WORD0_OFFSET_1G, mac_addr1_dword0_t);
-	txgbe_flash_write_dword(hw, MAC_ADDR1_WORD1_OFFSET_1G, (mac_addr1_dword1_t | 0x80000000));//lan1
+	txgbe_flash_write_dword(hw, mac_addr0_dword0_addr, mac_addr0_dword0_t);
+	txgbe_flash_write_dword(hw, mac_addr0_dword1_addr, (mac_addr0_dword1_t | 0x80000000));//lan0
+	txgbe_flash_write_dword(hw, mac_addr1_dword0_addr, mac_addr1_dword0_t);
+	txgbe_flash_write_dword(hw, mac_addr1_dword1_addr, (mac_addr1_dword1_t | 0x80000000));//lan1
 	if (sn_is_str) {
 		for (i = 0; i < 24; i++) {
 			txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 4 * i, sn[i]);
