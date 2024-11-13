@@ -4327,7 +4327,6 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 	/* enable queue */
 	wr32(hw, TXGBE_PX_TR_CFG(reg_idx), txdctl);
 
-
 	/* poll to verify queue is enabled */
 	do {
 		msleep(1);

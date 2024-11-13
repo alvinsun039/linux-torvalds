@@ -2808,6 +2808,84 @@ static void txgbe_free_desc_rings(struct txgbe_adapter *adapter)
 	txgbe_free_rx_resources(&adapter->test_rx_ring);
 }
 
+static void txgbe_loopback_configure_tx_ring(struct txgbe_adapter *adapter,
+			     struct txgbe_ring *ring)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u64 tdba = ring->dma;
+	int wait_loop = 10;
+	u32 txdctl = TXGBE_PX_TR_CFG_ENABLE;
+	u8 reg_idx = ring->reg_idx;
+#ifdef HAVE_AF_XDP_ZC_SUPPORT
+	ring->xsk_pool = NULL;
+	if (ring_is_xdp(ring))
+		ring->xsk_pool = txgbe_xsk_umem(adapter, ring);
+#endif
+	/* disable queue to avoid issues while updating state */
+	wr32(hw, TXGBE_PX_TR_CFG(reg_idx), TXGBE_PX_TR_CFG_SWFLSH);
+	TXGBE_WRITE_FLUSH(hw);
+
+	wr32(hw, TXGBE_PX_TR_BAL(reg_idx), tdba & DMA_BIT_MASK(32));
+	wr32(hw, TXGBE_PX_TR_BAH(reg_idx), tdba >> 32);
+
+	/* reset head and tail pointers */
+	wr32(hw, TXGBE_PX_TR_RP(reg_idx), 0);
+	wr32(hw, TXGBE_PX_TR_WP(reg_idx), 0);
+	ring->tail = adapter->io_addr + TXGBE_PX_TR_WP(reg_idx);
+
+	/* reset ntu and ntc to place SW in sync with hardwdare */
+	ring->next_to_clean = 0;
+	ring->next_to_use = 0;
+
+	txdctl |= TXGBE_RING_SIZE(ring) << TXGBE_PX_TR_CFG_TR_SIZE_SHIFT;
+
+	/*
+	 * set WTHRESH to encourage burst writeback, it should not be set
+	 * higher than 1 when:
+	 * - ITR is 0 as it could cause false TX hangs
+	 * - ITR is set to > 100k int/sec and BQL is enabled
+	 *
+	 * In order to avoid issues WTHRESH + PTHRESH should always be equal
+	 * to or less than the number of on chip descriptors, which is
+	 * currently 40.
+	 */
+
+	txdctl |= 0x20 << TXGBE_PX_TR_CFG_WTHRESH_SHIFT;
+
+	/* reinitialize flowdirector state */
+	if (adapter->flags & TXGBE_FLAG_FDIR_HASH_CAPABLE) {
+		ring->atr_sample_rate = adapter->atr_sample_rate;
+		ring->atr_count = 0;
+		set_bit(__TXGBE_TX_FDIR_INIT_DONE, &ring->state);
+	} else {
+		ring->atr_sample_rate = 0;
+	}
+
+	/* initialize XPS */
+	if (!test_and_set_bit(__TXGBE_TX_XPS_INIT_DONE, &ring->state)) {
+		struct txgbe_q_vector *q_vector = ring->q_vector;
+
+		if (q_vector)
+			netif_set_xps_queue(adapter->netdev,
+					    &q_vector->affinity_mask,
+					    ring->queue_index);
+	}
+
+	clear_bit(__TXGBE_HANG_CHECK_ARMED, &ring->state);
+
+	/* enable queue */
+	wr32(hw, TXGBE_PX_TR_CFG(reg_idx), txdctl);
+
+	/* poll to verify queue is enabled */
+	do {
+		msleep(20);
+		txdctl = rd32(hw, TXGBE_PX_TR_CFG(reg_idx));
+	} while (--wait_loop && !(txdctl & TXGBE_PX_TR_CFG_ENABLE));
+	if (!wait_loop)
+		e_err(drv, "Could not enable Tx Queue %d\n", reg_idx);
+}
+
+
 static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 {
 	struct txgbe_ring *tx_ring = &adapter->test_tx_ring;
@@ -2832,7 +2910,8 @@ static int txgbe_setup_desc_rings(struct txgbe_adapter *adapter)
 	wr32m(&adapter->hw, TXGBE_TDM_CTL,
 		TXGBE_TDM_CTL_TE, TXGBE_TDM_CTL_TE);
 
-	txgbe_configure_tx_ring(adapter, tx_ring);
+	txgbe_loopback_configure_tx_ring(adapter, tx_ring);
+
 	/* enable mac transmitter */
 
 	if (hw->mac.type == txgbe_mac_aml40) {
