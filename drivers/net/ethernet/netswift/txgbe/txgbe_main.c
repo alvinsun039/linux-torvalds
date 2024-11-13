@@ -9131,6 +9131,22 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	txgbe_ping_all_vfs_with_link_status(adapter, true);
 }
 
+static void txgbe_link_down_flush_tx(struct txgbe_adapter *adapter)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+			~TXGBE_MAC_RX_CFG_RE);
+	wr32m(hw, TXGBE_MAC_RX_CFG,
+		TXGBE_MAC_RX_CFG_LM, TXGBE_MAC_RX_CFG_LM);
+
+	udelay(1000);
+
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_LM, 0);
+	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+			TXGBE_MAC_RX_CFG_RE);
+}
+
 /**
  * txgbe_watchdog_link_is_down - update netif_carrier status and
  *                               print link down message
@@ -9169,6 +9185,7 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	netif_carrier_off(netdev);
 	netif_tx_stop_all_queues(netdev);
 
+	txgbe_link_down_flush_tx(adapter);
 	/* ping all the active vfs to let them know link has changed */
 	//txgbe_ping_all_vfs(adapter);
 	txgbe_ping_all_vfs_with_link_status(adapter, false);
