@@ -13579,8 +13579,7 @@ no_info_string:
 			txgbe_vf_configuration(pdev, (i | 0x10000000));
 	}
 #endif
-	/* firmware requires blank driver version */
-	TCALL(hw, mac.ops.set_fw_drv_ver, 0xFF, 0xFF, 0xFF, 0xFF);
+
 #if defined(HAVE_NETDEV_STORAGE_ADDRESS) && defined(NETDEV_HW_ADDR_T_SAN)
 	/* add san mac addr to netdev */
 	txgbe_add_sanmac_netdev(netdev);
