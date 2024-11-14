@@ -936,12 +936,17 @@ unsigned int setup_authusers_ACE(struct smb_ace *pntace)
  * Fill in the special SID based on the mode. See
  * https://technet.microsoft.com/en-us/library/hh509017(v=ws.10).aspx
  */
-unsigned int setup_special_mode_ACE(struct smb_ace *pntace, __u64 nmode)
+unsigned int setup_special_mode_ACE(struct smb_ace *pntace,
+				    bool posix,
+				    __u64 nmode)
 {
 	int i;
 	unsigned int ace_size = 28;
 
-	pntace->type = ACCESS_DENIED_ACE_TYPE;
+	if (posix)
+		pntace->type = ACCESS_ALLOWED_ACE_TYPE;
+	else
+		pntace->type = ACCESS_DENIED_ACE_TYPE;
 	pntace->flags = 0x0;
 	pntace->access_req = 0;
 	pntace->sid.num_subauth = 3;
@@ -984,7 +989,8 @@ static void populate_new_aces(char *nacl_base,
 		struct smb_sid *pownersid,
 		struct smb_sid *pgrpsid,
 		__u64 *pnmode, u32 *pnum_aces, u16 *pnsize,
-		bool modefromsid)
+		bool modefromsid,
+		bool posix)
 {
 	__u64 nmode;
 	u32 num_aces = 0;
@@ -1001,13 +1007,15 @@ static void populate_new_aces(char *nacl_base,
 	num_aces = *pnum_aces;
 	nsize = *pnsize;
 
-	if (modefromsid) {
+	if (modefromsid || posix) {
 		pnntace = (struct smb_ace *) (nacl_base + nsize);
-		nsize += setup_special_mode_ACE(pnntace, nmode);
+		nsize += setup_special_mode_ACE(pnntace, posix, nmode);
 		num_aces++;
-		pnntace = (struct smb_ace *) (nacl_base + nsize);
-		nsize += setup_authusers_ACE(pnntace);
-		num_aces++;
+		if (modefromsid) {
+			pnntace = (struct smb_ace *) (nacl_base + nsize);
+			nsize += setup_authusers_ACE(pnntace);
+			num_aces++;
+		}
 		goto set_size;
 	}
 
@@ -1127,7 +1135,7 @@ static __u16 replace_sids_and_copy_aces(struct smb_acl *pdacl, struct smb_acl *p
 
 static int set_chmod_dacl(struct smb_acl *pdacl, struct smb_acl *pndacl,
 		struct smb_sid *pownersid,	struct smb_sid *pgrpsid,
-		__u64 *pnmode, bool mode_from_sid)
+		__u64 *pnmode, bool mode_from_sid, bool posix)
 {
 	int i;
 	u16 size = 0;
@@ -1145,11 +1153,11 @@ static int set_chmod_dacl(struct smb_acl *pdacl, struct smb_acl *pndacl,
 	nsize = sizeof(struct smb_acl);
 
 	/* If pdacl is NULL, we don't have a src. Simply populate new ACL. */
-	if (!pdacl) {
+	if (!pdacl || posix) {
 		populate_new_aces(nacl_base,
 				pownersid, pgrpsid,
 				pnmode, &num_aces, &nsize,
-				mode_from_sid);
+				mode_from_sid, posix);
 		goto finalize_dacl;
 	}
 
@@ -1166,7 +1174,7 @@ static int set_chmod_dacl(struct smb_acl *pdacl, struct smb_acl *pndacl,
 			populate_new_aces(nacl_base,
 					pownersid, pgrpsid,
 					pnmode, &num_aces, &nsize,
-					mode_from_sid);
+					mode_from_sid, posix);
 
 			new_aces_set = true;
 		}
@@ -1195,7 +1203,7 @@ next_ace:
 		populate_new_aces(nacl_base,
 				pownersid, pgrpsid,
 				pnmode, &num_aces, &nsize,
-				mode_from_sid);
+				mode_from_sid, posix);
 
 		new_aces_set = true;
 	}
@@ -1302,7 +1310,7 @@ static int parse_sec_desc(struct cifs_sb_info *cifs_sb,
 /* Convert permission bits from mode to equivalent CIFS ACL */
 static int build_sec_desc(struct cifs_ntsd *pntsd, struct cifs_ntsd *pnntsd,
 	__u32 secdesclen, __u32 *pnsecdesclen, __u64 *pnmode, kuid_t uid, kgid_t gid,
-	bool mode_from_sid, bool id_from_sid, int *aclflag)
+	bool mode_from_sid, bool id_from_sid, bool posix, int *aclflag)
 {
 	int rc = 0;
 	__u32 dacloffset;
@@ -1339,7 +1347,7 @@ static int build_sec_desc(struct cifs_ntsd *pntsd, struct cifs_ntsd *pnntsd,
 		ndacl_ptr->num_aces = cpu_to_le32(0);
 
 		rc = set_chmod_dacl(dacl_ptr, ndacl_ptr, owner_sid_ptr, group_sid_ptr,
-				    pnmode, mode_from_sid);
+				    pnmode, mode_from_sid, posix);
 
 		sidsoffset = ndacloffset + le16_to_cpu(ndacl_ptr->size);
 		/* copy the non-dacl portion of secdesc */
@@ -1638,6 +1646,7 @@ id_mode_to_cifs_acl(struct inode *inode, const char *path, __u64 *pnmode,
 	struct tcon_link *tlink = cifs_sb_tlink(cifs_sb);
 	struct smb_version_operations *ops;
 	bool mode_from_sid, id_from_sid;
+	bool posix = tlink_tcon(tlink)->posix_extensions;
 	const u32 info = 0;
 
 	if (IS_ERR(tlink))
@@ -1673,12 +1682,13 @@ id_mode_to_cifs_acl(struct inode *inode, const char *path, __u64 *pnmode,
 		id_from_sid = false;
 
 	/* Potentially, five new ACEs can be added to the ACL for U,G,O mapping */
-	nsecdesclen = secdesclen;
 	if (pnmode && *pnmode != NO_CHANGE_64) { /* chmod */
-		if (mode_from_sid)
-			nsecdesclen += 2 * sizeof(struct smb_ace);
+		if (posix)
+			nsecdesclen = 1 * sizeof(struct smb_ace);
+		else if (mode_from_sid)
+			nsecdesclen = secdesclen + (2 * sizeof(struct smb_ace));
 		else /* cifsacl */
-			nsecdesclen += 5 * sizeof(struct smb_ace);
+			nsecdesclen = secdesclen + (5 * sizeof(struct smb_ace));
 	} else { /* chown */
 		/* When ownership changes, changes new owner sid length could be different */
 		nsecdesclen = sizeof(struct cifs_ntsd) + (sizeof(struct smb_sid) * 2);
@@ -1708,7 +1718,7 @@ id_mode_to_cifs_acl(struct inode *inode, const char *path, __u64 *pnmode,
 	}
 
 	rc = build_sec_desc(pntsd, pnntsd, secdesclen, &nsecdesclen, pnmode, uid, gid,
-			    mode_from_sid, id_from_sid, &aclflag);
+			    mode_from_sid, id_from_sid, posix, &aclflag);
 
 	cifs_dbg(NOISY, "build_sec_desc rc: %d\n", rc);
 

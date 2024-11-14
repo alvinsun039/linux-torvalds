@@ -242,7 +242,9 @@ extern int cifs_set_acl(struct mnt_idmap *idmap,
 extern int set_cifs_acl(struct cifs_ntsd *, __u32, struct inode *,
 				const char *, int);
 extern unsigned int setup_authusers_ACE(struct smb_ace *pace);
-extern unsigned int setup_special_mode_ACE(struct smb_ace *pace, __u64 nmode);
+extern unsigned int setup_special_mode_ACE(struct smb_ace *pace,
+			bool posix,
+			__u64 nmode);
 extern unsigned int setup_special_user_owner_ACE(struct smb_ace *pace);
 
 extern void dequeue_mid(struct mid_q_entry *mid, bool malformed);
