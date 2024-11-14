@@ -2302,8 +2302,8 @@ add_addr_timeout_tests()
 	# signal invalid addresses timeout
 	if reset_with_add_addr_timeout "invalid address, ADD_ADDR timeout"; then
 		pm_nl_set_limits $ns1 2 2
-		pm_nl_add_endpoint $ns1 10.0.12.1 flags signal
 		pm_nl_add_endpoint $ns1 10.0.3.1 flags signal
+		pm_nl_add_endpoint $ns1 10.0.12.1 flags signal
 		pm_nl_set_limits $ns2 2 2
 		speed=10 \
 			run_tests $ns1 $ns2 10.0.1.1
