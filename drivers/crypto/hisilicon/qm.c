@@ -509,7 +509,7 @@ static u32 qm_get_dev_err_status(struct hisi_qm *qm)
 static bool qm_check_dev_error(struct hisi_qm *qm)
 {
 	struct hisi_qm *pf_qm = pci_get_drvdata(pci_physfn(qm->pdev));
-	u32 hw_status, dev_status;
+	u32 err_status;
 
 	if (test_bit(QM_DEVICE_DOWN, &qm->misc_ctl))
 		return true;
@@ -518,12 +518,12 @@ static bool qm_check_dev_error(struct hisi_qm *qm)
 	if (pf_qm->fun_type == QM_HW_VF)
 		return false;
 
-	hw_status = qm_get_hw_error_status(pf_qm) &
-		pf_qm->err_info.qm_shutdown_mask;
-	dev_status = qm_get_dev_err_status(pf_qm) &
-		pf_qm->err_info.dev_shutdown_mask;
-	if (hw_status || dev_status)
+	err_status = qm_get_hw_error_status(pf_qm);
+	if (err_status & pf_qm->err_info.qm_shutdown_mask)
 		return true;
+
+	if (pf_qm->err_ini->dev_is_abnormal)
+		return pf_qm->err_ini->dev_is_abnormal(pf_qm);
 
 	return false;
 }
@@ -4258,6 +4258,12 @@ static int qm_controller_reset_prepare(struct hisi_qm *qm)
 	struct pci_dev *pdev = qm->pdev;
 	int ret;
 
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret)
+			return ret;
+	}
+
 	ret = qm_reset_prepare_ready(qm);
 	if (ret) {
 		pci_err(pdev, "Controller reset not ready!\n");
@@ -5484,6 +5490,14 @@ static int qm_clear_device(struct hisi_qm *qm)
 		return ret;
 	}
 
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret) {
+			writel(0x0, qm->io_base + ACC_MASTER_GLOBAL_CTRL);
+			return ret;
+		}
+	}
+
 	return qm_reset_device(qm);
 }
 
@@ -5794,6 +5808,12 @@ static int qm_prepare_for_suspend(struct hisi_qm *qm)
 	ret = qm_master_ooo_check(qm);
 	if (ret)
 		return ret;
+
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret)
+			return ret;
+	}
 
 	ret = qm_set_pf_mse(qm, false);
 	if (ret)
