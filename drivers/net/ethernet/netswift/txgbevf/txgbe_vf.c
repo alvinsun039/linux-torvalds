@@ -629,13 +629,11 @@ static int txgbe_notify_vf_link_status(struct txgbe_hw *hw, u32 *msgbuf)
 	adapter->pf_link_up = links_reg & TXGBE_VXSTATUS_UP;
 
 	if (msgbuf[1] & BIT(31)) {
-		printk("%s , %d --not running .\n", __func__, __LINE__);
 		adapter->pf_speed = 0;
 		adapter->pf_link_up = false;
 		hw->pf_is_down = true;
 		adapter->flagsd &= ~TXGBE_F_REQ_RESET;
 	} else {
-		printk("%s , %d -- running .\n", __func__, __LINE__);
 		hw->pf_is_down = false;
 	}
 
@@ -651,7 +649,6 @@ static int txgbe_notify_vf_link_status(struct txgbe_hw *hw, u32 *msgbuf)
 
 	adapter->pf_speed = TXGBE_PFLINK_SPEED(links_reg);
 	/* if pf notify vf link up, no need to rcv mailbox msg until a new interrupt*/
-	printk("%s , %d speed : %d \n", __func__, __LINE__, adapter->pf_speed);
 	switch (adapter->pf_speed) {
 	case SPEED_40000:
 		lan_speed = TXGBE_LINK_SPEED_40GB_FULL;
