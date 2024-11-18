@@ -943,7 +943,6 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_RSS_FIELD_IPV4_UDP          (1U << 9)
 #define TXGBE_FLAG2_RSS_FIELD_IPV6_UDP          (1U << 10)
 #define TXGBE_FLAG2_RSS_ENABLED                 (1U << 12)
-#define TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS      (1U << 13)
 #define TXGBE_FLAG2_PTP_PPS_ENABLED             (1U << 11)
 #define TXGBE_FLAG2_EEE_CAPABLE                 (1U << 14)
 #define TXGBE_FLAG2_EEE_ENABLED                 (1U << 15)
@@ -972,6 +971,7 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG2_DMA_RESET_REQUESTED          (1U << 2)
 
 #define TXGBE_FLAG3_PHY_EVENT                   (1U << 0)
+#define TXGBE_FLAG3_TEMP_SENSOR_INPROGRESS      (1U << 1)
 
 #define TXGBE_SET_FLAG(_input, _flag, _result) \
 	((_flag <= _result) ? \

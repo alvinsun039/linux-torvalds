@@ -3433,7 +3433,7 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 	if (value == TXGBE_FAILED_READ_CFG_WORD)
 		return ;
 
-	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS)) {
+	if (!(adapter->flags3 & TXGBE_FLAG3_TEMP_SENSOR_INPROGRESS)) {
 		if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_EVENT))
 			return;
 
@@ -3456,13 +3456,15 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 
 	if (temp_state == TXGBE_ERR_UNDERTEMP &&
 		test_bit(__TXGBE_HANGING, &adapter->state)) {
-		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-			adapter->flags2 &= ~TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS;
-
-		e_crit(drv, "%s\n", txgbe_underheat_msg);
-		// re-enable over_heat misx itr
-		wr32m(&adapter->hw, TXGBE_PX_MISC_IEN, TXGBE_PX_MISC_IEN_OVER_HEAT,
+		if (hw->mac.type == txgbe_mac_aml ||
+				hw->mac.type == txgbe_mac_aml40) {
+			adapter->flags3 &= ~TXGBE_FLAG3_TEMP_SENSOR_INPROGRESS;
+			// re-enable over_heat misx itr
+			wr32m(&adapter->hw, TXGBE_PX_MISC_IEN, TXGBE_PX_MISC_IEN_OVER_HEAT,
 							TXGBE_PX_MISC_IEN_OVER_HEAT);
+		}
+		e_crit(drv, "%s\n", txgbe_underheat_msg);
+
 		wr32m(&adapter->hw, TXGBE_RDB_PB_CTL,
 				TXGBE_RDB_PB_CTL_RXEN, TXGBE_RDB_PB_CTL_RXEN);
 		netif_carrier_on(adapter->netdev);
@@ -3477,8 +3479,9 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 		clear_bit(__TXGBE_HANGING, &adapter->state);
 	} else if (temp_state == TXGBE_ERR_OVERTEMP &&
 		!test_and_set_bit(__TXGBE_HANGING, &adapter->state)) {
-		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-			adapter->flags2 |= TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS;
+		if (hw->mac.type == txgbe_mac_aml ||
+				hw->mac.type == txgbe_mac_aml40)
+			adapter->flags3 |= TXGBE_FLAG3_TEMP_SENSOR_INPROGRESS;
 		e_crit(drv, "%s\n", txgbe_overheat_msg);
 		netif_carrier_off(adapter->netdev);
 #ifdef HAVE_VIRTUAL_STATION
@@ -3612,7 +3615,7 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE)
 		mask |= TXGBE_PX_MISC_IEN_OVER_HEAT;
 
-	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS)
+	if (adapter->flags3 & TXGBE_FLAG3_TEMP_SENSOR_INPROGRESS)
 		mask &= ~TXGBE_PX_MISC_IEN_OVER_HEAT;
 
 	if ((adapter->flags & TXGBE_FLAG_FDIR_HASH_CAPABLE) &&
