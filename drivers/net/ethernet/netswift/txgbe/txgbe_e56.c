@@ -2179,6 +2179,7 @@ int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed)
 //--------------------------------------------------------------
 int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	int status = 0;
 	unsigned int rdata;
 	int SECOND_CODE;
@@ -2200,6 +2201,7 @@ int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed)
 	int CMVAR_COARSE_MIN;
 	int CMVAR_UFINE_FMIN_WRAP;
 	int CMVAR_FINE_FMIN_WRAP;
+	int temp;
 
 	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
 		CMVAR_SEC_LOW_TH = S10G_CMVAR_SEC_LOW_TH;
@@ -2231,7 +2233,15 @@ int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed)
 		CMVAR_COARSE_MIN = S25G_CMVAR_COARSE_MIN;
 		CMVAR_UFINE_FMIN_WRAP = S25G_CMVAR_UFINE_FMIN_WRAP;
 		CMVAR_FINE_FMIN_WRAP = S25G_CMVAR_FINE_FMIN_WRAP;
+	} else {
+		return 0;
 	}
+
+	status = txgbe_e56_get_temp(hw, &temp);
+	if (status)
+		temp = DEFAULT_TEMP;
+
+	adapter->amlite_temp = temp;
 
 	//Assign software defined variables as below �C
 	//a. SECOND_CODE = ALIAS::RXS::SECOND_ORDER
@@ -3211,7 +3221,6 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 
 u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 status;
 	u32 value;
 	int temp;
@@ -3220,7 +3229,6 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 	if (status)
 		temp = DEFAULT_TEMP;
 
-	adapter->amlite_temp = temp;
 	if (temp < DEFAULT_TEMP) {
 		value = rd32_ephy(hw, CMS_ANA_OVRDEN0);
 		SetFields(&value, 25, 25, 0x1);
@@ -3478,7 +3486,6 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 			E56PHY_INTR_1_IDLE_EXIT1);
 
 	TCALL(hw, mac.ops.enable_sec_tx_path);
-	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 
 	return status;
 }
@@ -3805,8 +3812,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 out:
 	if (ppl_lock) {
 		TCALL(hw, mac.ops.enable_sec_tx_path);
-		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
-		      TXGBE_MAC_RX_CFG_RE);
 	}
 	TCALL(hw, mac.ops.enable_tx_laser);
 

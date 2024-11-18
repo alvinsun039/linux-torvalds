@@ -9000,6 +9000,10 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
 					TXGBE_MAC_TX_CFG_AML_SPEED_1G);
 			}
+
+			/* enable mac receiver */
+			wr32m(hw, TXGBE_MAC_RX_CFG,
+				TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 		} else {
 			if (link_speed & TXGBE_LINK_SPEED_10GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
@@ -9162,11 +9166,9 @@ static void txgbe_link_down_flush_tx(struct txgbe_adapter *adapter)
 	wr32m(hw, TXGBE_MAC_RX_CFG,
 		TXGBE_MAC_RX_CFG_LM, TXGBE_MAC_RX_CFG_LM);
 
-	udelay(1000);
+	mdelay(20);
 
 	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_LM, 0);
-	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
-			TXGBE_MAC_RX_CFG_RE);
 }
 
 /**

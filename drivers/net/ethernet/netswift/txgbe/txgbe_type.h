@@ -704,6 +704,7 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_CFG_GENEVE                0x14418
 #define TXGBE_CFG_TEREDO                0x1441C
 #define TXGBE_CFG_TCP_TIME              0x14420
+#define TXGBE_LINKUP_FILTER             0x14428
 #define TXGBE_CFG_TAG_TPID(_i)          (0x14430 + ((_i) * 4))
 
 /*AML LINK STATUS OVERWRITE*/

@@ -5897,10 +5897,8 @@ s32 txgbe_setup_mac_link_sp(struct txgbe_hw *hw,
 
 		if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_1GB_FULL &&
-			(adapter->autoneg != curr_autoneg)) &&
-			(adapter->fec_link_mode & adapter->cur_fec_link)) {
+			(adapter->autoneg != curr_autoneg)))
 				goto out;
-		}
 	}
 
 	if ((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4 ||
@@ -6175,6 +6173,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 
 	/* amlite TODO*/
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
+		wr32(hw, TXGBE_LINKUP_FILTER, 30);
 		/* amlite: bme */
 		wr32(hw, 0x4B8, 0x1);
 		/* amlite: rdm_rsc_ctl_free_ctl set to 1 */
