@@ -28,34 +28,34 @@ static inline const char *str_high_low(bool v)
 }
 #define str_low_high(v)		str_high_low(!(v))
 
-static inline const char *str_read_write(bool v)
-{
-	return v ? "read" : "write";
-}
-#define str_write_read(v)		str_read_write(!(v))
-
 static inline const char *str_on_off(bool v)
 {
 	return v ? "on" : "off";
 }
 #define str_off_on(v)		str_on_off(!(v))
 
-static inline const char *str_yes_no(bool v)
+static inline const char *str_read_write(bool v)
 {
-	return v ? "yes" : "no";
+	return v ? "read" : "write";
 }
-#define str_no_yes(v)		str_yes_no(!(v))
-
-static inline const char *str_up_down(bool v)
-{
-	return v ? "up" : "down";
-}
+#define str_write_read(v)		str_read_write(!(v))
 
 static inline const char *str_true_false(bool v)
 {
 	return v ? "true" : "false";
 }
 #define str_false_true(v)		str_true_false(!(v))
+
+static inline const char *str_up_down(bool v)
+{
+	return v ? "up" : "down";
+}
+
+static inline const char *str_yes_no(bool v)
+{
+	return v ? "yes" : "no";
+}
+#define str_no_yes(v)		str_yes_no(!(v))
 
 /**
  * str_plural - Return the simple pluralization based on English counts
