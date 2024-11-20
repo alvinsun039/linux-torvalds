@@ -8431,6 +8431,8 @@ again:
 	if (prev->sched_class != &fair_sched_class)
 		goto simple;
 
+	__put_prev_set_next_dl_server(rq, prev, p);
+
 	/*
 	 * Because of the set_next_buddy() in dequeue_task_fair() it is rather
 	 * likely that a next task is from the same cgroup as the current.
