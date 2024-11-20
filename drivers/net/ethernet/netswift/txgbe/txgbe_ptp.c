@@ -111,7 +111,8 @@ static void txgbe_ptp_setup_sdp(struct txgbe_adapter *adapter)
 	if (!(adapter->flags2 & TXGBE_FLAG2_PTP_PPS_ENABLED)) {
 		if (adapter->pps_enabled == 1) {
 			adapter->pps_enabled = 0;
-			txgbe_set_pps(hw, adapter->pps_enabled, 0, 0);
+			if (TXGBE_1588_TOD_ENABLE)
+				txgbe_set_pps(hw, adapter->pps_enabled, 0, 0);
 		}
 		return;
 	}
@@ -145,7 +146,8 @@ static void txgbe_ptp_setup_sdp(struct txgbe_adapter *adapter)
 	trgttiml0 = (u32)adapter->pps_edge_start;
 	trgttimh0 = (u32)(adapter->pps_edge_start >> 32);
 
-	txgbe_set_pps(hw, adapter->pps_enabled, ns + rem, adapter->pps_edge_start);
+	if (TXGBE_1588_TOD_ENABLE)
+		txgbe_set_pps(hw, adapter->pps_enabled, ns + rem, adapter->pps_edge_start);
 
 	rem += TXGBE_1588_PPS_WIDTH * NS_PER_MSEC;
 	adapter->pps_edge_end += div_u64(((u64)rem << cc->shift), cc->mult);
@@ -399,8 +401,11 @@ static int txgbe_ptp_feature_enable(struct ptp_clock_info *ptp,
 void txgbe_ptp_check_pps_event(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 tsauxc, int_status;
+	struct cyclecounter *cc = &adapter->hw_cc;
+	u32 tsauxc, rem, int_status;
 	u32 trgttiml0, trgttimh0, trgttiml1, trgttimh1;
+	u64 ns = 0;
+	unsigned long flags;
 
 	/* this check is necessary in case the interrupt was enabled via some
 	 * alternative means (ex. debug_fs). Better to check here than
@@ -419,11 +424,31 @@ void txgbe_ptp_check_pps_event(struct txgbe_adapter *adapter)
 			tsauxc = TXGBE_TSEC_1588_AUX_CTL_PLSG | TXGBE_TSEC_1588_AUX_CTL_EN_TT0 |
 				TXGBE_TSEC_1588_AUX_CTL_EN_TT1 | TXGBE_TSEC_1588_AUX_CTL_EN_TS0;
 
+			/* Read the current clock time, and save the cycle counter value */
+			spin_lock_irqsave(&adapter->tmreg_lock, flags);
+			ns = timecounter_read(&adapter->hw_tc);
+			adapter->pps_edge_start = adapter->hw_tc.cycle_last;
+			spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
+			adapter->pps_edge_end = adapter->pps_edge_start;
+
+			/* Figure out how far past the next second we are */
+			div_u64_rem(ns, NS_PER_SEC, &rem);
+
+			/* Figure out how many nanoseconds to add to round the clock edge up
+			 * to the next full second
+			 */
+			rem = (NS_PER_SEC - rem);
+
 			/* Adjust the clock edge to align with the next full second. */
-			adapter->pps_edge_start += adapter->sec_to_cc;
-			adapter->pps_edge_end += adapter->sec_to_cc;
+			adapter->pps_edge_start += div_u64(((u64)rem << cc->shift), cc->mult);
+
+			/* Adjust the clock edge to align with the next full second. */
 			trgttiml0 = (u32)adapter->pps_edge_start;
 			trgttimh0 = (u32)(adapter->pps_edge_start >> 32);
+
+			rem += TXGBE_1588_PPS_WIDTH * NS_PER_MSEC;
+			adapter->pps_edge_end += div_u64(((u64)rem << cc->shift), cc->mult);
+
 			trgttiml1 = (u32)adapter->pps_edge_end;
 			trgttimh1 = (u32)(adapter->pps_edge_end >> 32);
 
