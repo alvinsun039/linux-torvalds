@@ -7033,10 +7033,12 @@ s32 txgbe_start_hw(struct txgbe_hw *hw)
 	/* Setup flow control */
 	ret_val = TCALL(hw, mac.ops.setup_fc);
 
-	/* Clear the rate limiters */
-	for (i = 0; i < hw->mac.max_tx_queues; i++) {
-		wr32(hw, TXGBE_TDM_RP_IDX, i);
-		wr32(hw, TXGBE_TDM_RP_RATE, 0);
+	if (hw->mac.type == txgbe_mac_sp) {
+		/* Clear the rate limiters */
+		for (i = 0; i < hw->mac.max_tx_queues; i++) {
+			wr32(hw, TXGBE_TDM_RP_IDX, i);
+			wr32(hw, TXGBE_TDM_RP_RATE, 0);
+		}
 	}
 	TXGBE_WRITE_FLUSH(hw);
 
