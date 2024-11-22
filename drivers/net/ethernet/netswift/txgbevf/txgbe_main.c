@@ -6056,28 +6056,12 @@ static void txgbe_set_features(struct txgbe_adapter *adapter, u8 fea_flags)
 			    NETIF_F_HW_VLAN_RX |
 			    NETIF_F_HW_VLAN_FILTER;
 #endif
-#ifdef HAVE_NDO_SET_FEATURES
-		/* copy netdev features into list of user selectable features */
-#ifndef HAVE_RHEL6_NET_DEVICE_OPS_EXT
-		hw_features = netdev->hw_features;
-#else
-		hw_features = get_netdev_hw_features(netdev);
-#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
-	
-		hw_features |= netdev->features;
-#else
+#ifndef HAVE_NDO_SET_FEATURES
 #ifdef NETIF_F_GRO
 			netdev->features |= NETIF_F_GRO;
 #endif /* NETIF_F_GRO */
 #endif /* HAVE_NDO_SET_FEATURES */
-#ifdef HAVE_NDO_SET_FEATURES
-#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
-		set_netdev_hw_features(netdev, hw_features);
-#else
-		netdev->hw_features = hw_features;
-#endif
-#endif /* HAVE_NDO_SET_FEATURES */
-	
+
 #ifdef HAVE_NETDEV_VLAN_FEATURES
 		netdev->vlan_features |= netdev->features;
 #ifdef NETIF_F_GSO_PARTIAL
@@ -6103,6 +6087,25 @@ static void txgbe_set_features(struct txgbe_adapter *adapter, u8 fea_flags)
 					NETIF_F_HW_VLAN_FILTER;
 #endif
 #endif
+
+#ifdef HAVE_NDO_SET_FEATURES
+		/* copy netdev features into list of user selectable features */
+#ifndef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	hw_features = netdev->hw_features;
+#else
+	hw_features = get_netdev_hw_features(netdev);
+#endif /* HAVE_RHEL6_NET_DEVICE_OPS_EXT */
+
+	hw_features |= netdev->features;
+#endif /* HAVE_NDO_SET_FEATURES */
+
+#ifdef HAVE_NDO_SET_FEATURES
+#ifdef HAVE_RHEL6_NET_DEVICE_OPS_EXT
+	set_netdev_hw_features(netdev, hw_features);
+#else
+	netdev->hw_features = hw_features;
+#endif
+#endif /* HAVE_NDO_SET_FEATURES */
 
 #if 0
 	/*
