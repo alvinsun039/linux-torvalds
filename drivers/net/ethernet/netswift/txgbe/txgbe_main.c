@@ -3418,6 +3418,7 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 eicr = adapter->interrupt_event;
 	s32 temp_state;
+	u16 value = 0;
 #ifdef HAVE_VIRTUAL_STATION
 	struct net_device *upper;
 	struct list_head *iter;
@@ -3427,6 +3428,10 @@ static void txgbe_check_overtemp_subtask(struct txgbe_adapter *adapter)
 		return;
 	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE))
 		return;
+	/*when pci lose link, not check over heat*/
+	value = pci_read_config_word(adapter->pdev, PCI_VENDOR_ID, &value);
+	if (value == TXGBE_FAILED_READ_CFG_WORD)
+		return ;
 
 	if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_INPROGRESS)) {
 		if (!(adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_EVENT))
