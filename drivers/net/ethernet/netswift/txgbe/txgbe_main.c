@@ -13934,12 +13934,13 @@ static pci_ers_result_t txgbe_io_slot_reset(struct pci_dev *pdev)
 
 	e_info(hw, "in txgbe_io_slot_reset\n");
 
-	if (adapter->cmplt_to_dis) {
-		pcie_capability_read_word(adapter->pdev, PCI_EXP_DEVCTL2, &value);
-		value |= 0x10;
-		pcie_capability_write_word(adapter->pdev, PCI_EXP_DEVCTL2, value);
-		adapter->cmplt_to_dis = false;
-	}
+	if (adapter->hw.mac.type == txgbe_mac_sp)
+		if (adapter->cmplt_to_dis) {
+			pcie_capability_read_word(adapter->pdev, PCI_EXP_DEVCTL2, &value);
+			value |= 0x10;
+			pcie_capability_write_word(adapter->pdev, PCI_EXP_DEVCTL2, value);
+			adapter->cmplt_to_dis = false;
+		}
 
 	if (pci_enable_device_mem(pdev)) {
 		e_err(probe, "Cannot re-enable PCI device after reset.\n");
