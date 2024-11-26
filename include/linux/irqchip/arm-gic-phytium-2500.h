@@ -1,8 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright (C) 2013, 2014 ARM Limited, All Rights Reserved.
- * Author: Marc Zyngier <marc.zyngier@arm.com>
+ * Copyright (C) 2020-2023, Phytium Technology Co., Ltd
  */
+
 #ifndef __LINUX_IRQCHIP_ARM_GIC_PHYTIUM_2500_H
 #define __LINUX_IRQCHIP_ARM_GIC_PHYTIUM_2500_H
 
@@ -635,7 +635,7 @@ struct rdists {
 
 struct irq_domain;
 struct fwnode_handle;
-int __init its_lpi_memreserve_init(void);
+int __init phytium_its_lpi_memreserve_init(void);
 int phytium_its_cpu_init(void);
 int phytium_its_init(struct fwnode_handle *handle, struct rdists *rdists,
 	     struct irq_domain *domain);

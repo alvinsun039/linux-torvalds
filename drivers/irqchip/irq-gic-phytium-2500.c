@@ -1,25 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2022 Phytium Corporation.
- * Author:
- *         Wang Yinfeng <wangyinfeng@phytium.com.cn>
- *         Chen Baozi <chenbaozi@phytium.com.cn>
- *         Chen Siyu  <chensiyu1321@phytium.com.cn>
- *         Cui Fulong <cuifulong2112@phytium.com.cn>
- *         Li Yuting <liyuting2071@phytium.com.cn>
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * Copyright (C) 2020-2023, Phytium Technology Co., Ltd
  */
-
 
 #define pr_fmt(fmt)	"GIC-2500: " fmt
 
@@ -29,7 +11,6 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
-#include <linux/kstrtox.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
@@ -41,9 +22,6 @@
 #include <linux/irqchip/arm-gic-common.h>
 #include <linux/irqchip/arm-gic-phytium-2500.h>
 #include <linux/irqchip/irq-partition-percpu.h>
-#include <linux/bitfield.h>
-#include <linux/bits.h>
-#include <linux/arm-smccc.h>
 
 #include <asm/cputype.h>
 #include <asm/exception.h>
@@ -51,6 +29,7 @@
 #include <asm/virt.h>
 
 #include "irq-gic-common.h"
+#include <linux/crash_dump.h>
 
 #define MAX_MARS3_SOC_COUNT	8
 #define MARS3_ADDR_SKTID_SHIFT	41
@@ -61,18 +40,10 @@ struct gic_dist_desc {
 	unsigned long		size;
 };
 
-static struct gic_dist_desc mars3_gic_dists[MAX_MARS3_SOC_COUNT] __read_mostly;
-
-static unsigned int mars3_sockets_bitmap = 0x1;
-
-#define mars3_irq_to_skt(hwirq)     (((hwirq) - 32) % 8)
-
 #define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
-#define FLAGS_WORKAROUND_MTK_GICR_SAVE		(1ULL << 2)
-#define FLAGS_WORKAROUND_ASR_ERRATUM_8601001	(1ULL << 3)
 
 #define GIC_IRQ_TYPE_PARTITION	(GIC_IRQ_TYPE_LPI + 1)
 
@@ -82,9 +53,14 @@ struct redist_region {
 	bool			single_redist;
 };
 
+static struct gic_dist_desc mars3_gic_dists[MAX_MARS3_SOC_COUNT] __read_mostly;
+
+static unsigned int mars3_sockets_bitmap = 0x1;
+
+#define mars3_irq_to_skt(hwirq)	(((hwirq) - 32) % 8)
+
 struct gic_chip_data {
 	struct fwnode_handle	*fwnode;
-	phys_addr_t		dist_phys_base;
 	void __iomem		*dist_base;
 	struct redist_region	*redist_regions;
 	struct rdists		rdists;
@@ -96,12 +72,6 @@ struct gic_chip_data {
 	unsigned int		ppi_nr;
 	struct partition_desc	**ppi_descs;
 };
-
-#define T241_CHIPS_MAX		4
-static void __iomem *t241_dist_base_alias[T241_CHIPS_MAX] __read_mostly;
-static DEFINE_STATIC_KEY_FALSE(gic_nvidia_t241_erratum);
-
-static DEFINE_STATIC_KEY_FALSE(gic_arm64_2941627_erratum);
 
 static struct gic_chip_data gic_data __read_mostly;
 static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
@@ -131,9 +101,14 @@ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
  * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
  *   interrupt.
  */
-static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis_ft2500);
+static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
 
+#ifndef CONFIG_ARM_GIC_V3
+DEFINE_STATIC_KEY_FALSE(gic_nonsecure_priorities);
+EXPORT_SYMBOL(gic_nonsecure_priorities);
+#else
 extern struct static_key_false gic_nonsecure_priorities;
+#endif
 
 /*
  * When the Non-secure world has access to group 0 interrupts (as a
@@ -160,7 +135,7 @@ extern struct static_key_false gic_nonsecure_priorities;
 static refcount_t *ppi_nmi_refs;
 
 static struct gic_kvm_info gic_v3_kvm_info __initdata;
-static DEFINE_PER_CPU(bool, has_rss_ft2500);
+static DEFINE_PER_CPU(bool, has_rss);
 
 #define MPIDR_RS(mpidr)			(((mpidr) & 0xF0UL) >> 4)
 #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
@@ -222,39 +197,6 @@ static inline bool gic_irq_in_rdist(struct irq_data *d)
 	}
 }
 
-static inline void __iomem *gic_dist_base_alias(struct irq_data *d)
-{
-	if (static_branch_unlikely(&gic_nvidia_t241_erratum)) {
-		irq_hw_number_t hwirq = irqd_to_hwirq(d);
-		u32 chip;
-
-		/*
-		 * For the erratum T241-FABRIC-4, read accesses to GICD_In{E}
-		 * registers are directed to the chip that owns the SPI. The
-		 * the alias region can also be used for writes to the
-		 * GICD_In{E} except GICD_ICENABLERn. Each chip has support
-		 * for 320 {E}SPIs. Mappings for all 4 chips:
-		 *    Chip0 = 32-351
-		 *    Chip1 = 352-671
-		 *    Chip2 = 672-991
-		 *    Chip3 = 4096-4415
-		 */
-		switch (__get_intid_range(hwirq)) {
-		case SPI_RANGE:
-			chip = (hwirq - 32) / 320;
-			break;
-		case ESPI_RANGE:
-			chip = 3;
-			break;
-		default:
-			unreachable();
-		}
-		return t241_dist_base_alias[chip];
-	}
-
-	return gic_data.dist_base;
-}
-
 static inline void __iomem *gic_dist_base(struct irq_data *d)
 {
 	switch (get_intid_range(d)) {
@@ -274,11 +216,11 @@ static inline void __iomem *gic_dist_base(struct irq_data *d)
 	}
 }
 
-static void gic_do_wait_for_rwp(void __iomem *base)
+static void gic_do_wait_for_rwp(void __iomem *base, u32 bit)
 {
 	u32 count = 1000000;	/* 1s! */
 
-	while (readl_relaxed(base + GICD_CTLR) & GICD_CTLR_RWP) {
+	while (readl_relaxed(base + GICD_CTLR) & bit) {
 		count--;
 		if (!count) {
 			pr_err_ratelimited("RWP timeout, gone fishing\n");
@@ -292,14 +234,25 @@ static void gic_do_wait_for_rwp(void __iomem *base)
 /* Wait for completion of a distributor change */
 static void gic_dist_wait_for_rwp(void)
 {
-	gic_do_wait_for_rwp(gic_data.dist_base);
+	gic_do_wait_for_rwp(gic_data.dist_base, GICD_CTLR_RWP);
 }
 
 /* Wait for completion of a redistributor change */
 static void gic_redist_wait_for_rwp(void)
 {
-	gic_do_wait_for_rwp(gic_data_rdist_rd_base());
+	gic_do_wait_for_rwp(gic_data_rdist_rd_base(), GICR_CTLR_RWP);
 }
+
+#ifdef CONFIG_ARM64
+
+static u64 __maybe_unused gic_read_iar(void)
+{
+	if (cpus_have_const_cap(ARM64_WORKAROUND_CAVIUM_23154))
+		return gic_read_iar_cavium_thunderx();
+	else
+		return gic_read_iar_common();
+}
+#endif
 
 static void gic_enable_redist(bool enable)
 {
@@ -341,24 +294,25 @@ static void gic_enable_redist(bool enable)
 
 	mpidr = (unsigned long)cpu_logical_map(smp_processor_id());
 
-	if (mpidr & 0xFFFF)  // either Aff1 or Aff0 is not zero
+	/* Either Aff0 or Aff1 is not zero */
+	if (mpidr & 0xffff)
 		return;
 
-	rbase = rbase + 64 * SZ_128K; // skip 64 Redistributors
+	/* Skip 64 Redistributors */
+	rbase = rbase + 64 * SZ_128K;
 
 	for (i = 0; i < 4; i++) {
 		val = readl_relaxed(rbase + GICR_WAKER);
 		if (enable)
-			/* Wake up this CPU redistributor */
 			val &= ~GICR_WAKER_ProcessorSleep;
 		else
 			val |= GICR_WAKER_ProcessorSleep;
 		writel_relaxed(val, rbase + GICR_WAKER);
 
-		if (!enable) {          /* Check that GICR_WAKER is writeable */
+		if (!enable) {
 			val = readl_relaxed(rbase + GICR_WAKER);
 			if (!(val & GICR_WAKER_ProcessorSleep))
-				return; /* No PM support in this redistributor */
+				return;
 		}
 
 		count = 1000000;    /* 1s! */
@@ -369,11 +323,12 @@ static void gic_enable_redist(bool enable)
 			cpu_relax();
 			udelay(1);
 		};
+
 		if (!count)
 			pr_err_ratelimited("CPU MPIDR 0x%lx: redistributor %d failed to %s...\n",
-					mpidr, 64 + i, enable ? "wakeup" : "sleep");
+					   mpidr, 64 + i, enable ? "wakeup" : "sleep");
 
-		rbase = rbase + SZ_128K;  // next redistributor
+		rbase = rbase + SZ_128K;
 	}
 }
 
@@ -433,7 +388,7 @@ static u32 convert_offset_index(struct irq_data *d, u32 offset, u32 *index)
 static int gic_peek_irq(struct irq_data *d, u32 offset)
 {
 	void __iomem *base;
-	u32 index, mask;
+	u32 index, mask, skt;
 
 	offset = convert_offset_index(d, offset, &index);
 	mask = 1 << (index % 32);
@@ -441,8 +396,6 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
 	if (gic_irq_in_rdist(d))
 		base = gic_data_rdist_sgi_base();
 	else {
-		unsigned int skt;
-
 		skt = mars3_irq_to_skt(gic_irq(d));
 		base = mars3_gic_dists[skt].dist_base;
 	}
@@ -452,13 +405,10 @@ static int gic_peek_irq(struct irq_data *d, u32 offset)
 
 static void gic_poke_irq(struct irq_data *d, u32 offset)
 {
-	void __iomem *base;
-
+	void __iomem *base, *rbase;
 	unsigned long mpidr;
-	void __iomem *rbase;
 	int i;
-	unsigned int skt;
-	u32 index, mask;
+	u32 index, mask, skt;
 
 	offset = convert_offset_index(d, offset, &index);
 	mask = 1 << (index % 32);
@@ -471,20 +421,20 @@ static void gic_poke_irq(struct irq_data *d, u32 offset)
 
 		mpidr = (unsigned long)cpu_logical_map(smp_processor_id());
 
-		if ((mpidr & 0xFFFF) == 0) {     // both Aff1 and Aff0 are zero
-			rbase = base + 64*SZ_128K;     // skip 64 Redistributors
+		if ((mpidr & 0xffff) == 0) {
+			rbase = base + 64*SZ_128K;
 
 			for (i = 0; i < 4; i++) {
 				writel_relaxed(mask, rbase + offset + (index / 32) * 4);
-				gic_do_wait_for_rwp(rbase -  SZ_64K);   // RD from SGI base
+				gic_do_wait_for_rwp(rbase - SZ_64K, GICR_CTLR_RWP);
 				rbase = rbase + SZ_128K;
 			}
-		} // core 0 of each socket
+		}
 	} else {
 		skt = mars3_irq_to_skt(gic_irq(d));
-		base =  mars3_gic_dists[skt].dist_base;
+		base = mars3_gic_dists[skt].dist_base;
 		writel_relaxed(mask, base + offset + (index / 32) * 4);
-		gic_do_wait_for_rwp(base);
+		gic_do_wait_for_rwp(base, GICD_CTLR_RWP);
 	}
 }
 
@@ -517,10 +467,10 @@ static void gic_unmask_irq(struct irq_data *d)
 	gic_poke_irq(d, GICD_ISENABLER);
 }
 
-static inline bool gic_supports_nmi_ft2500(void)
+static inline bool gic_supports_nmi(void)
 {
 	return IS_ENABLED(CONFIG_ARM64_PSEUDO_NMI) &&
-	       static_branch_likely(&supports_pseudo_nmis_ft2500);
+	       static_branch_likely(&supports_pseudo_nmis);
 }
 
 static int gic_irq_set_irqchip_state(struct irq_data *d,
@@ -613,7 +563,7 @@ static int gic_irq_nmi_setup(struct irq_data *d)
 {
 	struct irq_desc *desc = irq_to_desc(d->irq);
 
-	if (!gic_supports_nmi_ft2500())
+	if (!gic_supports_nmi())
 		return -EINVAL;
 
 	if (gic_peek_irq(d, GICD_ISENABLER)) {
@@ -650,7 +600,7 @@ static void gic_irq_nmi_teardown(struct irq_data *d)
 {
 	struct irq_desc *desc = irq_to_desc(d->irq);
 
-	if (WARN_ON(!gic_supports_nmi_ft2500()))
+	if (WARN_ON(!gic_supports_nmi()))
 		return;
 
 	if (gic_peek_irq(d, GICD_ISENABLER)) {
@@ -679,54 +629,21 @@ static void gic_irq_nmi_teardown(struct irq_data *d)
 	gic_irq_set_prio(d, GICD_INT_DEF_PRI);
 }
 
-static bool gic_arm64_erratum_2941627_needed(struct irq_data *d)
-{
-	enum gic_intid_range range;
-
-	if (!static_branch_unlikely(&gic_arm64_2941627_erratum))
-		return false;
-
-	range = get_intid_range(d);
-
-	/*
-	 * The workaround is needed if the IRQ is an SPI and
-	 * the target cpu is different from the one we are
-	 * executing on.
-	 */
-	return (range == SPI_RANGE || range == ESPI_RANGE) &&
-		!cpumask_test_cpu(raw_smp_processor_id(),
-				  irq_data_get_effective_affinity_mask(d));
-}
-
 static void gic_eoi_irq(struct irq_data *d)
 {
 	write_gicreg(gic_irq(d), ICC_EOIR1_EL1);
 	isb();
-
-	if (gic_arm64_erratum_2941627_needed(d)) {
-		/*
-		 * Make sure the GIC stream deactivate packet
-		 * issued by ICC_EOIR1_EL1 has completed before
-		 * deactivating through GICD_IACTIVER.
-		 */
-		dsb(sy);
-		gic_poke_irq(d, GICD_ICACTIVER);
-	}
 }
 
 static void gic_eoimode1_eoi_irq(struct irq_data *d)
 {
 	/*
 	 * No need to deactivate an LPI, or an interrupt that
-	 * is is getting forwarded to a vcpu.
+	 * is getting forwarded to a vcpu.
 	 */
 	if (gic_irq(d) >= 8192 || irqd_is_forwarded_to_vcpu(d))
 		return;
-
-	if (!gic_arm64_erratum_2941627_needed(d))
-		gic_write_dir(gic_irq(d));
-	else
-		gic_poke_irq(d, GICD_ICACTIVER);
+	gic_write_dir(gic_irq(d));
 }
 
 static int gic_set_type(struct irq_data *d, unsigned int type)
@@ -739,7 +656,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	unsigned long mpidr;
 
 	range = get_intid_range(d);
-
 	/* Interrupt configuration for SGIs can't be changed */
 	if (range == SGI_RANGE)
 		return type != IRQ_TYPE_EDGE_RISING ? -EINVAL : 0;
@@ -754,7 +670,6 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 	if (gic_irq_in_rdist(d)) {
 		base = gic_data_rdist_sgi_base();
 		ret = gic_configure_irq(index, type, base + offset, gic_redist_wait_for_rwp);
-
 		mpidr = (unsigned long)cpu_logical_map(smp_processor_id());
 
 		if ((mpidr & 0xffff) == 0) {
@@ -762,7 +677,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 
 			for (i = 0; i < 4; i++) {
 				ret = gic_configure_irq(index, type, rbase + offset, NULL);
-				gic_do_wait_for_rwp(rbase - SZ_64K);
+				gic_do_wait_for_rwp(rbase - SZ_64K, GICR_CTLR_RWP);
 				rbase = rbase + SZ_128K;
 			}
 		}
@@ -770,8 +685,9 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 		skt = mars3_irq_to_skt(gic_irq(d));
 		base = mars3_gic_dists[skt].dist_base;
 		ret = gic_configure_irq(index, type, base + offset, NULL);
-		gic_do_wait_for_rwp(base);
+		gic_do_wait_for_rwp(base, GICD_CTLR_RWP);
 	}
+
 
 	if (ret && (range == PPI_RANGE || range == EPPI_RANGE)) {
 		/* Misconfigured PPIs are usually not fatal */
@@ -794,15 +710,9 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
 	return 0;
 }
 
-static u64 gic_cpu_to_affinity(int cpu)
+static u64 gic_mpidr_to_affinity(unsigned long mpidr)
 {
-	u64 mpidr = cpu_logical_map(cpu);
 	u64 aff;
-
-	/* ASR8601 needs to have its affinities shifted down... */
-	if (unlikely(gic_data.flags & FLAGS_WORKAROUND_ASR_ERRATUM_8601001))
-		mpidr = (MPIDR_AFFINITY_LEVEL(mpidr, 1)	|
-			 (MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8));
 
 	aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
 	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
@@ -852,7 +762,7 @@ static inline void gic_complete_ack(u32 irqnr)
 
 static bool gic_rpr_is_nmi_prio(void)
 {
-	if (!gic_supports_nmi_ft2500())
+	if (!gic_supports_nmi())
 		return false;
 
 	return unlikely(gic_read_rpr() == GICD_INT_RPR_PRI(GICD_INT_NMI_PRI));
@@ -962,7 +872,7 @@ static void __gic_handle_irq_from_irqsoff(struct pt_regs *regs)
 
 static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
 {
-	if (unlikely(gic_supports_nmi_ft2500() && !interrupts_enabled(regs)))
+	if (unlikely(gic_supports_nmi() && !interrupts_enabled(regs)))
 		__gic_handle_irq_from_irqsoff(regs);
 	else
 		__gic_handle_irq_from_irqson(regs);
@@ -1021,7 +931,7 @@ static void __init gic_dist_init(void)
 
 		/* Disable the distributor */
 		writel_relaxed(0, base + GICD_CTLR);
-		gic_do_wait_for_rwp(base);
+		gic_do_wait_for_rwp(base, GICD_CTLR_RWP);
 
 		/*
 		 * Configure SPIs as non-secure Group-1. This will only matter
@@ -1047,9 +957,9 @@ static void __init gic_dist_init(void)
 		for (i = 0; i < GIC_ESPI_NR; i += 4)
 			writel_relaxed(GICD_INT_DEF_PRI_X4, base + GICD_IPRIORITYRnE + i);
 
-		/* Now do the common stuff */
+		/* Now do the common stuff, and wait for the distributor to drain */
 		gic_dist_config(base, GIC_LINE_NR, NULL);
-		gic_do_wait_for_rwp(base);
+		gic_do_wait_for_rwp(base, GICD_CTLR_RWP);      // do sync outside of gic_dist_config
 
 		val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
 		if (gic_data.rdists.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
@@ -1057,15 +967,14 @@ static void __init gic_dist_init(void)
 			val |= GICD_CTLR_nASSGIreq;
 		}
 
-		/* Enable distributor with ARE, Group1, and wait for it to drain */
+		/* Enable distributor with ARE, Group1 */
 		writel_relaxed(val, base + GICD_CTLR);
-		gic_dist_wait_for_rwp();
 
-		/*
+	        /*
 		 * Set all global interrupts to the boot CPU only. ARE must be
 		 * enabled.
 		 */
-		affinity = gic_cpu_to_affinity(smp_processor_id());
+		affinity = gic_mpidr_to_affinity(cpu_logical_map(smp_processor_id()));
 		for (i = 32; i < GIC_LINE_NR; i++)
 			gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
 
@@ -1115,25 +1024,21 @@ static int gic_iterate_rdists(int (*fn)(struct redist_region *, void __iomem *))
 
 static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
 {
-	unsigned long mpidr;
+	unsigned long mpidr = cpu_logical_map(smp_processor_id());
 	u64 typer;
-	u32 aff;
-	u32 aff2_skt;
-	u32 redist_skt;
+	u32 aff, aff2_skt, rdist_skt;
 
 	/*
 	 * Convert affinity to a 32bit value that can be matched to
 	 * GICR_TYPER bits [63:32].
 	 */
-	mpidr = gic_cpu_to_affinity(smp_processor_id());
-
 	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
-		MPIDR_AFFINITY_LEVEL(mpidr, 0));
+	      MPIDR_AFFINITY_LEVEL(mpidr, 0));
 
 	aff2_skt = MPIDR_AFFINITY_LEVEL(mpidr, 2) & 0x7;
-	redist_skt = (((u64)region->phys_base >> MARS3_ADDR_SKTID_SHIFT) & 0x7);
+	rdist_skt = (((u64)region->phys_base >> MARS3_ADDR_SKTID_SHIFT) & 0x7);
 
-	if (aff2_skt != redist_skt)
+	if (aff2_skt != rdist_skt)
 		return 1;
 
 	typer = gic_read_typer(ptr + GICR_TYPER);
@@ -1173,7 +1078,7 @@ static int __gic_update_rdist_properties(struct redist_region *region,
 	u64 typer = gic_read_typer(ptr + GICR_TYPER);
 	u32 ctlr = readl_relaxed(ptr + GICR_CTLR);
 
-	/* Boot-time cleanup */
+	/* Boot-time cleanip */
 	if ((typer & GICR_TYPER_VLPIS) && (typer & GICR_TYPER_RVPEID)) {
 		u64 val;
 
@@ -1224,7 +1129,7 @@ static void gic_update_rdist_properties(void)
 	gic_iterate_rdists(__gic_update_rdist_properties);
 	if (WARN_ON(gic_data.ppi_nr == UINT_MAX))
 		gic_data.ppi_nr = 0;
-	pr_info("GICv3 features: %d PPIs%s%s\n",
+	pr_info("GIC-2500 features: %d PPIs%s%s\n",
 		gic_data.ppi_nr,
 		gic_data.has_rss ? ", RSS" : "",
 		gic_data.rdists.has_direct_lpi ? ", DirectLPI" : "");
@@ -1245,7 +1150,7 @@ static inline bool gic_dist_security_disabled(void)
 static void gic_cpu_sys_reg_init(void)
 {
 	int i, cpu = smp_processor_id();
-	u64 mpidr = gic_cpu_to_affinity(cpu);
+	u64 mpidr = cpu_logical_map(cpu);
 	u64 need_rss = MPIDR_RS(mpidr);
 	bool group0;
 	u32 pribits;
@@ -1267,7 +1172,7 @@ static void gic_cpu_sys_reg_init(void)
 	/* Set priority mask register */
 	if (!gic_prio_masking_enabled()) {
 		write_gicreg(DEFAULT_PMR_VALUE, ICC_PMR_EL1);
-	} else if (gic_supports_nmi_ft2500()) {
+	} else if (gic_supports_nmi()) {
 		/*
 		 * Mismatch configuration with boot CPU, the system is likely
 		 * to die as interrupt masking will not work properly on all
@@ -1338,17 +1243,17 @@ static void gic_cpu_sys_reg_init(void)
 	gic_write_grpen1(1);
 
 	/* Keep the RSS capability status in per_cpu variable */
-	per_cpu(has_rss_ft2500, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
+	per_cpu(has_rss, cpu) = !!(gic_read_ctlr() & ICC_CTLR_EL1_RSS);
 
 	/* Check all the CPUs have capable of sending SGIs to other CPUs */
 	for_each_online_cpu(i) {
-		bool have_rss = per_cpu(has_rss_ft2500, i) && per_cpu(has_rss_ft2500, cpu);
+		bool have_rss = per_cpu(has_rss, i) && per_cpu(has_rss, cpu);
 
-		need_rss |= MPIDR_RS(gic_cpu_to_affinity(i));
+		need_rss |= MPIDR_RS(cpu_logical_map(i));
 		if (need_rss && (!have_rss))
 			pr_crit("CPU%d (%lx) can't SGI CPU%d (%lx), no RSS\n",
 				cpu, (unsigned long)mpidr,
-				i, (unsigned long)gic_cpu_to_affinity(i));
+				i, (unsigned long)cpu_logical_map(i));
 	}
 
 	/**
@@ -1366,7 +1271,7 @@ static bool gicv3_nolpi;
 
 static int __init gicv3_nolpi_cfg(char *buf)
 {
-	return kstrtobool(buf, &gicv3_nolpi);
+	return strtobool(buf, &gicv3_nolpi);
 }
 early_param("irqchip.gicv3_nolpi", gicv3_nolpi_cfg);
 
@@ -1404,18 +1309,17 @@ static void gic_cpu_init(void)
 
 	mpidr = (unsigned long)cpu_logical_map(smp_processor_id());
 
-	if ((mpidr & 0xFFFF) == 0) {     // both Aff1 and Aff0 is zero
-		rbase = rbase + 64*SZ_128K;     // skip 64 Redistributors
+	if ((mpidr & 0xffff) == 0) {
+		rbase = rbase + 64*SZ_128K;
 
 		for (i = 0; i < 4; i++) {
 			/* Configure SGIs/PPIs as non-secure Group-1 */
 			writel_relaxed(~0, rbase + GICR_IGROUPR0);
 
 			gic_cpu_config(rbase, gic_data.ppi_nr + 16, NULL);
-			gic_do_wait_for_rwp(rbase - SZ_64K);
+			gic_do_wait_for_rwp(rbase - SZ_64K, GICR_CTLR_RWP);
 
 			rbase = rbase + SZ_128K;
-
 		}
 	}
 
@@ -1442,10 +1346,8 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
 				   unsigned long cluster_id)
 {
 	int next_cpu, cpu = *base_cpu;
-	unsigned long mpidr;
+	unsigned long mpidr = cpu_logical_map(cpu);
 	u16 tlist = 0;
-
-	mpidr = gic_cpu_to_affinity(cpu);
 
 	while (cpu < nr_cpu_ids) {
 		tlist |= 1 << (mpidr & 0xf);
@@ -1455,7 +1357,7 @@ static u16 gic_compute_target_list(int *base_cpu, const struct cpumask *mask,
 			goto out;
 		cpu = next_cpu;
 
-		mpidr = gic_cpu_to_affinity(cpu);
+		mpidr = cpu_logical_map(cpu);
 
 		if (cluster_id != MPIDR_TO_SGI_CLUSTER_ID(mpidr)) {
 			cpu--;
@@ -1500,7 +1402,7 @@ static void gic_ipi_send_mask(struct irq_data *d, const struct cpumask *mask)
 	dsb(ishst);
 
 	for_each_cpu(cpu, mask) {
-		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(gic_cpu_to_affinity(cpu));
+		u64 cluster_id = MPIDR_TO_SGI_CLUSTER_ID(cpu_logical_map(cpu));
 		u16 tlist;
 
 		tlist = gic_compute_target_list(&cpu, mask, cluster_id);
@@ -1520,11 +1422,13 @@ static void __init gic_smp_init(void)
 	int base_sgi;
 
 	cpuhp_setup_state_nocalls(CPUHP_AP_IRQ_GIC_STARTING,
-				  "irqchip/arm/gicv3:starting",
+				  "irqchip/arm/gic_phytium_2500:starting",
 				  gic_starting_cpu, NULL);
 
 	/* Register all 8 non-secure SGIs */
-	base_sgi = irq_domain_alloc_irqs(gic_data.domain, 8, NUMA_NO_NODE, &sgi_fwspec);
+	base_sgi = __irq_domain_alloc_irqs(gic_data.domain, -1, 8,
+					   NUMA_NO_NODE, &sgi_fwspec,
+					   false, NULL);
 	if (WARN_ON(base_sgi <= 0))
 		return;
 
@@ -1535,22 +1439,26 @@ static int gic_cpumask_select(struct irq_data *d, const struct cpumask *mask_val
 {
 	unsigned int skt, irq_skt, i;
 	unsigned int cpu, cpus = 0;
-
 	unsigned int skt_cpu_cnt[MAX_MARS3_SOC_COUNT] = {0};
-
-	for (i = 0; i < nr_cpu_ids; i++) {
-		skt = (cpu_logical_map(i) >> 16) & 0xff;
-		if ((skt >= 0) && (skt < MAX_MARS3_SOC_COUNT))
-			skt_cpu_cnt[skt]++;
-		else if (skt != 0xff)
-			pr_err("socket address: %d is out of range.", skt);
-	}
 
 	irq_skt = mars3_irq_to_skt(gic_irq(d));
 
-	if (irq_skt != 0)
+	for (i = 0; i < nr_cpu_ids; i++) {
+		skt = (cpu_logical_map(i) >> 16) & 0xff;
+		if ((skt >= 0) && (skt < MAX_MARS3_SOC_COUNT)) {
+			if ((is_kdump_kernel()) && (irq_skt == skt))
+				return i;
+
+			skt_cpu_cnt[skt]++;
+		} else if (skt != 0xff) {
+			pr_err("socket address: %d is out of range.", skt);
+		}
+	}
+
+	if (irq_skt) {
 		for (i = 0; i < irq_skt; i++)
 			cpus += skt_cpu_cnt[i];
+	}
 
 	cpu = cpumask_any_and(mask_val, cpu_online_mask);
 	cpus = cpus + cpu % skt_cpu_cnt[irq_skt];
@@ -1561,12 +1469,11 @@ static int gic_cpumask_select(struct irq_data *d, const struct cpumask *mask_val
 static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 			    bool force)
 {
-	unsigned int cpu;
+	unsigned int cpu, skt;
 	u32 offset, index;
 	void __iomem *reg;
 	int enabled;
 	u64 val;
-	unsigned int skt;
 
 	if (force)
 		cpu = cpumask_first(mask_val);
@@ -1587,9 +1494,8 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	offset = convert_offset_index(d, GICD_IROUTER, &index);
 
 	skt = mars3_irq_to_skt(gic_irq(d));
-	reg = mars3_gic_dists[skt].dist_base + offset + GICD_IROUTER + (index * 8);
-	reg = gic_dist_base(d) + offset + (index * 8);
-	val = gic_cpu_to_affinity(cpu);
+	reg = mars3_gic_dists[skt].dist_base + offset + (index * 8);
+	val = gic_mpidr_to_affinity(cpu_logical_map(cpu));
 
 	gic_write_irouter(val, reg);
 
@@ -1644,7 +1550,7 @@ static inline void gic_cpu_pm_init(void) { }
 #endif /* CONFIG_CPU_PM */
 
 static struct irq_chip gic_chip = {
-	.name			= "GIC-phytium-2500",
+	.name			= "GIC-Phytium-2500",
 	.irq_mask		= gic_mask_irq,
 	.irq_unmask		= gic_unmask_irq,
 	.irq_eoi		= gic_eoi_irq,
@@ -1662,7 +1568,7 @@ static struct irq_chip gic_chip = {
 };
 
 static struct irq_chip gic_eoimode1_chip = {
-	.name			= "GICv3-phytium-2500",
+	.name			= "GIC-Phytium-2500",
 	.irq_mask		= gic_eoimode1_mask_irq,
 	.irq_unmask		= gic_unmask_irq,
 	.irq_eoi		= gic_eoimode1_eoi_irq,
@@ -1925,199 +1831,12 @@ static const struct irq_domain_ops partition_domain_ops = {
 	.select = gic_irq_domain_select,
 };
 
-static bool gic_enable_quirk_msm8996(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	d->flags |= FLAGS_WORKAROUND_GICR_WAKER_MSM8996;
-
-	return true;
-}
-
-static bool gic_enable_quirk_mtk_gicr(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	d->flags |= FLAGS_WORKAROUND_MTK_GICR_SAVE;
-
-	return true;
-}
-
-static bool gic_enable_quirk_cavium_38539(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	d->flags |= FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539;
-
-	return true;
-}
-
-static bool gic_enable_quirk_hip06_07(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	/*
-	 * HIP06 GICD_IIDR clashes with GIC-600 product number (despite
-	 * not being an actual ARM implementation). The saving grace is
-	 * that GIC-600 doesn't have ESPI, so nothing to do in that case.
-	 * HIP07 doesn't even have a proper IIDR, and still pretends to
-	 * have ESPI. In both cases, put them right.
-	 */
-	if (d->rdists.gicd_typer & GICD_TYPER_ESPI) {
-		/* Zero both ESPI and the RES0 field next to it... */
-		d->rdists.gicd_typer &= ~GENMASK(9, 8);
-		return true;
-	}
-
-	return false;
-}
-
-#define T241_CHIPN_MASK		GENMASK_ULL(45, 44)
-#define T241_CHIP_GICDA_OFFSET	0x1580000
-#define SMCCC_SOC_ID_T241	0x036b0241
-
-static bool gic_enable_quirk_nvidia_t241(void *data)
-{
-	s32 soc_id = arm_smccc_get_soc_id_version();
-	unsigned long chip_bmask = 0;
-	phys_addr_t phys;
-	u32 i;
-
-	/* Check JEP106 code for NVIDIA T241 chip (036b:0241) */
-	if ((soc_id < 0) || (soc_id != SMCCC_SOC_ID_T241))
-		return false;
-
-	/* Find the chips based on GICR regions PHYS addr */
-	for (i = 0; i < gic_data.nr_redist_regions; i++) {
-		chip_bmask |= BIT(FIELD_GET(T241_CHIPN_MASK,
-				  (u64)gic_data.redist_regions[i].phys_base));
-	}
-
-	if (hweight32(chip_bmask) < 3)
-		return false;
-
-	/* Setup GICD alias regions */
-	for (i = 0; i < ARRAY_SIZE(t241_dist_base_alias); i++) {
-		if (chip_bmask & BIT(i)) {
-			phys = gic_data.dist_phys_base + T241_CHIP_GICDA_OFFSET;
-			phys |= FIELD_PREP(T241_CHIPN_MASK, i);
-			t241_dist_base_alias[i] = ioremap(phys, SZ_64K);
-			WARN_ON_ONCE(!t241_dist_base_alias[i]);
-		}
-	}
-	static_branch_enable(&gic_nvidia_t241_erratum);
-	return true;
-}
-
-static bool gic_enable_quirk_asr8601(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	d->flags |= FLAGS_WORKAROUND_ASR_ERRATUM_8601001;
-
-	return true;
-}
-
-static bool gic_enable_quirk_arm64_2941627(void *data)
-{
-	static_branch_enable(&gic_arm64_2941627_erratum);
-	return true;
-}
-
-static bool rd_set_non_coherent(void *data)
-{
-	struct gic_chip_data *d = data;
-
-	d->rdists.flags |= RDIST_FLAGS_FORCE_NON_SHAREABLE;
-	return true;
-}
-
-static const struct gic_quirk gic_quirks[] = {
-	{
-		.desc	= "GICv3: Qualcomm MSM8996 broken firmware",
-		.compatible = "qcom,msm8996-gic-v3",
-		.init	= gic_enable_quirk_msm8996,
-	},
-	{
-		.desc	= "GICv3: ASR erratum 8601001",
-		.compatible = "asr,asr8601-gic-v3",
-		.init	= gic_enable_quirk_asr8601,
-	},
-	{
-		.desc	= "GICv3: Mediatek Chromebook GICR save problem",
-		.property = "mediatek,broken-save-restore-fw",
-		.init	= gic_enable_quirk_mtk_gicr,
-	},
-	{
-		.desc	= "GICv3: HIP06 erratum 161010803",
-		.iidr	= 0x0204043b,
-		.mask	= 0xffffffff,
-		.init	= gic_enable_quirk_hip06_07,
-	},
-	{
-		.desc	= "GICv3: HIP07 erratum 161010803",
-		.iidr	= 0x00000000,
-		.mask	= 0xffffffff,
-		.init	= gic_enable_quirk_hip06_07,
-	},
-	{
-		/*
-		 * Reserved register accesses generate a Synchronous
-		 * External Abort. This erratum applies to:
-		 * - ThunderX: CN88xx
-		 * - OCTEON TX: CN83xx, CN81xx
-		 * - OCTEON TX2: CN93xx, CN96xx, CN98xx, CNF95xx*
-		 */
-		.desc	= "GICv3: Cavium erratum 38539",
-		.iidr	= 0xa000034c,
-		.mask	= 0xe8f00fff,
-		.init	= gic_enable_quirk_cavium_38539,
-	},
-	{
-		.desc	= "GICv3: NVIDIA erratum T241-FABRIC-4",
-		.iidr	= 0x0402043b,
-		.mask	= 0xffffffff,
-		.init	= gic_enable_quirk_nvidia_t241,
-	},
-	{
-		/*
-		 * GIC-700: 2941627 workaround - IP variant [0,1]
-		 *
-		 */
-		.desc	= "GICv3: ARM64 erratum 2941627",
-		.iidr	= 0x0400043b,
-		.mask	= 0xff0e0fff,
-		.init	= gic_enable_quirk_arm64_2941627,
-	},
-	{
-		/*
-		 * GIC-700: 2941627 workaround - IP variant [2]
-		 */
-		.desc	= "GICv3: ARM64 erratum 2941627",
-		.iidr	= 0x0402043b,
-		.mask	= 0xff0f0fff,
-		.init	= gic_enable_quirk_arm64_2941627,
-	},
-	{
-		.desc   = "GICv3: non-coherent attribute",
-		.property = "dma-noncoherent",
-		.init   = rd_set_non_coherent,
-	},
-	{
-	}
-};
-
 static void gic_enable_nmi_support(void)
 {
 	int i;
 
 	if (!gic_prio_masking_enabled())
 		return;
-
-	if (gic_data.flags & FLAGS_WORKAROUND_MTK_GICR_SAVE) {
-		pr_warn("Skipping NMI enable due to firmware issues\n");
-		return;
-	}
 
 	ppi_nmi_refs = kcalloc(gic_data.ppi_nr, sizeof(*ppi_nmi_refs), GFP_KERNEL);
 	if (!ppi_nmi_refs)
@@ -2159,7 +1878,7 @@ static void gic_enable_nmi_support(void)
 	if (gic_has_group0() && !gic_dist_security_disabled())
 		static_branch_enable(&gic_nonsecure_priorities);
 
-	static_branch_enable(&supports_pseudo_nmis_ft2500);
+	static_branch_enable(&supports_pseudo_nmis);
 
 	if (static_branch_likely(&supports_deactivate_key))
 		gic_eoimode1_chip.flags |= IRQCHIP_SUPPORTS_NMI;
@@ -2167,8 +1886,7 @@ static void gic_enable_nmi_support(void)
 		gic_chip.flags |= IRQCHIP_SUPPORTS_NMI;
 }
 
-static int __init gic_init_bases(phys_addr_t dist_phys_base,
-				 void __iomem *dist_base,
+static int __init gic_init_bases(void __iomem *dist_base,
 				 struct redist_region *rdist_regs,
 				 u32 nr_redist_regions,
 				 u64 redist_stride,
@@ -2184,7 +1902,6 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 		pr_info("GIC: Using split EOI/Deactivate mode\n");
 
 	gic_data.fwnode = handle;
-	gic_data.dist_phys_base = dist_phys_base;
 	gic_data.dist_base = dist_base;
 	gic_data.redist_regions = rdist_regs;
 	gic_data.nr_redist_regions = nr_redist_regions;
@@ -2196,29 +1913,18 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
 	gic_data.rdists.gicd_typer = typer;
 
-	gic_enable_quirks(readl_relaxed(gic_data.dist_base + GICD_IIDR),
-			  gic_quirks, &gic_data);
-
 	pr_info("%d SPIs implemented\n", GIC_LINE_NR - 32);
 	pr_info("%d Extended SPIs implemented\n", GIC_ESPI_NR);
 
-	/*
-	 * ThunderX1 explodes on reading GICD_TYPER2, in violation of the
-	 * architecture spec (which says that reserved registers are RES0).
-	 */
-	if (!(gic_data.flags & FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539))
-		gic_data.rdists.gicd_typer2 = readl_relaxed(gic_data.dist_base + GICD_TYPER2);
+	gic_data.rdists.gicd_typer2 = readl_relaxed(gic_data.dist_base + GICD_TYPER2);
 
 	gic_data.domain = irq_domain_create_tree(handle, &gic_irq_domain_ops,
 						 &gic_data);
 	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
-	if (!static_branch_unlikely(&gic_nvidia_t241_erratum)) {
-		/* Disable GICv4.x features for the erratum T241-FABRIC-4 */
-		gic_data.rdists.has_rvpeid = true;
-		gic_data.rdists.has_vlpis = true;
-		gic_data.rdists.has_direct_lpi = true;
-		gic_data.rdists.has_vpend_valid_dirty = true;
-	}
+	gic_data.rdists.has_rvpeid = true;
+	gic_data.rdists.has_vlpis = true;
+	gic_data.rdists.has_direct_lpi = true;
+	gic_data.rdists.has_vpend_valid_dirty = true;
 
 	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
 		err = -ENOMEM;
@@ -2247,7 +1953,7 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 	if (gic_dist_supports_lpis()) {
 		phytium_its_init(handle, &gic_data.rdists, gic_data.domain);
 		phytium_its_cpu_init();
-		its_lpi_memreserve_init();
+		phytium_its_lpi_memreserve_init();
 	} else {
 		if (IS_ENABLED(CONFIG_ARM_GIC_V2M))
 			gicv2m_init(handle, gic_data.domain);
@@ -2334,13 +2040,13 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
 				continue;
 			}
 
-			pr_info("%pOF[%d] ", cpu_node, cpu);
+			pr_cont("%pOF[%d] ", cpu_node, cpu);
 
 			cpumask_set_cpu(cpu, &part->mask);
 			of_node_put(cpu_node);
 		}
 
-		pr_info("}\n");
+		pr_cont("}\n");
 		part_idx++;
 	}
 
@@ -2424,13 +2130,12 @@ static void __iomem *gic_of_iomap(struct device_node *node, int idx,
 
 static int __init gic_of_init(struct device_node *node, struct device_node *parent)
 {
-	phys_addr_t dist_phys_base;
 	void __iomem *dist_base;
 	struct redist_region *rdist_regs;
-	struct resource res;
 	u64 redist_stride;
 	u32 nr_redist_regions;
 	int err, i;
+	struct resource res;
 	unsigned long   skt;
 
 	dist_base = gic_of_iomap(node, 0, "GICD", &res);
@@ -2438,8 +2143,6 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 		pr_err("%pOF: unable to map gic dist registers\n", node);
 		return PTR_ERR(dist_base);
 	}
-
-	dist_phys_base = res.start;
 
 	err = gic_validate_dist_version(dist_base);
 	if (err) {
@@ -2456,7 +2159,7 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	mars3_gic_dists[0].size =  resource_size(&res);
 	mars3_gic_dists[0].dist_base = dist_base;
 
-	if (of_property_read_u32(node, "#mars3_soc_bitmap", &mars3_sockets_bitmap))
+	if (of_property_read_u32(node, "#mars3-soc-bitmap", &mars3_sockets_bitmap))
 		mars3_sockets_bitmap = 0x1;
 
 	for (skt = 1; skt < MAX_MARS3_SOC_COUNT; skt++) {
@@ -2493,8 +2196,8 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
 		redist_stride = 0;
 
-	err = gic_init_bases(dist_phys_base, dist_base, rdist_regs,
-			     nr_redist_regions, redist_stride, &node->fwnode);
+	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
+			     redist_stride, &node->fwnode);
 	if (err)
 		goto out_unmap_rdist;
 
@@ -2514,7 +2217,7 @@ out_unmap_dist:
 	return err;
 }
 
-IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
+IRQCHIP_DECLARE(gic_phyt_2500, "arm,gic-phytium-2500", gic_of_init);
 
 #ifdef CONFIG_ACPI
 static struct
@@ -2533,10 +2236,9 @@ static int gic_mars3_sockets_bitmap(void)
 {
 	unsigned int skt, i;
 	int skt_bitmap = 0;
-
 	unsigned int skt_cpu_cnt[MAX_MARS3_SOC_COUNT] = {0};
 
-	for (i = 0; i < nr_cpu_ids; i++) {
+	for (i = 0; i < max_t(unsigned int, nr_cpu_ids, NR_CPUS); i++) {
 		skt = (cpu_logical_map(i) >> 16) & 0xff;
 		if ((skt >= 0) && (skt < MAX_MARS3_SOC_COUNT))
 			skt_cpu_cnt[skt]++;
@@ -2544,9 +2246,10 @@ static int gic_mars3_sockets_bitmap(void)
 			pr_err("socket address: %d is out of range.", skt);
 	}
 
-	for (i = 0; i < MAX_MARS3_SOC_COUNT; i++)
+	for (i = 0; i < MAX_MARS3_SOC_COUNT; i++) {
 		if (skt_cpu_cnt[i] > 0)
 			skt_bitmap |= (1 << i);
+	}
 
 	return skt_bitmap;
 }
@@ -2554,7 +2257,7 @@ static int gic_mars3_sockets_bitmap(void)
 static void __init
 gic_acpi_register_redist(phys_addr_t phys_base, void __iomem *redist_base)
 {
-	static int count;
+	static int count = 0;
 
 	acpi_data.redist_regs[count].phys_base = phys_base;
 	acpi_data.redist_regs[count].redist_base = redist_base;
@@ -2786,7 +2489,7 @@ static void __init gic_acpi_setup_kvm_info(void)
 
 static struct fwnode_handle *gsi_domain_handle;
 
-static struct fwnode_handle *gic_v3_get_gsi_domain_id(u32 gsi)
+static struct fwnode_handle *gic_s2500_get_gsi_domain_id(u32 gsi)
 {
 	return gsi_domain_handle;
 }
@@ -2796,8 +2499,7 @@ gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 {
 	struct acpi_madt_generic_distributor *dist;
 	size_t size;
-	int i, err;
-	int skt;
+	int i, err, skt;
 
 	/* Get distributor base address */
 	dist = (struct acpi_madt_generic_distributor *)header;
@@ -2820,24 +2522,22 @@ gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 	mars3_gic_dists[0].size =  ACPI_GICV3_DIST_MEM_SIZE;
 	mars3_gic_dists[0].dist_base = acpi_data.dist_base;
 
-#ifdef CONFIG_ACPI
 	mars3_sockets_bitmap = gic_mars3_sockets_bitmap();
 	if (mars3_sockets_bitmap == 0) {
 		mars3_sockets_bitmap = 0x1;
-		pr_err("No socket, please check cpus MPIDR_AFFINITY_LEVEL!!!");
+		pr_err("No socket, please check cpus MPIDR_AFFINITY_LEVEL!");
 	} else
 		pr_info("mars3_sockets_bitmap = 0x%x\n", mars3_sockets_bitmap);
-#endif
 
 	for (skt = 1; skt < MAX_MARS3_SOC_COUNT; skt++) {
 		if (((1U << skt) & mars3_sockets_bitmap) == 0)
 			continue;
 
 		mars3_gic_dists[skt].phys_base = ((unsigned long)skt << MARS3_ADDR_SKTID_SHIFT) |
-						mars3_gic_dists[0].phys_base;
+						 mars3_gic_dists[0].phys_base;
 		mars3_gic_dists[skt].size =  mars3_gic_dists[0].size;
 		mars3_gic_dists[skt].dist_base = ioremap(mars3_gic_dists[skt].phys_base,
-							mars3_gic_dists[skt].size);
+							 mars3_gic_dists[skt].size);
 	}
 
 	size = sizeof(*acpi_data.redist_regs) * acpi_data.nr_redist_regions;
@@ -2857,13 +2557,12 @@ gic_acpi_init(union acpi_subtable_headers *header, const unsigned long end)
 		goto out_redist_unmap;
 	}
 
-	err = gic_init_bases(dist->base_address, acpi_data.dist_base,
-			     acpi_data.redist_regs, acpi_data.nr_redist_regions,
-			     0, gsi_domain_handle);
+	err = gic_init_bases(acpi_data.dist_base, acpi_data.redist_regs,
+			     acpi_data.nr_redist_regions, 0, gsi_domain_handle);
 	if (err)
 		goto out_fwhandle_free;
 
-	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, gic_v3_get_gsi_domain_id);
+	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, gic_s2500_get_gsi_domain_id);
 
 	if (static_branch_likely(&supports_deactivate_key))
 		gic_acpi_setup_kvm_info();
@@ -2881,7 +2580,7 @@ out_dist_unmap:
 	iounmap(acpi_data.dist_base);
 	return err;
 }
-IRQCHIP_ACPI_DECLARE(gic_phyt_2500, ACPI_MADT_TYPE_PHYTIUM_2500,
+IRQCHIP_ACPI_DECLARE(gic_phyt_2500, ACPI_MADT_TYPE_OEM_RESERVED,
 		     acpi_validate_gic_table, ACPI_MADT_GIC_VERSION_V3,
 		     gic_acpi_init);
 #endif
