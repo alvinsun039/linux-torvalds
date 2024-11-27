@@ -264,6 +264,8 @@ static int txgbe_set_advertising_1g_10gtypes(struct txgbe_hw *hw,
 		}
 		break;
 	case txgbe_sfp_type_sr:
+	case txgbe_sfp_type_25g_sr_core0:
+	case txgbe_sfp_type_25g_sr_core1:
 		if (advertised_speed & TXGBE_LINK_SPEED_10GB_FULL) {
 			ethtool_link_ksettings_add_link_mode(cmd, advertising,
 								 10000baseSR_Full);
@@ -274,6 +276,8 @@ static int txgbe_set_advertising_1g_10gtypes(struct txgbe_hw *hw,
 		}
 		break;
 	case txgbe_sfp_type_lr:
+	case txgbe_sfp_type_25g_lr_core0:
+	case txgbe_sfp_type_25g_lr_core1:
 		if (advertised_speed & TXGBE_LINK_SPEED_10GB_FULL) {
 			ethtool_link_ksettings_add_link_mode(cmd, advertising,
 								 10000baseLR_Full);
@@ -321,10 +325,14 @@ static int txgbe_set_supported_1g_10gtypes(struct txgbe_hw *hw,
 						     10000baseLR_Full);
 		break;
 	case txgbe_sfp_type_sr:
+	case txgbe_sfp_type_25g_sr_core0:
+	case txgbe_sfp_type_25g_sr_core1:
 		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseSR_Full);
 		break;
 	case txgbe_sfp_type_lr:
+	case txgbe_sfp_type_25g_lr_core0:
+	case txgbe_sfp_type_25g_lr_core1:
 		ethtool_link_ksettings_add_link_mode(cmd, supported,
 							 10000baseLR_Full);
 		break;
