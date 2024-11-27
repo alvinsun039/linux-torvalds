@@ -920,8 +920,8 @@ EXPORT_SYMBOL(transfer_args_to_stack);
  */
 static struct file *do_open_execat(int fd, struct filename *name, int flags)
 {
-	struct file *file;
 	int err;
+	struct file *file __free(fput) = NULL;
 	struct open_flags open_exec_flags = {
 		.open_flag = O_LARGEFILE | O_RDONLY | __FMODE_EXEC,
 		.acc_mode = MAY_EXEC,
@@ -940,9 +940,8 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	if (IS_ERR(file))
 		return file;
 
-	err = -EACCES;
 	if (path_noexec(&file->f_path))
-		goto exit;
+		return ERR_PTR(-EACCES);
 
 	/*
 	 * In the past the regular type check was here. It moved to may_open() in
@@ -950,13 +949,13 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	 * an invariant that all non-regular files error out before we get here.
 	 */
 	if (WARN_ON_ONCE(!S_ISREG(file_inode(file)->i_mode)))
-		goto exit;
+		return ERR_PTR(-EACCES);
 
-	return file;
+	err = deny_write_access(file);
+	if (err)
+		return ERR_PTR(err);
 
-exit:
-	fput(file);
-	return ERR_PTR(err);
+	return no_free_ptr(file);
 }
 
 /**
@@ -966,7 +965,8 @@ exit:
  *
  * Returns ERR_PTR on failure or allocated struct file on success.
  *
- * As this is a wrapper for the internal do_open_execat(). Also see
+ * As this is a wrapper for the internal do_open_execat(), callers
+ * must call allow_write_access() before fput() on release. Also see
  * do_close_execat().
  */
 struct file *open_exec(const char *name)
@@ -1536,8 +1536,10 @@ static int prepare_bprm_creds(struct linux_binprm *bprm)
 /* Matches do_open_execat() */
 static void do_close_execat(struct file *file)
 {
-	if (file)
-		fput(file);
+	if (!file)
+		return;
+	allow_write_access(file);
+	fput(file);
 }
 
 static void free_bprm(struct linux_binprm *bprm)
@@ -1883,6 +1885,7 @@ static int exec_binprm(struct linux_binprm *bprm)
 		bprm->file = bprm->interpreter;
 		bprm->interpreter = NULL;
 
+		allow_write_access(exec);
 		if (unlikely(bprm->have_execfd)) {
 			if (bprm->executable) {
 				fput(exec);
