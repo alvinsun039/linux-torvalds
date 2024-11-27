@@ -274,6 +274,45 @@ static int txgbe_ptp_adjtime(struct ptp_clock_info *ptp,
 	return 0;
 }
 
+#ifdef HAVE_PTP_CLOCK_INFO_GETTIME64
+#ifdef HAVE_PTP_SYS_OFFSET_EXTENDED_IOCTL
+/**
+ * txgbe_ptp_gettimex
+ * @ptp: the ptp clock structure
+ * @ts: timespec to hold the PHC timestamp
+ * @sts: structure to hold the system time before and after reading the PHC
+ *
+ * read the timecounter and return the correct value on ns,
+ * after converting it into a struct timespec.
+ */
+static int txgbe_ptp_gettimex(struct ptp_clock_info *ptp,
+			      struct timespec64 *ts,
+			      struct ptp_system_timestamp *sts)
+{
+	struct txgbe_adapter *adapter =
+		container_of(ptp, struct txgbe_adapter, ptp_caps);
+	struct txgbe_hw *hw = &adapter->hw;
+	unsigned long flags;
+	u64 ns, stamp;
+
+	spin_lock_irqsave(&adapter->tmreg_lock, flags);
+
+	ptp_read_system_prets(sts);
+	stamp = rd32(hw, TXGBE_TSC_1588_SYSTIML);
+	ptp_read_system_postts(sts);
+	stamp |= (u64)rd32(hw, TXGBE_TSC_1588_SYSTIMH) << 32;
+
+	ns = timecounter_cyc2time(&adapter->hw_tc, stamp);
+
+	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
+
+	*ts = ns_to_timespec64(ns);
+
+	return 0;
+}
+#endif
+#endif
+
 /**
  * txgbe_ptp_gettime64
  * @ptp: the ptp clock structure
@@ -992,7 +1031,11 @@ static long txgbe_ptp_create_clock(struct txgbe_adapter *adapter)
 	adapter->ptp_caps.adjfine = txgbe_ptp_adjfreq;
 	adapter->ptp_caps.adjtime = txgbe_ptp_adjtime;
 #ifdef HAVE_PTP_CLOCK_INFO_GETTIME64
+#ifdef HAVE_PTP_SYS_OFFSET_EXTENDED_IOCTL
+		adapter->ptp_caps.gettimex64 = txgbe_ptp_gettimex;
+#else
 	adapter->ptp_caps.gettime64 = txgbe_ptp_gettime64;
+#endif /* HAVE_PTP_SYS_OFFSET_EXTENDED_IOCTL */
 	adapter->ptp_caps.settime64 = txgbe_ptp_settime64;
 #else
 	adapter->ptp_caps.gettime = txgbe_ptp_gettime;
