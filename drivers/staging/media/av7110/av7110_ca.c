@@ -18,6 +18,7 @@
 #include <linux/timer.h>
 #include <linux/poll.h>
 #include <linux/gfp.h>
+#include <linux/nospec.h>
 
 #include "av7110.h"
 #include "av7110_hw.h"
