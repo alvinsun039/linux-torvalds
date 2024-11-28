@@ -173,9 +173,9 @@ int __init pv_ipi_init(void)
 		return 0;
 
 #ifdef CONFIG_SMP
-	mp_ops.init_ipi		= pv_init_ipi;
-	mp_ops.send_ipi_single	= pv_send_ipi_single;
-	mp_ops.send_ipi_mask	= pv_send_ipi_mask;
+	smp_ops.init_ipi		= pv_init_ipi;
+	smp_ops.send_ipi_single	= pv_send_ipi_single;
+	smp_ops.send_ipi_mask	= pv_send_ipi_mask;
 #endif
 
 	return 0;
