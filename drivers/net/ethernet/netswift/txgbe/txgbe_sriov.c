@@ -1700,6 +1700,22 @@ static int txgbe_link_mbps(struct txgbe_adapter *adapter)
 	}
 }
 
+static u16 txgbe_frac_to_bi(u16 frac, u16 denom, int max_bits)
+{
+	u16 value = 0;
+
+	while (frac > 0 && max_bits > 0) {
+		max_bits -= 1;
+		frac *= 2;
+		if (frac >= denom) {
+			value |= BIT(max_bits);
+			frac -= denom;
+		}
+	}
+
+	return value;
+}
+
 static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 {
 	struct txgbe_ring_feature *vmdq = &adapter->ring_feature[RING_F_VMDQ];
@@ -1726,11 +1742,14 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		if (max_tx_rate) {
-			link_speed = adapter->vf_rate_link_speed;
+			u16 frac;
+
+			link_speed = adapter->vf_rate_link_speed / 1000 * 1024;
 
 			/* Calculate the rate factor values to set */
 			factor_int = link_speed / max_tx_rate;
-			factor_fra = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
+			frac = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
+			factor_fra = txgbe_frac_to_bi(frac, 10000, 14);
 
 			wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
 			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
