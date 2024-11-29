@@ -1363,16 +1363,22 @@ static int txgbe_get_fec_param(struct net_device *netdev,
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 supported_link = 0;
 	bool autoneg = false;
+	u32 speed = 0;
+	bool link_up;
 
 	TCALL(hw, mac.ops.get_link_capabilities, &supported_link, &autoneg);
 
-	if (hw->mac.type != txgbe_mac_aml ||
-	    !(supported_link & TXGBE_LINK_SPEED_25GB_FULL)) {
+	if (hw->mac.type != txgbe_mac_aml) {
 		err = -EAGAIN;
 		goto done;
 	}
-
+	TCALL(hw, mac.ops.check_link, &speed, &link_up, false);
 	fecparam->fec = 0;
+	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
+		fecparam->fec |= ETHTOOL_FEC_OFF;
+		fecparam->active_fec = ETHTOOL_FEC_OFF;
+		goto done;
+	}
 	if (adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO)
 		fecparam->fec |= ETHTOOL_FEC_AUTO;
 	else if (adapter->fec_link_mode & TXGBE_PHY_FEC_BASER)
@@ -1382,6 +1388,10 @@ static int txgbe_get_fec_param(struct net_device *netdev,
 	else
 		fecparam->fec |= ETHTOOL_FEC_OFF;
 
+	if (!link_up) {
+		fecparam->active_fec = ETHTOOL_FEC_OFF;
+		goto done;
+	}
 	switch (adapter->cur_fec_link) {
 	case TXGBE_PHY_FEC_BASER:
 		fecparam->active_fec = ETHTOOL_FEC_BASER;
