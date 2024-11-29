@@ -8162,6 +8162,7 @@ static int txgbe_change_mtu(struct net_device *netdev, int new_mtu)
 int txgbe_open(struct net_device *netdev)
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	struct txgbe_hw *hw = &adapter->hw;
 	int err;
 
 	/*special for backplane flow*/
@@ -8224,7 +8225,15 @@ int txgbe_open(struct net_device *netdev)
 	vxlan_get_rx_port(netdev);
 #endif /* HAVE_UDP_ENC_RX_OFFLOAD */
 #endif /* HAVE_UDP_ENC_RX_OFFLOAD && HAVE_UDP_TUNNEL_NIC_INFO */
-	
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
+							 ~TXGBE_MAC_TX_CFG_TE);
+		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+							 ~TXGBE_MAC_RX_CFG_RE);
+		hw->mac.ops.clear_hw_cntrs(hw);
+	}
+
 	return 0;
 
 err_set_queues:
@@ -8317,6 +8326,14 @@ int txgbe_close(struct net_device *netdev)
 		sizeof(struct txgbe_5tuple_filter_info));
 
 	txgbe_release_hw_control(adapter);
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
+							 ~TXGBE_MAC_TX_CFG_TE);
+		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
+							 ~TXGBE_MAC_RX_CFG_RE);
+		hw->mac.ops.clear_hw_cntrs(hw);
+	}
 
 	return 0;
 }
