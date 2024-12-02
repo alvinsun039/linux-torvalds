@@ -1681,6 +1681,7 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_MAC_RX_FLOW_CTRL          0x11090
 #define TXGBE_MAC_ADDRESS0_HIGH         0x11300
 #define TXGBE_MAC_ADDRESS0_LOW          0x11304
+#define TXGBE_MAC_MISC_CTL              0x11f00
 
 #define TXGBE_MAC_TX_CFG_TE             0x00000001U
 #define TXGBE_MAC_TX_CFG_SPEED_MASK     0x60000000U
@@ -1692,6 +1693,10 @@ enum txgbe_fdir_pballoc_type {
 #define TXGBE_MAC_WDG_TIMEOUT_PWE       0x00000100U
 #define TXGBE_MAC_WDG_TIMEOUT_WTO_MASK  0x0000000FU
 #define TXGBE_MAC_WDG_TIMEOUT_WTO_DELTA 2
+#define TXGBE_MAC_MISC_LINK_STS_MOD     0x1
+
+#define TXGBE_LINK_BOTH_PCS_MAC         0x1
+
 
 #define TXGBE_EPHY_STAT                 0x13404
 #define TXGBE_EPHY_STAT_PPL_LOCK        0x3

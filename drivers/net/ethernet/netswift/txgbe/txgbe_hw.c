@@ -6208,6 +6208,8 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 	/* amlite TODO*/
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_LINKUP_FILTER, 30);
+		wr32m(hw, TXGBE_MAC_MISC_CTL, TXGBE_MAC_MISC_LINK_STS_MOD,
+					TXGBE_LINK_BOTH_PCS_MAC);
 		/* amlite: bme */
 		wr32(hw, 0x4B8, 0x1);
 		/* amlite: rdm_rsc_ctl_free_ctl set to 1 */
