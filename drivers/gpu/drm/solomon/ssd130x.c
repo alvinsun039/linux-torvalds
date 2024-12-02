@@ -139,7 +139,7 @@ const struct ssd130x_deviceinfo ssd130x_variants[] = {
 		.page_height = 8,
 	}
 };
-EXPORT_SYMBOL_NS_GPL(ssd130x_variants, DRM_SSD130X);
+EXPORT_SYMBOL_NS_GPL(ssd130x_variants, "DRM_SSD130X");
 
 struct ssd130x_plane_state {
 	struct drm_shadow_plane_state base;

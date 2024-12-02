@@ -149,7 +149,7 @@ const struct regmap_config kx022a_regmap = {
 	.max_register = KX022A_MAX_REGISTER,
 	.cache_type = REGCACHE_RBTREE,
 };
-EXPORT_SYMBOL_NS_GPL(kx022a_regmap, IIO_KX022A);
+EXPORT_SYMBOL_NS_GPL(kx022a_regmap, "IIO_KX022A");
 
 struct kx022a_data {
 	struct regmap *regmap;
@@ -1138,7 +1138,7 @@ int kx022a_probe_internal(struct device *dev)
 
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(kx022a_probe_internal, IIO_KX022A);
+EXPORT_SYMBOL_NS_GPL(kx022a_probe_internal, "IIO_KX022A");
 
 MODULE_DESCRIPTION("ROHM/Kionix KX022A accelerometer driver");
 MODULE_AUTHOR("Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>");

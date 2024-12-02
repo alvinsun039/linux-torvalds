@@ -73,7 +73,7 @@ int cn10k_cptpf_lmtst_init(struct otx2_cptpf_dev *cptpf)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cn10k_cptpf_lmtst_init, CRYPTO_DEV_OCTEONTX2_CPT);
+EXPORT_SYMBOL_NS_GPL(cn10k_cptpf_lmtst_init, "CRYPTO_DEV_OCTEONTX2_CPT");
 
 int cn10k_cptvf_lmtst_init(struct otx2_cptvf_dev *cptvf)
 {
@@ -94,7 +94,7 @@ int cn10k_cptvf_lmtst_init(struct otx2_cptvf_dev *cptvf)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cn10k_cptvf_lmtst_init, CRYPTO_DEV_OCTEONTX2_CPT);
+EXPORT_SYMBOL_NS_GPL(cn10k_cptvf_lmtst_init, "CRYPTO_DEV_OCTEONTX2_CPT");
 
 void cptvf_hw_ops_get(struct otx2_cptvf_dev *cptvf)
 {
@@ -103,4 +103,4 @@ void cptvf_hw_ops_get(struct otx2_cptvf_dev *cptvf)
 	else
 		cptvf->lfs.ops = &otx2_hw_ops;
 }
-EXPORT_SYMBOL_NS_GPL(cptvf_hw_ops_get, CRYPTO_DEV_OCTEONTX2_CPT);
+EXPORT_SYMBOL_NS_GPL(cptvf_hw_ops_get, "CRYPTO_DEV_OCTEONTX2_CPT");

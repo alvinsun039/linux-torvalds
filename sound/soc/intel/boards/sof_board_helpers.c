@@ -34,7 +34,7 @@ int sof_intel_board_card_late_probe(struct snd_soc_card *card)
 
 	return hda_dsp_hdmi_build_controls(card, ctx->hdmi.hdmi_comp);
 }
-EXPORT_SYMBOL_NS(sof_intel_board_card_late_probe, SND_SOC_INTEL_SOF_BOARD_HELPERS);
+EXPORT_SYMBOL_NS(sof_intel_board_card_late_probe, "SND_SOC_INTEL_SOF_BOARD_HELPERS");
 
 /*
  * DAI Link Helpers
@@ -104,9 +104,9 @@ int sof_intel_board_set_intel_hdmi_link(struct device *dev,
 
 	return 0;
 }
-EXPORT_SYMBOL_NS(sof_intel_board_set_intel_hdmi_link, SND_SOC_INTEL_SOF_BOARD_HELPERS);
+EXPORT_SYMBOL_NS(sof_intel_board_set_intel_hdmi_link, "SND_SOC_INTEL_SOF_BOARD_HELPERS");
 
 MODULE_DESCRIPTION("ASoC Intel SOF Machine Driver Board Helpers");
 MODULE_AUTHOR("Brent Lu <brent.lu@intel.com>");
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(SND_SOC_INTEL_HDA_DSP_COMMON);
+MODULE_IMPORT_NS("SND_SOC_INTEL_HDA_DSP_COMMON");

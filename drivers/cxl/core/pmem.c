@@ -49,13 +49,13 @@ struct cxl_nvdimm_bridge *to_cxl_nvdimm_bridge(struct device *dev)
 		return NULL;
 	return container_of(dev, struct cxl_nvdimm_bridge, dev);
 }
-EXPORT_SYMBOL_NS_GPL(to_cxl_nvdimm_bridge, CXL);
+EXPORT_SYMBOL_NS_GPL(to_cxl_nvdimm_bridge, "CXL");
 
 bool is_cxl_nvdimm_bridge(struct device *dev)
 {
 	return dev->type == &cxl_nvdimm_bridge_type;
 }
-EXPORT_SYMBOL_NS_GPL(is_cxl_nvdimm_bridge, CXL);
+EXPORT_SYMBOL_NS_GPL(is_cxl_nvdimm_bridge, "CXL");
 
 static int match_nvdimm_bridge(struct device *dev, void *data)
 {
@@ -83,7 +83,7 @@ struct cxl_nvdimm_bridge *cxl_find_nvdimm_bridge(struct cxl_port *port)
 
 	return to_cxl_nvdimm_bridge(dev);
 }
-EXPORT_SYMBOL_NS_GPL(cxl_find_nvdimm_bridge, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_find_nvdimm_bridge, "CXL");
 
 static struct lock_class_key cxl_nvdimm_bridge_key;
 
@@ -165,7 +165,7 @@ err:
 	put_device(dev);
 	return ERR_PTR(rc);
 }
-EXPORT_SYMBOL_NS_GPL(devm_cxl_add_nvdimm_bridge, CXL);
+EXPORT_SYMBOL_NS_GPL(devm_cxl_add_nvdimm_bridge, "CXL");
 
 static void cxl_nvdimm_release(struct device *dev)
 {
@@ -189,7 +189,7 @@ bool is_cxl_nvdimm(struct device *dev)
 {
 	return dev->type == &cxl_nvdimm_type;
 }
-EXPORT_SYMBOL_NS_GPL(is_cxl_nvdimm, CXL);
+EXPORT_SYMBOL_NS_GPL(is_cxl_nvdimm, "CXL");
 
 struct cxl_nvdimm *to_cxl_nvdimm(struct device *dev)
 {
@@ -198,7 +198,7 @@ struct cxl_nvdimm *to_cxl_nvdimm(struct device *dev)
 		return NULL;
 	return container_of(dev, struct cxl_nvdimm, dev);
 }
-EXPORT_SYMBOL_NS_GPL(to_cxl_nvdimm, CXL);
+EXPORT_SYMBOL_NS_GPL(to_cxl_nvdimm, "CXL");
 
 static struct lock_class_key cxl_nvdimm_key;
 
@@ -294,4 +294,4 @@ err_alloc:
 
 	return rc;
 }
-EXPORT_SYMBOL_NS_GPL(devm_cxl_add_nvdimm, CXL);
+EXPORT_SYMBOL_NS_GPL(devm_cxl_add_nvdimm, "CXL");

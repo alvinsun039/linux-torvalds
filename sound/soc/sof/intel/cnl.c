@@ -375,7 +375,7 @@ void cnl_ipc4_dump(struct snd_sof_dev *sdev)
 
 /* cannonlake ops */
 struct snd_sof_dsp_ops sof_cnl_ops;
-EXPORT_SYMBOL_NS(sof_cnl_ops, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_cnl_ops, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 int sof_cnl_ops_init(struct snd_sof_dev *sdev)
 {
@@ -444,7 +444,7 @@ int sof_cnl_ops_init(struct snd_sof_dev *sdev)
 
 	return 0;
 };
-EXPORT_SYMBOL_NS(sof_cnl_ops_init, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_cnl_ops_init, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 const struct sof_intel_dsp_desc cnl_chip_info = {
 	/* Cannonlake */
@@ -473,7 +473,7 @@ const struct sof_intel_dsp_desc cnl_chip_info = {
 	.disable_interrupts = hda_dsp_disable_interrupts,
 	.hw_ip_version = SOF_INTEL_CAVS_1_8,
 };
-EXPORT_SYMBOL_NS(cnl_chip_info, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(cnl_chip_info, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 /*
  * JasperLake is technically derived from IceLake, and should be in
@@ -509,4 +509,4 @@ const struct sof_intel_dsp_desc jsl_chip_info = {
 	.disable_interrupts = hda_dsp_disable_interrupts,
 	.hw_ip_version = SOF_INTEL_CAVS_2_0,
 };
-EXPORT_SYMBOL_NS(jsl_chip_info, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(jsl_chip_info, "SND_SOC_SOF_INTEL_HDA_COMMON");

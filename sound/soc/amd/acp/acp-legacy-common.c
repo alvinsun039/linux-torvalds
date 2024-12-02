@@ -26,7 +26,7 @@ void acp_enable_interrupts(struct acp_dev_data *adata)
 	ext_intr_ctrl |= ACP_ERROR_MASK;
 	writel(ext_intr_ctrl, ACP_EXTERNAL_INTR_CNTL(adata, rsrc->irqp_used));
 }
-EXPORT_SYMBOL_NS_GPL(acp_enable_interrupts, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(acp_enable_interrupts, "SND_SOC_ACP_COMMON");
 
 void acp_disable_interrupts(struct acp_dev_data *adata)
 {
@@ -35,7 +35,7 @@ void acp_disable_interrupts(struct acp_dev_data *adata)
 	writel(ACP_EXT_INTR_STAT_CLEAR_MASK, ACP_EXTERNAL_INTR_STAT(adata, rsrc->irqp_used));
 	writel(0x00, ACP_EXTERNAL_INTR_ENB(adata));
 }
-EXPORT_SYMBOL_NS_GPL(acp_disable_interrupts, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(acp_disable_interrupts, "SND_SOC_ACP_COMMON");
 
 static void set_acp_pdm_ring_buffer(struct snd_pcm_substream *substream,
 				    struct snd_soc_dai *dai)
@@ -92,7 +92,7 @@ void restore_acp_pdm_params(struct snd_pcm_substream *substream,
 	writel(ext_int_ctrl, ACP_EXTERNAL_INTR_CNTL(adata, 0));
 	set_acp_pdm_clk(substream, dai);
 }
-EXPORT_SYMBOL_NS_GPL(restore_acp_pdm_params, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(restore_acp_pdm_params, "SND_SOC_ACP_COMMON");
 
 static int set_acp_i2s_dma_fifo(struct snd_pcm_substream *substream,
 				struct snd_soc_dai *dai)
@@ -243,7 +243,7 @@ int restore_acp_i2s_params(struct snd_pcm_substream *substream,
 	}
 	return set_acp_i2s_dma_fifo(substream, dai);
 }
-EXPORT_SYMBOL_NS_GPL(restore_acp_i2s_params, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(restore_acp_i2s_params, "SND_SOC_ACP_COMMON");
 
 static int acp_power_on(struct acp_chip_info *chip)
 {
@@ -310,7 +310,7 @@ int acp_init(struct acp_chip_info *chip)
 	}
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(acp_init, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(acp_init, "SND_SOC_ACP_COMMON");
 
 int acp_deinit(void __iomem *base)
 {
@@ -324,7 +324,7 @@ int acp_deinit(void __iomem *base)
 	writel(0, base + ACP_CONTROL);
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(acp_deinit, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(acp_deinit, "SND_SOC_ACP_COMMON");
 
 int smn_write(struct pci_dev *dev, u32 smn_addr, u32 data)
 {
@@ -332,7 +332,7 @@ int smn_write(struct pci_dev *dev, u32 smn_addr, u32 data)
 	pci_write_config_dword(dev, 0x64, data);
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(smn_write, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(smn_write, "SND_SOC_ACP_COMMON");
 
 int smn_read(struct pci_dev *dev, u32 smn_addr)
 {
@@ -342,6 +342,6 @@ int smn_read(struct pci_dev *dev, u32 smn_addr)
 	pci_read_config_dword(dev, 0x64, &data);
 	return data;
 }
-EXPORT_SYMBOL_NS_GPL(smn_read, SND_SOC_ACP_COMMON);
+EXPORT_SYMBOL_NS_GPL(smn_read, "SND_SOC_ACP_COMMON");
 
 MODULE_LICENSE("Dual BSD/GPL");

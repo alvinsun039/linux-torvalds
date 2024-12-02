@@ -994,7 +994,7 @@ void insert_resource_expand_to_fit(struct resource *root, struct resource *new)
  * to use this interface. The former are built-in and only the latter,
  * CXL, is a module.
  */
-EXPORT_SYMBOL_NS_GPL(insert_resource_expand_to_fit, CXL);
+EXPORT_SYMBOL_NS_GPL(insert_resource_expand_to_fit, "CXL");
 
 /**
  * remove_resource - Remove a resource in the resource tree
@@ -2053,7 +2053,7 @@ struct resource *alloc_free_mem_region(struct resource *base,
 	return get_free_mem_region(NULL, base, size, align, name,
 				   IORES_DESC_NONE, flags);
 }
-EXPORT_SYMBOL_NS_GPL(alloc_free_mem_region, CXL);
+EXPORT_SYMBOL_NS_GPL(alloc_free_mem_region, "CXL");
 #endif /* CONFIG_GET_FREE_REGION */
 
 static int __init strict_iomem(char *str)

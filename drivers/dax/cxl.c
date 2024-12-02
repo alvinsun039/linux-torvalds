@@ -44,4 +44,4 @@ module_cxl_driver(cxl_dax_region_driver);
 MODULE_ALIAS_CXL(CXL_DEVICE_DAX_REGION);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Intel Corporation");
-MODULE_IMPORT_NS(CXL);
+MODULE_IMPORT_NS("CXL");

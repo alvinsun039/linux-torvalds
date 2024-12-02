@@ -123,7 +123,7 @@ int iio_backend_chan_enable(struct iio_backend *back, unsigned int chan)
 {
 	return iio_backend_op_call(back, chan_enable, chan);
 }
-EXPORT_SYMBOL_NS_GPL(iio_backend_chan_enable, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(iio_backend_chan_enable, "IIO_BACKEND");
 
 /**
  * iio_backend_chan_disable - Disable a backend channel
@@ -137,7 +137,7 @@ int iio_backend_chan_disable(struct iio_backend *back, unsigned int chan)
 {
 	return iio_backend_op_call(back, chan_disable, chan);
 }
-EXPORT_SYMBOL_NS_GPL(iio_backend_chan_disable, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(iio_backend_chan_disable, "IIO_BACKEND");
 
 static void __iio_backend_disable(void *back)
 {
@@ -162,7 +162,7 @@ int devm_iio_backend_enable(struct device *dev, struct iio_backend *back)
 
 	return devm_add_action_or_reset(dev, __iio_backend_disable, back);
 }
-EXPORT_SYMBOL_NS_GPL(devm_iio_backend_enable, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(devm_iio_backend_enable, "IIO_BACKEND");
 
 /**
  * iio_backend_data_format_set - Configure the channel data format
@@ -184,7 +184,7 @@ int iio_backend_data_format_set(struct iio_backend *back, unsigned int chan,
 
 	return iio_backend_op_call(back, data_format_set, chan, data);
 }
-EXPORT_SYMBOL_NS_GPL(iio_backend_data_format_set, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(iio_backend_data_format_set, "IIO_BACKEND");
 
 static void iio_backend_free_buffer(void *arg)
 {
@@ -229,7 +229,7 @@ int devm_iio_backend_request_buffer(struct device *dev,
 
 	return devm_add_action_or_reset(dev, iio_backend_free_buffer, pair);
 }
-EXPORT_SYMBOL_NS_GPL(devm_iio_backend_request_buffer, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(devm_iio_backend_request_buffer, "IIO_BACKEND");
 
 static void iio_backend_release(void *arg)
 {
@@ -318,7 +318,7 @@ struct iio_backend *devm_iio_backend_get(struct device *dev, const char *name)
 	fwnode_handle_put(fwnode);
 	return ERR_PTR(-EPROBE_DEFER);
 }
-EXPORT_SYMBOL_NS_GPL(devm_iio_backend_get, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(devm_iio_backend_get, "IIO_BACKEND");
 
 /**
  * __devm_iio_backend_get_from_fwnode_lookup - Device managed fwnode backend device get
@@ -353,7 +353,7 @@ __devm_iio_backend_get_from_fwnode_lookup(struct device *dev,
 
 	return ERR_PTR(-EPROBE_DEFER);
 }
-EXPORT_SYMBOL_NS_GPL(__devm_iio_backend_get_from_fwnode_lookup, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(__devm_iio_backend_get_from_fwnode_lookup, "IIO_BACKEND");
 
 /**
  * iio_backend_get_priv - Get driver private data
@@ -363,7 +363,7 @@ void *iio_backend_get_priv(const struct iio_backend *back)
 {
 	return back->priv;
 }
-EXPORT_SYMBOL_NS_GPL(iio_backend_get_priv, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(iio_backend_get_priv, "IIO_BACKEND");
 
 static void iio_backend_unregister(void *arg)
 {
@@ -411,7 +411,7 @@ int devm_iio_backend_register(struct device *dev,
 
 	return devm_add_action_or_reset(dev, iio_backend_unregister, back);
 }
-EXPORT_SYMBOL_NS_GPL(devm_iio_backend_register, IIO_BACKEND);
+EXPORT_SYMBOL_NS_GPL(devm_iio_backend_register, "IIO_BACKEND");
 
 MODULE_AUTHOR("Nuno Sa <nuno.sa@analog.com>");
 MODULE_DESCRIPTION("Framework to handle complex IIO aggregate devices");

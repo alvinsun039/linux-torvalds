@@ -145,4 +145,4 @@ void hda_probes_unregister(struct snd_sof_dev *sdev)
 	sof_client_dev_unregister(sdev, "hda-probes", 0);
 }
 
-MODULE_IMPORT_NS(SND_SOC_SOF_CLIENT);
+MODULE_IMPORT_NS("SND_SOC_SOF_CLIENT");

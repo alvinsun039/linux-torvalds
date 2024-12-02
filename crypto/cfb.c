@@ -251,4 +251,4 @@ module_exit(crypto_cfb_module_exit);
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("CFB block cipher mode of operation");
 MODULE_ALIAS_CRYPTO("cfb");
-MODULE_IMPORT_NS(CRYPTO_INTERNAL);
+MODULE_IMPORT_NS("CRYPTO_INTERNAL");

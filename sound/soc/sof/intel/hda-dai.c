@@ -634,7 +634,7 @@ void hda_ops_free(struct snd_sof_dev *sdev)
 			intel_nhlt_free(ipc4_data->nhlt);
 	}
 }
-EXPORT_SYMBOL_NS(hda_ops_free, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(hda_ops_free, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 /*
  * common dai driver for skl+ platforms.

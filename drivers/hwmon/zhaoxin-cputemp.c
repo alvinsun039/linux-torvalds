@@ -313,7 +313,7 @@ static void __exit zhaoxin_cputemp_exit(void)
 
 MODULE_DESCRIPTION("Zhaoxin CPU temperature monitor");
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(HWMON_THERMAL);
+MODULE_IMPORT_NS("HWMON_THERMAL");
 
 module_init(zhaoxin_cputemp_init)
 module_exit(zhaoxin_cputemp_exit)

@@ -41,7 +41,7 @@ const struct dev_pm_ops sof_acpi_pm = {
 	SET_RUNTIME_PM_OPS(snd_sof_runtime_suspend, snd_sof_runtime_resume,
 			   snd_sof_runtime_idle)
 };
-EXPORT_SYMBOL_NS(sof_acpi_pm, SND_SOC_SOF_ACPI_DEV);
+EXPORT_SYMBOL_NS(sof_acpi_pm, "SND_SOC_SOF_ACPI_DEV");
 
 static void sof_acpi_probe_complete(struct device *dev)
 {
@@ -93,7 +93,7 @@ int sof_acpi_probe(struct platform_device *pdev, const struct sof_dev_desc *desc
 	/* call sof helper for DSP hardware probe */
 	return snd_sof_device_probe(dev, sof_pdata);
 }
-EXPORT_SYMBOL_NS(sof_acpi_probe, SND_SOC_SOF_ACPI_DEV);
+EXPORT_SYMBOL_NS(sof_acpi_probe, "SND_SOC_SOF_ACPI_DEV");
 
 int sof_acpi_remove(struct platform_device *pdev)
 {
@@ -107,6 +107,6 @@ int sof_acpi_remove(struct platform_device *pdev)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS(sof_acpi_remove, SND_SOC_SOF_ACPI_DEV);
+EXPORT_SYMBOL_NS(sof_acpi_remove, "SND_SOC_SOF_ACPI_DEV");
 
 MODULE_LICENSE("Dual BSD/GPL");

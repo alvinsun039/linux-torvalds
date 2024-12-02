@@ -236,5 +236,5 @@ static struct pci_driver snd_amd_acp_pci_driver = {
 module_pci_driver(snd_amd_acp_pci_driver);
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_IMPORT_NS(SND_SOC_ACP_COMMON);
+MODULE_IMPORT_NS("SND_SOC_ACP_COMMON");
 MODULE_ALIAS(DRV_NAME);

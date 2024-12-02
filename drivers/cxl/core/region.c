@@ -2183,7 +2183,7 @@ bool is_cxl_region(struct device *dev)
 {
 	return dev->type == &cxl_region_type;
 }
-EXPORT_SYMBOL_NS_GPL(is_cxl_region, CXL);
+EXPORT_SYMBOL_NS_GPL(is_cxl_region, "CXL");
 
 static struct cxl_region *to_cxl_region(struct device *dev)
 {
@@ -2459,7 +2459,7 @@ bool is_cxl_pmem_region(struct device *dev)
 {
 	return dev->type == &cxl_pmem_region_type;
 }
-EXPORT_SYMBOL_NS_GPL(is_cxl_pmem_region, CXL);
+EXPORT_SYMBOL_NS_GPL(is_cxl_pmem_region, "CXL");
 
 struct cxl_pmem_region *to_cxl_pmem_region(struct device *dev)
 {
@@ -2468,7 +2468,7 @@ struct cxl_pmem_region *to_cxl_pmem_region(struct device *dev)
 		return NULL;
 	return container_of(dev, struct cxl_pmem_region, dev);
 }
-EXPORT_SYMBOL_NS_GPL(to_cxl_pmem_region, CXL);
+EXPORT_SYMBOL_NS_GPL(to_cxl_pmem_region, "CXL");
 
 struct cxl_poison_context {
 	struct cxl_port *port;
@@ -2743,7 +2743,7 @@ struct cxl_dax_region *to_cxl_dax_region(struct device *dev)
 		return NULL;
 	return container_of(dev, struct cxl_dax_region, dev);
 }
-EXPORT_SYMBOL_NS_GPL(to_cxl_dax_region, CXL);
+EXPORT_SYMBOL_NS_GPL(to_cxl_dax_region, "CXL");
 
 static struct lock_class_key cxl_dax_region_key;
 
@@ -3085,7 +3085,7 @@ out:
 	put_device(cxlrd_dev);
 	return rc;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_add_to_region, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_add_to_region, "CXL");
 
 static int is_system_ram(struct resource *res, void *arg)
 {
@@ -3168,6 +3168,6 @@ void cxl_region_exit(void)
 	cxl_driver_unregister(&cxl_region_driver);
 }
 
-MODULE_IMPORT_NS(CXL);
-MODULE_IMPORT_NS(DEVMEM);
+MODULE_IMPORT_NS("CXL");
+MODULE_IMPORT_NS("DEVMEM");
 MODULE_ALIAS_CXL(CXL_DEVICE_REGION);

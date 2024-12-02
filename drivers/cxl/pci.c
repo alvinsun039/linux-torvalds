@@ -967,4 +967,4 @@ static struct pci_driver cxl_pci_driver = {
 
 MODULE_LICENSE("GPL v2");
 module_pci_driver(cxl_pci_driver);
-MODULE_IMPORT_NS(CXL);
+MODULE_IMPORT_NS("CXL");

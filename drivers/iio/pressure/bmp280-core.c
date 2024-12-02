@@ -827,7 +827,7 @@ const struct bmp280_chip_info bmp280_chip_info = {
 	.read_press = bmp280_read_press,
 	.read_calib = bmp280_read_calib,
 };
-EXPORT_SYMBOL_NS(bmp280_chip_info, IIO_BMP280);
+EXPORT_SYMBOL_NS(bmp280_chip_info, "IIO_BMP280");
 
 static int bme280_chip_config(struct bmp280_data *data)
 {
@@ -875,7 +875,7 @@ const struct bmp280_chip_info bme280_chip_info = {
 	.read_humid = bme280_read_humid,
 	.read_calib = bme280_read_calib,
 };
-EXPORT_SYMBOL_NS(bme280_chip_info, IIO_BMP280);
+EXPORT_SYMBOL_NS(bme280_chip_info, "IIO_BMP280");
 
 /*
  * Helper function to send a command to BMP3XX sensors.
@@ -1260,7 +1260,7 @@ const struct bmp280_chip_info bmp380_chip_info = {
 	.read_calib = bmp380_read_calib,
 	.preinit = bmp380_preinit,
 };
-EXPORT_SYMBOL_NS(bmp380_chip_info, IIO_BMP280);
+EXPORT_SYMBOL_NS(bmp380_chip_info, "IIO_BMP280");
 
 static int bmp580_soft_reset(struct bmp280_data *data)
 {
@@ -1768,7 +1768,7 @@ const struct bmp280_chip_info bmp580_chip_info = {
 	.read_press = bmp580_read_press,
 	.preinit = bmp580_preinit,
 };
-EXPORT_SYMBOL_NS(bmp580_chip_info, IIO_BMP280);
+EXPORT_SYMBOL_NS(bmp580_chip_info, "IIO_BMP280");
 
 static int bmp180_measure(struct bmp280_data *data, u8 ctrl_meas)
 {
@@ -2027,7 +2027,7 @@ const struct bmp280_chip_info bmp180_chip_info = {
 	.read_press = bmp180_read_press,
 	.read_calib = bmp180_read_calib,
 };
-EXPORT_SYMBOL_NS(bmp180_chip_info, IIO_BMP280);
+EXPORT_SYMBOL_NS(bmp180_chip_info, "IIO_BMP280");
 
 static irqreturn_t bmp085_eoc_irq(int irq, void *d)
 {
@@ -2229,7 +2229,7 @@ int bmp280_common_probe(struct device *dev,
 
 	return devm_iio_device_register(dev, indio_dev);
 }
-EXPORT_SYMBOL_NS(bmp280_common_probe, IIO_BMP280);
+EXPORT_SYMBOL_NS(bmp280_common_probe, "IIO_BMP280");
 
 static int bmp280_runtime_suspend(struct device *dev)
 {
