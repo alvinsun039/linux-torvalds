@@ -9625,12 +9625,8 @@ static void txgbe_service_timer(struct timer_list *t)
 		(hw->phy.sfp_type == txgbe_sfp_type_1g_cu_core1) ||
 		(hw->phy.sfp_type == txgbe_sfp_type_10g_cu_core0) ||
 		(hw->phy.sfp_type == txgbe_sfp_type_10g_cu_core1)) {
-		next_event_offset = HZ/10;
 		queue_work(txgbe_wq, &adapter->sfp_sta_task);
 	}
-
-	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-		queue_work(txgbe_wq, &adapter->temp_task);
 }
 
 static void txgbe_sfp_phy_status_work(struct work_struct *work)
@@ -9693,14 +9689,14 @@ RELEASE_SEM:
 	}
 }
 
-static void txgbe_amlit_temp_work(struct work_struct *work)
+static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 {
-	struct txgbe_adapter *adapter = container_of(work,
-						     struct txgbe_adapter,
-						     temp_task);
 	struct txgbe_hw *hw = &adapter->hw;
 	s32 status = 0;
 	int temp;
+
+	if (hw->mac.type != txgbe_mac_aml)
+		return;
 
 	status = txgbe_e56_get_temp(hw, &temp);
 	if (status)
@@ -10106,6 +10102,8 @@ static void txgbe_service_task(struct work_struct *work)
 #endif /* HAVE_PTP_1588_CLOCK */
 
 	txgbe_tx_queue_clear_error_task(adapter);
+	txgbe_amlit_temp_subtask(adapter);
+
 	txgbe_service_event_complete(adapter);
 }
 
@@ -13368,7 +13366,6 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 	}
 	INIT_WORK(&adapter->service_task, txgbe_service_task);
 	INIT_WORK(&adapter->sfp_sta_task, txgbe_sfp_phy_status_work);
-	INIT_WORK(&adapter->temp_task, txgbe_amlit_temp_work);
 	set_bit(__TXGBE_SERVICE_INITED, &adapter->state);
 	clear_bit(__TXGBE_SERVICE_SCHED, &adapter->state);
 
@@ -13688,7 +13685,6 @@ static void __devexit txgbe_remove(struct pci_dev *pdev)
 
 	set_bit(__TXGBE_REMOVING, &adapter->state);
 	cancel_work_sync(&adapter->service_task);
-	cancel_work_sync(&adapter->temp_task);
 
 #if IS_ENABLED(CONFIG_TPH)
 	if (adapter->flags & TXGBE_FLAG_TPH_ENABLED) {
