@@ -230,6 +230,7 @@ static int nbl_probe(struct pci_dev *pdev, const struct pci_device_id __always_u
 	struct nbl_init_param param = {{0}};
 	int err;
 
+	mark_partner_supported_module_once("NebulaMatrix", THIS_MODULE);
 	dev_info(dev, "nbl probe\n");
 
 	err = pci_enable_device(pdev);
