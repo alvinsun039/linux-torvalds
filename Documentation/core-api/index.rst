@@ -104,6 +104,7 @@ more memory-management documentation in Documentation/mm/index.rst.
    dma-attributes
    dma-isa-lpc
    mm-api
+   cgroup
    genalloc
    pin_user_pages
    boot-time-mm
