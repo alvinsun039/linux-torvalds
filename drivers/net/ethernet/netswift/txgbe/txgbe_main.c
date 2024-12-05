@@ -9543,6 +9543,7 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 	u32 speed;
 	bool autoneg = false;
 	u16 value;
+	u32 gssr = hw->phy.phy_semaphore_mask;
 	u8 device_type = hw->subsystem_device_id & 0xF0;
 
 	if (!(adapter->flags & TXGBE_FLAG_NEED_LINK_CONFIG))
@@ -9586,7 +9587,22 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 	}
 
 
+	/* firmware is configuring phy now, delay host driver config action */
+	if (hw->mac.type == txgbe_mac_aml ||
+			hw->mac.type == txgbe_mac_aml40) {
+		if (TCALL(hw, mac.ops.acquire_swfw_sync, gssr) != 0) {
+			adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
+			clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
+			e_warn(probe, "delay config ephy\n");
+			return;
+		}
+	}
+
 	TCALL(hw, mac.ops.setup_link, speed, false);
+
+	if (hw->mac.type == txgbe_mac_aml ||
+			hw->mac.type == txgbe_mac_aml40)
+		TCALL(hw, mac.ops.release_swfw_sync, gssr);
 
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
 	adapter->link_check_timeout = jiffies;
