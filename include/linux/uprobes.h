@@ -16,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <linux/timer.h>
+#include <linux/seqlock.h>
 
 struct uprobe;
 struct vm_area_struct;
@@ -123,6 +124,10 @@ struct hprobe {
 struct uprobe_task {
 	enum uprobe_task_state		state;
 
+	struct return_instance		*ri_pool;
+	struct timer_list		ri_timer;
+	seqcount_t			ri_seqcount;
+
 	union {
 		struct {
 			struct arch_uprobe_task	autask;
@@ -136,7 +141,6 @@ struct uprobe_task {
 	};
 
 	struct uprobe			*active_uprobe;
-	struct timer_list		ri_timer;
 	unsigned long			xol_vaddr;
 
 	struct arch_uprobe              *auprobe;
