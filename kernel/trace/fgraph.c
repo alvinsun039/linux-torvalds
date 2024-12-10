@@ -668,7 +668,12 @@ int function_graph_enter_regs(unsigned long ret, unsigned long func,
 	struct ftrace_graph_ent trace;
 	unsigned long bitmap = 0;
 	int offset;
+	int bit;
 	int i;
+
+	bit = ftrace_test_recursion_trylock(func, ret);
+	if (bit < 0)
+		return -EBUSY;
 
 	trace.func = func;
 	trace.depth = ++current->curr_ret_depth;
@@ -715,12 +720,13 @@ int function_graph_enter_regs(unsigned long ret, unsigned long func,
 	 * flag, set that bit always.
 	 */
 	set_bitmap(current, offset, bitmap | BIT(0));
-
+	ftrace_test_recursion_unlock(bit);
 	return 0;
  out_ret:
 	current->curr_ret_stack -= FGRAPH_FRAME_OFFSET + 1;
  out:
 	current->curr_ret_depth--;
+	ftrace_test_recursion_unlock(bit);
 	return -EBUSY;
 }
 

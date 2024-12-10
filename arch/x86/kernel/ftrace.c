@@ -652,14 +652,9 @@ void prepare_ftrace_return(unsigned long ip, unsigned long *parent,
 	if (unlikely(skip_ftrace_return()))
 		return;
 
-	bit = ftrace_test_recursion_trylock(ip, *parent);
-	if (bit < 0)
-		return;
-
 	if (!function_graph_enter(*parent, ip, frame_pointer, parent))
 		*parent = return_hooker;
 
-	ftrace_test_recursion_unlock(bit);
 }
 
 #ifdef CONFIG_HAVE_DYNAMIC_FTRACE_WITH_ARGS
