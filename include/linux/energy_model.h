@@ -172,6 +172,7 @@ struct em_perf_table *em_table_alloc(struct em_perf_domain *pd);
 void em_table_free(struct em_perf_table *table);
 int em_dev_compute_costs(struct device *dev, struct em_perf_state *table,
 			 int nr_states);
+void em_rebuild_sched_domains(void);
 
 /**
  * em_pd_get_efficient_state() - Get an efficient performance state from the EM
@@ -386,6 +387,7 @@ int em_dev_compute_costs(struct device *dev, struct em_perf_state *table,
 {
 	return -EINVAL;
 }
+static inline void em_rebuild_sched_domains(void) {}
 #endif
 
 #endif
