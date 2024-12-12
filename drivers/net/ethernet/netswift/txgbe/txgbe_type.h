@@ -141,7 +141,7 @@
 #define TXGBE_ID_SFI_XAUI						0x50
 
 /* Revision ID */
-#define TXGBE_SP_MPW  1
+#define TXGBE_SP_MPW  0xfe
 
 /* MDIO Manageable Devices (MMDs). */
 #define TXGBE_MDIO_PMA_PMD_DEV_TYPE            0x1 /* PMA and PMD */
