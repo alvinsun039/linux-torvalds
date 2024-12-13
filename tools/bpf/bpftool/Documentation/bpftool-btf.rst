@@ -45,7 +45,7 @@ DESCRIPTION
 		  objects. On such kernels bpftool will automatically emit this
 		  information as well.
 
-	**bpftool btf dump** *BTF_SRC*
+	**bpftool btf dump** *BTF_SRC* [format *FORMAT*]
 		  Dump BTF entries from a given *BTF_SRC*.
 
 		  When **id** is specified, BTF object with that ID will be
