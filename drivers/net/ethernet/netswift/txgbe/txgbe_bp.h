@@ -7,6 +7,21 @@
 #include "txgbe_type.h"
 #include "txgbe_hw.h"
 
+typedef enum {
+	ABILITY_1000BASE_KX,
+	ABILITY_10GBASE_KX4,
+	ABILITY_10GBASE_KR,
+	ABILITY_40GBASE_KR4,
+	ABILITY_40GBASE_CR4,
+	ABILITY_100GBASE_CR10,
+	ABILITY_100GBASE_KP4,
+	ABILITY_100GBASE_KR4,
+	ABILITY_100GBASE_CR4,
+	ABILITY_25GBASE_KRCR_S,
+	ABILITY_25GBASE_KRCR,
+	ABILITY_MAX,
+} ability_filed_encding;
+
 /* Backplane AN73 Base Page Ability struct*/
 typedef struct TBKPAN73ABILITY {
 	unsigned int nextPage;    //Next Page (bit0)

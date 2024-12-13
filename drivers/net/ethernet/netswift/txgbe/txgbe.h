@@ -1008,7 +1008,7 @@ struct txgbe_adapter {
 	struct pci_dev *pdev;
 
 	unsigned long state;
-
+	u32 bp_link_mode;
 	/* Some features need tri-state capability,
 	 * thus the additional *_CAPABLE flags.
 	 */

@@ -269,7 +269,10 @@
 #define TXGBE_SR_AN_MMD_ADV_REG1_PAUSE_SYM      0x400
 #define TXGBE_SR_AN_MMD_ADV_REG1_PAUSE_ASM      0x800
 #define TXGBE_SR_AN_MMD_ADV_REG2                0x70011
+#define TXGBE_SR_AN_MMD_ADV_REG3                0x70012
 #define TXGBE_SR_AN_MMD_LP_ABL1                 0x70013
+#define TXGBE_SR_AN_MMD_LP_ABL2                 0x70014
+#define TXGBE_SR_AN_MMD_LP_ABL3                 0x70015
 #define TXGBE_VR_AN_KR_MODE_CL                  0x78003
 #define TXGBE_VR_XS_OR_PCS_MMD_DIGI_CTL1        0x38000
 #define TXGBE_VR_XS_OR_PCS_MMD_DIGI_STATUS      0x38010

@@ -1016,7 +1016,7 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_adapter *adapter, u8 byLinkMode,
 	status |= read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0x1b),
 				    1000, 500000, false, hw,
 				    E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
-	kr_dbg(KR_MODE, "Wait 25G fsm_rx_sts = %x, Wait rx_sts %s.\n", rdata,
+	kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x, Wait rx_sts %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 
 	return status;
@@ -2381,23 +2381,62 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 #define TXGBE_25G_BASE_FEC_REQ BIT(13)
 #define TXGBE_25G_RS_FEC_REQ BIT(12)
 
-static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter)
+static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter,
+					bkpan73ability *tBkpAn73Ability,
+					bkpan73ability *tLpBkpAn73Ability)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 rdata = 0;
 
-	rdata = txgbe_rd32_epcs(hw, 0x70010);
-	kr_dbg(KR_MODE, "read 70010 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70011);
-	kr_dbg(KR_MODE, "read 70011 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70012);
-	kr_dbg(KR_MODE, "read 70012 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70013);
-	kr_dbg(KR_MODE, "read 70013 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70014);
-	kr_dbg(KR_MODE, "read 70014 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70015);
+	/* Read the local AN73 Base Page Ability Registers */
+	kr_dbg(KR_MODE, "Read the local Base Page Ability Registers\n");
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_ADV_REG1);
+	tBkpAn73Ability->nextPage = (rdata & BIT(15)) ? 1 : 0;
+	kr_dbg(KR_MODE, "\tread 70010 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_ADV_REG2);
+	kr_dbg(KR_MODE, "\tread 70011 data %0x\n", rdata);
+	tBkpAn73Ability->linkAbility = (rdata >> 5) & GENMASK(10, 0);
+	/* amber-lite only support 10GKR - 25GKR/CR - 25GKR-S/CR-S */
+	kr_dbg(KR_MODE, "\t10GKR : %x\t25GKR-S/CR-S: %x\t25GKR/CR : %x\n",
+	       tBkpAn73Ability->linkAbility & BIT(ABILITY_10GBASE_KR) ? 1 : 0,
+	       tBkpAn73Ability->linkAbility & BIT(ABILITY_25GBASE_KRCR_S) ? 1 :
+									    0,
+	       tBkpAn73Ability->linkAbility & BIT(ABILITY_25GBASE_KRCR) ? 1 :
+									  0);
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_ADV_REG3);
+	kr_dbg(KR_MODE, "\tF1:FEC Req\tF0:FEC Sup\tF3:25GFEC\tF2:25GRS\n");
+	kr_dbg(KR_MODE, "\tF1: %d\t\tF0: %d\t\tF3: %d\t\tF2: %d\n",
+	       ((rdata >> 15) & 0x01), ((rdata >> 14) & 0x01),
+	       ((rdata >> 13) & 0x01), ((rdata >> 12) & 0x01));
+	tBkpAn73Ability->fecAbility = rdata;
+	kr_dbg(KR_MODE, "\tread 70012 data %0x\n", rdata);
 
+	/* Read the link partner AN73 Base Page Ability Registers */
+	kr_dbg(KR_MODE, "Read the link partner Base Page Ability Registers\n");
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_LP_ABL1);
+	tLpBkpAn73Ability->nextPage = (rdata & BIT(15)) ? 1 : 0;
+	kr_dbg(KR_MODE, "\tread 70013 data %0x\n", rdata);
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_LP_ABL2);
+	tLpBkpAn73Ability->linkAbility = (rdata >> 5) & GENMASK(10, 0);
+	kr_dbg(KR_MODE, "\tread 70014 data %0x\n", rdata);
+	kr_dbg(KR_MODE, "\tKX : %x\tKX4 : %x\n",
+	       tLpBkpAn73Ability->linkAbility & BIT(ABILITY_1000BASE_KX) ? 1 :
+									   0,
+	       tLpBkpAn73Ability->linkAbility & BIT(ABILITY_10GBASE_KX4) ? 1 :
+									   0);
+	kr_dbg(KR_MODE, "\t10GKR : %x\t25GKR-S/CR-S: %x\t25GKR/CR : %x\n",
+	       tLpBkpAn73Ability->linkAbility & BIT(ABILITY_10GBASE_KR) ? 1 : 0,
+	       tLpBkpAn73Ability->linkAbility & BIT(ABILITY_25GBASE_KRCR_S) ?
+		       1 :
+		       0,
+	       tLpBkpAn73Ability->linkAbility & BIT(ABILITY_25GBASE_KRCR) ? 1 :
+									    0);
+	rdata = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_LP_ABL3);
+	kr_dbg(KR_MODE, "\tF1:FEC Req\tF0:FEC Sup\tF3:25GFEC\tF2:25GRS\n");
+	kr_dbg(KR_MODE, "\tF1: %d\t\tF0: %d\t\tF3: %d\t\tF2: %d\n",
+	       ((rdata >> 15) & 0x01), ((rdata >> 14) & 0x01),
+	       ((rdata >> 13) & 0x01), ((rdata >> 12) & 0x01));
+	tLpBkpAn73Ability->fecAbility = rdata;
 	adapter->fec_mode = 0;
 	if (rdata & TXGBE_25G_RS_FEC_REQ)
 		adapter->fec_mode |= TXGBE_25G_RS_FEC_REQ;
@@ -2407,37 +2446,64 @@ static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter)
 		adapter->fec_mode |= TXGBE_10G_FEC_ABL;
 	if (rdata & TXGBE_10G_FEC_REQ)
 		adapter->fec_mode |= TXGBE_10G_FEC_REQ;
+	kr_dbg(KR_MODE, "\tread 70015 data %0x\n", rdata);
 
-	kr_dbg(KR_MODE, "read 70015 data %0x\n", rdata);
 	rdata = txgbe_rd32_epcs(hw, 0x70016);
-	kr_dbg(KR_MODE, "read 70016 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70017);
-	kr_dbg(KR_MODE, "read 70017 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70018);
-	kr_dbg(KR_MODE, "read 70018 data %0x\n", rdata);
+	kr_dbg(KR_MODE, "\tread 70016 data %0x\n", rdata);
 	rdata = txgbe_rd32_epcs(hw, 0x70019);
-	kr_dbg(KR_MODE, "read 70019 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70020);
-	kr_dbg(KR_MODE, "read 70020 data %0x\n", rdata);
-	rdata = txgbe_rd32_epcs(hw, 0x70021);
-	kr_dbg(KR_MODE, "read 70021 data %0x\n", rdata);
+	kr_dbg(KR_MODE, "\tread 70019 data %0x\n", rdata);
+}
+
+static int chk_bkp_ability(struct txgbe_adapter *adapter,
+			   bkpan73ability tBkpAn73Ability,
+			   bkpan73ability tLpBkpAn73Ability)
+{
+	unsigned int comLinkAbility;
+
+	kr_dbg(KR_MODE, "CheckBkpAn73Ability():\n");
+	/* Check the common link ability and take action based on the result*/
+	comLinkAbility = tBkpAn73Ability.linkAbility &
+			 tLpBkpAn73Ability.linkAbility;
+	kr_dbg(KR_MODE, "comAbility= 0x%x, Ability= 0x%x, lpAbility= 0x%x\n",
+	       comLinkAbility, tBkpAn73Ability.linkAbility,
+	       tLpBkpAn73Ability.linkAbility);
+
+	if (comLinkAbility == 0) {
+		kr_dbg(KR_MODE, "Do not support any compatible speed mode!\n");
+	} else if (comLinkAbility & BIT(ABILITY_25GBASE_KRCR_S)) {
+		kr_dbg(KR_MODE, "Link mode is [ABILITY_25GBASE_KRCR_S].\n");
+		adapter->bp_link_mode = 25;
+	} else if (comLinkAbility & BIT(ABILITY_25GBASE_KRCR)) {
+		kr_dbg(KR_MODE, "Link mode is [ABILITY_25GBASE_KRCR].\n");
+		adapter->bp_link_mode = 25;
+	} else if (comLinkAbility & BIT(ABILITY_10GBASE_KR)) {
+		kr_dbg(KR_MODE, "Link mode is [ABILITY_10GBASE_KR].\n");
+		adapter->bp_link_mode = 10;
+	}
+
+	return 0;
 }
 
 static void txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 {
+	bkpan73ability tBkpAn73Ability, tLpBkpAn73Ability;
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 an_int, base_page = 0;
 	int count = 0;
 
 	an_int = txgbe_rd32_epcs(hw, 0x78002);
+	if (!(an_int & TXGBE_E56_AN_PG_RCV))
+		return;
+
 	/* 500ms timeout */
 	for (count = 0; count < 5000; count++) {
 		kr_dbg(KR_MODE, "-----count----- %d\n", count);
-		if (an_int & BIT(2)) {
+		if (an_int & TXGBE_E56_AN_PG_RCV) {
 			u8 next_page = 0;
 			u32 rdata, addr;
 
-			txgbe_e56_print_page_status(adapter);
+			txgbe_e56_print_page_status(adapter, &tBkpAn73Ability,
+						    &tLpBkpAn73Ability);
 			addr = base_page == 0 ? 0x70013 : 0x70019;
 			rdata = txgbe_rd32_epcs(hw, addr);
 			if (rdata & BIT(14)) {
@@ -2462,25 +2528,82 @@ static void txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 			kr_dbg(KR_MODE, "write 78002 0x%0x\n", 0x0000);
 			usec_delay(100);
 			if (next_page == 0)
-				return;
+				goto check_ability;
 		}
 		usec_delay(100);
 	}
+
+check_ability:
+	chk_bkp_ability(adapter, tBkpAn73Ability, tLpBkpAn73Ability);
 }
 
-static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
-				    struct txgbe_adapter *adapter)
+static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
+{
+	u32 bylinkmode = adapter->bp_link_mode;
+	struct txgbe_hw *hw = &adapter->hw;
+	int status = 0, pTempData = 0;
+	u8 bypassCtle = 0;
+	u32 rdata;
+
+	kr_dbg(KR_MODE, "2.3 Wait %dG KR phy mode init ....\n", bylinkmode);
+	status = SetPhyLinkMode(adapter, bylinkmode, bypassCtle);
+
+	/* set phy an status to 1 */
+	rdata = rd32_ephy(hw, 0x1434);
+	SetFields(&rdata, 7, 4, 0xf);
+	txgbe_wr32_ephy(hw, 0x1434, rdata);
+
+	/* kr training */
+	rdata = rd32_ephy(hw, 0x1640);
+	SetFields(&rdata, 7, 0, 0x3);
+	txgbe_wr32_ephy(hw, 0x1640, rdata);
+
+	/* enable CMS and its internal PLL and tx enable */
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 21, 20, 0x3); //pll en
+	SetFields(&rdata, 19, 12, 0x1); // tx/rx en
+	SetFields(&rdata, 8, 8, 0x0); // pmd mode
+	SetFields(&rdata, 1, 1, 0x1); // pmd en
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
+
+	kr_dbg(KR_MODE, "2.4 Wait %dG RXS....\n", bylinkmode);
+	status = E56phyRxsCalibAdaptSeq(adapter, bylinkmode, bypassCtle);
+
+	kr_dbg(KR_MODE, "2.5 Wait %dG phy calibration....\n", bylinkmode);
+	E56phySetRxsUfineLeMax(adapter, bylinkmode);
+
+	status = txgbe_e56_get_temp(hw, &pTempData);
+	status = E56phyRxsPostCdrLockTempTrackSeq(adapter, bylinkmode);
+
+	kr_dbg(KR_MODE, "2.6 Wait %dG phy kr training check....\n", bylinkmode);
+	status = read_poll_timeout(rd32_ephy, rdata, (rdata & BIT(1)), 100,
+				   200000, false, hw, 0x163c);
+	kr_dbg(KR_MODE, "KR TRAINNING CHECK = %x, %s.\n", rdata,
+	       status ? "FAILED" : "SUCCESS");
+
+	kr_dbg(KR_MODE, "2.7 Wait %dG phy Rx adc....\n", bylinkmode);
+	status = E56phyRxsAdcAdaptSeq(adapter, bypassCtle);
+
+	/* Wait an RLU */
+	kr_dbg(KR_MODE, "2.8 Wait %dG phy RLU....\n", bylinkmode);
+	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(2)),
+				   100, 500000, false, hw, 0x30001);
+	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
+	       status ? "FAILED" : "SUCCESS");
+
+	return status;
+}
+
+static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
+	//u8 bypassCtle = 0;
 	int status = 0;
 	u32 rdata;
-	int pTempData = 0;
-	u8 bypassCtle = 0;
-	int byLinkMode = 25;
 
-	kr_dbg(KR_MODE, "2.1 Wait 25G page changed ....\n");
+	kr_dbg(KR_MODE, "2.1 Wait page changed ....\n");
 	txgbe_e56_exchange_page(adapter);
-	kr_dbg(KR_MODE, "2.2 Wait 25G page changed ..done..\n");
+	kr_dbg(KR_MODE, "2.2 Wait page changed ..done..\n");
 
 	if (AN74_TRAINNING_MODE) {
 		rdata = txgbe_rd32_epcs(hw, 0x70000);
@@ -2504,7 +2627,6 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 
 	/* wait rx/tx/cm powerdn_st */
 	msleep(20);
-
 	if (adapter->fec_mode & TXGBE_25G_RS_FEC_REQ) {
 		txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a3,
@@ -2533,59 +2655,21 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 		/* FEC: FC-FEC/BASE-R */
 		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
-		e_dev_info("Advertised FEC modes : %s\n", "BASE-R");
+		e_dev_info("Advertised FEC modes : %s\n", "25GBASE-R");
+		adapter->cur_fec_link = TXGBE_PHY_FEC_BASER;
+	} else if (adapter->fec_mode &
+		   (TXGBE_10G_FEC_REQ | TXGBE_10G_FEC_ABL)) {
+		/* FEC: FC-FEC/BASE-R */
+		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
+		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
+		e_dev_info("Advertised FEC modes : %s\n", "10GBASE-R");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_BASER;
 	} else {
 		e_dev_info("Advertised FEC modes : %s\n", "NONE");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 	}
 
-	kr_dbg(KR_MODE, "2.3 Wait 25G KR phy mode init ....\n");
-	status = SetPhyLinkMode(adapter, byLinkMode, bypassCtle);
-
-	/* set phy an status to 1 */
-	rdata = rd32_ephy(hw, 0x1434);
-	SetFields(&rdata, 7, 4, 0xf);
-	txgbe_wr32_ephy(hw, 0x1434, rdata);
-
-	/* kr training */
-	rdata = rd32_ephy(hw, 0x1640);
-	SetFields(&rdata, 7, 0, 0x3);
-	txgbe_wr32_ephy(hw, 0x1640, rdata);
-
-	/* enable CMS and its internal PLL and tx enable */
-	rdata = rd32_ephy(hw, 0x1400);
-	SetFields(&rdata, 21, 20, 0x3); //pll en
-	SetFields(&rdata, 19, 12, 0x1); // tx/rx en
-	SetFields(&rdata, 8, 8, 0x0); // pmd mode
-	SetFields(&rdata, 1, 1, 0x1); // pmd en
-	txgbe_wr32_ephy(hw, 0x1400, rdata);
-
-	kr_dbg(KR_MODE, "2.4 Wait 25G RXS....\n");
-	status = E56phyRxsCalibAdaptSeq(adapter, byLinkMode, bypassCtle);
-
-	kr_dbg(KR_MODE, "2.5 Wait 25G phy calibration....\n");
-	E56phySetRxsUfineLeMax(adapter, byLinkMode);
-
-	status = txgbe_e56_get_temp(hw, &pTempData);
-	status = E56phyRxsPostCdrLockTempTrackSeq(adapter, byLinkMode);
-
-	kr_dbg(KR_MODE, "2.6 Wait 25G phy kr training check....\n");
-	status = read_poll_timeout(rd32_ephy, rdata, (rdata & BIT(1)), 100,
-				   200000, false, hw, 0x163c);
-	kr_dbg(KR_MODE, "KR TRAINNING CHECK = %x, %s.\n", rdata,
-	       status ? "FAILED" : "SUCCESS");
-
-	kr_dbg(KR_MODE, "2.7 Wait 25G phy Rx adc....\n");
-	status = E56phyRxsAdcAdaptSeq(adapter, bypassCtle);
-
-	/* Wait an RLU */
-	kr_dbg(KR_MODE, "2.8 Wait 25G phy RLU....\n");
-	status = read_poll_timeout(txgbe_rd32_epcs, rdata, (rdata & BIT(2)),
-				   100, 500000, false, hw, 0x30001);
-	kr_dbg(KR_MODE, "Wait_RLU_CMPLT = %x, Wait RLU %s.\n", rdata,
-	       status ? "FAILED" : "SUCCESS");
-
+	status = txgbe_e56_cl72_trainning(adapter);
 	rdata = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
 	SetFields(&rdata, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
@@ -2599,11 +2683,6 @@ static int handle_e56_bkp_an73_flow(u8 bp_link_mode,
 
 	return status;
 }
-
-#define TXGBE_E56_AN_TXDIS BIT(3)
-#define TXGBE_E56_AN_PG_RCV BIT(2)
-#define TXGBE_E56_AN_INC_LINK BIT(1)
-#define TXGBE_E56_AN_INT_CMPLT BIT(0)
 
 void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 {
@@ -2626,7 +2705,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
 			adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
 			e_dev_info("Enter training\n");
-			ret = handle_e56_bkp_an73_flow(0, adapter);
+			ret = handle_e56_bkp_an73_flow(adapter);
 			if (ret) {
 				mutex_lock(&adapter->e56_lock);
 				txgbe_e56_set_link_to_kr(adapter, 25, 0);
