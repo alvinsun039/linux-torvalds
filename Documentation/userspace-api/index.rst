@@ -35,6 +35,7 @@ place where this information is gathered.
    futex2
    lsm
    tee
+   ntsync
 
 .. only::  subproject and html
 
