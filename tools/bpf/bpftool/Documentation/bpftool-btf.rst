@@ -24,7 +24,7 @@ BTF COMMANDS
 =============
 
 |	**bpftool** **btf** { **show** | **list** } [**id** *BTF_ID*]
-|	**bpftool** **btf dump** *BTF_SRC* [**format** *FORMAT*]
+|	**bpftool** **btf dump** *BTF_SRC* [**format** *FORMAT*] [**root_id** *ROOT_ID*]
 |	**bpftool** **btf help**
 |
 |	*BTF_SRC* := { **id** *BTF_ID* | **prog** *PROG* | **map** *MAP* [{**key** | **value** | **kv** | **all**}] | **file** *FILE* }
@@ -45,7 +45,7 @@ DESCRIPTION
 		  objects. On such kernels bpftool will automatically emit this
 		  information as well.
 
-	**bpftool btf dump** *BTF_SRC* [format *FORMAT*]
+	**bpftool btf dump** *BTF_SRC* [format *FORMAT*] [root_id *ROOT_ID*]
 		  Dump BTF entries from a given *BTF_SRC*.
 
 		  When **id** is specified, BTF object with that ID will be
@@ -71,6 +71,12 @@ DESCRIPTION
 		  formats are supported. With C-style formatting, the 
                   output is sorted by default. Use the **unsorted** option
                   to avoid sorting the output.
+
+	**root_id**
+		  option can be used to filter a dump to a single type and all
+		  its dependent types. It cannot be used with any other types of filtering
+		  (such as the "key", "value", or "kv" arguments when dumping BTF for a map).
+		  It can be passed multiple times to dump multiple types.
 
 	**bpftool btf help**
 		  Print short help message.
