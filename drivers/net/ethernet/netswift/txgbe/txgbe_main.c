@@ -10086,6 +10086,7 @@ static void txgbe_service_task(struct work_struct *work)
 /*	txgbe_swfw_mbox_subtask(adapter); */
 	txgbe_reset_subtask(adapter);
 	txgbe_phy_event_subtask(adapter);
+	txgbe_watchdog_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
 	txgbe_sfp_reset_eth_phy_subtask(adapter);
