@@ -30,15 +30,17 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 			       u32 speed,
 			       bool autoneg_wait_to_complete)
 {
-	bool autoneg = false;
-	s32 status = 0;
 	u32 link_capabilities = TXGBE_LINK_SPEED_UNKNOWN;
-	struct txgbe_adapter *adapter = hw->back;
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
+	struct txgbe_adapter *adapter = hw->back;
+	bool tx_config = false;
 	bool link_up = false;
+	bool autoneg = false;
 	s32 ret_status = 0;
-	int i = 0, j = 0;
 	int config_retry;
+	u32 old_fec = 0;
+	int i = 0, j = 0;
+	s32 status = 0;
 	u32 value = 0;
 
 	/* Check to see if speed passed in is supported. */
@@ -54,19 +56,6 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		goto out;
 	}
 
-	if (!(hw->dac_sfp)) {
-		status = TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
-
-		if (status != 0)
-			goto out;
-
-		if ((link_speed == speed) && link_up && adapter->phy_tx_ready &&
-			(adapter->fec_link_mode & adapter->cur_fec_link)) {
-				goto out;
-		}
-	}
-
 	if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
@@ -77,38 +66,64 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		return 0;
 	}
 
+	status = TCALL(hw, mac.ops.check_link,
+			&link_speed, &link_up, false);
+
+	if (status != 0)
+		goto out;
+
+	if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
+		adapter->cur_fec_link = txgbe_get_cur_fec_mode(hw);
+		old_fec = adapter->cur_fec_link;
+	}
+
+	if ((link_speed == speed) && link_up &&
+			!(speed == TXGBE_LINK_SPEED_25GB_FULL &&
+				!(adapter->fec_link_mode & adapter->cur_fec_link))) {
+		adapter->phy_tx_ready = true;
+		adapter->tx_speed = speed;
+		goto out;
+	}
+
 	for (config_retry = 0; config_retry < 2; config_retry++) {
 		j = 0;
+		if (speed == TXGBE_LINK_SPEED_25GB_FULL &&
+			!(adapter->fec_link_mode & old_fec))
+			adapter->phy_tx_ready = true;
+
 		if (speed != adapter->tx_speed || !adapter->phy_tx_ready) {
 			mutex_lock(&adapter->e56_lock);
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 			mutex_unlock(&adapter->e56_lock);
 			adapter->tx_speed = speed;
+			tx_config = true;
 		} else {
 			mutex_lock(&adapter->e56_lock);
 			/* this ret_status for workaorund not return to upper*/
 			ret_status = txgbe_e56_reconfig_rx(hw, speed);
 			mutex_unlock(&adapter->e56_lock);
+			tx_config = false;
 		}
 
 		if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
 			goto out;
 
+		if (ret_status == TXGBE_ERR_TIMEOUT) {
+			/* if config phy return timeout, do pcs rst*/
+			adapter->phy_tx_ready = false;
+			continue;
+		}
+
 		do {
 			if (speed != TXGBE_LINK_SPEED_25GB_FULL)
-				goto out;
+				break;
 
-			if (!(adapter->fec_link_mode & BIT(j)) &&
-				!((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))) {
+			if (!(adapter->fec_link_mode & BIT(j))) {
 				j += 1;
 				continue;
 			}
 
-			/*revert to rs fec mode if all fec mode cannot link when auto try*/
-			if ((adapter->fec_link_mode == TXGBE_PHY_FEC_AUTO) && (j == 3))
-				adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
-			else
-				adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
+			adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
 
 			/*if in fec auto mode, try another fec mode after no link in 1s*/
 			/* for lr sfp, enable KR-FEC to link up with mellonax and intel */
@@ -165,15 +180,31 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 			for (i = 0; i < 4; i++) {
 				msleep(250);
 				TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
+					&link_speed, &link_up, false);
 				if (link_up)
 					goto out;
 			}
-			j += 1;
-		} while (j < 4);
+					j += 1;
+		} while (j < 3);
 
-		adapter->phy_tx_ready = false;
+		if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
+			for (i = 0; i < 4; i++) {
+				TCALL(hw, mac.ops.check_link,
+						&link_speed, &link_up, false);
+				if (link_up)
+					goto out;
+				msleep(250);
+			}
+		}
+
+		/* we expect to configure tx/rx once
+		 * and rx only (txgbe_e56_reconfig_rx)once.
+		 */
+		if (!tx_config)
+			adapter->phy_tx_ready = false;
 	}
+
+	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 out:
 	return status;
 }
@@ -302,12 +333,12 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 					  u32 speed,
 					  bool autoneg_wait_to_complete)
 {
-	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	u32 highest_link_speed = TXGBE_LINK_SPEED_UNKNOWN;
-	s32 status = 0;
-	u32 speedcnt = 0;
-	u32 i = 0;
+	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
+	struct txgbe_adapter *adapter = hw->back;
 	bool autoneg, link_up = false;
+	u32 speedcnt = 0;
+	s32 status = 0;
 
 	/* Mask off requested but non-supported speeds */
 	status = TCALL(hw, mac.ops.get_link_capabilities,
@@ -330,10 +361,13 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		if (status != 0)
 			return status;
 
-		if ((link_speed == TXGBE_LINK_SPEED_25GB_FULL) && link_up)
+		adapter->cur_fec_link = txgbe_get_cur_fec_mode(hw);
+
+		if ((link_speed == TXGBE_LINK_SPEED_25GB_FULL) && link_up &&
+		    adapter->fec_link_mode & adapter->cur_fec_link)
 			goto out;
 
-		/* Allow module to change analog characteristics (1G->10G) */
+		/* Allow module to change analog characteristics (10G->25G) */
 		msec_delay(40);
 
 		status = TCALL(hw, mac.ops.setup_mac_link,
@@ -342,26 +376,15 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		if (status != 0)
 			return status;
 
-		/* Flap the Tx laser if it has not already been done */
-		TCALL(hw, mac.ops.flap_tx_laser);
+		/*aml wait link in setup,no need to repeatly wait*/
+		/* If we have link, just jump out */
+		status = TCALL(hw, mac.ops.check_link,
+					&link_speed, &link_up, false);
+		if (status != 0)
+			return status;
 
-		/* Wait for the controller to acquire link.  Per IEEE 802.3ap,
-		 * Section 73.10.2, we may have to wait up to 500ms if KR is
-		 * attempted.  sapphire uses the same timing for 10g SFI.
-		 */
-		for (i = 0; i < 5; i++) {
-			/* Wait for the link partner to also set speed */
-			msec_delay(100);
-
-			/* If we have link, just jump out */
-			status = TCALL(hw, mac.ops.check_link,
-						&link_speed, &link_up, false);
-			if (status != 0)
-				return status;
-
-			if (link_up)
-				goto out;
-		}
+		if (link_up)
+			goto out;
 	}
 
 	if (speed & TXGBE_LINK_SPEED_10GB_FULL) {
@@ -378,7 +401,7 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		if ((link_speed == TXGBE_LINK_SPEED_10GB_FULL) && link_up)
 			goto out;
 
-		/* Allow module to change analog characteristics (1G->10G) */
+		/* Allow module to change analog characteristics (25G->10G) */
 		msec_delay(40);
 
 		status = TCALL(hw, mac.ops.setup_mac_link,
@@ -387,26 +410,15 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		if (status != 0)
 			return status;
 
-		/* Flap the Tx laser if it has not already been done */
-		TCALL(hw, mac.ops.flap_tx_laser);
+		/*aml wait link in setup,no need to repeatly wait*/
+		/* If we have link, just jump out */
+		status = TCALL(hw, mac.ops.check_link,
+					&link_speed, &link_up, false);
+		if (status != 0)
+			return status;
 
-		/* Wait for the controller to acquire link.  Per IEEE 802.3ap,
-		 * Section 73.10.2, we may have to wait up to 500ms if KR is
-		 * attempted.  sapphire uses the same timing for 10g SFI.
-		 */
-		for (i = 0; i < 5; i++) {
-			/* Wait for the link partner to also set speed */
-			msec_delay(100);
-
-			/* If we have link, just jump out */
-			status = TCALL(hw, mac.ops.check_link,
-						&link_speed, &link_up, false);
-			if (status != 0)
-				return status;
-
-			if (link_up)
-				goto out;
-		}
+		if (link_up)
+			goto out;
 	}
 
 	/* We didn't get link.  Configure back to the highest speed we tried,

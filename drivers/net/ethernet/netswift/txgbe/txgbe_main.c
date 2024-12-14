@@ -8327,7 +8327,8 @@ int txgbe_close(struct net_device *netdev)
 
 	txgbe_release_hw_control(adapter);
 
-	if (hw->mac.type == txgbe_mac_aml) {
+	if (hw->mac.type == txgbe_mac_aml ||
+			hw->mac.type == txgbe_mac_aml40) {
 		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
 							 ~TXGBE_MAC_TX_CFG_TE);
 		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
@@ -8983,6 +8984,9 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 					~TXGBE_MAC_TX_CFG_AML_SPEED_MASK) | TXGBE_MAC_TX_CFG_TE |
 					TXGBE_MAC_TX_CFG_AML_SPEED_40G);
 			}
+			/* enable mac receiver */
+			wr32m(hw, TXGBE_MAC_RX_CFG,
+				TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 		} else if (hw->mac.type == txgbe_mac_aml) {
 			if (link_speed & TXGBE_LINK_SPEED_25GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
@@ -9180,6 +9184,7 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	struct txgbe_hw *hw = &adapter->hw;
+
 	adapter->link_up = false;
 	adapter->link_speed = 0;
 
@@ -9199,6 +9204,10 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
 		return;
+
+	if (hw->mac.type == txgbe_mac_aml ||
+			hw->mac.type == txgbe_mac_aml40)
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
 
 #ifdef HAVE_PTP_1588_CLOCK
 	if (test_bit(__TXGBE_PTP_RUNNING, &adapter->state))
@@ -9714,7 +9723,8 @@ static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 	s32 status = 0;
 	int temp;
 
-	if (hw->mac.type != txgbe_mac_aml)
+	if (hw->mac.type != txgbe_mac_aml ||
+			hw->mac.type != txgbe_mac_aml40)
 		return;
 
 	status = txgbe_e56_get_temp(hw, &temp);

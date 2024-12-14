@@ -3284,6 +3284,7 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		mac_addr1_dword1_addr = MAC_ADDR1_WORD1_OFFSET_1G;
 		break;
 	case txgbe_mac_aml:
+	case txgbe_mac_aml40:
 		mac_addr0_dword0_addr = AMLITE_MAC_ADDR0_WORD0_OFFSET;
 		mac_addr0_dword1_addr = AMLITE_MAC_ADDR0_WORD1_OFFSET;
 		mac_addr1_dword0_addr = AMLITE_MAC_ADDR1_WORD0_OFFSET;

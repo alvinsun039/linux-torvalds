@@ -174,7 +174,7 @@ static u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 			  0x1fff);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
-		addr = E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR +
+		addr = E56PHY_RXS_OSC_CAL_N_CDR_1_ADDR +
 		       (E56PHY_RXS_OFFSET * i);
 		rdata = rd32_ephy(hw, addr);
 		((E56G_RXS0_OSC_CAL_N_CDR_0 *)&rdata)->prediv0 = 0xfa0;
@@ -382,8 +382,7 @@ static u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 		addr = E56PHY_RXS_ANA_OVRDEN_0_ADDR + (E56PHY_RXS_OFFSET * i);
 		rdata = rd32_ephy(hw, addr);
 		SetFields(&rdata,
-			  E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_TRIM_RTERM_I,
-			  0x1);
+			  E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_EN_RTERM_I, 0x1);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
 		addr = E56PHY_RXS_ANA_OVRDVAL_6_ADDR + (E56PHY_RXS_OFFSET * i);
@@ -467,7 +466,7 @@ static u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_CONT_ON_ADC_GAIN_CAL_ERR, 0x1);
 	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_DO_RX_ADC_OFST_CAL, 0x3);
-	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x0);
+	SetFields(&rdata, E56PHY_CTRL_FSM_CFG_0_RX_ERR_ACTION_EN, 0x40);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_CTRL_FSM_CFG_1_ADDR;
@@ -615,7 +614,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 	SetFields(&rdata, 23, 0, 0x260000);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	addr = E56PHY_CMS_ANA_OVRDEN_0_ADDR;
+	addr = E56PHY_CMS_ANA_OVRDEN_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata,
 		  E56PHY_CMS_ANA_OVRDEN_1_OVRD_EN_ANA_LCPLL_HF_TEST_IN_I, 0x1);
@@ -662,7 +661,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 		  0x1fff);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	addr = E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR;
+	addr = E56PHY_RXS_OSC_CAL_N_CDR_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_1_PREDIV1, 0x700);
 	SetFields(&rdata, E56PHY_RXS_OSC_CAL_N_CDR_1_TARGET_CNT1, 0x2418);
@@ -829,8 +828,7 @@ u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw)
 	rdata = 0x0000;
 	addr = E56PHY_RXS_ANA_OVRDEN_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_TRIM_RTERM_I,
-		  0x1);
+	SetFields(&rdata, E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_EN_RTERM_I, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_ANA_OVRDVAL_6_ADDR;
@@ -1086,7 +1084,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 		  0x1fff);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	addr = E56PHY_RXS_OSC_CAL_N_CDR_4_ADDR;
+	addr = E56PHY_RXS_OSC_CAL_N_CDR_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	((E56G_RXS0_OSC_CAL_N_CDR_0 *)&rdata)->prediv0 = 0xfa0;
 	((E56G_RXS0_OSC_CAL_N_CDR_0 *)&rdata)->target_cnt0 = 0x203a;
@@ -1244,8 +1242,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 
 	addr = E56PHY_RXS_ANA_OVRDEN_0_ADDR;
 	rdata = rd32_ephy(hw, addr);
-	SetFields(&rdata, E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_TRIM_RTERM_I,
-		  0x1);
+	SetFields(&rdata, E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_EN_RTERM_I, 0x1);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	addr = E56PHY_RXS_ANA_OVRDVAL_6_ADDR;
@@ -2570,17 +2567,24 @@ static int E56phyRxsCalibAdaptSeq40G(struct txgbe_hw *hw, u32 speed)
 	timer = 0;
 	rdata = 0;
 	while (EPHY_XFLD(E56G__PMD_CTRL_FSM_RX_STAT_0, ctrl_fsm_rx0_st) !=
-		       E56PHY_RX_RDY_ST &&
+		       E56PHY_RX_RDY_ST ||
 	       EPHY_XFLD(E56G__PMD_CTRL_FSM_RX_STAT_0, ctrl_fsm_rx1_st) !=
-		       E56PHY_RX_RDY_ST &&
+		       E56PHY_RX_RDY_ST ||
 	       EPHY_XFLD(E56G__PMD_CTRL_FSM_RX_STAT_0, ctrl_fsm_rx2_st) !=
-		       E56PHY_RX_RDY_ST &&
+		       E56PHY_RX_RDY_ST ||
 	       EPHY_XFLD(E56G__PMD_CTRL_FSM_RX_STAT_0, ctrl_fsm_rx3_st) !=
 		       E56PHY_RX_RDY_ST) {
 		rdata = rd32_ephy(hw, addr);
 		udelay(500);
-		if (timer++ > PHYINIT_TIMEOUT)
+		if (timer++ > PHYINIT_TIMEOUT) {
+			//Do SEQ::RX_DISABLE
+			rdata = 0;
+			addr = E56PHY_PMD_CFG_0_ADDR;
+			rdata = rd32_ephy(hw, addr);
+			SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
+			txgbe_wr32_ephy(hw, addr, rdata);
 			return TXGBE_ERR_TIMEOUT;
+		}
 	}
 
 	//RXS ADC adaptation sequence
@@ -2986,8 +2990,15 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 		rdata = rd32_ephy(hw, addr);
 		udelay(500);
 		EPHY_RREG(E56G__PMD_CTRL_FSM_RX_STAT_0);
-		if (timer++ > PHYINIT_TIMEOUT)
+		if (timer++ > PHYINIT_TIMEOUT) {
+			//Do SEQ::RX_DISABLE
+			rdata = 0;
+			addr = E56PHY_PMD_CFG_0_ADDR;
+			rdata = rd32_ephy(hw, addr);
+			SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
+			txgbe_wr32_ephy(hw, addr, rdata);
 			return TXGBE_ERR_TIMEOUT;
+		}
 	}
 
 	//RXS ADC adaptation sequence
@@ -3454,13 +3465,21 @@ static int txgbe_e56_disable_rx(struct txgbe_hw *hw)
 
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 {
-	u32 addr;
 	int status = 0;
+	u32 rdata;
+	u32 addr;
 
 	wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE, ~TXGBE_MAC_TX_CFG_TE);
 	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE, ~TXGBE_MAC_RX_CFG_RE);
 
 	TCALL(hw, mac.ops.disable_sec_tx_path);
+
+	if (hw->mac.type == txgbe_mac_aml) {
+		rdata = rd32(hw, TXGBE_GPIO_EXT);
+		if (rdata & (TXGBE_SFP1_MOD_ABS_LS | TXGBE_SFP1_RX_LOS_LS)) {
+			return TXGBE_ERR_TIMEOUT;
+		}
+	}
 
 	txgbe_wr32_ephy(hw, E56PHY_INTR_0_ENABLE_ADDR, 0x0);
 	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR, 0x0);
@@ -3816,4 +3835,26 @@ out:
 	TCALL(hw, mac.ops.enable_tx_laser);
 
 	return status;
+}
+
+int txgbe_get_cur_fec_mode(struct txgbe_hw *hw)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	int value = 0;
+
+	mutex_lock(&adapter->e56_lock);
+	value = txgbe_rd32_epcs(hw, SR_PMA_RS_FEC_CTRL);
+	mutex_unlock(&adapter->e56_lock);
+
+	if (value & 0x4)
+		return TXGBE_PHY_FEC_RS;
+
+	mutex_lock(&adapter->e56_lock);
+	value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+	mutex_unlock(&adapter->e56_lock);
+
+	if (value & 0x1)
+		return TXGBE_PHY_FEC_BASER;
+
+	return TXGBE_PHY_FEC_OFF;
 }
