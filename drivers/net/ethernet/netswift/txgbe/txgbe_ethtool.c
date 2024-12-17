@@ -3031,7 +3031,9 @@ static int txgbe_setup_config(struct txgbe_adapter *adapter)
 static int txgbe_setup_mac_loopback_test(struct txgbe_adapter *adapter)
 {
 	wr32m(&adapter->hw, TXGBE_MAC_RX_CFG,
-		TXGBE_MAC_RX_CFG_LM, TXGBE_MAC_RX_CFG_LM);
+		TXGBE_MAC_RX_CFG_LM | TXGBE_MAC_RX_CFG_RE,
+		TXGBE_MAC_RX_CFG_LM | TXGBE_MAC_RX_CFG_RE);
+
 	wr32m(&adapter->hw, TXGBE_CFG_PORT_CTL,
 		TXGBE_CFG_PORT_CTL_FORCE_LKUP, TXGBE_CFG_PORT_CTL_FORCE_LKUP);
 
