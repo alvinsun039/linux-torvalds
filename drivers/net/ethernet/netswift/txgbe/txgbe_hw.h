@@ -279,6 +279,7 @@ s32 txgbe_init_phy_ops_sp(struct txgbe_hw *hw);
 s32 txgbe_enable_rx_dma(struct txgbe_hw *hw, u32 regval);
 s32 txgbe_init_ops_generic(struct txgbe_hw *hw);
 s32 txgbe_setup_eee(struct txgbe_hw *hw, bool enable_eee);
+int txgbe_reconfig_mac(struct txgbe_hw *hw);
 
 s32 txgbe_init_flash_params(struct txgbe_hw *hw);
 s32 txgbe_read_flash_buffer(struct txgbe_hw *hw, u32 offset,

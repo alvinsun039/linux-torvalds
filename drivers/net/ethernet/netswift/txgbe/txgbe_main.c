@@ -8978,6 +8978,8 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 
 #endif
 		if (hw->mac.type == txgbe_mac_aml40) {
+			txgbe_reconfig_mac(hw);
+
 			if (link_speed & TXGBE_LINK_SPEED_40GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
 					(rd32(hw, TXGBE_MAC_TX_CFG) &
@@ -8988,6 +8990,8 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 			wr32m(hw, TXGBE_MAC_RX_CFG,
 				TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 		} else if (hw->mac.type == txgbe_mac_aml) {
+			txgbe_reconfig_mac(hw);
+
 			if (link_speed & TXGBE_LINK_SPEED_25GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
 					(rd32(hw, TXGBE_MAC_TX_CFG) &

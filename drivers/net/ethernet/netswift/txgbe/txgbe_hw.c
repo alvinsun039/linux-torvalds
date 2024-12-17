@@ -5984,6 +5984,39 @@ STATIC s32 txgbe_setup_copper_link(struct txgbe_hw *hw,
 	return status;
 }
 
+int txgbe_reconfig_mac(struct txgbe_hw *hw)
+{
+	u32 mac_wdg_timeout;
+	u32 mac_flow_ctrl;
+
+	mac_wdg_timeout = rd32(hw, TXGBE_MAC_WDG_TIMEOUT);
+	mac_flow_ctrl = rd32(hw, TXGBE_MAC_RX_FLOW_CTRL);
+
+	if (hw->bus.lan_id == 0)
+		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_LAN0_MAC_RST);
+	else if (hw->bus.lan_id == 1)
+		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_LAN1_MAC_RST);
+
+	/* receive packets that size > 2048 */
+	wr32m(hw, TXGBE_MAC_RX_CFG,
+		TXGBE_MAC_RX_CFG_JE, TXGBE_MAC_RX_CFG_JE);
+
+	/* clear counters on read */
+	wr32m(hw, TXGBE_MMC_CONTROL,
+		TXGBE_MMC_CONTROL_RSTONRD, TXGBE_MMC_CONTROL_RSTONRD);
+
+	wr32m(hw, TXGBE_MAC_RX_FLOW_CTRL,
+		TXGBE_MAC_RX_FLOW_CTRL_RFE, TXGBE_MAC_RX_FLOW_CTRL_RFE);
+
+	wr32(hw, TXGBE_MAC_PKT_FLT,
+		TXGBE_MAC_PKT_FLT_PR);
+
+	wr32(hw, TXGBE_MAC_WDG_TIMEOUT, mac_wdg_timeout);
+	wr32(hw, TXGBE_MAC_RX_FLOW_CTRL, mac_flow_ctrl);
+
+	return 0;
+}
+
 static int txgbe_reset_misc(struct txgbe_hw *hw)
 {
 	struct txgbe_adapter *adapter = hw->back;
