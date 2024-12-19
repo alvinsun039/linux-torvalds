@@ -33,7 +33,6 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 	u32 link_capabilities = TXGBE_LINK_SPEED_UNKNOWN;
 	u32 link_speed = TXGBE_LINK_SPEED_UNKNOWN;
 	struct txgbe_adapter *adapter = hw->back;
-	bool tx_config = false;
 	bool link_up = false;
 	bool autoneg = false;
 	s32 ret_status = 0;
@@ -69,37 +68,25 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 			ret_status = txgbe_set_link_to_amlite(hw, speed);
 			mutex_unlock(&adapter->e56_lock);
 			adapter->tx_speed = speed;
-			tx_config = true;
 		} else {
 			mutex_lock(&adapter->e56_lock);
 			/* this ret_status for workaorund not return to upper*/
 			ret_status = txgbe_e56_reconfig_rx(hw, speed);
 			mutex_unlock(&adapter->e56_lock);
-			tx_config = false;
+			adapter->phy_tx_ready = false;
 		}
 
-		if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
-			goto out;
-
 		if (ret_status == TXGBE_ERR_TIMEOUT) {
-			/* if config phy return timeout, do pcs rst*/
-			adapter->phy_tx_ready = false;
 			continue;
 		}
 
-		for (i = 0; i < 4; i++) {
+		for (i = 0; i < 8; i++) {
 			TCALL(hw, mac.ops.check_link,
 					&link_speed, &link_up, false);
 			if (link_up)
 				goto out;
 			msleep(250);
 		}
-
-		/* we expect to configure tx/rx once
-		 * and rx only (txgbe_e56_reconfig_rx)once.
-		 */
-		if (!tx_config)
-			adapter->phy_tx_ready = false;
 	}
 
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
