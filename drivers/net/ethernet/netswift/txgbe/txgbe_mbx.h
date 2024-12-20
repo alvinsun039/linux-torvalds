@@ -124,6 +124,7 @@ enum txgbe_pfvf_api_rev {
 
 /* mailbox API, version 2.1 VF requests */
 #define TXGBE_VF_SET_5TUPLE	0x20 /* VF request PF for 5-tuple filter */
+#define TXGBE_VF_QUEUE_RATE_LIMIT 0x21 /* VF request PF to set vf-queue rate limit */
 
 #define TXGBE_VF_BACKUP		0x8001 /* VF requests backup */
 
@@ -147,6 +148,12 @@ enum txgbevf_5tuple_msg {
 };
 
 #define TXGBEVF_5T_ADD_SHIFT	31
+
+enum txgbevf_queue_rate_limit_msg {
+	TXGBEVF_Q_RATE_REQ = 0,
+	TXGBEVF_Q_RATE_INDEX,
+	TXGBEVF_Q_RATE_LIMIT,
+};
 
 /* GET_QUEUES return data indices within the mailbox */
 #define TXGBE_VF_TX_QUEUES      1       /* number of Tx queues supported */

@@ -208,6 +208,8 @@ enum txgbe_tx_flags {
 #define VMDQ_P(p)       (p)
 #endif
 
+#define TXGBE_VF_MAX_TX_QUEUES          4
+
 struct vf_data_storage {
 	struct pci_dev *vfdev;
 	u8 IOMEM *b4_addr;
@@ -236,6 +238,7 @@ struct vf_data_storage {
 	int xcast_mode;
 	unsigned int vf_api;
 	u16 ft_filter_idx[TXGBE_MAX_RDB_5T_CTL0_FILTERS];
+	u16 queue_max_tx_rate[TXGBE_VF_MAX_TX_QUEUES];
 };
 
 struct vf_macvlans {

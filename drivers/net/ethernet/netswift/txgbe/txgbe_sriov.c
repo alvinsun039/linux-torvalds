@@ -38,7 +38,8 @@
 #include "txgbe_sriov.h"
 
 static void txgbe_set_vf_rx_tx(struct txgbe_adapter *adapter, int vf);
-
+static int txgbe_set_queue_rate_limit_vf(struct txgbe_adapter *adapter,
+						      u32 *msgbuf, u32 vf);
 
 #ifdef CONFIG_PCI_IOV
 static int __txgbe_enable_sriov(struct txgbe_adapter *adapter,
@@ -1297,6 +1298,9 @@ static int txgbe_rcv_msg_from_vf(struct txgbe_adapter *adapter, u16 vf)
 	case TXGBE_VF_SET_5TUPLE:
 		retval = txgbe_set_5tuple_filter_vf(adapter, msgbuf, vf);
 		break;
+	case TXGBE_VF_QUEUE_RATE_LIMIT:
+		retval = txgbe_set_queue_rate_limit_vf(adapter, msgbuf, vf);
+		break;
 	case TXGBE_VF_BACKUP:
 #ifdef CONFIG_PCI_IOV
 		retval = txgbe_vf_backup(adapter, vf);
@@ -1804,6 +1808,67 @@ void txgbe_check_vf_rate_limit(struct txgbe_adapter *adapter)
 
 		txgbe_set_vf_rate_limit(adapter, i);
 	}
+}
+
+static int
+txgbe_set_queue_rate_limit_vf(struct txgbe_adapter *adapter,
+				      u32 *msgbuf, u32 vf)
+{
+	struct txgbe_ring_feature *vmdq = &adapter->ring_feature[RING_F_VMDQ];
+	struct txgbe_hw *hw = &adapter->hw;
+	u16 queue, queues_per_pool, max_tx_rate;
+	int factor_int, factor_fra, link_speed;
+	u32 reg_idx;
+
+	if (hw->mac.type != txgbe_mac_aml)
+		return -EOPNOTSUPP;
+
+	/* verify the PF is supporting the correct API */
+	if (adapter->vfinfo[vf].vf_api < txgbe_mbox_api_21)
+		return -EOPNOTSUPP;
+
+	/* determine how many queues per pool based on VMDq mask */
+	queues_per_pool = __ALIGN_MASK(1, ~vmdq->mask);
+
+	queue = msgbuf[TXGBEVF_Q_RATE_INDEX];
+	max_tx_rate = msgbuf[TXGBEVF_Q_RATE_LIMIT];
+
+	/* convert queue index on each vf to the global index */
+	reg_idx = (vf * queues_per_pool) + queue;
+
+	/*
+	 * Set global transmit compensation time to the MMW_SIZE in RTTBCNRM
+	 * register. Typically MMW_SIZE=0x014 if 9728-byte jumbo is supported
+	 * and 0x004 otherwise.
+	 */
+	wr32(hw, TXGBE_TDM_MMW, 0x14);
+
+	if (max_tx_rate) {
+		u16 frac;
+
+		link_speed = txgbe_link_mbps(adapter) / 1000 * 1024;
+
+		/* Calculate the rate factor values to set */
+		factor_int = link_speed / max_tx_rate;
+		frac = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
+		factor_fra = txgbe_frac_to_bi(frac, 10000, 14);
+
+		wr32(hw, TXGBE_TDM_RL_QUEUE_IDX, reg_idx);
+		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			TXGBE_TDM_FACTOR_INT_MASK, factor_int << TXGBE_TDM_FACTOR_INT_SHIFT);
+		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			TXGBE_TDM_FACTOR_FRA_MASK, factor_fra << TXGBE_TDM_FACTOR_FRA_SHIFT);
+		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
+	} else
+		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			TXGBE_TDM_RL_EN, 0);
+
+	adapter->vfinfo[vf].queue_max_tx_rate[queue] = max_tx_rate;
+	e_info(drv, "set vf %d queue %d max_tx_rate to %d Mbps",
+		     vf, queue, max_tx_rate);
+
+	return 0;
 }
 
 #ifdef HAVE_NDO_SET_VF_MIN_MAX_TX_RATE
