@@ -57,6 +57,7 @@
 #define SMBIOS_FREQHIGH_OFFSET		0x17
 #define SMBIOS_FREQLOW_MASK		0xFF
 #define SMBIOS_CORE_PACKAGE_OFFSET	0x23
+#define SMBIOS_THREAD_PACKAGE_OFFSET	0x25
 #define LOONGSON_EFI_ENABLE		(1 << 3)
 
 #ifdef CONFIG_EFI
@@ -71,6 +72,8 @@ EXPORT_SYMBOL(cpu_data);
 
 struct loongson_board_info b_info;
 static const char dmi_empty_string[] = "        ";
+static int possible_cpus;
+static bool bsp_added;
 
 /*
  * Setup information
@@ -131,7 +134,7 @@ static void __init parse_cpu_table(const struct dmi_header *dm)
 	cpu_clock_freq = freq_temp * 1000000;
 
 	loongson_sysconf.cpuname = (void *)dmi_string_parse(dm, dmi_data[16]);
-	loongson_sysconf.cores_per_package = *(dmi_data + SMBIOS_CORE_PACKAGE_OFFSET);
+	loongson_sysconf.cores_per_package = *(dmi_data + SMBIOS_THREAD_PACKAGE_OFFSET);
 
 	pr_info("CpuClock = %llu\n", cpu_clock_freq);
 }
@@ -185,12 +188,14 @@ bool wc_enabled = false;
 
 EXPORT_SYMBOL(wc_enabled);
 
+static int wc_arg = -1;
+
 static int __init setup_writecombine(char *p)
 {
 	if (!strcmp(p, "on"))
-		wc_enabled = true;
+		wc_arg = true;
 	else if (!strcmp(p, "off"))
-		wc_enabled = false;
+		wc_arg = false;
 	else
 		pr_warn("Unknown writecombine setting \"%s\".\n", p);
 
@@ -359,10 +364,75 @@ out:
 	*cmdline_p = boot_command_line;
 }
 
+int topo_get_cpu(int physid)
+{
+	int i;
+
+	for (i = 0; i < possible_cpus; i++)
+		if (cpu_logical_map(i) == physid)
+			break;
+
+	if (i == possible_cpus)
+		return -ENOENT;
+
+	return i;
+}
+
+int topo_add_cpu(int physid)
+{
+	int cpu;
+
+	if (!bsp_added && (physid == loongson_sysconf.boot_cpu_id)) {
+		bsp_added = true;
+		return 0;
+	}
+
+	cpu = topo_get_cpu(physid);
+	if (cpu >= 0) {
+		pr_warn("Adding duplicated physical cpuid 0x%x\n", physid);
+		return -EEXIST;
+	}
+
+	if (possible_cpus >= nr_cpu_ids)
+		return -ERANGE;
+
+	__cpu_logical_map[possible_cpus] = physid;
+	cpu = possible_cpus++;
+	return cpu;
+}
+
+static void __init topo_init(void)
+{
+	loongson_sysconf.boot_cpu_id = read_csr_cpuid();
+	__cpu_logical_map[0] = loongson_sysconf.boot_cpu_id;
+	possible_cpus++;
+}
+
+static void __init writecombine_detect(void)
+{
+	u64 cpuname;
+
+	if (wc_arg >= 0) {
+		wc_enabled = wc_arg;
+		return;
+	}
+
+	cpuname = iocsr_read64(LOONGARCH_IOCSR_CPUNAME);
+	cpuname &= 0x0000ffffffffffff;
+	switch (cpuname) {
+	case 0x0000303030364333:
+		wc_enabled = false;
+		break;
+	default:
+		break;
+	}
+}
+
 void __init platform_init(void)
 {
 	arch_reserve_vmcore();
 	arch_reserve_crashkernel();
+	topo_init();
 
 #ifdef CONFIG_ACPI_TABLE_UPGRADE
 	acpi_table_upgrade();
@@ -382,6 +452,8 @@ void __init platform_init(void)
 	smbios_parse();
 	pr_info("The BIOS Version: %s\n", b_info.bios_version);
 
+	writecombine_detect();
+	pr_info("WriteCombine: %s\n", wc_enabled ? "on":"off");
 	efi_runtime_init();
 }
 
@@ -618,6 +690,8 @@ void __init setup_arch(char **cmdline_p)
 	arch_mem_init(cmdline_p);
 
 	resource_init();
+	jump_label_init(); /* Initialise the static keys for paravirtualization */
+
 #ifdef CONFIG_SMP
 	plat_smp_setup();
 	prefill_possible_map();

@@ -50,9 +50,7 @@ static int kvm_emu_cpucfg(struct kvm_vcpu *vcpu, larch_inst inst)
 		vcpu->arch.gprs[rd] = *(unsigned int *)KVM_SIGNATURE;
 		break;
 	case CPUCFG_KVM_FEATURE:
-		ret = KVM_FEATURE_IPI;
-		if (kvm_pvtime_supported())
-			ret |= KVM_FEATURE_STEAL_TIME;
+		ret = vcpu->kvm->arch.pv_features & LOONGARCH_PV_FEAT_MASK;
 		vcpu->arch.gprs[rd] = ret;
 		break;
 	default:
@@ -159,7 +157,7 @@ static int kvm_handle_csr(struct kvm_vcpu *vcpu, larch_inst inst)
 int kvm_emu_iocsr(larch_inst inst, struct kvm_run *run, struct kvm_vcpu *vcpu)
 {
 	int ret;
-	unsigned long val;
+	unsigned long *val;
 	u32 addr, rd, rj, opcode;
 
 	/*
@@ -172,6 +170,7 @@ int kvm_emu_iocsr(larch_inst inst, struct kvm_run *run, struct kvm_vcpu *vcpu)
 	ret = EMULATE_DO_IOCSR;
 	run->iocsr_io.phys_addr = addr;
 	run->iocsr_io.is_write = 0;
+	val = &vcpu->arch.gprs[rd];
 
 	/* LoongArch is Little endian */
 	switch (opcode) {
@@ -205,15 +204,21 @@ int kvm_emu_iocsr(larch_inst inst, struct kvm_run *run, struct kvm_vcpu *vcpu)
 		break;
 	default:
 		ret = EMULATE_FAIL;
-		break;
+		return ret;
 	}
 
-	if (ret == EMULATE_DO_IOCSR) {
-		if (run->iocsr_io.is_write) {
-			val = vcpu->arch.gprs[rd];
-			memcpy(run->iocsr_io.data, &val, run->iocsr_io.len);
-		}
-		vcpu->arch.io_gpr = rd;
+	if (run->iocsr_io.is_write) {
+		if (!kvm_io_bus_write(vcpu, KVM_IOCSR_BUS, addr, run->iocsr_io.len, val))
+			ret = EMULATE_DONE;
+		else
+			/* Save data and let user space to write it */
+			memcpy(run->iocsr_io.data, val, run->iocsr_io.len);
+	} else {
+		if (!kvm_io_bus_read(vcpu, KVM_IOCSR_BUS, addr, run->iocsr_io.len, val))
+			ret = EMULATE_DONE;
+		else
+			/* Save register id for iocsr read completion */
+			vcpu->arch.io_gpr = rd;
 	}
 
 	return ret;
@@ -449,18 +454,30 @@ int kvm_emu_mmio_read(struct kvm_vcpu *vcpu, larch_inst inst)
 	}
 
 	if (ret == EMULATE_DO_MMIO) {
+		/*
+		* if mmio device such as pch pic is emulated in KVM,
+		* it need not return to user space to handle the mmio
+		* exception.
+		*/
+		ret = kvm_io_bus_read(vcpu, KVM_MMIO_BUS, vcpu->arch.badv,
+				      run->mmio.len, &vcpu->arch.gprs[rd]);
+		if (!ret) {
+			update_pc(&vcpu->arch);
+			vcpu->mmio_needed = 0;
+			return EMULATE_DONE;
+		}
 		/* Set for kvm_complete_mmio_read() use */
 		vcpu->arch.io_gpr = rd;
 		run->mmio.is_write = 0;
 		vcpu->mmio_is_write = 0;
 		trace_kvm_mmio(KVM_TRACE_MMIO_READ_UNSATISFIED, run->mmio.len,
 				run->mmio.phys_addr, NULL);
-	} else {
-		kvm_err("Read not supported Inst=0x%08x @%lx BadVaddr:%#lx\n",
-			inst.word, vcpu->arch.pc, vcpu->arch.badv);
-		kvm_arch_vcpu_dump_regs(vcpu);
-		vcpu->mmio_needed = 0;
+		return EMULATE_DO_MMIO;
 	}
+	kvm_err("Read not supported Inst=0x%08x @%lx BadVaddr:%#lx\n",
+		inst.word, vcpu->arch.pc, vcpu->arch.badv);
+	kvm_arch_vcpu_dump_regs(vcpu);
+	vcpu->mmio_needed = 0;
 
 	return ret;
 }
@@ -602,18 +619,29 @@ int kvm_emu_mmio_write(struct kvm_vcpu *vcpu, larch_inst inst)
 	}
 
 	if (ret == EMULATE_DO_MMIO) {
+		/*                                                              
+		* if mmio device such as pch pic is emulated in KVM,           
+		* it need not return to user space to handle the mmio          
+		* exception.                                                   
+		*/                                                             
+		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, vcpu->arch.badv,
+				       run->mmio.len, data);                           
+		if (!ret)                                                       
+			return EMULATE_DONE; 
+
 		run->mmio.is_write = 1;
 		vcpu->mmio_needed = 1;
 		vcpu->mmio_is_write = 1;
 		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, run->mmio.len,
 				run->mmio.phys_addr, data);
-	} else {
-		vcpu->arch.pc = curr_pc;
-		kvm_err("Write not supported Inst=0x%08x @%lx BadVaddr:%#lx\n",
-			inst.word, vcpu->arch.pc, vcpu->arch.badv);
-		kvm_arch_vcpu_dump_regs(vcpu);
-		/* Rollback PC if emulation was unsuccessful */
+		return EMULATE_DO_MMIO;
 	}
+
+	vcpu->arch.pc = curr_pc;
+	kvm_err("Write not supported Inst=0x%08x @%lx BadVaddr:%#lx\n",
+		inst.word, vcpu->arch.pc, vcpu->arch.badv);
+	kvm_arch_vcpu_dump_regs(vcpu);
+	/* Rollback PC if emulation was unsuccessful */
 
 	return ret;
 }
@@ -756,6 +784,14 @@ static int kvm_handle_lasx_disabled(struct kvm_vcpu *vcpu)
 	return RESUME_GUEST;
 }
 
+static int kvm_handle_lbt_disabled(struct kvm_vcpu *vcpu)
+{
+	if (kvm_own_lbt(vcpu))
+		kvm_queue_exception(vcpu, EXCCODE_INE, 0);
+
+	return RESUME_GUEST;
+}
+
 static int kvm_send_pv_ipi(struct kvm_vcpu *vcpu)
 {
 	unsigned int min, cpu, i;
@@ -789,19 +825,21 @@ static int kvm_send_pv_ipi(struct kvm_vcpu *vcpu)
  */
 static void kvm_handle_service(struct kvm_vcpu *vcpu)
 {
+	long ret = KVM_HCALL_INVALID_CODE;
 	unsigned long func = kvm_read_reg(vcpu, LOONGARCH_GPR_A0);
-	long ret;
 
 	switch (func) {
 	case KVM_HCALL_FUNC_IPI:
-		kvm_send_pv_ipi(vcpu);
-		ret = KVM_HCALL_SUCCESS;
+		if (kvm_guest_has_pv_feature(vcpu, KVM_FEATURE_IPI)) {
+			kvm_send_pv_ipi(vcpu);
+			ret = KVM_HCALL_SUCCESS;
+		}
 		break;
 	case KVM_HCALL_FUNC_NOTIFY:
-		ret = kvm_save_notify(vcpu);
+		if (kvm_guest_has_pv_feature(vcpu, KVM_FEATURE_STEAL_TIME))
+                       ret = kvm_save_notify(vcpu);		
 		break;
 	default:
-		ret = KVM_HCALL_INVALID_CODE;
 		break;
 	}
 
@@ -873,6 +911,7 @@ static exit_handle_fn kvm_fault_tables[EXCCODE_INT_START] = {
 	[EXCCODE_FPDIS]			= kvm_handle_fpu_disabled,
 	[EXCCODE_LSXDIS]		= kvm_handle_lsx_disabled,
 	[EXCCODE_LASXDIS]		= kvm_handle_lasx_disabled,
+	[EXCCODE_BTDIS]			= kvm_handle_lbt_disabled,
 	[EXCCODE_GSPR]			= kvm_handle_gspr,
 	[EXCCODE_HVC]			= kvm_handle_hypercall,
 };

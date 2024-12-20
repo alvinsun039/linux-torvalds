@@ -161,16 +161,8 @@
 
 /*
  * CPUCFG index area: 0x40000000 -- 0x400000ff
- * SW emulation for KVM hypervirsor
+ * SW emulation for KVM hypervirsor, see arch/loongarch/include/uapi/asm/kvm_para.h
  */
-#define CPUCFG_KVM_BASE			0x40000000
-#define CPUCFG_KVM_SIZE			0x100
-
-#define CPUCFG_KVM_SIG			(CPUCFG_KVM_BASE + 0)
-#define  KVM_SIGNATURE			"KVM\0"
-#define CPUCFG_KVM_FEATURE		(CPUCFG_KVM_BASE + 4)
-#define  KVM_FEATURE_IPI		BIT(1)
-#define  KVM_FEATURE_STEAL_TIME		BIT(2)
 
 #ifndef __ASSEMBLY__
 
@@ -887,7 +879,7 @@
 #define LOONGARCH_CSR_DMWIN2		0x182	/* 64 direct map win2: MEM */
 #define LOONGARCH_CSR_DMWIN3		0x183	/* 64 direct map win3: MEM */
 
-/* Direct Map window 0/1 */
+/* Direct Map window 0/1/2/3 */
 #define CSR_DMW0_PLV0		_CONST64_(1 << 0)
 #define CSR_DMW0_VSEG		_CONST64_(0x8000)
 #define CSR_DMW0_BASE		(CSR_DMW0_VSEG << DMW_PABITS)
@@ -898,6 +890,14 @@
 #define CSR_DMW1_VSEG		_CONST64_(0x9000)
 #define CSR_DMW1_BASE		(CSR_DMW1_VSEG << DMW_PABITS)
 #define CSR_DMW1_INIT		(CSR_DMW1_BASE | CSR_DMW1_MAT | CSR_DMW1_PLV0)
+
+#define CSR_DMW2_PLV0		_CONST64_(1 << 0)
+#define CSR_DMW2_MAT		_CONST64_(2 << 4)
+#define CSR_DMW2_VSEG		_CONST64_(0xa000)
+#define CSR_DMW2_BASE		(CSR_DMW2_VSEG << DMW_PABITS)
+#define CSR_DMW2_INIT		(CSR_DMW2_BASE | CSR_DMW2_MAT | CSR_DMW2_PLV0)
+
+#define CSR_DMW3_INIT		0x0
 
 /* Performance Counter registers */
 #define LOONGARCH_CSR_PERFCTRL0		0x200	/* 32 perf event 0 config */

@@ -12,6 +12,7 @@ static int has_steal_clock;
 struct static_key paravirt_steal_enabled;
 struct static_key paravirt_steal_rq_enabled;
 static DEFINE_PER_CPU(struct kvm_steal_time, steal_time) __aligned(64);
+DEFINE_STATIC_KEY_FALSE(virt_spin_lock_key);
 
 static u64 native_steal_clock(int cpu)
 {
@@ -165,7 +166,7 @@ int __init pv_ipi_init(void)
 
 	if (!cpu_has_hypervisor)
 		return 0;
-	if (!kvm_para_available())
+	if (!(feature & BIT(KVM_FEATURE_IPI)))
 		return 0;
 
 	feature = read_cpucfg(CPUCFG_KVM_FEATURE);
@@ -200,7 +201,7 @@ static int pv_enable_steal_time(void)
 	}
 
 	addr |= KVM_STEAL_PHYS_VALID;
-	kvm_hypercall2(KVM_HCALL_FUNC_NOTIFY, KVM_FEATURE_STEAL_TIME, addr);
+	kvm_hypercall2(KVM_HCALL_FUNC_NOTIFY, BIT(KVM_FEATURE_STEAL_TIME), addr);
 
 	return 0;
 }
@@ -208,7 +209,7 @@ static int pv_enable_steal_time(void)
 static void pv_disable_steal_time(void)
 {
 	if (has_steal_clock)
-		kvm_hypercall2(KVM_HCALL_FUNC_NOTIFY, KVM_FEATURE_STEAL_TIME, 0);
+		kvm_hypercall2(KVM_HCALL_FUNC_NOTIFY, BIT(KVM_FEATURE_STEAL_TIME), 0);
 }
 
 #ifdef CONFIG_SMP
@@ -260,7 +261,7 @@ int __init pv_time_init(void)
 		return 0;
 
 	feature = read_cpucfg(CPUCFG_KVM_FEATURE);
-	if (!(feature & KVM_FEATURE_STEAL_TIME))
+	if (!(feature & BIT(KVM_FEATURE_STEAL_TIME)))
 		return 0;
 
 	has_steal_clock = 1;
@@ -291,6 +292,16 @@ int __init pv_time_init(void)
 #endif
 
 	pr_info("Using paravirt steal-time\n");
+
+	return 0;
+}
+
+int __init pv_spinlock_init(void)
+{
+	if (!cpu_has_hypervisor)
+		return 0;
+
+	static_branch_enable(&virt_spin_lock_key);
 
 	return 0;
 }
