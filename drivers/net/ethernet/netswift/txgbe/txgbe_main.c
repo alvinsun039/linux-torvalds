@@ -9169,6 +9169,10 @@ static void txgbe_link_down_flush_tx(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 
+	if (hw->mac.type != txgbe_mac_aml ||
+			hw->mac.type != txgbe_mac_aml40)
+		return;
+
 	wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
 			~TXGBE_MAC_RX_CFG_RE);
 	wr32m(hw, TXGBE_MAC_RX_CFG,
