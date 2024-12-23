@@ -699,7 +699,7 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		cmd->base.duplex = -1;
 	}
 
-	if (hw->mac.type == txgbe_mac_aml && !netif_carrier_ok(netdev)) {
+	if (!netif_carrier_ok(netdev)) {
 		cmd->base.speed = -1;
 		cmd->base.duplex = -1;
 	}
