@@ -17,6 +17,9 @@
 #ifdef CONFIG_CREDP
 #include <asm/iee-cred.h>
 #endif
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
 #include "cifsglob.h"
 #include "cifs_spnego.h"
 #include "cifs_debug.h"
@@ -36,7 +39,13 @@ cifs_spnego_key_instantiate(struct key *key, struct key_preparsed_payload *prep)
 		goto error;
 
 	/* attach the data */
+	#ifdef CONFIG_KEYP
+	union key_payload *key_payload = (union key_payload *)(key->name_link.next);
+
+	key_payload->data[0] = payload;
+	#else
 	key->payload.data[0] = payload;
+	#endif
 	ret = 0;
 
 error:
@@ -46,7 +55,11 @@ error:
 static void
 cifs_spnego_key_destroy(struct key *key)
 {
+	#ifdef CONFIG_KEYP
+	kfree(((union key_payload *)(key->name_link.next))->data[0]);
+	#else
 	kfree(key->payload.data[0]);
+	#endif
 }
 
 
@@ -166,7 +179,11 @@ cifs_get_spnego_key(struct cifs_ses *sesInfo,
 
 #ifdef CONFIG_CIFS_DEBUG2
 	if (cifsFYI && !IS_ERR(spnego_key)) {
+		#ifdef CONFIG_KEYP
+		struct cifs_spnego_msg *msg = ((union key_payload *)(spnego_key->name_link.next))->data[0];
+		#else
 		struct cifs_spnego_msg *msg = spnego_key->payload.data[0];
+		#endif
 		cifs_dump_mem("SPNEGO reply blob:", msg->data, min(1024U,
 				msg->secblob_len + msg->sesskey_len));
 	}
@@ -214,7 +231,11 @@ init_cifs_spnego(void)
 	 * instruct request_key() to use this special keyring as a cache for
 	 * the results it looks up
 	 */
+	#ifdef CONFIG_KEYP
+	iee_set_key_flag_bit(keyring, KEY_FLAG_ROOT_CAN_CLEAR, SET_BIT_OP);
+	#else
 	set_bit(KEY_FLAG_ROOT_CAN_CLEAR, &keyring->flags);
+	#endif
 	#ifdef CONFIG_CREDP
 	iee_set_cred_thread_keyring(cred, keyring);
 	iee_set_cred_jit_keyring(cred, KEY_REQKEY_DEFL_THREAD_KEYRING);

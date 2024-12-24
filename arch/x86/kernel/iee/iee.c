@@ -82,6 +82,35 @@ iee_func iee_funcs[] = {
 	(iee_func)_iee_set_cred_rcu,
 	(iee_func)_iee_set_cred_ucounts,
 #endif
+#ifdef CONFIG_KEYP
+	(iee_func)_iee_set_key_union,
+	(iee_func)_iee_set_key_struct,
+	(iee_func)_iee_set_key_payload,
+	(iee_func)_iee_set_key_usage,
+	(iee_func)_iee_set_key_serial,
+	(iee_func)_iee_set_key_watchers,
+	(iee_func)_iee_set_key_user,
+	(iee_func)_iee_set_key_security,
+	(iee_func)_iee_set_key_expiry,
+	(iee_func)_iee_set_key_revoked_at,
+	(iee_func)_iee_set_key_last_used_at,
+	(iee_func)_iee_set_key_uid,
+	(iee_func)_iee_set_key_gid,
+	(iee_func)_iee_set_key_perm,
+	(iee_func)_iee_set_key_quotalen,
+	(iee_func)_iee_set_key_datalen,
+	(iee_func)_iee_set_key_state,
+	(iee_func)_iee_set_key_magic,
+	(iee_func)_iee_set_key_flags,
+	(iee_func)_iee_set_key_index_key,
+	(iee_func)_iee_set_key_hash,
+	(iee_func)_iee_set_key_len_desc,
+	(iee_func)_iee_set_key_type,
+	(iee_func)_iee_set_key_domain_tag,
+	(iee_func)_iee_set_key_description,
+	(iee_func)_iee_set_key_restrict_link,
+	(iee_func)_iee_set_key_flag_bit,
+#endif
 	NULL
 };
 
@@ -544,6 +573,232 @@ void __iee_code _iee_set_cred_uid(unsigned long __unused, struct cred *cred, kui
 {
 	cred = iee_cred(__unused, cred);
 	cred->uid = uid;
+}
+#endif
+
+#ifdef CONFIG_KEYP
+unsigned long __iee_code _iee_set_key_flag_bit(unsigned long __unused, struct key *key,
+				      long nr, int flag)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	switch (flag) {
+	case SET_BIT_OP: {
+		set_bit(nr, &key->flags);
+		break;
+	}
+	case TEST_AND_CLEAR_BIT: {
+		return test_and_clear_bit(nr, &key->flags);
+	}
+	case TEST_AND_SET_BIT: {
+		return test_and_set_bit(nr, &key->flags);
+	}
+	}
+	return 0;
+}
+
+void __iee_code _iee_set_key_restrict_link(unsigned long __unused,
+					   struct key *key,
+					   struct key_restriction *restrict_link)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->restrict_link = restrict_link;
+}
+
+void __iee_code _iee_set_key_magic(unsigned long __unused, struct key *key,
+				   unsigned int magic)
+{
+#ifdef KEY_DEBUGGING
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->magic = magic;
+#endif
+}
+
+void __iee_code _iee_set_key_flags(unsigned long __unused, struct key *key,
+				   unsigned long flags)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->flags = flags;
+}
+
+void __iee_code _iee_set_key_index_key(unsigned long __unused,
+					   struct key *key,
+					   struct keyring_index_key *index_key)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->index_key = *index_key;
+}
+
+void __iee_code _iee_set_key_hash(unsigned long __unused, struct key *key,
+				  unsigned long hash)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->hash = hash;
+}
+
+void __iee_code _iee_set_key_len_desc(unsigned long __unused, struct key *key,
+				      unsigned long len_desc)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->len_desc = len_desc;
+}
+
+void __iee_code _iee_set_key_type(unsigned long __unused, struct key *key,
+				  struct key_type *type)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->type = type;
+}
+
+void __iee_code _iee_set_key_domain_tag(unsigned long __unused,
+					struct key *key,
+					struct key_tag *domain_tag)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->domain_tag = domain_tag;
+}
+
+void __iee_code _iee_set_key_description(unsigned long __unused,
+					 struct key *key, char *description)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->description = description;
+}
+
+void __iee_code _iee_set_key_uid(unsigned long __unused, struct key *key,
+				 kuid_t uid)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->uid = uid;
+}
+
+void __iee_code _iee_set_key_gid(unsigned long __unused, struct key *key,
+				 kgid_t gid)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->gid = gid;
+}
+
+void __iee_code _iee_set_key_perm(unsigned long __unused, struct key *key,
+				  key_perm_t perm)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->perm = perm;
+}
+
+void __iee_code _iee_set_key_quotalen(unsigned long __unused, struct key *key,
+				      unsigned short quotalen)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->quotalen = quotalen;
+}
+
+void __iee_code _iee_set_key_datalen(unsigned long __unused, struct key *key,
+				     unsigned short datalen)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->datalen = datalen;
+}
+
+void __iee_code _iee_set_key_state(unsigned long __unused, struct key *key,
+				   short state)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	WRITE_ONCE(key->state, state);
+}
+
+void __iee_code _iee_set_key_user(unsigned long __unused, struct key *key,
+				  struct key_user *user)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->user = user;
+}
+
+void __iee_code _iee_set_key_security(unsigned long __unused, struct key *key,
+				      void *security)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->security = security;
+}
+
+void __iee_code _iee_set_key_expiry(unsigned long __unused, struct key *key,
+				    time64_t expiry)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->expiry = expiry;
+}
+
+void __iee_code _iee_set_key_revoked_at(unsigned long __unused,
+					struct key *key, time64_t revoked_at)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->revoked_at = revoked_at;
+}
+
+void __iee_code _iee_set_key_last_used_at(unsigned long __unused,
+					  struct key *key,
+					  time64_t last_used_at)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->last_used_at = last_used_at;
+}
+
+unsigned long __iee_code _iee_set_key_usage(unsigned long __unused, struct key *key,
+				   int n, int flag)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	switch (flag) {
+	case REFCOUNT_INC: {
+		refcount_inc(&key->usage);
+		break;
+	}
+	case REFCOUNT_SET: {
+		refcount_set(&key->usage, n);
+		break;
+	}
+	case REFCOUNT_DEC_AND_TEST: {
+		return refcount_dec_and_test(&key->usage);
+	}
+	case REFCOUNT_INC_NOT_ZERO: {
+		return refcount_inc_not_zero(&key->usage);
+	}
+	}
+	return 0;
+}
+
+void __iee_code _iee_set_key_serial(unsigned long __unused, struct key *key,
+				    key_serial_t serial)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->serial = serial;
+}
+
+void __iee_code _iee_set_key_watchers(unsigned long __unused, struct key *key, struct watch_list *watchers)
+{
+#ifdef CONFIG_KEY_NOTIFICATIONS
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->watchers = watchers;
+#endif
+}
+
+void __iee_code _iee_set_key_union(unsigned long __unused, struct key *key,
+				   struct key_union *key_union)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->graveyard_link.next = (struct list_head *)key_union;
+}
+
+void __iee_code _iee_set_key_struct(unsigned long __unused, struct key *key,
+				    struct key_struct *key_struct)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->name_link.prev = (struct list_head *)key_struct;
+}
+
+void __iee_code _iee_set_key_payload(unsigned long __unused, struct key *key,
+				     union key_payload *key_payload)
+{
+	key = (struct key *)(__phys_to_iee(__pa(key)));
+	key->name_link.next = (struct list_head *)key_payload;
 }
 #endif
 

@@ -154,6 +154,11 @@ int slab_unmergeable(struct kmem_cache *s)
 		return 1;
 	#endif
 
+	#ifdef CONFIG_KEYP
+	if ((strcmp(s->name, "key_jar") == 0) || (strcmp(s->name, "key_payload_jar") == 0))
+		return 1;
+	#endif
+
 #ifdef CONFIG_HARDENED_USERCOPY
 	if (s->usersize)
 		return 1;
@@ -186,6 +191,11 @@ struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 
 	#ifdef CONFIG_IEE_SELINUX_P
 	if (strcmp(name, "policy_jar") == 0)
+		return NULL;
+	#endif
+
+	#ifdef CONFIG_KEYP
+	if ((strcmp(name, "key_jar") == 0) || (strcmp(name, "key_payload_jar") == 0))
 		return NULL;
 	#endif
 

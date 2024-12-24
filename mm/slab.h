@@ -48,6 +48,12 @@ extern struct kmem_cache *policy_jar;
 #ifdef CONFIG_CREDP
 extern struct kmem_cache *cred_jar;
 #endif
+#ifdef CONFIG_KEYP
+extern struct kmem_cache *key_jar;
+extern struct kmem_cache *key_union_jar;
+extern struct kmem_cache *key_struct_jar;
+extern struct kmem_cache *key_payload_jar;
+#endif
 
 /*
  * Freelist pointer and counter to cmpxchg together, avoids the typical ABA

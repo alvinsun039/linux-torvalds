@@ -45,6 +45,10 @@
 #include <keys/dns_resolver-type.h>
 #include <keys/user-type.h>
 
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
+
 #include "internal.h"
 
 /**
@@ -133,16 +137,26 @@ int dns_query(struct net *net,
 		goto out;
 	}
 
+	#ifdef CONFIG_KEYP
+	down_read(&KEY_SEM(rkey));
+	iee_set_key_flag_bit(rkey, KEY_FLAG_ROOT_CAN_INVAL, SET_BIT_OP);
+	iee_set_key_perm(rkey, rkey->perm | KEY_USR_VIEW);
+	#else
 	down_read(&rkey->sem);
 	set_bit(KEY_FLAG_ROOT_CAN_INVAL, &rkey->flags);
 	rkey->perm |= KEY_USR_VIEW;
+	#endif
 
 	ret = key_validate(rkey);
 	if (ret < 0)
 		goto put;
 
 	/* If the DNS server gave an error, return that to the caller */
+	#ifdef CONFIG_KEYP
+	ret = PTR_ERR(((union key_payload *)(rkey->name_link.next))->data[dns_key_error]);
+	#else
 	ret = PTR_ERR(rkey->payload.data[dns_key_error]);
+	#endif
 	if (ret)
 		goto put;
 
@@ -161,7 +175,11 @@ int dns_query(struct net *net,
 
 	ret = len;
 put:
+	#ifdef CONFIG_KEYP
+	up_read(&KEY_SEM(rkey));
+	#else
 	up_read(&rkey->sem);
+	#endif
 	if (invalidate)
 		key_invalidate(rkey);
 	key_put(rkey);

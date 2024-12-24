@@ -587,6 +587,13 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 		return;
 	}
 	#endif
+	#ifdef CONFIG_KEYP
+	if (s == key_jar) {
+		iee_set_freeptr((void **)freeptr_addr, (void *)freelist_ptr_encode(s, fp, freeptr_addr).v);
+		return;
+	}
+	#endif
+
 	*(freeptr_t *)freeptr_addr = freelist_ptr_encode(s, fp, freeptr_addr);
 }
 
@@ -2654,6 +2661,11 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		alloc_gfp |= __GFP_ZERO;
 	#endif
 
+	#ifdef CONFIG_KEYP
+	if (s == key_jar)
+		alloc_gfp |= __GFP_ZERO;
+	#endif
+
 	slab = alloc_slab_page(alloc_gfp, node, oo);
 	if (unlikely(!slab)) {
 		oo = s->min;
@@ -2664,6 +2676,10 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		 */
 		#ifdef CONFIG_IEE_SELINUX_P
 		if (s == policy_jar)
+			alloc_gfp |= __GFP_ZERO;
+		#endif
+		#ifdef CONFIG_KEYP
+		if (s == key_jar)
 			alloc_gfp |= __GFP_ZERO;
 		#endif
 		slab = alloc_slab_page(alloc_gfp, node, oo);
@@ -2690,6 +2706,11 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	#endif
 	#ifdef CONFIG_CREDP
 	if (s == cred_jar)
+		set_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	#endif
+
+	#ifdef CONFIG_KEYP
+	if (s == key_jar)
 		set_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
 	#endif
 
@@ -2773,6 +2794,10 @@ static void __free_slab(struct kmem_cache *s, struct slab *slab)
 		unset_iee_page((unsigned long)page_address(folio_page(folio, 0)), order);
 		#endif
 	}
+	#endif
+	#ifdef CONFIG_KEYP
+	if (s == key_jar)
+		unset_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
 	#endif
 
 	#ifdef CONFIG_IEE_SELINUX_P
@@ -4268,6 +4293,10 @@ static bool is_iee_kmem_cache(struct kmem_cache *s)
 	else if (s == cred_jar)
 		return  true;
 #endif
+#ifdef CONFIG_KEYP
+	else if (s == key_jar || s == key_payload_jar)
+		return  true;
+#endif
 	return false;
 }
 #endif	//	CONFIG_IEE
@@ -5553,6 +5582,10 @@ static int calculate_sizes(struct kmem_cache *s)
 	if (strcmp(s->name, "cred_jar") == 0)
 		order = HUGE_PMD_ORDER;
 	#endif
+	#ifdef CONFIG_KEYP
+	if (strcmp(s->name, "key_jar") == 0)
+		order = HUGE_PMD_ORDER;
+	#endif
 
 	if ((int)order < 0)
 		return 0;
@@ -5620,6 +5653,10 @@ static int kmem_cache_open(struct kmem_cache *s, slab_flags_t flags)
 		s->min_partial *= (1 << TASK_ORDER);
 	if (strcmp(s->name, "iee_stack_jar") == 0)
 		s->min_partial *= (1 << TASK_ORDER);
+	#endif
+	#ifdef CONFIG_KEYP
+	if (strcmp(s->name, "key_jar") == 0)
+		s->min_partial = (1 << TASK_ORDER);
 	#endif
 
 	set_cpu_partial(s);

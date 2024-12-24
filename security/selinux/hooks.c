@@ -108,6 +108,9 @@
 #include <linux/iee-func.h>
 #include <asm/iee-selinuxp.h>
 #endif
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
 
 #define SELINUX_INODE_INIT_XATTRS 1
 
@@ -6594,7 +6597,11 @@ static int selinux_key_alloc(struct key *k, const struct cred *cred,
 	else
 		ksec->sid = tsec->sid;
 
+	#ifdef CONFIG_KEYP
+	iee_set_key_security(k, ksec);
+	#else
 	k->security = ksec;
+	#endif
 	return 0;
 }
 
@@ -6602,7 +6609,11 @@ static void selinux_key_free(struct key *k)
 {
 	struct key_security_struct *ksec = k->security;
 
+	#ifdef CONFIG_KEYP
+	iee_set_key_security(k, NULL);
+	#else
 	k->security = NULL;
+	#endif
 	kfree(ksec);
 }
 

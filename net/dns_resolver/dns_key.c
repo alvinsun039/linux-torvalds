@@ -35,6 +35,9 @@
 #ifdef CONFIG_CREDP
 #include <asm/iee-cred.h>
 #endif
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
 #include "internal.h"
 
 MODULE_DESCRIPTION("DNS Resolver");
@@ -298,7 +301,11 @@ static void dns_resolver_describe(const struct key *key, struct seq_file *m)
 {
 	seq_puts(m, key->description);
 	if (key_is_positive(key)) {
+		#ifdef CONFIG_KEYP
+		int err = PTR_ERR(((union key_payload *)(key->name_link.next))->data[dns_key_error]);
+		#else
 		int err = PTR_ERR(key->payload.data[dns_key_error]);
+		#endif
 
 		if (err)
 			seq_printf(m, ": %d", err);
@@ -314,7 +321,11 @@ static void dns_resolver_describe(const struct key *key, struct seq_file *m)
 static long dns_resolver_read(const struct key *key,
 			      char *buffer, size_t buflen)
 {
+	#ifdef CONFIG_KEYP
+	int err = PTR_ERR(((union key_payload *)(key->name_link.next))->data[dns_key_error]);
+	#else
 	int err = PTR_ERR(key->payload.data[dns_key_error]);
+	#endif
 
 	if (err)
 		return err;
@@ -367,7 +378,11 @@ static int __init init_dns_resolver(void)
 
 	/* instruct request_key() to use this special keyring as a cache for
 	 * the results it looks up */
+	#ifdef CONFIG_KEYP
+	iee_set_key_flag_bit(keyring, KEY_FLAG_ROOT_CAN_CLEAR, SET_BIT_OP);
+	#else
 	set_bit(KEY_FLAG_ROOT_CAN_CLEAR, &keyring->flags);
+	#endif
 	#ifdef CONFIG_CREDP
 	iee_set_cred_thread_keyring(cred, keyring);
 	iee_set_cred_jit_keyring(cred, KEY_REQKEY_DEFL_THREAD_KEYRING);

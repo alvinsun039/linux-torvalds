@@ -76,4 +76,36 @@ void __iee_code _iee_set_cred_security(unsigned long __unused, struct cred *cred
 void __iee_code _iee_set_cred_rcu(unsigned long __unused, struct cred *cred, struct rcu_head *rcu);
 void __iee_code _iee_set_cred_ucounts(unsigned long __unused, struct cred *cred, struct ucounts *ucounts);
 #endif
+#ifdef CONFIG_KEYP
+#include<linux/key.h>
+struct watch_list;
+void __iee_code _iee_set_key_union(unsigned long __unused, struct key *key, struct key_union *key_union);
+void __iee_code _iee_set_key_struct(unsigned long __unused, struct key *key, struct key_struct *key_struct);
+void __iee_code _iee_set_key_payload(unsigned long __unused, struct key *key, union key_payload *key_payload);
+unsigned long __iee_code _iee_set_key_usage(unsigned long __unused, struct key *key, int n, int flag);
+void __iee_code _iee_set_key_serial(unsigned long __unused, struct key *key, key_serial_t serial);
+void __iee_code _iee_set_key_watchers(unsigned long __unused, struct key *key, struct watch_list *watchers);
+void __iee_code _iee_set_key_user(unsigned long __unused, struct key *key, struct key_user *user);
+void __iee_code _iee_set_key_security(unsigned long __unused, struct key *key, void *security);
+void __iee_code _iee_set_key_expiry(unsigned long __unused, struct key *key, time64_t expiry);
+void __iee_code _iee_set_key_revoked_at(unsigned long __unused, struct key *key, time64_t revoked_at);
+void __iee_code _iee_set_key_last_used_at(unsigned long __unused, struct key *key, time64_t last_used_at);
+void __iee_code _iee_set_key_uid(unsigned long __unused, struct key *key, kuid_t uid);
+void __iee_code _iee_set_key_gid(unsigned long __unused, struct key *key, kgid_t gid);
+void __iee_code _iee_set_key_perm(unsigned long __unused, struct key *key, key_perm_t perm);
+void __iee_code _iee_set_key_quotalen(unsigned long __unused, struct key *key, unsigned short quotalen);
+void __iee_code _iee_set_key_datalen(unsigned long __unused, struct key *key, unsigned short datalen);
+void __iee_code _iee_set_key_state(unsigned long __unused, struct key *key, short state);
+void __iee_code _iee_set_key_magic(unsigned long __unused, struct key *key, unsigned int magic);
+void __iee_code _iee_set_key_flags(unsigned long __unused, struct key *key, unsigned long flags);
+void __iee_code _iee_set_key_index_key(unsigned long __unused, struct key *key, struct keyring_index_key *index_key);
+void __iee_code _iee_set_key_hash(unsigned long __unused, struct key *key, unsigned long hash);
+void __iee_code _iee_set_key_len_desc(unsigned long __unused, struct key *key, unsigned long len_desc);
+void __iee_code _iee_set_key_type(unsigned long __unused, struct key *key, struct key_type *type);
+void __iee_code _iee_set_key_domain_tag(unsigned long __unused, struct key *key, struct key_tag *domain_tag);
+void __iee_code _iee_set_key_description(unsigned long __unused, struct key *key, char *description);
+void __iee_code _iee_set_key_restrict_link(unsigned long __unused, struct key *key,
+									struct key_restriction *restrict_link);
+unsigned long __iee_code _iee_set_key_flag_bit(unsigned long __unused, struct key *key, long nr, int flag);
+#endif
 #endif
