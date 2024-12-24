@@ -14,6 +14,11 @@ unsigned long kernel_physical_mapping_init(unsigned long start,
 					     unsigned long end,
 					     unsigned long page_size_mask,
 					     pgprot_t prot);
+#ifdef CONFIG_IEE
+unsigned long kernel_physical_mapping_init_for_iee(unsigned long paddr_start,
+			     unsigned long paddr_end,
+			     unsigned long page_size_mask, pgprot_t prot);
+#endif /* CONFIG_IEE*/
 unsigned long kernel_physical_mapping_change(unsigned long start,
 					     unsigned long end,
 					     unsigned long page_size_mask);

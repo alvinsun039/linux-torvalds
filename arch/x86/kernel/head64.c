@@ -44,6 +44,10 @@
 #include <asm/csv.h>
 #include <asm/init.h>
 
+#ifdef CONFIG_IEE
+#include <asm/iee-si.h>
+#endif
+
 /*
  * Manage page tables very early on.
  */
@@ -659,7 +663,11 @@ static void startup_64_load_idt(unsigned long physbase)
 	}
 
 	desc->address = (unsigned long)idt;
+	#ifdef CONFIG_IEE
+	iee_load_idt_pre_init(desc);
+	#else
 	native_load_idt(desc);
+	#endif
 }
 
 /* This is used when running on kernel addresses */

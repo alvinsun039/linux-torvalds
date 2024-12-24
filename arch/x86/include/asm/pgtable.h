@@ -252,6 +252,14 @@ static inline unsigned long pgd_pfn(pgd_t pgd)
 	return (pgd_val(pgd) & PTE_PFN_MASK) >> PAGE_SHIFT;
 }
 
+#ifdef CONFIG_IEE
+#define __pte_to_phys(pte)		(pte_pfn(pte) << PAGE_SHIFT)
+#define __pmd_to_phys(pmd)		(__pte_to_phys(__pte(pmd_val(pmd))))
+#define __pud_to_phys(pud)		(__pte_to_phys(__pte(pud_val(pud))))
+#define __p4d_to_phys(p4d)		(__pte_to_phys(__pte(p4d_val(p4d))))
+#define __pgd_to_phys(pgd)		(__pte_to_phys(__pte(pgd_val(pgd))))
+#endif
+
 #define p4d_leaf p4d_leaf
 static inline bool p4d_leaf(p4d_t p4d)
 {
@@ -1184,6 +1192,11 @@ static inline int pgd_none(pgd_t pgd)
 
 extern int direct_gbpages;
 void init_mem_mapping(void);
+#ifdef CONFIG_IEE
+void init_iee_mapping(void);
+unsigned long init_memory_mapping_for_iee(unsigned long start,
+				  unsigned long end, pgprot_t prot);
+#endif /* CONFIG_IEE*/
 void early_alloc_pgt_buf(void);
 extern void memblock_find_dma_reserve(void);
 void __init poking_init(void);

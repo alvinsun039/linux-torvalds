@@ -77,6 +77,10 @@
 
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_IEE
+#include <asm/iee-token.h>
+#endif
+
 static int bprm_creds_from_file(struct linux_binprm *bprm);
 
 int suid_dumpable = 0;
@@ -1006,6 +1010,10 @@ static int exec_mmap(struct mm_struct *mm)
 	if (!IS_ENABLED(CONFIG_ARCH_WANT_IRQS_OFF_ACTIVATE_MM))
 		local_irq_enable();
 	activate_mm(active_mm, mm);
+	#ifdef CONFIG_IEE
+	/* set token pgd after activate_mm, because we need to check current.token.pgd == read_cr3() */
+	iee_set_token_pgd(tsk, mm->pgd);
+	#endif
 	if (IS_ENABLED(CONFIG_ARCH_WANT_IRQS_OFF_ACTIVATE_MM))
 		local_irq_enable();
 	lru_gen_add_mm(mm);

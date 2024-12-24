@@ -144,6 +144,11 @@ int slab_unmergeable(struct kmem_cache *s)
 	if (s->ctor)
 		return 1;
 
+	#ifdef CONFIG_IEE
+	if (strcmp(s->name, "iee_stack_jar") == 0)
+		return 1;
+	#endif
+
 #ifdef CONFIG_HARDENED_USERCOPY
 	if (s->usersize)
 		return 1;
@@ -168,6 +173,11 @@ struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 
 	if (ctor)
 		return NULL;
+
+	#ifdef CONFIG_IEE
+	if (strcmp(name, "iee_stack_jar") == 0)
+		return NULL;
+	#endif
 
 	size = ALIGN(size, sizeof(void *));
 	align = calculate_alignment(flags, align, size);

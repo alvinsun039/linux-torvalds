@@ -116,6 +116,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/task.h>
 
+#ifdef CONFIG_IEE
+#include <asm/iee-token.h>
+#endif
+
 /*
  * Minimum number of threads to boot the kernel
  */
@@ -171,7 +175,11 @@ void __weak arch_release_task_struct(struct task_struct *tsk)
 }
 
 #ifndef CONFIG_ARCH_TASK_STRUCT_ALLOCATOR
+#ifdef CONFIG_IEE
+struct kmem_cache *task_struct_cachep;
+#else
 static struct kmem_cache *task_struct_cachep;
+#endif
 
 static inline struct task_struct *alloc_task_struct_node(int node)
 {
@@ -628,6 +636,9 @@ void free_task(struct task_struct *tsk)
 	arch_release_task_struct(tsk);
 	if (tsk->flags & PF_KTHREAD)
 		free_kthread_struct(tsk);
+	#ifdef CONFIG_IEE
+	iee_invalidate_token(tsk);
+	#endif
 	bpf_task_storage_free(tsk);
 	free_task_struct(tsk);
 }
@@ -1073,10 +1084,17 @@ void __init fork_init(void)
 
 	/* create a slab on which task_structs can be allocated */
 	task_struct_whitelist(&useroffset, &usersize);
+	#ifdef CONFIG_IEE
+	task_struct_cachep = kmem_cache_create_usercopy("task_struct",
+			arch_task_struct_size, align,
+			SLAB_PANIC|SLAB_ACCOUNT|SLAB_RED_ZONE,
+			useroffset, usersize, NULL);
+	#else
 	task_struct_cachep = kmem_cache_create_usercopy("task_struct",
 			arch_task_struct_size, align,
 			SLAB_PANIC|SLAB_ACCOUNT,
 			useroffset, usersize, NULL);
+	#endif
 #endif
 
 	/* do the arch specific task caches init */
@@ -1738,6 +1756,9 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 #endif
 
 	tsk->mm = NULL;
+	#ifdef CONFIG_IEE
+	iee_set_token_pgd(tsk, NULL);
+	#endif
 	tsk->active_mm = NULL;
 
 	/*
@@ -1759,6 +1780,9 @@ static int copy_mm(unsigned long clone_flags, struct task_struct *tsk)
 	}
 
 	tsk->mm = mm;
+	#ifdef CONFIG_IEE
+	iee_set_token_pgd(tsk, mm->pgd);
+	#endif
 	tsk->active_mm = mm;
 	sched_mm_cid_fork(tsk);
 	return 0;
@@ -2238,6 +2262,11 @@ __latent_entropy struct task_struct *copy_process(
 	p = dup_task_struct(current, node);
 	if (!p)
 		goto fork_out;
+
+	#ifdef CONFIG_IEE
+	iee_validate_token(p);
+	#endif
+
 	p->flags &= ~PF_KTHREAD;
 	if (args->kthread)
 		p->flags |= PF_KTHREAD;

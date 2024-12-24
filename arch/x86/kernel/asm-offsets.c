@@ -112,6 +112,12 @@ static void __used common(void)
 #ifdef CONFIG_MITIGATION_CALL_DEPTH_TRACKING
 	OFFSET(X86_call_depth, pcpu_hot, call_depth);
 #endif
+#ifdef CONFIG_IEE
+	DEFINE(iee_from_token_offset, offsetof(struct task_token, iee_stack));
+	DEFINE(tmp_page_from_token_offset, offsetof(struct task_token, tmp_page));
+	DEFINE(kernel_from_token_offset, offsetof(struct task_token, kernel_stack));
+	DEFINE(pgd_from_token_offset, offsetof(struct task_token, pgd));
+#endif
 #if IS_ENABLED(CONFIG_CRYPTO_ARIA_AESNI_AVX_X86_64)
 	/* Offset for fields in aria_ctx */
 	BLANK();

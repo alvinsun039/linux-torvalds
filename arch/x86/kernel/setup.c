@@ -56,6 +56,10 @@
 #include <asm/vsyscall.h>
 #include <linux/vmalloc.h>
 #include <asm/csv.h>
+#ifdef CONFIG_IEE
+#include <linux/iee-func.h>
+void *init_token_page_vaddr;
+#endif
 
 /*
  * max_low_pfn_mapped: highest directly mapped pfn < 4 GB
@@ -714,6 +718,52 @@ static void __init x86_report_nx(void)
 	}
 }
 
+#ifdef CONFIG_IEE
+#include <asm/pgalloc.h>
+unsigned long IEE_OFFSET = 0x200000000000;
+EXPORT_SYMBOL(IEE_OFFSET);
+unsigned long iee_offset = 0x200000000000;
+#ifdef CONFIG_X86_5LEVEL
+void init_iee_offset(void)
+{
+	if (pgtable_l5_enabled()) {
+		IEE_OFFSET = 0x40000000000000;
+		iee_offset = IEE_OFFSET;
+	}
+}
+#endif /* CONFIG_X86_5LEVEL */
+
+void __init iee_set_token_page_valid_pre_init(void *token, void *token_page)
+{
+	pgd_t *pgdir = swapper_pg_dir;
+	pgd_t *pgdp = pgd_offset_pgd(pgdir, (unsigned long)token);
+	p4d_t *p4dp = p4d_offset(pgdp, (unsigned long)token);
+	pud_t *pudp = pud_offset(p4dp, (unsigned long)token);
+	pmd_t *pmdp = pmd_offset(pudp, (unsigned long)token);
+
+	if (pmd_leaf(*pmdp)) {
+		pte_t *pgtable = alloc_low_pages(1);
+		struct page *page = pmd_page(*pmdp);
+		pte_t *ptep = (pte_t *)((unsigned long)pgtable);
+
+		for (int i = 0; i < PMD_SIZE / PAGE_SIZE; i++, ptep++) {
+			pte_t entry;
+			pgprot_t pgprot = pmd_pgprot(*pmdp);
+
+			entry = mk_pte(page + i, pgprot);
+			WRITE_ONCE(*ptep, entry);
+		}
+		pmd_populate_kernel(&init_mm, pmdp, pgtable);
+	}
+	pte_t *ptep = pte_offset_kernel(pmdp, (unsigned long)token);
+	pte_t pte = READ_ONCE(*ptep);
+
+	pte = __pte(((pte_val(pte) & ~PTE_PFN_MASK) | __PP) | (__phys_to_pfn(__pa(token_page)) << PAGE_SHIFT));
+	set_pte(ptep, pte);
+	flush_tlb_kernel_range((unsigned long)token, (unsigned long)(token+PAGE_SIZE));
+}
+#endif /* CONFIG_IEE */
+
 /*
  * Determine if we were loaded by an EFI loader.  If so, then we have also been
  * passed the efi memmap, systab, etc., so we should use these data structures
@@ -955,6 +1005,9 @@ void __init setup_arch(char **cmdline_p)
 	 * Define random base addresses for memory sections after max_pfn is
 	 * defined and before each memory section base is used.
 	 */
+	#if defined(CONFIG_IEE) && defined(CONFIG_X86_5LEVEL)
+	init_iee_offset();
+	#endif
 	kernel_randomize_memory();
 
 #ifdef CONFIG_X86_32
@@ -1039,6 +1092,33 @@ void __init setup_arch(char **cmdline_p)
 	x86_platform.realmode_reserve();
 
 	init_mem_mapping();
+
+	#ifdef CONFIG_IEE
+	init_iee_mapping();
+
+	// Change init_task image va to Logival VA
+	unsigned long init_task_la = (unsigned long)__va(__pa_symbol(&init_task));
+
+	raw_cpu_write(pcpu_hot.current_task, (struct task_struct *)init_task_la);
+	init_task.cpus_ptr = &(((struct task_struct *)(__va(__pa_symbol(&init_task))))->cpus_mask);
+	init_task.children.prev = (__va(__pa_symbol(init_task.children.prev)));
+	init_task.children.next = (__va(__pa_symbol(init_task.children.next)));
+
+	void *new;
+	void *init_token;
+	struct task_token *token;
+
+	// Alloc a page for init_token.
+	new = alloc_low_pages(1);
+	init_token_page_vaddr = new;
+	init_token = (void *)__phys_to_iee(__pa_symbol(&init_task));
+	// Use lm to write token before IEE initialized.
+	token = (struct task_token *)((unsigned long)new + (((unsigned long)&init_task) & ~PAGE_MASK));
+	token->pgd = NULL;
+	token->iee_stack = (void *)__phys_to_iee(__pa_symbol(init_iee_stack_end));
+	token->valid = true;
+	iee_set_token_page_valid_pre_init(init_token, new);
+	#endif	/* CONFIG_IEE*/
 
 	idt_setup_early_pf();
 

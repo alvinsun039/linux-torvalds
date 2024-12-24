@@ -30,6 +30,9 @@
 #include <linux/sched/isolation.h>
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_IEE
+#include <asm/iee-token.h>
+#endif
 
 static DEFINE_SPINLOCK(kthread_create_lock);
 static LIST_HEAD(kthread_create_list);
@@ -1447,6 +1450,9 @@ void kthread_use_mm(struct mm_struct *mm)
 	tsk->active_mm = mm;
 	tsk->mm = mm;
 	membarrier_update_current_mm(mm);
+	#ifdef CONFIG_IEE
+	iee_set_token_pgd(tsk, mm->pgd);
+	#endif
 	switch_mm_irqs_off(active_mm, mm, tsk);
 	local_irq_enable();
 	task_unlock(tsk);
@@ -1491,6 +1497,9 @@ void kthread_unuse_mm(struct mm_struct *mm)
 	local_irq_disable();
 	tsk->mm = NULL;
 	membarrier_update_current_mm(NULL);
+	#ifdef CONFIG_IEE
+	iee_set_token_pgd(tsk, NULL);
+	#endif
 	mmgrab_lazy_tlb(mm);
 	/* active_mm is still 'mm' */
 	enter_lazy_tlb(mm, tsk);

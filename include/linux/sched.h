@@ -748,6 +748,16 @@ struct kmap_ctrl {
 #endif
 };
 
+#ifdef CONFIG_IEE
+struct task_token {
+	pgd_t *pgd; /* Logical VA */
+	void *iee_stack; /* VA */
+	void *tmp_page;
+	bool valid;
+	void *kernel_stack; /* VA */
+};
+#endif /* CONFIG_IEE */
+
 struct task_struct {
 #ifdef CONFIG_THREAD_INFO_IN_TASK
 	/*

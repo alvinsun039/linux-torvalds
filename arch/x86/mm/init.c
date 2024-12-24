@@ -252,6 +252,7 @@ static void __init probe_page_size_mask(void)
 	if (cpu_feature_enabled(X86_FEATURE_PTI))
 		__default_kernel_pte_mask &= ~_PAGE_GLOBAL;
 
+	#ifndef CONFIG_IEE
 	/* Enable 1 GB linear kernel mappings if available: */
 	if (direct_gbpages && boot_cpu_has(X86_FEATURE_GBPAGES)) {
 		printk(KERN_INFO "Using GB pages for direct mapping\n");
@@ -259,6 +260,7 @@ static void __init probe_page_size_mask(void)
 	} else {
 		direct_gbpages = 0;
 	}
+	#endif
 }
 
 #define INTEL_MATCH(_model) { .vendor  = X86_VENDOR_INTEL,	\
@@ -449,6 +451,7 @@ static int __meminit split_mem_range(struct map_range *mr, int nr_range,
 	}
 
 #ifdef CONFIG_X86_64
+#ifndef CONFIG_IEE
 	/* big page (1G) range */
 	start_pfn = round_up(pfn, PFN_DOWN(PUD_SIZE));
 	end_pfn = round_down(limit_pfn, PFN_DOWN(PUD_SIZE));
@@ -467,6 +470,7 @@ static int __meminit split_mem_range(struct map_range *mr, int nr_range,
 				page_size_mask & (1<<PG_LEVEL_2M));
 		pfn = end_pfn;
 	}
+#endif
 #endif
 
 	/* tail is not big page (2M) alignment */
@@ -807,6 +811,186 @@ void __init init_mem_mapping(void)
 
 	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
 }
+
+#ifdef CONFIG_IEE
+extern unsigned long IEE_OFFSET;
+static unsigned long __init init_range_memory_mapping_for_iee(
+					   unsigned long r_start,
+					   unsigned long r_end)
+{
+	unsigned long start_pfn, end_pfn;
+	unsigned long mapped_ram_size = 0;
+	int i;
+
+	for_each_mem_pfn_range(i, MAX_NUMNODES, &start_pfn, &end_pfn, NULL) {
+		u64 start = clamp_val(PFN_PHYS(start_pfn), r_start, r_end);
+		u64 end = clamp_val(PFN_PHYS(end_pfn), r_start, r_end);
+
+		if (start >= end)
+			continue;
+		/*
+		 * if it is overlapping with brk pgt, we need to
+		 * alloc pgt buf from memblock instead.
+		 */
+		can_use_brk_pgt = max(start, (u64)pgt_buf_end<<PAGE_SHIFT) >=
+				    min(end, (u64)pgt_buf_top<<PAGE_SHIFT);
+		init_memory_mapping_for_iee(start, end, SET_RO(PAGE_KERNEL));
+		mapped_ram_size += end - start;
+		can_use_brk_pgt = true;
+	}
+	return mapped_ram_size;
+}
+static void __init memory_map_top_down_for_iee(unsigned long map_start,
+				       unsigned long map_end)
+{
+	unsigned long real_end, last_start;
+	unsigned long step_size;
+	unsigned long addr;
+	unsigned long mapped_ram_size = 0;
+	/*
+	 * Systems that have many reserved areas near top of the memory,
+	 * e.g. QEMU with less than 1G RAM and EFI enabled, or Xen, will
+	 * require lots of 4K mappings which may exhaust pgt_buf.
+	 * Start with top-most PMD_SIZE range aligned at PMD_SIZE to ensure
+	 * there is enough mapped memory that can be allocated from
+	 * memblock.
+	 */
+	addr = memblock_phys_alloc_range(PMD_SIZE, PMD_SIZE, map_start,
+					 map_end);
+	memblock_phys_free(addr, PMD_SIZE);
+	real_end = addr + PMD_SIZE;
+	/* step_size need to be small so pgt_buf from BRK could cover it */
+	step_size = PMD_SIZE;
+	// max_pfn_mapped = 0; /* will get exact value next */
+	min_pfn_mapped = real_end >> PAGE_SHIFT;
+	last_start = real_end;
+	/*
+	 * We start from the top (end of memory) and go to the bottom.
+	 * The memblock_find_in_range() gets us a block of RAM from the
+	 * end of RAM in [min_pfn_mapped, max_pfn_mapped) used as new pages
+	 * for page table.
+	 */
+	while (last_start > map_start) {
+		unsigned long start;
+
+		if (last_start > step_size) {
+			start = round_down(last_start - 1, step_size);
+			if (start < map_start)
+				start = map_start;
+		} else
+			start = map_start;
+		mapped_ram_size += init_range_memory_mapping_for_iee(start,
+							last_start);
+		last_start = start;
+		min_pfn_mapped = last_start >> PAGE_SHIFT;
+		if (mapped_ram_size >= step_size)
+			step_size = get_new_step_size(step_size);
+	}
+	if (real_end < map_end)
+		init_range_memory_mapping_for_iee(real_end, map_end);
+}
+/**
+ * memory_map_bottom_up - Map [map_start, map_end) bottom up
+ * @map_start: start address of the target memory range
+ * @map_end: end address of the target memory range
+ *
+ * This function will setup direct mapping for memory range
+ * [map_start, map_end) in bottom-up. Since we have limited the
+ * bottom-up allocation above the kernel, the page tables will
+ * be allocated just above the kernel and we map the memory
+ * in [map_start, map_end) in bottom-up.
+ */
+static void __init memory_map_bottom_up_for_iee(unsigned long map_start,
+					unsigned long map_end)
+{
+	unsigned long next, start;
+	unsigned long mapped_ram_size = 0;
+	/* step_size need to be small so pgt_buf from BRK could cover it */
+	unsigned long step_size = PMD_SIZE;
+
+	start = map_start;
+	min_pfn_mapped = start >> PAGE_SHIFT;
+	/*
+	 * We start from the bottom (@map_start) and go to the top (@map_end).
+	 * The memblock_find_in_range() gets us a block of RAM from the
+	 * end of RAM in [min_pfn_mapped, max_pfn_mapped) used as new pages
+	 * for page table.
+	 */
+	while (start < map_end) {
+		if (step_size && map_end - start > step_size) {
+			next = round_up(start + 1, step_size);
+			if (next > map_end)
+				next = map_end;
+		} else {
+			next = map_end;
+		}
+		mapped_ram_size += init_range_memory_mapping_for_iee(start, next);
+		start = next;
+		if (mapped_ram_size >= step_size)
+			step_size = get_new_step_size(step_size);
+	}
+}
+unsigned long __ref init_memory_mapping_for_iee(unsigned long start,
+					unsigned long end, pgprot_t prot)
+{
+	struct map_range mr[NR_RANGE_MR];
+	unsigned long ret = 0;
+	int nr_range, i;
+
+	memset(mr, 0, sizeof(mr));
+	nr_range = split_mem_range(mr, 0, start, end);
+	for (i = 0; i < nr_range; i++)
+		ret = kernel_physical_mapping_init_for_iee(mr[i].start, mr[i].end,
+						   mr[i].page_size_mask,
+						   prot);
+
+	add_pfn_range_mapped(start >> PAGE_SHIFT, ret >> PAGE_SHIFT);
+	return ret >> PAGE_SHIFT;
+}
+void __init init_iee_mapping(void)
+{
+	unsigned long end;
+#ifdef CONFIG_X86_64
+	end = max_pfn << PAGE_SHIFT;
+#else
+	end = max_low_pfn << PAGE_SHIFT;
+#endif
+	/* the ISA range is always mapped regardless of memory holes */
+	init_memory_mapping_for_iee(0, ISA_END_ADDRESS, SET_RO(PAGE_KERNEL));
+	if (__pa_symbol(_end) > IEE_OFFSET)
+		panic("Image on too high phys mem.\n");
+
+	/*
+	 * If the allocation is in bottom-up direction, we setup direct mapping
+	 * in bottom-up, otherwise we setup direct mapping in top-down.
+	 */
+	if (memblock_bottom_up()) {
+		unsigned long kernel_end = __pa_symbol(_end);
+
+		/*
+		 * we need two separate calls here. This is because we want to
+		 * allocate page tables above the kernel. So we first map
+		 * [kernel_end, end) to make memory above the kernel be mapped
+		 * as soon as possible. And then use page tables allocated above
+		 * the kernel to map [ISA_END_ADDRESS, kernel_end).
+		 */
+
+		memory_map_bottom_up_for_iee(kernel_end, end);
+		memory_map_bottom_up_for_iee(ISA_END_ADDRESS, kernel_end);
+	} else {
+		memory_map_top_down_for_iee(ISA_END_ADDRESS, end);
+	}
+#ifdef CONFIG_X86_64
+	if (max_pfn > max_low_pfn) {
+		/* can we preserve max_low_pfn ?*/
+		max_low_pfn = max_pfn;
+	}
+#else
+	early_ioremap_page_table_range_init();
+#endif
+	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
+}
+#endif /* CONFIG_IEE*/
 
 /*
  * Initialize an mm_struct to be used during poking and a pointer to be used

@@ -788,6 +788,59 @@ kernel_physical_mapping_init(unsigned long paddr_start,
 					      page_size_mask, prot, true);
 }
 
+#ifdef CONFIG_IEE
+static unsigned long __meminit
+__kernel_physical_mapping_init_for_iee(unsigned long paddr_start,
+			       unsigned long paddr_end,
+			       unsigned long page_size_mask,
+			       pgprot_t prot, bool init)
+{
+	bool pgd_changed = false;
+	unsigned long vaddr, vaddr_start, vaddr_end, vaddr_next, paddr_last;
+
+	paddr_last = paddr_end;
+	vaddr = (unsigned long)__phys_to_iee(paddr_start);
+	vaddr_end = (unsigned long)__phys_to_iee(paddr_end);
+	vaddr_start = vaddr;
+	for (; vaddr < vaddr_end; vaddr = vaddr_next) {
+		pgd_t *pgd = pgd_offset_k(vaddr);
+		p4d_t *p4d;
+
+		vaddr_next = (vaddr & PGDIR_MASK) + PGDIR_SIZE;
+		if (pgd_val(*pgd)) {
+			p4d = (p4d_t *)pgd_page_vaddr(*pgd);
+			paddr_last = phys_p4d_init(p4d, __iee_pa(vaddr),
+							__iee_pa(vaddr_end),
+							page_size_mask, prot, init);
+			continue;
+		}
+		p4d = alloc_low_page();
+		paddr_last = phys_p4d_init(p4d, __iee_pa(vaddr),
+						__iee_pa(vaddr_end),
+						page_size_mask, prot, init);
+		spin_lock(&init_mm.page_table_lock);
+		if (pgtable_l5_enabled())
+			pgd_populate_init(&init_mm, pgd, p4d, init);
+		else
+			p4d_populate_init(&init_mm, p4d_offset(pgd, vaddr),
+					  (pud_t *) p4d, init);
+		spin_unlock(&init_mm.page_table_lock);
+		pgd_changed = true;
+	}
+	if (pgd_changed)
+		sync_global_pgds(vaddr_start, vaddr_end - 1);
+	return paddr_last;
+}
+unsigned long __meminit
+kernel_physical_mapping_init_for_iee(unsigned long paddr_start,
+			     unsigned long paddr_end,
+			     unsigned long page_size_mask, pgprot_t prot)
+{
+	return __kernel_physical_mapping_init_for_iee(paddr_start, paddr_end,
+					      page_size_mask, prot, true);
+}
+#endif /* CONFIG_IEE*/
+
 /*
  * This function is similar to kernel_physical_mapping_init() above with the
  * exception that it uses set_{pud,pmd}() instead of the set_{pud,pte}_safe()

@@ -99,6 +99,42 @@ jiffies = jiffies_64;
 
 #endif
 
+#ifdef CONFIG_IEE
+#define IEE_TEXT \
+	. = ALIGN(PAGE_SIZE);				\
+	__iee_code_start = .;       \
+	*(.iee.text.header)         \
+	*(.iee.text)				        \
+	. = ALIGN(PAGE_SIZE);				\
+	__iee_code_end = .;
+#else
+#define IEE_TEXT
+#endif
+#ifdef CONFIG_IEE
+#define IEE_SI_TEXT \
+	. = ALIGN(PAGE_SIZE);       \
+	__iee_si_text_start = .; 			\
+	*(.iee.si_text)				    \
+	. = ALIGN(PAGE_SIZE);           \
+	__iee_trampoline_si_text_start = .; \
+	*(.iee.trampoline.si_text) \
+	__iee_trampoline_si_text_end = .; \
+	. = ALIGN(PAGE_SIZE);           \
+	__iee_si_text_end = .;
+#else
+#define IEE_SI_TEXT
+#endif
+#ifdef CONFIG_IEE
+#define IEE_SI_DATA \
+    . = ALIGN(PAGE_SIZE);       \
+    __iee_si_data_start = .;	\
+	*(.iee.si_data)				\
+	. = ALIGN(PAGE_SIZE);           \
+	__iee_si_data_end = .;
+#else
+#define IEE_SI_DATA
+#endif
+
 PHDRS {
 	text PT_LOAD FLAGS(5);          /* R_E */
 	data PT_LOAD FLAGS(6);          /* RW_ */
@@ -128,6 +164,8 @@ SECTIONS
 		/* bootstrapping code */
 		HEAD_TEXT
 		TEXT_TEXT
+		IEE_TEXT
+		IEE_SI_TEXT
 		SCHED_TEXT
 		LOCK_TEXT
 		KPROBES_TEXT
@@ -181,6 +219,7 @@ SECTIONS
 		CACHELINE_ALIGNED_DATA(L1_CACHE_BYTES)
 
 		DATA_DATA
+		IEE_SI_DATA
 		CONSTRUCTORS
 
 		/* rarely changed data like cpu maps */
@@ -407,6 +446,13 @@ SECTIONS
 		. = ALIGN(PAGE_SIZE);
 		__bss_stop = .;
 	}
+
+#ifdef CONFIG_IEE
+	. = ALIGN(PAGE_SIZE*4);
+	init_iee_stack_begin = .;
+	. += PAGE_SIZE*4;
+	init_iee_stack_end = .;
+#endif
 
 	/*
 	 * The memory occupied from _text to here, __end_of_kernel_reserve, is
