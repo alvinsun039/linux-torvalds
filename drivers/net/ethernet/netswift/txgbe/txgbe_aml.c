@@ -417,8 +417,10 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		if (status != 0)
 			return status;
 
-		if (link_up)
+		if (link_up) {
+			adapter->flags &= ~TXGBE_FLAG_NEED_LINK_CONFIG;
 			goto out;
+		}
 	}
 
 	/* We didn't get link.  Configure back to the highest speed we tried,
