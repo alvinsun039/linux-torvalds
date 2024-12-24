@@ -42,6 +42,9 @@ extern struct kmem_cache *task_struct_cachep;
 extern void *fixup_red_left(struct kmem_cache *s, void *p);
 extern int iee_get_oo_objects(struct kmem_cache *s);
 #endif
+#ifdef CONFIG_IEE_SELINUX_P
+extern struct kmem_cache *policy_jar;
+#endif
 
 /*
  * Freelist pointer and counter to cmpxchg together, avoids the typical ABA

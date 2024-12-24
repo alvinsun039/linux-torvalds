@@ -135,6 +135,15 @@ jiffies = jiffies_64;
 #define IEE_SI_DATA
 #endif
 
+#ifdef CONFIG_IEE_SELINUX_P
+	#define IEE_SELINUX_DATA		\
+		. = ALIGN(PAGE_SIZE);		\
+		*(.iee.selinux)		\
+		. = ALIGN(PAGE_SIZE);
+#else
+	#define IEE_SELINUX_DATA
+#endif
+
 PHDRS {
 	text PT_LOAD FLAGS(5);          /* R_E */
 	data PT_LOAD FLAGS(6);          /* RW_ */
@@ -220,6 +229,7 @@ SECTIONS
 
 		DATA_DATA
 		IEE_SI_DATA
+		IEE_SELINUX_DATA
 		CONSTRUCTORS
 
 		/* rarely changed data like cpu maps */

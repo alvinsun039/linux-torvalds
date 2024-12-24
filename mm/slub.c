@@ -575,6 +575,12 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 		return;
 	}
 	#endif
+	#ifdef CONFIG_IEE_SELINUX_P
+	if (s == policy_jar) {
+		iee_set_freeptr((void **)freeptr_addr, (void *)freelist_ptr_encode(s, fp, freeptr_addr).v);
+		return;
+	}
+	#endif
 	*(freeptr_t *)freeptr_addr = freelist_ptr_encode(s, fp, freeptr_addr);
 }
 
@@ -2573,6 +2579,11 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if ((alloc_gfp & __GFP_DIRECT_RECLAIM) && oo_order(oo) > oo_order(s->min))
 		alloc_gfp = (alloc_gfp | __GFP_NOMEMALLOC) & ~__GFP_RECLAIM;
 
+	#ifdef CONFIG_IEE_SELINUX_P
+	if (s == policy_jar)
+		alloc_gfp |= __GFP_ZERO;
+	#endif
+
 	slab = alloc_slab_page(alloc_gfp, node, oo);
 	if (unlikely(!slab)) {
 		oo = s->min;
@@ -2581,6 +2592,10 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 		 * Allocation may have failed due to fragmentation.
 		 * Try a lower order alloc if possible
 		 */
+		#ifdef CONFIG_IEE_SELINUX_P
+		if (s == policy_jar)
+			alloc_gfp |= __GFP_ZERO;
+		#endif
 		slab = alloc_slab_page(alloc_gfp, node, oo);
 		if (unlikely(!slab))
 			return NULL;
@@ -2602,6 +2617,11 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	}
 	if (s == iee_stack_jar)
 		set_iee_stack_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	#endif
+
+	#ifdef CONFIG_IEE_SELINUX_P
+	if (s == policy_jar)
+		set_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
 	#endif
 
 	account_slab(slab, oo_order(oo), s, flags);
@@ -2669,6 +2689,11 @@ static void __free_slab(struct kmem_cache *s, struct slab *slab)
 	}
 	if (s == iee_stack_jar)
 		unset_iee_stack_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	#endif
+
+	#ifdef CONFIG_IEE_SELINUX_P
+	if (s == policy_jar)
+		unset_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
 	#endif
 
 	__free_pages(&folio->page, order);
@@ -4151,6 +4176,10 @@ static bool is_iee_kmem_cache(struct kmem_cache *s)
 {
 	if (s == iee_stack_jar)
 		return  true;
+#ifdef CONFIG_IEE_SELINUX_P
+	else if (s == policy_jar)
+		return  true;
+#endif
 	return false;
 }
 #endif	//	CONFIG_IEE
@@ -5426,6 +5455,10 @@ static int calculate_sizes(struct kmem_cache *s)
 	if (strcmp(s->name, "task_struct") == 0)
 		order = HUGE_PMD_ORDER;
 	if (strcmp(s->name, "iee_stack_jar") == 0)
+		order = HUGE_PMD_ORDER;
+	#endif
+	#ifdef CONFIG_IEE_SELINUX_P
+	if (strcmp(s->name, "policy_jar") == 0)
 		order = HUGE_PMD_ORDER;
 	#endif
 

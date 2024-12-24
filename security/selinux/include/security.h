@@ -113,11 +113,15 @@ static inline bool selinux_initialized(void)
 	return smp_load_acquire(&selinux_state.initialized);
 }
 
+#ifdef CONFIG_IEE_SELINUX_P
+extern void selinux_mark_initialized(void);
+#else
 static inline void selinux_mark_initialized(void)
 {
 	/* do a synchronized write to avoid race conditions */
 	smp_store_release(&selinux_state.initialized, true);
 }
+#endif
 
 #ifdef CONFIG_SECURITY_SELINUX_DEVELOP
 static inline bool enforcing_enabled(void)
@@ -125,10 +129,15 @@ static inline bool enforcing_enabled(void)
 	return READ_ONCE(selinux_state.enforcing);
 }
 
+#ifdef CONFIG_IEE_SELINUX_P
+extern void enforcing_set(bool value);
+#else
 static inline void enforcing_set(bool value)
 {
 	WRITE_ONCE(selinux_state.enforcing, value);
 }
+#endif
+
 #else
 static inline bool enforcing_enabled(void)
 {

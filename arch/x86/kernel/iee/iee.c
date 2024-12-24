@@ -18,6 +18,9 @@
 #include <asm/pgtable_areas.h>
 #include <linux/hugetlb.h>
 #include <asm/iee-def.h>
+#ifdef CONFIG_IEE_SELINUX_P
+#include <asm/iee-selinuxp.h>
+#endif
 
 typedef void (*iee_func)(void);
 iee_func iee_funcs[] = {
@@ -40,6 +43,13 @@ iee_func iee_funcs[] = {
 	(iee_func)_iee_set_pud,
 	(iee_func)_iee_set_p4d,
 	(iee_func)_iee_set_pgd,
+#endif
+#ifdef CONFIG_IEE_SELINUX_P
+	(iee_func)_iee_set_selinux_status_pg,
+	(iee_func)_iee_set_selinux_enforcing,
+	(iee_func)_iee_mark_selinux_initialized,
+	(iee_func)_iee_set_sel_policy_cap,
+	(iee_func)_iee_sel_rcu_assign_policy,
 #endif
 	NULL
 };
@@ -260,6 +270,45 @@ void __iee_code _iee_set_p4d(unsigned long __unused, p4d_t *p4dp, p4d_t p4d)
 void __iee_code _iee_set_pgd(unsigned long __unused, pgd_t *pgdp, pgd_t pgd)
 {
 	WRITE_ONCE(*(pgd_t *)(__phys_to_iee(__pa(pgdp))), pgd);
+}
+#endif
+
+#ifdef CONFIG_IEE_SELINUX_P
+void __iee_code _iee_set_selinux_status_pg(unsigned long __unused, struct page *new_page)
+{
+	struct page **iee_addr = (struct page **)__phys_to_iee(__pa_symbol(&(selinux_state.status_page)));
+	*iee_addr = new_page;
+}
+
+void __iee_code _iee_set_selinux_enforcing(unsigned long __unused, bool value)
+{
+	*(bool *)__phys_to_iee(__pa_symbol(&(selinux_state.enforcing))) = value;
+}
+
+void __iee_code _iee_mark_selinux_initialized(unsigned long __unused)
+{
+	/* synchronize selinux status*/
+	smp_store_release(((bool *)__phys_to_iee(__pa_symbol(&(selinux_state.initialized)))), true);
+}
+
+void __iee_code _iee_set_sel_policy_cap(unsigned long __unused, unsigned int idx, int cap)
+{
+	*(bool *)__phys_to_iee(__pa_symbol(&(selinux_state.policycap[idx]))) = cap;
+}
+
+/*
+ * Please make sure param iee_new_policy is from policy_jar memcache.
+ * Need to free new_policy after calling this func as it's only used to
+ * trans data from kernel.
+ */
+void __iee_code _iee_sel_rcu_assign_policy(unsigned long __unused, struct selinux_policy *new_policy,
+					struct selinux_policy *iee_new_policy)
+{
+	struct selinux_policy *iee_addr = (struct selinux_policy *)(__phys_to_iee(__pa(iee_new_policy)));
+
+	memcpy(iee_addr, new_policy, sizeof(struct selinux_policy));
+	rcu_assign_pointer(*((struct selinux_policy **)__phys_to_iee(__pa_symbol(&(selinux_state.policy)))),
+			iee_new_policy);
 }
 #endif
 
