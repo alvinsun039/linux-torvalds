@@ -34,6 +34,13 @@ iee_func iee_funcs[] = {
 	(iee_func)_iee_test_and_clear_bit,
 	(iee_func)_iee_set_sensitive_pte,
 	(iee_func)_iee_unset_sensitive_pte,
+#ifdef CONFIG_PTP
+	(iee_func)_iee_set_pte,
+	(iee_func)_iee_set_pmd,
+	(iee_func)_iee_set_pud,
+	(iee_func)_iee_set_p4d,
+	(iee_func)_iee_set_pgd,
+#endif
 	NULL
 };
 
@@ -114,11 +121,11 @@ void __iee_code _iee_validate_token(unsigned long __unused, struct task_struct *
 
 void __iee_code _iee_unset_token(unsigned long __unused,
 	pte_t *token_ptep, pte_t *token_page_ptep,
-	void *token, void *token_page, unsigned long order, int use_block_pmd)
+	void *token, void *token_page, unsigned long order)
 {
 	token_ptep = (pte_t *)(__phys_to_iee(__pa(token_ptep)));
 	token_page_ptep = (pte_t *)(__phys_to_iee(__pa(token_page_ptep)));
-	if (use_block_pmd) {
+	if (order == 0) {
 		pmd_t *pmdp = (pmd_t *)token_page_ptep;
 		pmd_t pmd = READ_ONCE(*pmdp);
 
@@ -228,6 +235,33 @@ void __iee_code _iee_unset_sensitive_pte(unsigned long __unused, pte_t *lm_ptep,
 		}
 	}
 }
+
+#ifdef CONFIG_PTP
+void __iee_code _iee_set_pte(unsigned long __unused, pte_t *ptep, pte_t pte)
+{
+	WRITE_ONCE(*(pte_t *)(__phys_to_iee(__pa(ptep))), pte);
+}
+
+void __iee_code _iee_set_pmd(unsigned long __unused, pmd_t *pmdp, pmd_t pmd)
+{
+	WRITE_ONCE(*(pmd_t *)(__phys_to_iee(__pa(pmdp))), pmd);
+}
+
+void __iee_code _iee_set_pud(unsigned long __unused, pud_t *pudp, pud_t pud)
+{
+	WRITE_ONCE(*(pud_t *)(__phys_to_iee(__pa(pudp))), pud);
+}
+
+void __iee_code _iee_set_p4d(unsigned long __unused, p4d_t *p4dp, p4d_t p4d)
+{
+	WRITE_ONCE(*(p4d_t *)(__phys_to_iee(__pa(p4dp))), p4d);
+}
+
+void __iee_code _iee_set_pgd(unsigned long __unused, pgd_t *pgdp, pgd_t pgd)
+{
+	WRITE_ONCE(*(pgd_t *)(__phys_to_iee(__pa(pgdp))), pgd);
+}
+#endif
 
 /* iee si */
 bool iee_pgt_jar_init __iee_si_data;

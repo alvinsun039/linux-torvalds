@@ -196,5 +196,10 @@ void __init *early_memremap_decrypted_wp(resource_size_t phys_addr,
 void __early_set_fixmap(enum fixed_addresses idx,
 			phys_addr_t phys, pgprot_t flags);
 
+#ifdef CONFIG_PTP
+void __iee_set_fixmap_pre_init(enum fixed_addresses idx,
+			       phys_addr_t phys, pgprot_t flags);
+#endif
+
 #endif /* !__ASSEMBLY__ */
 #endif /* _ASM_X86_FIXMAP_H */

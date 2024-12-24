@@ -70,6 +70,24 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
 	__set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR)
 #endif
 
+#ifdef CONFIG_PTP
+#ifndef clear_fixmap_init
+#define clear_fixmap_init(idx)			\
+	__iee_set_fixmap_pre_init(idx, 0, FIXMAP_PAGE_CLEAR)
+#endif
+
+#define __iee_set_fixmap_offset_pre_init(idx, phys, flags)				\
+({									\
+	unsigned long ________addr;					\
+	__iee_set_fixmap_pre_init(idx, phys, flags);					\
+	________addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1));	\
+	________addr;							\
+})
+
+#define iee_set_fixmap_offset_pre_init(idx, phys) \
+	__iee_set_fixmap_offset_pre_init(idx, phys, FIXMAP_PAGE_NORMAL)
+#endif /* CONFIG_PTP */
+
 /* Return a pointer with offset calculated */
 #define __set_fixmap_offset(idx, phys, flags)				\
 ({									\

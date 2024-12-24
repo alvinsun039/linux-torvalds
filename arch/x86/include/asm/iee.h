@@ -22,7 +22,7 @@ void __iee_code _iee_invalidate_token(unsigned long __unused,
 void __iee_code _iee_validate_token(unsigned long __unused,
 	struct task_struct *tsk);
 void __iee_code _iee_unset_token(unsigned long __unused, pte_t *token_ptep,
-	pte_t *token_page_ptep, void *token, void *token_page, unsigned long order, int use_block_pmd);
+	pte_t *token_page_ptep, void *token, void *token_page, unsigned long order);
 void __iee_code _iee_set_token(unsigned long __unused,
 	pte_t *token_ptep, pte_t *new_ptep, void *new, unsigned long order, int use_block_pmd);
 unsigned long __iee_code _iee_test_and_clear_bit(unsigned long __unused,
@@ -31,4 +31,16 @@ void __iee_code _iee_set_sensitive_pte(unsigned long __unused,
 	pte_t *lm_ptep, int order, int use_block_pmd);
 void __iee_code _iee_unset_sensitive_pte(unsigned long __unused,
 	pte_t *lm_ptep, int order, int use_block_pmd);
+#ifdef CONFIG_PTP
+void __iee_code _iee_set_pte(unsigned long __unused,
+	pte_t *ptep, pte_t pte);
+void __iee_code _iee_set_pmd(unsigned long __unused,
+	pmd_t *pmdp, pmd_t pmd);
+void __iee_code _iee_set_pud(unsigned long __unused,
+	pud_t *pudp, pud_t pud);
+void __iee_code _iee_set_p4d(unsigned long __unused,
+	p4d_t *p4dp, p4d_t p4d);
+void __iee_code _iee_set_pgd(unsigned long __unused,
+	pgd_t *pgdp, pgd_t pgd);
+#endif
 #endif

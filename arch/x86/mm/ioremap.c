@@ -888,7 +888,11 @@ void __init early_ioremap_init(void)
 
 	pmd = early_ioremap_pmd(fix_to_virt(FIX_BTMAP_BEGIN));
 	memset(bm_pte, 0, sizeof(bm_pte));
+	#ifdef CONFIG_PTP
+	iee_pmd_populate_kernel_pre_init(&init_mm, pmd, bm_pte);
+	#else
 	pmd_populate_kernel(&init_mm, pmd, bm_pte);
+	#endif
 
 	/*
 	 * The boot-ioremap range spans multiple pmds, for which
@@ -929,8 +933,39 @@ void __init __early_set_fixmap(enum fixed_addresses idx,
 	pgprot_val(flags) &= __supported_pte_mask;
 
 	if (pgprot_val(flags))
+		#ifdef CONFIG_PTP
+		iee_set_pte_pre_init(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+		#else
 		set_pte(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+		#endif
 	else
+		#ifdef CONFIG_PTP
+		iee_set_pte_pre_init(pte, __pte(0));
+		#else
 		pte_clear(&init_mm, addr, pte);
+		#endif
 	flush_tlb_one_kernel(addr);
 }
+
+#ifdef CONFIG_PTP
+void __init __iee_set_fixmap_pre_init(enum fixed_addresses idx,
+			       phys_addr_t phys, pgprot_t flags)
+{
+	unsigned long addr = __fix_to_virt(idx);
+	pte_t *pte;
+
+	if (idx >= __end_of_fixed_addresses)
+		return;
+
+	pte = early_ioremap_pte(addr);
+
+	/* Sanitize 'prot' against any unsupported bits: */
+	pgprot_val(flags) &= __supported_pte_mask;
+
+	if (pgprot_val(flags))
+		iee_set_pte_pre_init(pte, pfn_pte(phys >> PAGE_SHIFT, flags));
+	else
+		iee_set_pte_pre_init(pte, __pte(0));
+	flush_tlb_one_kernel(addr);
+}
+#endif

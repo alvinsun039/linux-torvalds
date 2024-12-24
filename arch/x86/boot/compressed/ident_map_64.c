@@ -23,7 +23,11 @@
 /* Use the static base for this part of the boot process */
 #undef __PAGE_OFFSET
 #define __PAGE_OFFSET __PAGE_OFFSET_BASE
+#ifdef CONFIG_PTP
+#include "../../mm/ident_map_for_iee.c"
+#else
 #include "../../mm/ident_map.c"
+#endif
 
 #define _SETUP
 #include <asm/setup.h>	/* For COMMAND_LINE_SIZE */
@@ -101,9 +105,15 @@ void kernel_add_identity_map(unsigned long start, unsigned long end)
 		return;
 
 	/* Build the mapping. */
+	#ifdef CONFIG_PTP
+	ret = kernel_ident_mapping_init_for_iee(&mapping_info, (pgd_t *)top_level_pgt, start, end);
+	if (ret)
+		error("Error: kernel_ident_mapping_init_for_iee() failed\n");
+	#else
 	ret = kernel_ident_mapping_init(&mapping_info, (pgd_t *)top_level_pgt, start, end);
 	if (ret)
 		error("Error: kernel_ident_mapping_init() failed\n");
+	#endif
 }
 
 /* Locates and clears a region for a new top level page table. */
@@ -211,7 +221,11 @@ static pte_t *split_large_pmd(struct x86_mapping_info *info,
 
 	/* Populate the PTEs */
 	for (i = 0; i < PTRS_PER_PMD; i++) {
+		#ifdef CONFIG_PTP
+		iee_set_pte_pre_init(&pte[i], __pte(address | page_flags));
+		#else
 		set_pte(&pte[i], __pte(address | page_flags));
+		#endif
 		address += PAGE_SIZE;
 	}
 
@@ -225,7 +239,11 @@ static pte_t *split_large_pmd(struct x86_mapping_info *info,
 	 * of a TLB multihit.
 	 */
 	pmd = __pmd((unsigned long)pte | info->kernpg_flag);
+	#ifdef CONFIG_PTP
+	iee_set_pmd_pre_init(pmdp, pmd);
+	#else
 	set_pmd(pmdp, pmd);
+	#endif
 	/* Flush TLB to establish the new PMD */
 	#ifdef CONFIG_IEE
 	native_write_cr3_pre_init(top_level_pgt);
@@ -321,7 +339,11 @@ static int set_clr_page_flags(struct x86_mapping_info *info,
 	pte = *ptep;
 	pte = pte_set_flags(pte, set);
 	pte = pte_clear_flags(pte, clr);
+	#ifdef CONFIG_PTP
+	iee_set_pte_pre_init(ptep, pte);
+	#else
 	set_pte(ptep, pte);
+	#endif
 
 	/*
 	 * If the encryption attribute is being set, then change the page state to

@@ -12,6 +12,9 @@
 
 static inline void iee_set_sensitive_pte(pte_t *lm_ptep, int order, int use_block_pmd)
 {
+#ifdef CONFIG_PTP
+	iee_rw_gate(IEE_SET_SENSITIVE_PTE, lm_ptep, order, use_block_pmd);
+#else
 	int i;
 
 	if (use_block_pmd) {
@@ -28,10 +31,14 @@ static inline void iee_set_sensitive_pte(pte_t *lm_ptep, int order, int use_bloc
 			lm_ptep++;
 		}
 	}
+#endif
 }
 
 static inline void iee_unset_sensitive_pte(pte_t *lm_ptep, int order, int use_block_pmd)
 {
+#ifdef CONFIG_PTP
+	iee_rw_gate(IEE_UNSET_SENSITIVE_PTE, lm_ptep, order, use_block_pmd);
+#else
 	int i;
 
 	if (use_block_pmd) {
@@ -48,11 +55,16 @@ static inline void iee_unset_sensitive_pte(pte_t *lm_ptep, int order, int use_bl
 			lm_ptep++;
 		}
 	}
+#endif
 }
 
 static void do_split_huge_pmd(pmd_t *pmdp)
 {
 	pte_t *pgtable = pte_alloc_one_kernel(&init_mm);
+
+	#ifdef CONFIG_PTP
+	iee_split_huge_pmd(pmdp, pgtable);
+	#else
 	int i;
 	struct page *page = pmd_page(*pmdp);
 	pte_t *ptep = (pte_t *)((unsigned long)pgtable);
@@ -64,6 +76,7 @@ static void do_split_huge_pmd(pmd_t *pmdp)
 		entry = mk_pte(page + i, pgprot);
 		WRITE_ONCE(*ptep, entry);
 	}
+	#endif
 	spinlock_t *ptl = pmd_lock(&init_mm, pmdp);
 
 	if (pmd_leaf(READ_ONCE(*pmdp))) {
@@ -73,8 +86,12 @@ static void do_split_huge_pmd(pmd_t *pmdp)
 		pgtable = NULL;
 	}
 	spin_unlock(ptl);
-	if (pgtable)
+	if (pgtable) {
+		#ifdef CONFIG_PTP
+		iee_memset(pgtable, 0, PAGE_SIZE);
+		#endif
 		pte_free_kernel(&init_mm, pgtable);
+	}
 }
 
 // Input is the lm vaddr of sensitive data.
@@ -178,6 +195,9 @@ void iee_set_token_page_valid(void *token, void *token_page, unsigned int order)
 		token_page_ptep = pte_offset_kernel(token_page_pmdp, (unsigned long)token_page);
 	}
 
+#ifdef CONFIG_PTP
+	iee_rw_gate(IEE_OP_SET_TOKEN, token_ptep, token_page_ptep, token_page, order, use_block_pmd);
+#else
 	if (use_block_pmd) {
 		pmd_t *pmdp = (pmd_t *)token_page_ptep;
 		pmd_t pmd = READ_ONCE(*pmdp);
@@ -203,6 +223,7 @@ void iee_set_token_page_valid(void *token, void *token_page, unsigned int order)
 			token_page_ptep++;
 		}
 	}
+#endif
 	flush_tlb_kernel_range((unsigned long)token, (unsigned long)(token + (PAGE_SIZE * (1 << order))));
 	flush_tlb_kernel_range((unsigned long)token_page, (unsigned long)(token_page + (PAGE_SIZE * (1 << order))));
 }
@@ -237,6 +258,12 @@ void iee_set_token_page_invalid(void *token, void *__unused, unsigned long order
 	else
 		token_page_ptep = pte_offset_kernel(token_page_pmdp, (unsigned long)token);
 
+#ifdef CONFIG_PTP
+	if (use_block_pmd)
+		iee_rw_gate(IEE_OP_UNSET_TOKEN, token_ptep, token_page_ptep, token, token_page, 0);
+	else
+		iee_rw_gate(IEE_OP_UNSET_TOKEN, token_ptep, token_page_ptep, token, token_page, order);
+#else
 	if (use_block_pmd) {
 		pmd_t *pmdp = (pmd_t *)token_page_ptep;
 		pmd_t pmd = READ_ONCE(*pmdp);
@@ -262,6 +289,7 @@ void iee_set_token_page_invalid(void *token, void *__unused, unsigned long order
 			token_page_ptep++;
 		}
 	}
+#endif
 	free_pages((unsigned long)token_page, order);
 	flush_tlb_kernel_range((unsigned long)token, (unsigned long)(token + (PAGE_SIZE * (1 << order))));
 	flush_tlb_kernel_range((unsigned long)token_page, (unsigned long)(token_page + (PAGE_SIZE * (1 << order))));

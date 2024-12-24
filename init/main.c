@@ -1097,6 +1097,10 @@ void start_kernel(void)
 
 	set_iee_page((unsigned long)init_token_page_vaddr, 0);
 	#endif
+	#ifdef CONFIG_PTP
+	/* Set the logical va of existing pgtable readonly */
+	iee_mark_all_lm_pgtable_ro();
+	#endif
 
 	/* Do the rest non-__init'ed, we're now alive */
 	arch_call_rest_init();

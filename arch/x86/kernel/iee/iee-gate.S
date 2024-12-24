@@ -181,3 +181,104 @@ SYM_FUNC_START(iee_rwx_gate)
     popq %r12
     jmp __x86_return_thunk  /* ret */
 SYM_FUNC_END(iee_rwx_gate)
+
+#ifdef CONFIG_PTP
+SYM_FUNC_START(iee_set_xchg)
+.L_set_xchg:
+    xchg    %rsi, (%rdi)
+    mov     %rsi, %rax
+    jmp __x86_return_thunk  /* ret */
+.E_set_xchg:
+    /* save RFLAGS, close irq */
+    pushfq
+    cli
+
+    push %r12
+
+    DISABLE_WP r12
+
+    addq iee_offset(%rip), %rdi
+    xchg    %rsi, (%rdi)
+    mov     %rsi, %rax
+
+    ENABLE_WP r12
+
+    popq %r12
+
+    /* restore RFLAGS*/
+    popfq
+    jmp __x86_return_thunk  /* ret */
+    _ASM_EXTABLE(.L_set_xchg, .E_set_xchg)
+SYM_FUNC_END(iee_set_xchg)
+
+SYM_FUNC_START(iee_set_try_cmpxchg)
+    mov %rsi, %rax
+.L_set_try_cmpxchg:
+    lock cmpxchgq %rdx, (%rdi)
+    jmp __x86_return_thunk  /* ret */
+.E_set_try_cmpxchg:
+    /* save RFLAGS, close irq */
+    pushfq
+    cli
+
+    pushq %r12
+
+    DISABLE_WP r12
+
+    addq iee_offset(%rip), %rdi
+    lock cmpxchgq %rdx, (%rdi)
+
+    ENABLE_WP r12
+
+    popq %r12
+    /* restore RFLAGS*/
+    popfq
+    jmp __x86_return_thunk  /* ret */
+    _ASM_EXTABLE(.L_set_try_cmpxchg, .E_set_try_cmpxchg)
+SYM_FUNC_END(iee_set_try_cmpxchg)
+
+.macro IEE_SET_PGTABLE level
+.L_set_\level:
+    movq %rdx, (%rsi)
+    jmp __x86_return_thunk
+.E_set_\level:
+    pushfq
+    cli
+
+    DISABLE_WP rdi
+
+    addq iee_offset(%rip), %rsi
+    movq %rdx, (%rsi)
+
+    ENABLE_WP rdi
+
+    popfq
+    jmp __x86_return_thunk
+    _ASM_EXTABLE(.L_set_\level, .E_set_\level)
+.endm
+
+SYM_FUNC_START(iee_set_pte)
+    IEE_SET_PGTABLE pte
+SYM_FUNC_END(iee_set_pte)
+EXPORT_SYMBOL(iee_set_pte)
+
+SYM_FUNC_START(iee_set_pmd)
+    IEE_SET_PGTABLE pmd
+SYM_FUNC_END(iee_set_pmd)
+EXPORT_SYMBOL(iee_set_pmd)
+
+SYM_FUNC_START(iee_set_pud)
+    IEE_SET_PGTABLE pud
+SYM_FUNC_END(iee_set_pud)
+EXPORT_SYMBOL(iee_set_pud)
+
+SYM_FUNC_START(iee_set_p4d)
+    IEE_SET_PGTABLE p4d
+SYM_FUNC_END(iee_set_p4d)
+EXPORT_SYMBOL(iee_set_p4d)
+
+SYM_FUNC_START(iee_set_pgd)
+    IEE_SET_PGTABLE pgd
+SYM_FUNC_END(iee_set_pgd)
+EXPORT_SYMBOL(iee_set_pgd)
+#endif

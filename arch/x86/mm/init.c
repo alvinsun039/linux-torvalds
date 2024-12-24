@@ -28,6 +28,10 @@
 #include <asm/memtype.h>
 #include <asm/paravirt.h>
 
+#ifdef CONFIG_PTP
+#include <asm/pgalloc.h>
+#endif
+
 /*
  * We need to define the tracepoints somewhere, and tlb.c
  * is only compiled when SMP=y.
@@ -991,6 +995,287 @@ void __init init_iee_mapping(void)
 	early_memtest(0, max_pfn_mapped << PAGE_SHIFT);
 }
 #endif /* CONFIG_IEE*/
+
+#ifdef CONFIG_PTP
+void __init set_iee_valid_pre_init(unsigned long addr) {}
+
+static void __init move_pte_table_into_iee(pmd_t *pmdp, unsigned long addr, unsigned long end)
+{
+	pmd_t pmd = READ_ONCE(*pmdp);
+	unsigned long iee_addr = (unsigned long)__phys_to_iee(__pmd_to_phys(pmd));
+
+	set_iee_valid_pre_init(iee_addr);
+}
+
+static void __init move_pmd_table_into_iee(pud_t *pudp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	pud_t pud = READ_ONCE(*pudp);
+	pmd_t *pmdp;
+	pmd_t pmd;
+
+	unsigned long iee_addr = (unsigned long)__phys_to_iee(__pud_to_phys(pud));
+
+	set_iee_valid_pre_init(iee_addr);
+	pmdp = pmd_offset(pudp, addr);
+	do {
+		next = pmd_addr_end(addr, end);
+		pmd = READ_ONCE(*pmdp);
+		if (pmd_val(pmd) & _PSE)
+			continue;
+		else
+			move_pte_table_into_iee(pmdp, addr, next);
+	} while (pmdp++, addr = next, addr != end);
+}
+
+static void __init move_pud_table_into_iee(p4d_t *p4dp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	p4d_t p4d = READ_ONCE(*p4dp);
+	pud_t *pudp;
+	pud_t pud;
+	unsigned long iee_addr = (unsigned long)__phys_to_iee(__p4d_to_phys(p4d));
+
+	set_iee_valid_pre_init(iee_addr);
+	pudp = pud_offset(p4dp, addr);
+	do {
+		next = pud_addr_end(addr, end);
+		pud = READ_ONCE(*pudp);
+		if (pud_val(pud) & _PSE)
+			continue;
+		else
+			move_pmd_table_into_iee(pudp, addr, next);
+	} while (pudp++, addr = next, addr != end);
+}
+
+static void __init move_p4d_table_into_iee(pgd_t *pgdp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	pgd_t pgd = READ_ONCE(*pgdp);
+	p4d_t *p4dp;
+	p4d_t p4d;
+	unsigned long iee_addr = (unsigned long)__phys_to_iee(__pgd_to_phys(pgd));
+
+	set_iee_valid_pre_init(iee_addr);
+	p4dp = p4d_offset(pgdp, addr);
+	do {
+		next = p4d_addr_end(addr, end);
+		p4d = READ_ONCE(*p4dp);
+		/* No 512 GiB huge pages yet */
+		move_pud_table_into_iee(p4dp, addr, next);
+	} while (p4dp++, addr = next, addr != end);
+}
+
+static void __init init_iee_for_one_region(pgd_t *pgdir, unsigned long va_start, unsigned long va_end)
+{
+	unsigned long addr, end, next;
+	pgd_t *pgdp = pgd_offset_pgd(pgdir, va_start);
+
+	addr = va_start & PAGE_MASK;
+	end = PAGE_ALIGN(va_end);
+	do {
+		next = pgd_addr_end(addr, end);
+		move_p4d_table_into_iee(pgdp, addr, next);
+	} while (pgdp++, addr = next, addr != end);
+}
+
+void __init init_iee(void)
+{
+	unsigned long iee_addr;
+	pgd_t *pgdp;
+	phys_addr_t start, end;
+	u64 i;
+
+	// handling 1-level page table swapper_pg_dir
+	pgdp = swapper_pg_dir;
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(swapper_pg_dir));
+	set_iee_valid_pre_init(iee_addr);
+	#if PGD_ALLOCATION_ORDER == 1
+	set_iee_valid_pre_init(iee_addr + PAGE_SIZE);
+	#endif
+
+	#ifdef CONFIG_X86_5LEVEL
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(level4_kernel_pgt));
+	set_iee_valid_pre_init(iee_addr);
+	#endif
+
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(level3_kernel_pgt));
+	set_iee_valid_pre_init(iee_addr);
+
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(level2_kernel_pgt));
+	set_iee_valid_pre_init(iee_addr);
+
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(level2_fixmap_pgt));
+	set_iee_valid_pre_init(iee_addr);
+
+	iee_addr = (unsigned long)__phys_to_iee(__pa_symbol(level1_fixmap_pgt));
+	for (i = 0; i < FIXMAP_PMD_NUM; i++)
+		set_iee_valid_pre_init(iee_addr + PAGE_SIZE * i);
+
+	// handling 2/3/4-level page table for kernel
+	init_iee_for_one_region(pgdp, (unsigned long)_text, (unsigned long)_etext);
+	init_iee_for_one_region(pgdp, (unsigned long)__start_rodata, (unsigned long)__end_rodata);
+	init_iee_for_one_region(pgdp, (unsigned long)_sdata, (unsigned long)_edata);
+	init_iee_for_one_region(pgdp, (unsigned long)__bss_start, (unsigned long)__bss_stop);
+
+	// handling page table for fixmap i.e. FIXADDR_START ~ FIXADDR_TOP
+	// printk("fixmap into iee:\n");
+	init_iee_for_one_region(pgdp, FIXADDR_START, FIXADDR_TOP);
+
+	// handling page table for %esp fixup stacks
+	// espfix_pud_page in espfix_64.c
+
+	// handling 2/3/4-level page table for logical mem and iee
+	for_each_mem_range(i, &start, &end) {
+		if (start >= end)
+			break;
+		init_iee_for_one_region(pgdp,
+			(unsigned long)__va(start), (unsigned long)__va(end));
+		init_iee_for_one_region(pgdp,
+			(unsigned long)__phys_to_iee(start), (unsigned long)__phys_to_iee(end));
+	}
+}
+
+static void __init iee_set_pte_table_ro(pmd_t *pmdp, unsigned long addr, unsigned long end)
+{
+	pmd_t pmd = READ_ONCE(*pmdp);
+	unsigned long logical_addr = (unsigned long)__va(__pmd_to_phys(pmd));
+
+	iee_set_logical_mem_ro(logical_addr);
+}
+
+static void __init iee_set_pmd_table_ro(pud_t *pudp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	pud_t pud = READ_ONCE(*pudp);
+	pmd_t *pmdp;
+	pmd_t pmd;
+	unsigned long logical_addr = (unsigned long)__va(__pud_to_phys(pud));
+
+	iee_set_logical_mem_ro(logical_addr);
+	pmdp = pmd_offset(pudp, addr);
+	do {
+		next = pmd_addr_end(addr, end);
+		pmd = READ_ONCE(*pmdp);
+		if (pmd_val(pmd) & _PSE)
+			continue;
+		else
+			iee_set_pte_table_ro(pmdp, addr, next);
+	} while (pmdp++, addr = next, addr != end);
+}
+
+static void __init iee_set_pud_table_ro(p4d_t *p4dp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	p4d_t p4d = READ_ONCE(*p4dp);
+	pud_t *pudp;
+	pud_t pud;
+	unsigned long logical_addr = (unsigned long)__va(__p4d_to_phys(p4d));
+
+	iee_set_logical_mem_ro(logical_addr);
+	pudp = pud_offset(p4dp, addr);
+	do {
+		next = pud_addr_end(addr, end);
+		pud = READ_ONCE(*pudp);
+		if (pud_val(pud) & _PSE)
+			continue;
+		else
+			iee_set_pmd_table_ro(pudp, addr, next);
+	} while (pudp++, addr = next, addr != end);
+}
+
+static void __init iee_set_p4d_table_ro(pgd_t *pgdp, unsigned long addr, unsigned long end)
+{
+	unsigned long next;
+	pgd_t pgd = READ_ONCE(*pgdp);
+	p4d_t *p4dp;
+	p4d_t p4d;
+	unsigned long logical_addr = (unsigned long)__va(__pgd_to_phys(pgd));
+
+	iee_set_logical_mem_ro(logical_addr);
+	p4dp = p4d_offset(pgdp, addr);
+	do {
+		next = p4d_addr_end(addr, end);
+		p4d = READ_ONCE(*p4dp);
+		/* No 512 GiB huge pages yet */
+		iee_set_pud_table_ro(p4dp, addr, next);
+	} while (p4dp++, addr = next, addr != end);
+}
+
+static void __init iee_mark_pgtable_for_one_region_ro(pgd_t *pgdir, unsigned long va_start, unsigned long va_end)
+{
+	unsigned long addr, end, next;
+	pgd_t *pgdp = pgd_offset_pgd(pgdir, va_start);
+
+	addr = va_start & PAGE_MASK;
+	end = PAGE_ALIGN(va_end);
+
+	do {
+		next = pgd_addr_end(addr, end);
+		iee_set_p4d_table_ro(pgdp, addr, next);
+	} while (pgdp++, addr = next, addr != end);
+}
+
+// Mark pgtable outside as RO.
+void __init iee_mark_all_lm_pgtable_ro(void)
+{
+	unsigned long logical_addr;
+	phys_addr_t start, end;
+	u64 i;
+	pgd_t *pgdp;
+
+	// handling 1-level page table swapper_pg_dir
+	pgdp = swapper_pg_dir;
+	iee_set_logical_mem_ro((unsigned long)swapper_pg_dir);
+	logical_addr = (unsigned long)__va(__pa_symbol(swapper_pg_dir));
+	iee_set_logical_mem_ro(logical_addr);
+
+	// handling 2/3/4/5-level page table for kernel
+	iee_mark_pgtable_for_one_region_ro(pgdp, (unsigned long)_text, (unsigned long)_etext);
+	iee_mark_pgtable_for_one_region_ro(pgdp, (unsigned long)__start_rodata, (unsigned long)__end_rodata);
+	iee_mark_pgtable_for_one_region_ro(pgdp, (unsigned long)_sdata, (unsigned long)_edata);
+	iee_mark_pgtable_for_one_region_ro(pgdp, (unsigned long)__bss_start, (unsigned long)__bss_stop);
+
+	// handling 2/3/4/5-level statically allocated page table
+	#ifdef CONFIG_X86_5LEVEL
+	iee_set_logical_mem_ro((unsigned long)level4_kernel_pgt);
+	logical_addr = (unsigned long)__va(__pa_symbol(level4_kernel_pgt));
+	iee_set_logical_mem_ro(logical_addr);
+	#endif
+
+	iee_set_logical_mem_ro((unsigned long)level3_kernel_pgt);
+	logical_addr = (unsigned long)__va(__pa_symbol(level3_kernel_pgt));
+	iee_set_logical_mem_ro(logical_addr);
+
+	iee_set_logical_mem_ro((unsigned long)level2_kernel_pgt);
+	logical_addr = (unsigned long)__va(__pa_symbol(level2_kernel_pgt));
+	iee_set_logical_mem_ro(logical_addr);
+
+	iee_set_logical_mem_ro((unsigned long)level2_fixmap_pgt);
+	logical_addr = (unsigned long)__va(__pa_symbol(level2_fixmap_pgt));
+	iee_set_logical_mem_ro(logical_addr);
+
+	iee_set_logical_mem_ro((unsigned long)level1_fixmap_pgt);
+	logical_addr = (unsigned long)__va(__pa_symbol(level1_fixmap_pgt));
+	for (i = 0; i < FIXMAP_PMD_NUM; i++)
+		iee_set_logical_mem_ro(logical_addr + PAGE_SIZE * i);
+
+	// handling 2/3/4-level page table for logical mem and iee
+	for_each_mem_range(i, &start, &end) {
+		if (start >= end)
+			break;
+		/*
+		 * The linear map must allow allocation tags reading/writing
+		 * if MTE is present. Otherwise, it has the same attributes as
+		 * PAGE_KERNEL.
+		 */
+		iee_mark_pgtable_for_one_region_ro(pgdp,
+			(unsigned long)__va(start), (unsigned long)__va(end));
+		iee_mark_pgtable_for_one_region_ro(pgdp,
+			(unsigned long)__phys_to_iee(start), (unsigned long)__phys_to_iee(end));
+	}
+}
+#endif /* CONFIG_PTP */
 
 /*
  * Initialize an mm_struct to be used during poking and a pointer to be used

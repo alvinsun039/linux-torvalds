@@ -753,13 +753,21 @@ void __init iee_set_token_page_valid_pre_init(void *token, void *token_page)
 			entry = mk_pte(page + i, pgprot);
 			WRITE_ONCE(*ptep, entry);
 		}
+		#ifdef CONFIG_PTP
+		iee_pmd_populate_kernel_pre_init(&init_mm, pmdp, pgtable);
+		#else
 		pmd_populate_kernel(&init_mm, pmdp, pgtable);
+		#endif
 	}
 	pte_t *ptep = pte_offset_kernel(pmdp, (unsigned long)token);
 	pte_t pte = READ_ONCE(*ptep);
 
 	pte = __pte(((pte_val(pte) & ~PTE_PFN_MASK) | __PP) | (__phys_to_pfn(__pa(token_page)) << PAGE_SHIFT));
+	#ifdef CONFIG_PTP
+	iee_set_pte_pre_init(ptep, pte);
+	#else
 	set_pte(ptep, pte);
+	#endif
 	flush_tlb_kernel_range((unsigned long)token, (unsigned long)(token+PAGE_SIZE));
 }
 #endif /* CONFIG_IEE */
@@ -1119,6 +1127,10 @@ void __init setup_arch(char **cmdline_p)
 	token->valid = true;
 	iee_set_token_page_valid_pre_init(init_token, new);
 	#endif	/* CONFIG_IEE*/
+
+	#ifdef CONFIG_PTP
+	init_iee();
+	#endif
 
 	idt_setup_early_pf();
 
