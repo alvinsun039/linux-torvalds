@@ -35,6 +35,10 @@
 #include <linux/mnt_idmapping.h>
 #include <linux/filelock.h>
 
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
+
 #include "internal.h"
 
 int do_truncate(struct mnt_idmap *idmap, struct dentry *dentry,
@@ -414,17 +418,35 @@ static const struct cred *access_override_creds(void)
 	 * routine.
 	 */
 
+	#ifdef CONFIG_CREDP
+	iee_set_cred_fsuid(override_cred, override_cred->uid);
+	iee_set_cred_fsgid(override_cred, override_cred->gid);
+	#else
 	override_cred->fsuid = override_cred->uid;
 	override_cred->fsgid = override_cred->gid;
+	#endif
 
 	if (!issecure(SECURE_NO_SETUID_FIXUP)) {
 		/* Clear the capabilities if we switch to a non-root user */
 		kuid_t root_uid = make_kuid(override_cred->user_ns, 0);
 		if (!uid_eq(override_cred->uid, root_uid))
+			#ifdef CONFIG_CREDP
+			do {
+				kernel_cap_t tmp_cap = override_cred->cap_effective;
+
+				tmp_cap.val = 0;
+				iee_set_cred_cap_effective(override_cred, tmp_cap);
+			} while (0);
+			#else
 			cap_clear(override_cred->cap_effective);
+			#endif
 		else
+			#ifdef CONFIG_CREDP
+			iee_set_cred_cap_effective(override_cred, override_cred->cap_permitted);
+			#else
 			override_cred->cap_effective =
 				override_cred->cap_permitted;
+			#endif
 	}
 
 	/*
@@ -444,7 +466,11 @@ static const struct cred *access_override_creds(void)
 	 * expecting RCU freeing. But normal thread-synchronous
 	 * cred accesses will keep things non-RCY.
 	 */
+	#ifdef CONFIG_CREDP
+	iee_set_cred_non_rcu(override_cred, 1);
+	#else
 	override_cred->non_rcu = 1;
+	#endif
 
 	old_cred = override_creds(override_cred);
 

@@ -5,6 +5,9 @@
  */
 
 #include <linux/user_namespace.h>
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
 
 #include "smb_common.h"
 #include "server.h"
@@ -752,8 +755,13 @@ int ksmbd_override_fsids(struct ksmbd_work *work)
 	if (!cred)
 		return -ENOMEM;
 
+	#ifdef CONFIG_CREDP
+	iee_set_cred_fsuid(cred, make_kuid(&init_user_ns, uid));
+	iee_set_cred_fsgid(cred, make_kgid(&init_user_ns, gid));
+	#else
 	cred->fsuid = make_kuid(&init_user_ns, uid);
 	cred->fsgid = make_kgid(&init_user_ns, gid);
+	#endif
 
 	gi = groups_alloc(0);
 	if (!gi) {
@@ -764,7 +772,11 @@ int ksmbd_override_fsids(struct ksmbd_work *work)
 	put_group_info(gi);
 
 	if (!uid_eq(cred->fsuid, GLOBAL_ROOT_UID))
+		#ifdef CONFIG_CREDP
+		iee_set_cred_cap_effective(cred, cap_drop_fs_set(cred->cap_effective));
+		#else
 		cred->cap_effective = cap_drop_fs_set(cred->cap_effective);
+		#endif
 
 	WARN_ON(work->saved_cred);
 	work->saved_cred = override_creds(cred);

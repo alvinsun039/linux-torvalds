@@ -44,6 +44,20 @@ void iee_free_task_struct_slab(struct work_struct *work)
 	kfree(iee_free_slab_work);
 }
 
+#ifdef CONFIG_CREDP
+void iee_free_cred_slab(struct work_struct *work)
+{
+	struct iee_free_slab_work *iee_free_slab_work = container_of(work, struct iee_free_slab_work, work);
+	struct slab *slab = iee_free_slab_work->slab;
+	struct folio *folio = slab_folio(slab);
+	int order = folio_order(folio);
+
+	unset_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	__free_pages(&folio->page, order);
+	kfree(iee_free_slab_work);
+}
+#endif
+
 void iee_free_slab(struct kmem_cache *s, struct slab *slab, void (*do_free_slab)(struct work_struct *work))
 {
 	struct iee_free_slab_work *iee_free_slab_work = kmalloc(sizeof(struct iee_free_slab_work), GFP_ATOMIC);

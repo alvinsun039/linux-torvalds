@@ -43,4 +43,37 @@ void __iee_code _iee_set_p4d(unsigned long __unused,
 void __iee_code _iee_set_pgd(unsigned long __unused,
 	pgd_t *pgdp, pgd_t pgd);
 #endif
+#ifdef CONFIG_CREDP
+#include <linux/cred.h>
+extern struct cred init_cred;
+void __iee_code _iee_set_cred_uid(unsigned long __unused, struct cred *cred, kuid_t uid);
+void __iee_code _iee_set_cred_gid(unsigned long __unused, struct cred *cred, kgid_t gid);
+void __iee_code _iee_copy_cred(unsigned long __unused, struct cred *old, struct cred *new);
+void __iee_code _iee_set_cred_suid(unsigned long __unused, struct cred *cred, kuid_t suid);
+void __iee_code _iee_set_cred_sgid(unsigned long __unused, struct cred *cred, kgid_t sgid);
+void __iee_code _iee_set_cred_euid(unsigned long __unused, struct cred *cred, kuid_t euid);
+void __iee_code _iee_set_cred_egid(unsigned long __unused, struct cred *cred, kgid_t egid);
+void __iee_code _iee_set_cred_fsuid(unsigned long __unused, struct cred *cred, kuid_t fsuid);
+void __iee_code _iee_set_cred_fsgid(unsigned long __unused, struct cred *cred, kgid_t fsgid);
+void __iee_code _iee_set_cred_user(unsigned long __unused, struct cred *cred, struct user_struct *user);
+void __iee_code _iee_set_cred_user_ns(unsigned long __unused, struct cred *cred, struct user_namespace *user_ns);
+void __iee_code _iee_set_cred_group_info(unsigned long __unused, struct cred *cred, struct group_info *group_info);
+void __iee_code _iee_set_cred_securebits(unsigned long __unused, struct cred *cred, unsigned int securebits);
+void __iee_code _iee_set_cred_cap_inheritable(unsigned long __unused, struct cred *cred, kernel_cap_t cap_inheritable);
+void __iee_code _iee_set_cred_cap_permitted(unsigned long __unused, struct cred *cred, kernel_cap_t cap_permitted);
+void __iee_code _iee_set_cred_cap_effective(unsigned long __unused, struct cred *cred, kernel_cap_t cap_effective);
+void __iee_code _iee_set_cred_cap_bset(unsigned long __unused, struct cred *cred, kernel_cap_t cap_bset);
+void __iee_code _iee_set_cred_cap_ambient(unsigned long __unused, struct cred *cred, kernel_cap_t cap_ambient);
+void __iee_code _iee_set_cred_jit_keyring(unsigned long __unused, struct cred *cred, unsigned char jit_keyring);
+void __iee_code _iee_set_cred_session_keyring(unsigned long __unused, struct cred *cred, struct key *session_keyring);
+void __iee_code _iee_set_cred_process_keyring(unsigned long __unused, struct cred *cred, struct key *process_keyring);
+void __iee_code _iee_set_cred_thread_keyring(unsigned long __unused, struct cred *cred, struct key *thread_keyring);
+void __iee_code _iee_set_cred_request_key_auth(unsigned long __unused, struct cred *cred, struct key *request_key_auth);
+void __iee_code _iee_set_cred_non_rcu(unsigned long __unused, struct cred *cred, int non_rcu);
+void __iee_code _iee_set_cred_atomic_set_usage(unsigned long __unused, struct cred *cred, int i);
+unsigned long __iee_code _iee_set_cred_atomic_op_usage(unsigned long __unused, struct cred *cred, int flag, int nr);
+void __iee_code _iee_set_cred_security(unsigned long __unused, struct cred *cred, void *security);
+void __iee_code _iee_set_cred_rcu(unsigned long __unused, struct cred *cred, struct rcu_head *rcu);
+void __iee_code _iee_set_cred_ucounts(unsigned long __unused, struct cred *cred, struct ucounts *ucounts);
+#endif
 #endif

@@ -45,6 +45,9 @@ extern int iee_get_oo_objects(struct kmem_cache *s);
 #ifdef CONFIG_IEE_SELINUX_P
 extern struct kmem_cache *policy_jar;
 #endif
+#ifdef CONFIG_CREDP
+extern struct kmem_cache *cred_jar;
+#endif
 
 /*
  * Freelist pointer and counter to cmpxchg together, avoids the typical ABA

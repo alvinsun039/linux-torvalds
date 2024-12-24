@@ -51,6 +51,37 @@ iee_func iee_funcs[] = {
 	(iee_func)_iee_set_sel_policy_cap,
 	(iee_func)_iee_sel_rcu_assign_policy,
 #endif
+#ifdef CONFIG_CREDP
+	(iee_func)_iee_copy_cred,
+	(iee_func)_iee_set_cred_uid,
+	(iee_func)_iee_set_cred_gid,
+	(iee_func)_iee_set_cred_suid,
+	(iee_func)_iee_set_cred_sgid,
+	(iee_func)_iee_set_cred_euid,
+	(iee_func)_iee_set_cred_egid,
+	(iee_func)_iee_set_cred_fsuid,
+	(iee_func)_iee_set_cred_fsgid,
+	(iee_func)_iee_set_cred_user,
+	(iee_func)_iee_set_cred_user_ns,
+	(iee_func)_iee_set_cred_group_info,
+	(iee_func)_iee_set_cred_securebits,
+	(iee_func)_iee_set_cred_cap_inheritable,
+	(iee_func)_iee_set_cred_cap_permitted,
+	(iee_func)_iee_set_cred_cap_effective,
+	(iee_func)_iee_set_cred_cap_bset,
+	(iee_func)_iee_set_cred_cap_ambient,
+	(iee_func)_iee_set_cred_jit_keyring,
+	(iee_func)_iee_set_cred_session_keyring,
+	(iee_func)_iee_set_cred_process_keyring,
+	(iee_func)_iee_set_cred_thread_keyring,
+	(iee_func)_iee_set_cred_request_key_auth,
+	(iee_func)_iee_set_cred_non_rcu,
+	(iee_func)_iee_set_cred_atomic_set_usage,
+	(iee_func)_iee_set_cred_atomic_op_usage,
+	(iee_func)_iee_set_cred_security,
+	(iee_func)_iee_set_cred_rcu,
+	(iee_func)_iee_set_cred_ucounts,
+#endif
 	NULL
 };
 
@@ -309,6 +340,210 @@ void __iee_code _iee_sel_rcu_assign_policy(unsigned long __unused, struct selinu
 	memcpy(iee_addr, new_policy, sizeof(struct selinux_policy));
 	rcu_assign_pointer(*((struct selinux_policy **)__phys_to_iee(__pa_symbol(&(selinux_state.policy)))),
 			iee_new_policy);
+}
+#endif
+
+#ifdef CONFIG_CREDP
+static struct cred *iee_cred(unsigned long __unused, struct cred *cred)
+{
+	if (cred == &init_cred)
+		cred = (struct cred *)__phys_to_iee(__pa_symbol(cred));
+	else
+		cred = (struct cred *)(__phys_to_iee(__pa(cred)));
+	return cred;
+}
+
+void __iee_code _iee_set_cred_rcu(unsigned long __unused, struct cred *cred, struct rcu_head *rcu)
+{
+	cred = iee_cred(__unused, cred);
+	*((struct rcu_head **)(&(cred->rcu.func))) = rcu;
+}
+
+void __iee_code _iee_set_cred_security(unsigned long __unused, struct cred *cred, void *security)
+{
+	cred = iee_cred(__unused, cred);
+	cred->security = security;
+}
+
+unsigned long __iee_code _iee_set_cred_atomic_op_usage(unsigned long __unused, struct cred *cred, int flag, int nr)
+{
+	cred = iee_cred(__unused, cred);
+	switch (flag) {
+	case AT_ADD: {
+		atomic_long_add(nr, &cred->usage);
+		return 0;
+	}
+	case AT_INC_NOT_ZERO: {
+		return atomic_long_inc_not_zero(&cred->usage);
+	}
+	case AT_SUB_AND_TEST: {
+		return atomic_long_sub_and_test(nr, &cred->usage);
+	}
+	}
+	return 0;
+}
+
+void __iee_code _iee_set_cred_atomic_set_usage(unsigned long __unused, struct cred *cred, int i)
+{
+	cred = iee_cred(__unused, cred);
+	atomic_long_set(&cred->usage, i);
+}
+
+void __iee_code _iee_set_cred_non_rcu(unsigned long __unused, struct cred *cred, int non_rcu)
+{
+	cred = iee_cred(__unused, cred);
+	cred->non_rcu = non_rcu;
+}
+
+void __iee_code _iee_set_cred_session_keyring(unsigned long __unused, struct cred *cred, struct key *session_keyring)
+{
+	cred = iee_cred(__unused, cred);
+	cred->session_keyring = session_keyring;
+}
+
+void __iee_code _iee_set_cred_process_keyring(unsigned long __unused, struct cred *cred, struct key *process_keyring)
+{
+	cred = iee_cred(__unused, cred);
+	cred->process_keyring = process_keyring;
+}
+
+void __iee_code _iee_set_cred_thread_keyring(unsigned long __unused, struct cred *cred, struct key *thread_keyring)
+{
+	cred = iee_cred(__unused, cred);
+	cred->thread_keyring = thread_keyring;
+}
+
+void __iee_code _iee_set_cred_request_key_auth(unsigned long __unused, struct cred *cred, struct key *request_key_auth)
+{
+	cred = iee_cred(__unused, cred);
+	cred->request_key_auth = request_key_auth;
+}
+
+void __iee_code _iee_set_cred_jit_keyring(unsigned long __unused, struct cred *cred, unsigned char jit_keyring)
+{
+	cred = iee_cred(__unused, cred);
+	cred->jit_keyring = jit_keyring;
+}
+
+void __iee_code _iee_set_cred_cap_inheritable(unsigned long __unused, struct cred *cred, kernel_cap_t cap_inheritable)
+{
+	cred = iee_cred(__unused, cred);
+	cred->cap_inheritable = cap_inheritable;
+}
+
+void __iee_code _iee_set_cred_cap_permitted(unsigned long __unused, struct cred *cred, kernel_cap_t cap_permitted)
+{
+	cred = iee_cred(__unused, cred);
+	cred->cap_permitted = cap_permitted;
+}
+
+void __iee_code _iee_set_cred_cap_effective(unsigned long __unused, struct cred *cred, kernel_cap_t cap_effective)
+{
+	cred = iee_cred(__unused, cred);
+	cred->cap_effective = cap_effective;
+}
+
+void __iee_code _iee_set_cred_cap_bset(unsigned long __unused, struct cred *cred, kernel_cap_t cap_bset)
+{
+	cred = iee_cred(__unused, cred);
+	cred->cap_bset = cap_bset;
+}
+
+void __iee_code _iee_set_cred_cap_ambient(unsigned long __unused, struct cred *cred, kernel_cap_t cap_ambient)
+{
+	cred = iee_cred(__unused, cred);
+	cred->cap_ambient = cap_ambient;
+}
+
+void __iee_code _iee_set_cred_securebits(unsigned long __unused, struct cred *cred, unsigned int securebits)
+{
+	cred = iee_cred(__unused, cred);
+	cred->securebits = securebits;
+}
+
+void __iee_code _iee_set_cred_group_info(unsigned long __unused, struct cred *cred, struct group_info *group_info)
+{
+	cred = iee_cred(__unused, cred);
+	cred->group_info = group_info;
+}
+
+void __iee_code _iee_set_cred_ucounts(unsigned long __unused, struct cred *cred, struct ucounts *ucounts)
+{
+	cred = iee_cred(__unused, cred);
+	cred->ucounts = ucounts;
+}
+
+void __iee_code _iee_set_cred_user_ns(unsigned long __unused, struct cred *cred, struct user_namespace *user_ns)
+{
+	cred = iee_cred(__unused, cred);
+	cred->user_ns = user_ns;
+}
+
+void __iee_code _iee_set_cred_user(unsigned long __unused, struct cred *cred, struct user_struct *user)
+{
+	cred = iee_cred(__unused, cred);
+	cred->user = user;
+}
+
+void __iee_code _iee_set_cred_fsgid(unsigned long __unused, struct cred *cred, kgid_t fsgid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->fsgid = fsgid;
+}
+
+void __iee_code _iee_set_cred_fsuid(unsigned long __unused, struct cred *cred, kuid_t fsuid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->fsuid = fsuid;
+}
+
+void __iee_code _iee_set_cred_egid(unsigned long __unused, struct cred *cred, kgid_t egid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->egid = egid;
+}
+
+void __iee_code _iee_set_cred_euid(unsigned long __unused, struct cred *cred, kuid_t euid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->euid = euid;
+}
+
+void __iee_code _iee_set_cred_sgid(unsigned long __unused, struct cred *cred, kgid_t sgid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->sgid = sgid;
+}
+
+void __iee_code _iee_set_cred_suid(unsigned long __unused, struct cred *cred, kuid_t suid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->suid = suid;
+}
+
+void __iee_code _iee_copy_cred(unsigned long __unused, struct cred *old, struct cred *new)
+{
+	if (new == &init_cred)
+		panic("copy_cred for init_cred: %lx\n", (unsigned long)new);
+
+	struct rcu_head *rcu = (struct rcu_head *)(new->rcu.func);
+	struct cred *_new = (struct cred *)__phys_to_iee(__pa(new));
+
+	_iee_memcpy(__unused, new, old, sizeof(struct cred));
+	*(struct rcu_head **)(&(_new->rcu.func)) = rcu;
+	*(struct rcu_head *)(_new->rcu.func) = *(struct rcu_head *)(old->rcu.func);
+}
+
+void __iee_code _iee_set_cred_gid(unsigned long __unused, struct cred *cred, kgid_t gid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->gid = gid;
+}
+
+void __iee_code _iee_set_cred_uid(unsigned long __unused, struct cred *cred, kuid_t uid)
+{
+	cred = iee_cred(__unused, cred);
+	cred->uid = uid;
 }
 #endif
 

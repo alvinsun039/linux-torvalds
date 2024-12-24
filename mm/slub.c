@@ -581,6 +581,12 @@ static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 		return;
 	}
 	#endif
+	#ifdef CONFIG_CREDP
+	if (s == cred_jar) {
+		iee_set_freeptr((void **)freeptr_addr, (void *)freelist_ptr_encode(s, fp, freeptr_addr).v);
+		return;
+	}
+	#endif
 	*(freeptr_t *)freeptr_addr = freelist_ptr_encode(s, fp, freeptr_addr);
 }
 
@@ -928,6 +934,29 @@ static void set_track_update(struct kmem_cache *s, void *object,
 {
 	struct track *p = get_track(s, object, alloc);
 
+	#ifdef CONFIG_CREDP
+	struct track tmp;
+
+	if (s == cred_jar) {
+		tmp = *p;
+		#ifdef CONFIG_STACKDEPOT
+		tmp.handle = handle;
+		#endif
+		tmp.addr = addr;
+		tmp.cpu = smp_processor_id();
+		tmp.pid = current->pid;
+		tmp.when = jiffies;
+		iee_memcpy(p, &tmp, sizeof(struct track));
+	} else {
+		#ifdef CONFIG_STACKDEPOT
+		p->handle = handle;
+		#endif
+		p->addr = addr;
+		p->cpu = smp_processor_id();
+		p->pid = current->pid;
+		p->when = jiffies;
+	}
+	#else
 #ifdef CONFIG_STACKDEPOT
 	p->handle = handle;
 #endif
@@ -935,6 +964,7 @@ static void set_track_update(struct kmem_cache *s, void *object,
 	p->cpu = smp_processor_id();
 	p->pid = current->pid;
 	p->when = jiffies;
+	#endif
 }
 
 static __always_inline void set_track(struct kmem_cache *s, void *object,
@@ -953,7 +983,14 @@ static void init_tracking(struct kmem_cache *s, void *object)
 		return;
 
 	p = get_track(s, object, TRACK_ALLOC);
+	#ifdef CONFIG_CREDP
+	if (s == cred_jar)
+		iee_memset(p, 0, 2*sizeof(struct track));
+	else
+		memset(p, 0, 2*sizeof(struct track));
+	#else
 	memset(p, 0, 2*sizeof(struct track));
+	#endif
 }
 
 static void print_track(const char *s, struct track *t, unsigned long pr_time)
@@ -1163,7 +1200,14 @@ static void init_object(struct kmem_cache *s, void *object, u8 val)
 	unsigned int poison_size = s->object_size;
 
 	if (s->flags & SLAB_RED_ZONE) {
+		#ifdef CONFIG_CREDP
+		if (s == cred_jar)
+			iee_memset(p - s->red_left_pad, val, s->red_left_pad);
+		else
+			memset(p - s->red_left_pad, val, s->red_left_pad);
+		#else
 		memset(p - s->red_left_pad, val, s->red_left_pad);
+		#endif
 
 		if (slub_debug_orig_size(s) && val == SLUB_RED_ACTIVE) {
 			/*
@@ -1176,12 +1220,31 @@ static void init_object(struct kmem_cache *s, void *object, u8 val)
 	}
 
 	if (s->flags & __OBJECT_POISON) {
+		#ifdef CONFIG_CREDP
+		if (s == cred_jar) {
+			iee_memset(p, POISON_FREE, poison_size - 1);
+			iee_memset(&p[poison_size - 1], POISON_END, 1);
+		} else {
+			memset(p, POISON_FREE, poison_size - 1);
+			p[poison_size - 1] = POISON_END;
+		}
+		#else
 		memset(p, POISON_FREE, poison_size - 1);
 		p[poison_size - 1] = POISON_END;
+		#endif
 	}
 
 	if (s->flags & SLAB_RED_ZONE)
+		#ifdef CONFIG_CREDP
+	{
+		if (s == cred_jar)
+			iee_memset(p + poison_size, val, s->inuse - poison_size);
+		else
+			memset(p + poison_size, val, s->inuse - poison_size);
+	}
+		#else
 		memset(p + poison_size, val, s->inuse - poison_size);
+		#endif
 }
 
 static void restore_bytes(struct kmem_cache *s, char *message, u8 data,
@@ -1543,7 +1606,14 @@ void setup_slab_debug(struct kmem_cache *s, struct slab *slab, void *addr)
 		return;
 
 	metadata_access_enable();
+	#ifdef CONFIG_CREDP
+	if (s == cred_jar)
+		iee_memset(kasan_reset_tag(addr), POISON_INUSE, slab_size(slab));
+	else
+		memset(kasan_reset_tag(addr), POISON_INUSE, slab_size(slab));
+	#else
 	memset(kasan_reset_tag(addr), POISON_INUSE, slab_size(slab));
+	#endif
 	metadata_access_disable();
 }
 
@@ -2618,6 +2688,10 @@ static struct slab *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
 	if (s == iee_stack_jar)
 		set_iee_stack_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
 	#endif
+	#ifdef CONFIG_CREDP
+	if (s == cred_jar)
+		set_iee_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	#endif
 
 	#ifdef CONFIG_IEE_SELINUX_P
 	if (s == policy_jar)
@@ -2689,6 +2763,16 @@ static void __free_slab(struct kmem_cache *s, struct slab *slab)
 	}
 	if (s == iee_stack_jar)
 		unset_iee_stack_page((unsigned long)page_address(folio_page(slab_folio(slab), 0)), order);
+	#endif
+	#ifdef CONFIG_CREDP
+	if (s == cred_jar) {
+		#ifdef CONFIG_X86_64
+		iee_free_slab(s, slab, iee_free_cred_slab);
+		return;
+		#else
+		unset_iee_page((unsigned long)page_address(folio_page(folio, 0)), order);
+		#endif
+	}
 	#endif
 
 	#ifdef CONFIG_IEE_SELINUX_P
@@ -4180,6 +4264,10 @@ static bool is_iee_kmem_cache(struct kmem_cache *s)
 	else if (s == policy_jar)
 		return  true;
 #endif
+#ifdef CONFIG_CREDP
+	else if (s == cred_jar)
+		return  true;
+#endif
 	return false;
 }
 #endif	//	CONFIG_IEE
@@ -5459,6 +5547,10 @@ static int calculate_sizes(struct kmem_cache *s)
 	#endif
 	#ifdef CONFIG_IEE_SELINUX_P
 	if (strcmp(s->name, "policy_jar") == 0)
+		order = HUGE_PMD_ORDER;
+	#endif
+	#ifdef CONFIG_CREDP
+	if (strcmp(s->name, "cred_jar") == 0)
 		order = HUGE_PMD_ORDER;
 	#endif
 

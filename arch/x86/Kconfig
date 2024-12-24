@@ -1537,6 +1537,10 @@ config IEE_SELINUX_P
 	depends on SECURITY_SELINUX
 	def_bool y
 
+config CREDP
+	depends on IEE
+	def_bool y
+
 # Common NUMA Features
 config NUMA
 	bool "NUMA Memory Allocation and Scheduler Support"
