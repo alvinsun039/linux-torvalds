@@ -38,6 +38,15 @@ config KVM
 
 	  If unsure, say N.
 
+config ARCH_VCPU_STAT
+	bool "export kvm exits to vcpu_stat"
+	depends on KVM
+	default n
+	help
+	  Say Y here to enable kvm exits counting
+
+	  If unsure, say N.
+
 source "drivers/vhost/Kconfig"
 
 endif # VIRTUALIZATION
