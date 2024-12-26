@@ -8823,9 +8823,8 @@ void txgbe_update_stats(struct txgbe_adapter *adapter)
 	hwstats->tdmdc += rd32(hw, TXGBE_TDM_DRP_CNT);
 	hwstats->tdbpc += rd32(hw, TXGBE_TDB_OUT_PKT_CNT);
 
-	for (i = 0; i < 128; i++)
+	for (i = adapter->num_vfs; i < 128; i++)
 		hwstats->mprc += rd32(hw, TXGBE_PX_MPRC(i));
-
 
 	hwstats->roc += rd32(hw, TXGBE_RX_OVERSIZE_FRAMES_GOOD);
 	hwstats->rlec += rd32(hw, TXGBE_RX_LEN_ERROR_FRAMES_LOW);
