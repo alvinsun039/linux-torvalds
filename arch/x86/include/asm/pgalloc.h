@@ -147,6 +147,64 @@ static inline void pgd_populate_safe(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4
 	set_pgd_safe(pgd, __pgd(_PAGE_TABLE | __pa(p4d)));
 }
 
+#ifdef CONFIG_PTP
+#include <linux/iee-func.h>
+
+static inline void iee_pmd_populate_kernel_pre_init(struct mm_struct *mm,
+				       pmd_t *pmd, pte_t *pte)
+{
+	paravirt_alloc_pte(mm, __pa(pte) >> PAGE_SHIFT);
+	iee_set_pmd_pre_init(pmd, __pmd(__pa(pte) | _PAGE_TABLE));
+}
+static inline void iee_pmd_populate_kernel_safe_pre_init(struct mm_struct *mm,
+				       pmd_t *pmd, pte_t *pte)
+{
+	paravirt_alloc_pte(mm, __pa(pte) >> PAGE_SHIFT);
+	iee_set_pmd_safe_pre_init(pmd, __pmd(__pa(pte) | _PAGE_TABLE));
+}
+
+static inline void iee_pud_populate_pre_init(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
+{
+	paravirt_alloc_pmd(mm, __pa(pmd) >> PAGE_SHIFT);
+	iee_set_pud_pre_init(pud, __pud(_PAGE_TABLE | __pa(pmd)));
+}
+
+static inline void iee_pud_populate_safe_pre_init(struct mm_struct *mm, pud_t *pud, pmd_t *pmd)
+{
+	paravirt_alloc_pmd(mm, __pa(pmd) >> PAGE_SHIFT);
+	iee_set_pud_safe_pre_init(pud, __pud(_PAGE_TABLE | __pa(pmd)));
+}
+
+static inline void iee_p4d_populate_pre_init(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
+{
+	paravirt_alloc_pud(mm, __pa(pud) >> PAGE_SHIFT);
+	iee_set_p4d_pre_init(p4d, __p4d(_PAGE_TABLE | __pa(pud)));
+}
+
+static inline void iee_p4d_populate_safe_pre_init(struct mm_struct *mm, p4d_t *p4d, pud_t *pud)
+{
+	paravirt_alloc_pud(mm, __pa(pud) >> PAGE_SHIFT);
+	iee_set_p4d_safe_pre_init(p4d, __p4d(_PAGE_TABLE | __pa(pud)));
+}
+
+static inline void iee_pgd_populate_pre_init(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4d)
+{
+	if (!pgtable_l5_enabled())
+		return;
+	paravirt_alloc_p4d(mm, __pa(p4d) >> PAGE_SHIFT);
+	iee_set_pgd_pre_init(pgd, __pgd(_PAGE_TABLE | __pa(p4d)));
+}
+
+static inline void iee_pgd_populate_safe_pre_init(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4d)
+{
+	if (!pgtable_l5_enabled())
+		return;
+	paravirt_alloc_p4d(mm, __pa(p4d) >> PAGE_SHIFT);
+	iee_set_pgd_safe_pre_init(pgd, __pgd(_PAGE_TABLE | __pa(p4d)));
+}
+
+#endif
+
 static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	gfp_t gfp = GFP_KERNEL_ACCOUNT;

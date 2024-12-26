@@ -30,6 +30,10 @@
 #include <asm/smp.h>
 #include <asm/cacheflush.h>
 
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
+
 #include "psp-dev.h"
 #include "sev-dev.h"
 
@@ -205,7 +209,11 @@ static struct file *open_file_as_root(const char *filename, int flags, umode_t m
 	cred = prepare_creds();
 	if (!cred)
 		return ERR_PTR(-ENOMEM);
+	#ifdef CONFIG_CREDP
+	iee_set_cred_fsuid(cred, GLOBAL_ROOT_UID);
+	#else
 	cred->fsuid = GLOBAL_ROOT_UID;
+	#endif
 	old_cred = override_creds(cred);
 
 	fp = file_open_root(&root, filename, flags, mode);

@@ -68,6 +68,9 @@
 #include <asm/tdx.h>
 
 #include "cpu.h"
+#ifdef CONFIG_IEE
+#include <asm/iee-si.h>
+#endif
 
 u32 elf_hwcap2 __read_mostly;
 
@@ -401,14 +404,25 @@ out:
 }
 
 /* These bits should not change their value after CPU init is finished. */
+#ifdef CONFIG_IEE
+const unsigned long cr4_pinned_mask =
+	X86_CR4_UMIP |
+	X86_CR4_FSGSBASE | X86_CR4_CET;
+DEFINE_STATIC_KEY_FALSE_RO(cr_pinning);
+unsigned long cr4_pinned_bits __ro_after_init;
+#else
 static const unsigned long cr4_pinned_mask =
 	X86_CR4_SMEP | X86_CR4_SMAP | X86_CR4_UMIP |
 	X86_CR4_FSGSBASE | X86_CR4_CET;
 static DEFINE_STATIC_KEY_FALSE_RO(cr_pinning);
 static unsigned long cr4_pinned_bits __ro_after_init;
+#endif
 
 void native_write_cr0(unsigned long val)
 {
+#ifdef CONFIG_IEE
+	iee_rwx_gate(IEE_WRITE_CR0, val);
+#else
 	unsigned long bits_missing = 0;
 
 set_register:
@@ -423,11 +437,15 @@ set_register:
 		/* Warn after we've set the missing bits. */
 		WARN_ONCE(bits_missing, "CR0 WP bit went missing!?\n");
 	}
+#endif
 }
 EXPORT_SYMBOL(native_write_cr0);
 
 void __no_profile native_write_cr4(unsigned long val)
 {
+#ifdef CONFIG_IEE
+	iee_rwx_gate(IEE_WRITE_CR4, val);
+#else
 	unsigned long bits_changed = 0;
 
 set_register:
@@ -443,6 +461,7 @@ set_register:
 		WARN_ONCE(bits_changed, "pinned CR4 bits changed: 0x%lx!?\n",
 			  bits_changed);
 	}
+#endif
 }
 #if IS_MODULE(CONFIG_LKDTM)
 EXPORT_SYMBOL_GPL(native_write_cr4);
@@ -608,7 +627,9 @@ static __always_inline void setup_cet(struct cpuinfo_x86 *c)
 	else
 		wrmsrl(MSR_IA32_S_CET, 0);
 
+	#ifndef CONFIG_IEE
 	cr4_set_bits(X86_CR4_CET);
+	#endif
 
 	if (kernel_ibt && ibt_selftest()) {
 		pr_err("IBT selftest: Failed!\n");

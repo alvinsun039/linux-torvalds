@@ -94,6 +94,14 @@ extern pmdval_t early_pmd_flags;
 #define pud_clear(pud)			native_pud_clear(pud)
 #endif
 
+#ifdef CONFIG_PTP
+#define iee_set_pte_pre_init(ptep, pte)		iee_early_set_pte(ptep, pte)
+#define iee_set_pmd_pre_init(pmdp, pmd)		iee_early_set_pmd(pmdp, pmd)
+#define iee_set_pgd_pre_init(pgdp, pgd)		iee_early_set_pgd(pgdp, pgd)
+#define iee_set_p4d_pre_init(p4dp, p4d)		iee_early_set_p4d(p4dp, p4d)
+#define iee_set_pud_pre_init(pudp, pud)		iee_early_set_pud(pudp, pud)
+#endif
+
 #define pte_clear(mm, addr, ptep)	native_pte_clear(mm, addr, ptep)
 #define pmd_clear(pmd)			native_pmd_clear(pmd)
 
@@ -251,6 +259,14 @@ static inline unsigned long pgd_pfn(pgd_t pgd)
 {
 	return (pgd_val(pgd) & PTE_PFN_MASK) >> PAGE_SHIFT;
 }
+
+#ifdef CONFIG_IEE
+#define __pte_to_phys(pte)		(pte_pfn(pte) << PAGE_SHIFT)
+#define __pmd_to_phys(pmd)		(__pte_to_phys(__pte(pmd_val(pmd))))
+#define __pud_to_phys(pud)		(__pte_to_phys(__pte(pud_val(pud))))
+#define __p4d_to_phys(p4d)		(__pte_to_phys(__pte(p4d_val(p4d))))
+#define __pgd_to_phys(pgd)		(__pte_to_phys(__pte(pgd_val(pgd))))
+#endif
 
 #define p4d_leaf p4d_leaf
 static inline bool p4d_leaf(p4d_t p4d)
@@ -1184,6 +1200,14 @@ static inline int pgd_none(pgd_t pgd)
 
 extern int direct_gbpages;
 void init_mem_mapping(void);
+#ifdef CONFIG_IEE
+void init_iee_mapping(void);
+unsigned long init_memory_mapping_for_iee(unsigned long start,
+				  unsigned long end, pgprot_t prot);
+#endif /* CONFIG_IEE*/
+#ifdef CONFIG_PTP
+void init_iee(void);
+#endif
 void early_alloc_pgt_buf(void);
 extern void memblock_find_dma_reserve(void);
 void __init poking_init(void);
@@ -1284,6 +1308,11 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm,
 	return pte;
 }
 
+#ifdef CONFIG_PTP
+extern pgprotval_t iee_set_try_cmpxchg(pgprotval_t *pgprotp, pgprotval_t old_pgprotval, pgprotval_t new_pgprotval);
+extern pgprotval_t iee_set_xchg(pgprotval_t *pgprotp, pgprotval_t pgprotval);
+#endif
+
 #define __HAVE_ARCH_PTEP_SET_WRPROTECT
 static inline void ptep_set_wrprotect(struct mm_struct *mm,
 				      unsigned long addr, pte_t *ptep)
@@ -1296,9 +1325,15 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm,
 	pte_t old_pte, new_pte;
 
 	old_pte = READ_ONCE(*ptep);
+	#ifdef CONFIG_PTP
+	do {
+		new_pte = pte_wrprotect(old_pte);
+	} while (!iee_set_try_cmpxchg((long *)ptep, pte_val(old_pte), pte_val(new_pte)));
+	#else
 	do {
 		new_pte = pte_wrprotect(old_pte);
 	} while (!try_cmpxchg((long *)&ptep->pte, (long *)&old_pte, *(long *)&new_pte));
+	#endif
 }
 
 #define flush_tlb_fix_spurious_fault(vma, address, ptep) do { } while (0)
@@ -1358,9 +1393,15 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
 	pmd_t old_pmd, new_pmd;
 
 	old_pmd = READ_ONCE(*pmdp);
+	#ifdef CONFIG_PTP
+	do {
+		new_pmd = pmd_wrprotect(old_pmd);
+	} while (!iee_set_try_cmpxchg((long *)pmdp, pmd_val(old_pmd), pmd_val(new_pmd)));
+	#else
 	do {
 		new_pmd = pmd_wrprotect(old_pmd);
 	} while (!try_cmpxchg((long *)pmdp, (long *)&old_pmd, *(long *)&new_pmd));
+	#endif
 }
 
 #ifndef pmdp_establish
@@ -1370,10 +1411,20 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
 {
 	page_table_check_pmd_set(vma->vm_mm, pmdp, pmd);
 	if (IS_ENABLED(CONFIG_SMP)) {
+		#ifdef CONFIG_PTP
+		pmdval_t pmdval = iee_set_xchg((long *)pmdp, pmd_val(pmd));
+
+		return native_make_pmd(pmdval);
+		#else
 		return xchg(pmdp, pmd);
+		#endif
 	} else {
 		pmd_t old = *pmdp;
+		#ifdef CONFIG_PTP
+		set_pmd(pmdp, pmd);
+		#else
 		WRITE_ONCE(*pmdp, pmd);
+		#endif
 		return old;
 	}
 }

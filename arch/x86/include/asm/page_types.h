@@ -29,6 +29,11 @@
 
 #define PAGE_OFFSET		((unsigned long)__PAGE_OFFSET)
 
+#ifdef CONFIG_IEE
+#define SET_RO(x)    __pg(pgprot_val(x) & (~__RW) & (~___D))
+#define SET_NG(x)       __pg(pgprot_val(x) & (~_PAGE_GLOBAL))
+#endif /* CONFIG_IEE*/
+
 #define VM_DATA_DEFAULT_FLAGS	VM_DATA_FLAGS_TSK_EXEC
 
 #define __PHYSICAL_START	ALIGN(CONFIG_PHYSICAL_START, \

@@ -77,6 +77,13 @@
 
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_IEE
+#include <asm/iee-token.h>
+#endif
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
+
 static int bprm_creds_from_file(struct linux_binprm *bprm);
 
 int suid_dumpable = 0;
@@ -1006,6 +1013,10 @@ static int exec_mmap(struct mm_struct *mm)
 	if (!IS_ENABLED(CONFIG_ARCH_WANT_IRQS_OFF_ACTIVATE_MM))
 		local_irq_enable();
 	activate_mm(active_mm, mm);
+	#ifdef CONFIG_IEE
+	/* set token pgd after activate_mm, because we need to check current.token.pgd == read_cr3() */
+	iee_set_token_pgd(tsk, mm->pgd);
+	#endif
 	if (IS_ENABLED(CONFIG_ARCH_WANT_IRQS_OFF_ACTIVATE_MM))
 		local_irq_enable();
 	lru_gen_add_mm(mm);
@@ -1624,12 +1635,20 @@ static void bprm_fill_uid(struct linux_binprm *bprm, struct file *file)
 
 	if (mode & S_ISUID) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
+		#ifdef CONFIG_CREDP
+		iee_set_cred_euid(bprm->cred, vfsuid_into_kuid(vfsuid));
+		#else
 		bprm->cred->euid = vfsuid_into_kuid(vfsuid);
+		#endif
 	}
 
 	if ((mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) {
 		bprm->per_clear |= PER_CLEAR_ON_SETID;
+		#ifdef CONFIG_CREDP
+		iee_set_cred_egid(bprm->cred, vfsgid_into_kgid(vfsgid));
+		#else
 		bprm->cred->egid = vfsgid_into_kgid(vfsgid);
+		#endif
 	}
 }
 

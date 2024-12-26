@@ -61,6 +61,16 @@ static inline void copy_user_page(void *to, void *from, unsigned long vaddr,
 #define __boot_va(x)		__va(x)
 #define __boot_pa(x)		__pa(x)
 
+#ifdef CONFIG_IEE
+extern unsigned long IEE_OFFSET;
+#ifndef __iee_pa
+#define __iee_pa(x) (__pa(x - IEE_OFFSET))
+#endif
+#ifndef __phys_to_iee
+#define __phys_to_iee(x)		((void *)(__va(x) + IEE_OFFSET))
+#endif
+#endif /* CONFIG_IEE*/
+
 /*
  * virt_to_page(kaddr) returns a valid pointer if and only if
  * virt_addr_valid(kaddr) returns true.

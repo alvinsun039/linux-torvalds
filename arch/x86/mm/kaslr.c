@@ -30,7 +30,9 @@
 #include <asm/kaslr.h>
 
 #include "mm_internal.h"
-
+#ifdef CONFIG_IEE
+#include <asm/iee.h>
+#endif
 #define TB_SHIFT 40
 
 /*
@@ -136,6 +138,9 @@ void __init kernel_randomize_memory(void)
 		vaddr = round_up(vaddr + 1, PUD_SIZE);
 		remain_entropy -= entropy;
 	}
+	#ifdef CONFIG_IEE
+	iee_offset = *kaslr_regions[0].base - vaddr_start +  IEE_OFFSET;
+	#endif /* CONFIG_IEE*/
 }
 
 void __meminit init_trampoline_kaslr(void)

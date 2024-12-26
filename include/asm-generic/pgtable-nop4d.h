@@ -26,6 +26,11 @@ static inline void pgd_clear(pgd_t *pgd)	{ }
 
 #define pgd_populate(mm, pgd, p4d)		do { } while (0)
 #define pgd_populate_safe(mm, pgd, p4d)		do { } while (0)
+#ifdef CONFIG_PTP
+#define iee_pgd_populate_pre_init(mm, pgd, p4d)		do { } while (0)
+#define iee_pgd_populate_safe_pre_init(mm, pgd, p4d)		do { } while (0)
+#endif
+
 /*
  * (p4ds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)

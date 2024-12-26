@@ -113,6 +113,13 @@
 
 #include <kunit/test.h>
 
+#ifdef CONFIG_IEE
+#include <linux/iee-func.h>
+#include <asm/stack-slab.h>
+#include <asm/set_memory.h>
+#include <asm/iee-si.h>
+#endif
+
 static int kernel_init(void *);
 
 /*
@@ -873,6 +880,12 @@ static void __init print_unknown_bootoptions(void)
 	memblock_free(unknown_options, len);
 }
 
+#ifdef CONFIG_IEE
+void __weak __init iee_rest_init(void)
+{
+}
+#endif
+
 asmlinkage __visible __init __no_sanitize_address __noreturn __no_stack_protector
 void start_kernel(void)
 {
@@ -933,6 +946,9 @@ void start_kernel(void)
 	sort_main_extable();
 	trap_init();
 	mm_core_init();
+	#ifdef CONFIG_IEE
+	iee_stack_init();
+	#endif
 	poking_init();
 	ftrace_init();
 
@@ -1071,6 +1087,20 @@ void start_kernel(void)
 	acpi_subsystem_init();
 	arch_post_acpi_subsys_init();
 	kcsan_init();
+
+	#ifdef CONFIG_IEE
+	iee_rest_init();
+	/* Set iee stack pages ro */
+	set_iee_stack_page((unsigned long)(__va(__pa_symbol(init_iee_stack_begin))), 2);
+	for (int i = 0; i < 4; i++)
+		iee_set_logical_mem_ro((unsigned long)init_iee_stack_begin + PAGE_SIZE * i);
+
+	set_iee_page((unsigned long)init_token_page_vaddr, 0);
+	#endif
+	#ifdef CONFIG_PTP
+	/* Set the logical va of existing pgtable readonly */
+	iee_mark_all_lm_pgtable_ro();
+	#endif
 
 	/* Do the rest non-__init'ed, we're now alive */
 	arch_call_rest_init();

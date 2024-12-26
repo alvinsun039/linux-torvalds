@@ -6,6 +6,10 @@
 #include <asm/tlb.h>
 #include <asm/fixmap.h>
 #include <asm/mtrr.h>
+#ifdef CONFIG_PTP
+#include <linux/iee-func.h>
+#include <asm/iee-access.h>
+#endif
 
 #ifdef CONFIG_DYNAMIC_PHYSICAL_MASK
 phys_addr_t physical_mask __ro_after_init = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
@@ -557,8 +561,13 @@ int ptep_test_and_clear_young(struct vm_area_struct *vma,
 	int ret = 0;
 
 	if (pte_young(*ptep))
+		#ifdef CONFIG_PTP
+		ret = iee_test_and_clear_bit(_PAGE_BIT_ACCESSED,
+					 (unsigned long *) &ptep->pte);
+		#else
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *) &ptep->pte);
+		#endif
 
 	return ret;
 }
@@ -570,8 +579,13 @@ int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 	int ret = 0;
 
 	if (pmd_young(*pmdp))
+		#ifdef CONFIG_PTP
+		ret = iee_test_and_clear_bit(_PAGE_BIT_ACCESSED,
+					 (unsigned long *)pmdp);
+		#else
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *)pmdp);
+		#endif
 
 	return ret;
 }
@@ -584,8 +598,13 @@ int pudp_test_and_clear_young(struct vm_area_struct *vma,
 	int ret = 0;
 
 	if (pud_young(*pudp))
+		#ifdef CONFIG_PTP
+		ret = iee_test_and_clear_bit(_PAGE_BIT_ACCESSED,
+					 (unsigned long *)pudp);
+		#else
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *)pudp);
+		#endif
 
 	return ret;
 }

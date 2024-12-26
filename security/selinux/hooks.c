@@ -104,10 +104,21 @@
 #include "netlabel.h"
 #include "audit.h"
 #include "avc_ss.h"
+#ifdef CONFIG_IEE_SELINUX_P
+#include <linux/iee-func.h>
+#include <asm/iee-selinuxp.h>
+#endif
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
 
 #define SELINUX_INODE_INIT_XATTRS 1
 
+#ifdef CONFIG_IEE_SELINUX_P
+struct selinux_state selinux_state __section(".iee.selinux");
+#else
 struct selinux_state selinux_state;
+#endif
 
 /* SECMARK reference count */
 static atomic_t selinux_secmark_refcount = ATOMIC_INIT(0);
@@ -6586,7 +6597,11 @@ static int selinux_key_alloc(struct key *k, const struct cred *cred,
 	else
 		ksec->sid = tsec->sid;
 
+	#ifdef CONFIG_KEYP
+	iee_set_key_security(k, ksec);
+	#else
 	k->security = ksec;
+	#endif
 	return 0;
 }
 
@@ -6594,7 +6609,11 @@ static void selinux_key_free(struct key *k)
 {
 	struct key_security_struct *ksec = k->security;
 
+	#ifdef CONFIG_KEYP
+	iee_set_key_security(k, NULL);
+	#else
 	k->security = NULL;
+	#endif
 	kfree(ksec);
 }
 
@@ -7285,15 +7304,52 @@ static struct security_hook_list selinux_hooks[] __ro_after_init = {
 #endif
 };
 
+#ifdef CONFIG_IEE_SELINUX_P
+struct kmem_cache *policy_jar;
+
+static void policy_cache_init(void)
+{
+	struct selinux_policy *unused;
+
+	policy_jar = kmem_cache_create("policy_jar", sizeof(struct selinux_policy), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL);
+	/* Test this cache */
+	unused = kmem_cache_alloc(policy_jar, GFP_KERNEL);
+	kmem_cache_free(policy_jar, unused);
+}
+#endif
+
 static __init int selinux_init(void)
 {
 	pr_info("SELinux:  Initializing.\n");
 
 	memset(&selinux_state, 0, sizeof(selinux_state));
+#ifdef CONFIG_IEE_SELINUX_P
+	WRITE_ONCE(selinux_state.enforcing, selinux_enforcing_boot);
+#else
 	enforcing_set(selinux_enforcing_boot);
+#endif
 	selinux_avc_init();
+
+#ifdef CONFIG_IEE_SELINUX_P
+	/* Put selinux_status inside IEE. */
+	/* Prepare mutex lock and write the ptr to mutex->owner. */
+	struct mutex *status_lock = kzalloc(GFP_KERNEL, sizeof(struct mutex));
+	struct mutex *policy_mutex = kzalloc(GFP_KERNEL, sizeof(struct mutex));
+
+	mutex_init(status_lock);
+	mutex_init(policy_mutex);
+	selinux_state.status_lock.owner.counter = (s64)status_lock;
+	selinux_state.policy_mutex.owner.counter = (s64)policy_mutex;
+
+	/* Setting lm addr to be RO, IEE addr valid. */
+	iee_set_logical_mem_ro((unsigned long)&selinux_state);
+	set_iee_page((unsigned long)__va(__pa_symbol(&selinux_state)), 0);
+	policy_cache_init();
+#else
 	mutex_init(&selinux_state.status_lock);
 	mutex_init(&selinux_state.policy_mutex);
+#endif
 
 	/* Set the security state for the initial task. */
 	cred_init_security();

@@ -75,6 +75,9 @@
 
 #include <asm/unistd.h>
 #include <asm/mmu_context.h>
+#ifdef CONFIG_IEE
+#include <asm/iee-token.h>
+#endif
 
 /*
  * The default value should be high enough to not crash a system that randomly
@@ -562,6 +565,9 @@ static void exit_mm(void)
 	smp_mb__after_spinlock();
 	local_irq_disable();
 	current->mm = NULL;
+	#ifdef CONFIG_IEE
+	iee_set_token_pgd(current, NULL);
+	#endif
 	membarrier_update_current_mm(NULL);
 	enter_lazy_tlb(mm, current);
 	local_irq_enable();

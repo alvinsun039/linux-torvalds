@@ -147,7 +147,11 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 		if (after_paging_init)
 			__late_set_fixmap(idx, phys_addr, prot);
 		else
+			#ifdef CONFIG_PTP
+			__iee_set_fixmap_pre_init(idx, phys_addr, prot);
+			#else
 			__early_set_fixmap(idx, phys_addr, prot);
+			#endif
 		phys_addr += PAGE_SIZE;
 		--idx;
 		--nrpages;
@@ -199,12 +203,65 @@ void __init early_iounmap(void __iomem *addr, unsigned long size)
 		if (after_paging_init)
 			__late_clear_fixmap(idx);
 		else
+			#ifdef CONFIG_PTP
+			__iee_set_fixmap_pre_init(idx, 0, FIXMAP_PAGE_CLEAR);
+			#else
+			__early_set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR);
+			#endif
+		--idx;
+		--nrpages;
+	}
+	prev_map[slot] = NULL;
+}
+
+#ifdef CONFIG_PTP
+void __init early_iounmap_after_init(void __iomem *addr, unsigned long size)
+{
+	unsigned long virt_addr;
+	unsigned long offset;
+	unsigned int nrpages;
+	enum fixed_addresses idx;
+	int i, slot;
+
+	slot = -1;
+	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
+		if (prev_map[i] == addr) {
+			slot = i;
+			break;
+		}
+	}
+
+	if (WARN(slot < 0, "early_iounmap(%p, %08lx) not found slot\n",
+		 addr, size))
+		return;
+
+	if (WARN(prev_size[slot] != size,
+		 "early_iounmap(%p, %08lx) [%d] size not consistent %08lx\n",
+		 addr, size, slot, prev_size[slot]))
+		return;
+
+	WARN(early_ioremap_debug, "early_iounmap(%p, %08lx) [%d]\n",
+	     addr, size, slot);
+
+	virt_addr = (unsigned long)addr;
+	if (WARN_ON(virt_addr < fix_to_virt(FIX_BTMAP_BEGIN)))
+		return;
+
+	offset = offset_in_page(virt_addr);
+	nrpages = PAGE_ALIGN(offset + size) >> PAGE_SHIFT;
+
+	idx = FIX_BTMAP_BEGIN - NR_FIX_BTMAPS*slot;
+	while (nrpages > 0) {
+		if (after_paging_init)
+			__late_clear_fixmap(idx);
+		else
 			__early_set_fixmap(idx, 0, FIXMAP_PAGE_CLEAR);
 		--idx;
 		--nrpages;
 	}
 	prev_map[slot] = NULL;
 }
+#endif
 
 /* Remap an IO device */
 void __init __iomem *

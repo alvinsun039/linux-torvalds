@@ -22,6 +22,12 @@
 #include <linux/uio.h>
 #include <linux/uaccess.h>
 #include <keys/request_key_auth-type.h>
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
+#ifdef CONFIG_KEYP
+#include <asm/iee-key.h>
+#endif
 #include "internal.h"
 
 #define KEY_MAX_DESC_SIZE 4096
@@ -804,11 +810,19 @@ static long __keyctl_read_key(struct key *key, char *buffer, size_t buflen)
 {
 	long ret;
 
+	#ifdef CONFIG_KEYP
+	down_read(&KEY_SEM(key));
+	#else
 	down_read(&key->sem);
+	#endif
 	ret = key_validate(key);
 	if (ret == 0)
 		ret = key->type->read(key, buffer, buflen);
+	#ifdef CONFIG_KEYP
+	up_read(&KEY_SEM(key));
+	#else
 	up_read(&key->sem);
+	#endif
 	return ret;
 }
 
@@ -978,7 +992,11 @@ long keyctl_chown_key(key_serial_t id, uid_t user, gid_t group)
 
 	/* make the changes with the locks held to prevent chown/chown races */
 	ret = -EACCES;
+	#ifdef CONFIG_KEYP
+	down_write(&KEY_SEM(key));
+	#else
 	down_write(&key->sem);
+	#endif
 
 	{
 		bool is_privileged_op = false;
@@ -1036,19 +1054,32 @@ long keyctl_chown_key(key_serial_t id, uid_t user, gid_t group)
 		}
 
 		zapowner = key->user;
+		#ifdef CONFIG_KEYP
+		iee_set_key_user(key, newowner);
+		iee_set_key_uid(key, uid);
+		#else
 		key->user = newowner;
 		key->uid = uid;
+		#endif
 	}
 
 	/* change the GID */
 	if (group != (gid_t) -1)
+		#ifdef CONFIG_KEYP
+		iee_set_key_gid(key, gid);
+		#else
 		key->gid = gid;
+		#endif
 
 	notify_key(key, NOTIFY_KEY_SETATTR, 0);
 	ret = 0;
 
 error_put:
+	#ifdef CONFIG_KEYP
+	up_write(&KEY_SEM(key));
+	#else
 	up_write(&key->sem);
+	#endif
 	key_put(key);
 	if (zapowner)
 		key_user_put(zapowner);
@@ -1090,16 +1121,28 @@ long keyctl_setperm_key(key_serial_t id, key_perm_t perm)
 
 	/* make the changes with the locks held to prevent chown/chmod races */
 	ret = -EACCES;
+	#ifdef CONFIG_KEYP
+	down_write(&KEY_SEM(key));
+	#else
 	down_write(&key->sem);
+	#endif
 
 	/* if we're not the sysadmin, we can only change a key that we own */
 	if (uid_eq(key->uid, current_fsuid()) || capable(CAP_SYS_ADMIN)) {
+		#ifdef CONFIG_KEYP
+		iee_set_key_perm(key, perm);
+		#else
 		key->perm = perm;
+		#endif
 		notify_key(key, NOTIFY_KEY_SETATTR, 0);
 		ret = 0;
 	}
 
+	#ifdef CONFIG_KEYP
+	up_write(&KEY_SEM(key));
+	#else
 	up_write(&key->sem);
+	#endif
 	key_put(key);
 error:
 	return ret;
@@ -1155,7 +1198,11 @@ static int keyctl_change_reqkey_auth(struct key *key)
 		return -ENOMEM;
 
 	key_put(new->request_key_auth);
+	#ifdef CONFIG_CREDP
+	iee_set_cred_request_key_auth(new, key_get(key));
+	#else
 	new->request_key_auth = key_get(key);
+	#endif
 
 	return commit_creds(new);
 }
@@ -1196,7 +1243,11 @@ static long keyctl_instantiate_key_common(key_serial_t id,
 	if (!instkey)
 		goto error;
 
+	#ifdef CONFIG_KEYP
+	rka = ((union key_payload *)(instkey->name_link.next))->data[0];
+	#else
 	rka = instkey->payload.data[0];
+	#endif
 	if (rka->target_key->serial != id)
 		goto error;
 
@@ -1358,7 +1409,11 @@ long keyctl_reject_key(key_serial_t id, unsigned timeout, unsigned error,
 	if (!instkey)
 		goto error;
 
+	#ifdef CONFIG_KEYP
+	rka = ((union key_payload *)(instkey->name_link.next))->data[0];
+	#else
 	rka = instkey->payload.data[0];
+	#endif
 	if (rka->target_key->serial != id)
 		goto error;
 
@@ -1432,7 +1487,11 @@ long keyctl_set_reqkey_keyring(int reqkey_defl)
 	}
 
 set:
+	#ifdef CONFIG_CREDP
+	iee_set_cred_jit_keyring(new, reqkey_defl);
+	#else
 	new->jit_keyring = reqkey_defl;
+	#endif
 	commit_creds(new);
 	return old_setting;
 error:
@@ -1644,9 +1703,14 @@ long keyctl_session_to_parent(void)
 	cred = cred_alloc_blank();
 	if (!cred)
 		goto error_keyring;
+	#ifdef CONFIG_CREDP
+	newwork = (struct rcu_head *)(cred->rcu.func);
+	iee_set_cred_session_keyring(cred, key_ref_to_ptr(keyring_r));
+	#else
 	newwork = &cred->rcu;
 
 	cred->session_keyring = key_ref_to_ptr(keyring_r);
+	#endif
 	keyring_r = NULL;
 	init_task_work(newwork, key_change_session_keyring);
 
@@ -1705,7 +1769,11 @@ unlock:
 	write_unlock_irq(&tasklist_lock);
 	rcu_read_unlock();
 	if (oldwork)
+		#ifdef CONFIG_CREDP
+		put_cred(*(struct cred **)(oldwork + 1));
+		#else
 		put_cred(container_of(oldwork, struct cred, rcu));
+		#endif
 	if (newwork)
 		put_cred(cred);
 	return ret;
@@ -1814,25 +1882,45 @@ long keyctl_watch_key(key_serial_t id, int watch_queue_fd, int watch_id)
 		if (ret < 0)
 			goto err_watch;
 
+		#ifdef CONFIG_KEYP
+		down_write(&KEY_SEM(key));
+		#else
 		down_write(&key->sem);
+		#endif
 		if (!key->watchers) {
+			#ifdef CONFIG_KEYP
+			iee_set_key_watchers(key, wlist);
+			#else
 			key->watchers = wlist;
+			#endif
 			wlist = NULL;
 		}
 
 		ret = add_watch_to_object(watch, key->watchers);
+		#ifdef CONFIG_KEYP
+		up_write(&KEY_SEM(key));
+		#else
 		up_write(&key->sem);
+		#endif
 
 		if (ret == 0)
 			watch = NULL;
 	} else {
 		ret = -EBADSLT;
 		if (key->watchers) {
+			#ifdef CONFIG_KEYP
+			down_write(&KEY_SEM(key));
+			#else
 			down_write(&key->sem);
+			#endif
 			ret = remove_watch_from_object(key->watchers,
 						       wqueue, key_serial(key),
 						       false);
+			#ifdef CONFIG_KEYP
+			up_write(&KEY_SEM(key));
+			#else
 			up_write(&key->sem);
+			#endif
 		}
 	}
 

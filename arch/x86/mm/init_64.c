@@ -60,6 +60,10 @@
 
 #include "ident_map.c"
 
+#ifdef CONFIG_PTP
+#include <linux/iee-func.h>
+#endif
+
 #define DEFINE_POPULATE(fname, type1, type2, init)		\
 static inline void fname##_init(struct mm_struct *mm,		\
 		type1##_t *arg1, type2##_t *arg2, bool init)	\
@@ -89,6 +93,38 @@ DEFINE_ENTRY(p4d, p4d, init)
 DEFINE_ENTRY(pud, pud, init)
 DEFINE_ENTRY(pmd, pmd, init)
 DEFINE_ENTRY(pte, pte, init)
+
+#ifdef CONFIG_PTP
+#define DEFINE_IEE_POPULATE(fname, type1, type2, init)		\
+static inline void iee_##fname##_init(struct mm_struct *mm,		\
+		type1##_t * arg1, type2##_t * arg2, bool init)	\
+{								\
+	if (init)						\
+		iee_##fname##_safe_pre_init(mm, arg1, arg2);			\
+	else							\
+		iee_##fname##_pre_init(mm, arg1, arg2);				\
+}
+
+DEFINE_IEE_POPULATE(p4d_populate, p4d, pud, init)
+DEFINE_IEE_POPULATE(pgd_populate, pgd, p4d, init)
+DEFINE_IEE_POPULATE(pud_populate, pud, pmd, init)
+DEFINE_IEE_POPULATE(pmd_populate_kernel, pmd, pte, init)
+
+#define DEFINE_IEE_ENTRY(type1, type2, init)			\
+static inline void iee_set_##type1##_init(type1##_t * arg1,		\
+			type2##_t arg2, bool init)		\
+{								\
+	if (init)						\
+		iee_set_##type1##_safe_pre_init(arg1, arg2);			\
+	else							\
+		iee_set_##type1##_pre_init(arg1, arg2);			\
+}
+
+DEFINE_IEE_ENTRY(p4d, p4d, init)
+DEFINE_IEE_ENTRY(pud, pud, init)
+DEFINE_IEE_ENTRY(pmd, pmd, init)
+DEFINE_IEE_ENTRY(pte, pte, init)
+#endif
 
 static inline pgprot_t prot_sethuge(pgprot_t prot)
 {
@@ -442,7 +478,11 @@ void __init cleanup_highmap(void)
 		if (pmd_none(*pmd))
 			continue;
 		if (vaddr < (unsigned long) _text || vaddr > end)
+			#ifdef CONFIG_PTP
+			iee_set_pmd_pre_init(pmd, __pmd(0));
+			#else
 			set_pmd(pmd, __pmd(0));
+			#endif
 	}
 }
 
@@ -470,7 +510,11 @@ phys_pte_init(pte_t *pte_page, unsigned long paddr, unsigned long paddr_end,
 					     E820_TYPE_RAM) &&
 			    !e820__mapped_any(paddr & PAGE_MASK, paddr_next,
 					     E820_TYPE_RESERVED_KERN))
+				#ifdef CONFIG_PTP
+				iee_set_pte_init(pte, __pte(0), init);
+				#else
 				set_pte_init(pte, __pte(0), init);
+				#endif
 			continue;
 		}
 
@@ -490,7 +534,11 @@ phys_pte_init(pte_t *pte_page, unsigned long paddr, unsigned long paddr_end,
 			pr_info("   pte=%p addr=%lx pte=%016lx\n", pte, paddr,
 				pfn_pte(paddr >> PAGE_SHIFT, PAGE_KERNEL).pte);
 		pages++;
+		#ifdef CONFIG_PTP
+		iee_set_pte_init(pte, pfn_pte(paddr >> PAGE_SHIFT, prot), init);
+		#else
 		set_pte_init(pte, pfn_pte(paddr >> PAGE_SHIFT, prot), init);
+		#endif
 		paddr_last = (paddr & PAGE_MASK) + PAGE_SIZE;
 	}
 
@@ -525,7 +573,11 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 					     E820_TYPE_RAM) &&
 			    !e820__mapped_any(paddr & PMD_MASK, paddr_next,
 					     E820_TYPE_RESERVED_KERN))
+				#ifdef CONFIG_PTP
+				iee_set_pmd_init(pmd, __pmd(0), init);
+				#else
 				set_pmd_init(pmd, __pmd(0), init);
+				#endif
 			continue;
 		}
 
@@ -563,9 +615,15 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 		if (page_size_mask & (1<<PG_LEVEL_2M)) {
 			pages++;
 			spin_lock(&init_mm.page_table_lock);
+			#ifdef CONFIG_PTP
+			iee_set_pmd_init(pmd,
+				     pfn_pmd(paddr >> PAGE_SHIFT, prot_sethuge(prot)),
+				     init);
+			#else
 			set_pmd_init(pmd,
 				     pfn_pmd(paddr >> PAGE_SHIFT, prot_sethuge(prot)),
 				     init);
+			#endif
 			spin_unlock(&init_mm.page_table_lock);
 			paddr_last = paddr_next;
 			continue;
@@ -575,7 +633,11 @@ phys_pmd_init(pmd_t *pmd_page, unsigned long paddr, unsigned long paddr_end,
 		paddr_last = phys_pte_init(pte, paddr, paddr_end, new_prot, init);
 
 		spin_lock(&init_mm.page_table_lock);
+		#ifdef CONFIG_PTP
+		iee_pmd_populate_kernel_init(&init_mm, pmd, pte, init);
+		#else
 		pmd_populate_kernel_init(&init_mm, pmd, pte, init);
+		#endif
 		spin_unlock(&init_mm.page_table_lock);
 	}
 	update_page_count(PG_LEVEL_2M, pages);
@@ -612,7 +674,11 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 					     E820_TYPE_RAM) &&
 			    !e820__mapped_any(paddr & PUD_MASK, paddr_next,
 					     E820_TYPE_RESERVED_KERN))
+				#ifdef CONFIG_PTP
+				iee_set_pud_init(pud, __pud(0), init);
+				#else
 				set_pud_init(pud, __pud(0), init);
+				#endif
 			continue;
 		}
 
@@ -649,9 +715,15 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 		if (page_size_mask & (1<<PG_LEVEL_1G)) {
 			pages++;
 			spin_lock(&init_mm.page_table_lock);
+			#ifdef CONFIG_PTP
+			iee_set_pud_init(pud,
+				     pfn_pud(paddr >> PAGE_SHIFT, prot_sethuge(prot)),
+				     init);
+			#else
 			set_pud_init(pud,
 				     pfn_pud(paddr >> PAGE_SHIFT, prot_sethuge(prot)),
 				     init);
+			#endif
 			spin_unlock(&init_mm.page_table_lock);
 			paddr_last = paddr_next;
 			continue;
@@ -662,7 +734,11 @@ phys_pud_init(pud_t *pud_page, unsigned long paddr, unsigned long paddr_end,
 					   page_size_mask, prot, init);
 
 		spin_lock(&init_mm.page_table_lock);
+		#ifdef CONFIG_PTP
+		iee_pud_populate_init(&init_mm, pud, pmd, init);
+		#else
 		pud_populate_init(&init_mm, pud, pmd, init);
+		#endif
 		spin_unlock(&init_mm.page_table_lock);
 	}
 
@@ -715,7 +791,11 @@ phys_p4d_init(p4d_t *p4d_page, unsigned long paddr, unsigned long paddr_end,
 					   page_size_mask, prot, init);
 
 		spin_lock(&init_mm.page_table_lock);
+		#ifdef CONFIG_PTP
+		iee_p4d_populate_init(&init_mm, p4d, pud, init);
+		#else
 		p4d_populate_init(&init_mm, p4d, pud, init);
+		#endif
 		spin_unlock(&init_mm.page_table_lock);
 	}
 
@@ -757,10 +837,19 @@ __kernel_physical_mapping_init(unsigned long paddr_start,
 
 		spin_lock(&init_mm.page_table_lock);
 		if (pgtable_l5_enabled())
+			#ifdef CONFIG_PTP
+			iee_pgd_populate_init(&init_mm, pgd, p4d, init);
+			#else
 			pgd_populate_init(&init_mm, pgd, p4d, init);
+			#endif
 		else
+			#ifdef CONFIG_PTP
+			iee_p4d_populate_init(&init_mm, p4d_offset(pgd, vaddr),
+					  (pud_t *) p4d, init);
+			#else
 			p4d_populate_init(&init_mm, p4d_offset(pgd, vaddr),
 					  (pud_t *) p4d, init);
+			#endif
 
 		spin_unlock(&init_mm.page_table_lock);
 		pgd_changed = true;
@@ -787,6 +876,68 @@ kernel_physical_mapping_init(unsigned long paddr_start,
 	return __kernel_physical_mapping_init(paddr_start, paddr_end,
 					      page_size_mask, prot, true);
 }
+
+#ifdef CONFIG_IEE
+static unsigned long __meminit
+__kernel_physical_mapping_init_for_iee(unsigned long paddr_start,
+			       unsigned long paddr_end,
+			       unsigned long page_size_mask,
+			       pgprot_t prot, bool init)
+{
+	bool pgd_changed = false;
+	unsigned long vaddr, vaddr_start, vaddr_end, vaddr_next, paddr_last;
+
+	paddr_last = paddr_end;
+	vaddr = (unsigned long)__phys_to_iee(paddr_start);
+	vaddr_end = (unsigned long)__phys_to_iee(paddr_end);
+	vaddr_start = vaddr;
+	for (; vaddr < vaddr_end; vaddr = vaddr_next) {
+		pgd_t *pgd = pgd_offset_k(vaddr);
+		p4d_t *p4d;
+
+		vaddr_next = (vaddr & PGDIR_MASK) + PGDIR_SIZE;
+		if (pgd_val(*pgd)) {
+			p4d = (p4d_t *)pgd_page_vaddr(*pgd);
+			paddr_last = phys_p4d_init(p4d, __iee_pa(vaddr),
+							__iee_pa(vaddr_end),
+							page_size_mask, prot, init);
+			continue;
+		}
+		p4d = alloc_low_page();
+		paddr_last = phys_p4d_init(p4d, __iee_pa(vaddr),
+						__iee_pa(vaddr_end),
+						page_size_mask, prot, init);
+		spin_lock(&init_mm.page_table_lock);
+		if (pgtable_l5_enabled())
+			#ifdef CONFIG_PTP
+			iee_pgd_populate_init(&init_mm, pgd, p4d, init);
+			#else
+			pgd_populate_init(&init_mm, pgd, p4d, init);
+			#endif
+		else
+			#ifdef CONFIG_PTP
+			iee_p4d_populate_init(&init_mm, p4d_offset(pgd, vaddr),
+					  (pud_t *) p4d, init);
+			#else
+			p4d_populate_init(&init_mm, p4d_offset(pgd, vaddr),
+					  (pud_t *) p4d, init);
+			#endif
+		spin_unlock(&init_mm.page_table_lock);
+		pgd_changed = true;
+	}
+	if (pgd_changed)
+		sync_global_pgds(vaddr_start, vaddr_end - 1);
+	return paddr_last;
+}
+unsigned long __meminit
+kernel_physical_mapping_init_for_iee(unsigned long paddr_start,
+			     unsigned long paddr_end,
+			     unsigned long page_size_mask, pgprot_t prot)
+{
+	return __kernel_physical_mapping_init_for_iee(paddr_start, paddr_end,
+					      page_size_mask, prot, true);
+}
+#endif /* CONFIG_IEE*/
 
 /*
  * This function is similar to kernel_physical_mapping_init() above with the

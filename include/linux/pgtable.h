@@ -1062,6 +1062,38 @@ static inline int pgd_same(pgd_t pgd_a, pgd_t pgd_b)
 	set_pgd(pgdp, pgd); \
 })
 
+#ifdef CONFIG_PTP
+#define iee_set_pte_safe_pre_init(ptep, pte) \
+({ \
+	WARN_ON_ONCE(pte_present(*ptep) && !pte_same(*ptep, pte)); \
+	iee_set_pte_pre_init(ptep, pte); \
+})
+
+#define iee_set_pmd_safe_pre_init(pmdp, pmd) \
+({ \
+	WARN_ON_ONCE(pmd_present(*pmdp) && !pmd_same(*pmdp, pmd)); \
+	iee_set_pmd_pre_init(pmdp, pmd); \
+})
+
+#define iee_set_pud_safe_pre_init(pudp, pud) \
+({ \
+	WARN_ON_ONCE(pud_present(*pudp) && !pud_same(*pudp, pud)); \
+	iee_set_pud_pre_init(pudp, pud); \
+})
+
+#define iee_set_p4d_safe_pre_init(p4dp, p4d) \
+({ \
+	WARN_ON_ONCE(p4d_present(*p4dp) && !p4d_same(*p4dp, p4d)); \
+	iee_set_p4d_pre_init(p4dp, p4d); \
+})
+
+#define iee_set_pgd_safe_pre_init(pgdp, pgd) \
+({ \
+	WARN_ON_ONCE(pgd_present(*pgdp) && !pgd_same(*pgdp, pgd)); \
+	iee_set_pgd_pre_init(pgdp, pgd); \
+})
+#endif
+
 #ifndef __HAVE_ARCH_DO_SWAP_PAGE
 /*
  * Some architectures support metadata associated with a page. When a

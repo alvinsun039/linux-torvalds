@@ -38,9 +38,13 @@ static const struct rpc_authops __rcu *auth_flavors[RPC_AUTH_MAXFLAVOR] = {
 static LIST_HEAD(cred_unused);
 static unsigned long number_cred_unused;
 
+#ifdef CONFIG_CREDP
+static struct cred *machine_cred;
+#else
 static struct cred machine_cred = {
 	.usage = ATOMIC_INIT(1),
 };
+#endif
 
 /*
  * Return the machine_cred pointer to be used whenever
@@ -48,7 +52,11 @@ static struct cred machine_cred = {
  */
 const struct cred *rpc_machine_cred(void)
 {
+	#ifdef CONFIG_CREDP
+	return machine_cred;
+	#else
 	return &machine_cred;
+	#endif
 }
 EXPORT_SYMBOL_GPL(rpc_machine_cred);
 
@@ -659,15 +667,27 @@ rpcauth_bindcred(struct rpc_task *task, const struct cred *cred, int flags)
 	if (task->tk_op_cred)
 		/* Task must use exactly this rpc_cred */
 		new = get_rpccred(task->tk_op_cred);
+	#ifdef CONFIG_CREDP
+	else if (cred && cred != machine_cred)
+	#else
 	else if (cred != NULL && cred != &machine_cred)
+	#endif
 		new = auth->au_ops->lookup_cred(auth, &acred, lookupflags);
+	#ifdef CONFIG_CREDP
+	else if (cred == machine_cred)
+	#else
 	else if (cred == &machine_cred)
+	#endif
 		new = rpcauth_bind_machine_cred(task, lookupflags);
 
 	/* If machine cred couldn't be bound, try a root cred */
 	if (new)
 		;
+	#ifdef CONFIG_CREDP
+	else if (cred == machine_cred)
+	#else
 	else if (cred == &machine_cred)
+	#endif
 		new = rpcauth_bind_root_cred(task, lookupflags);
 	else if (flags & RPC_TASK_NULLCREDS)
 		new = authnull_ops.lookup_cred(NULL, NULL, 0);
@@ -867,6 +887,9 @@ static struct shrinker *rpc_cred_shrinker;
 
 int __init rpcauth_init_module(void)
 {
+	#ifdef CONFIG_CREDP
+	machine_cred = prepare_kernel_cred(&init_task);
+	#endif
 	int err;
 
 	err = rpc_init_authunix();
@@ -892,6 +915,9 @@ out1:
 
 void rpcauth_remove_module(void)
 {
+	#ifdef CONFIG_CREDP
+	abort_creds(machine_cred);
+	#endif
 	rpc_destroy_authunix();
 	shrinker_free(rpc_cred_shrinker);
 }

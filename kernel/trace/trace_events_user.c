@@ -22,6 +22,9 @@
 #include <linux/highmem.h>
 #include <linux/init.h>
 #include <linux/user_events.h>
+#ifdef CONFIG_CREDP
+#include <asm/iee-cred.h>
+#endif
 #include "trace_dynevent.h"
 #include "trace_output.h"
 #include "trace.h"
@@ -1449,7 +1452,11 @@ static int user_event_set_call_visible(struct user_event *user, bool visible)
 	 * add/remove calls themselves to tracefs. We need to temporarily
 	 * switch to root file permission to allow for this scenario.
 	 */
+	#ifdef CONFIG_CREDP
+	iee_set_cred_fsuid(cred, GLOBAL_ROOT_UID);
+	#else
 	cred->fsuid = GLOBAL_ROOT_UID;
+	#endif
 
 	old_cred = override_creds(cred);
 

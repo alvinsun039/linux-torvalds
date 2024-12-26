@@ -36,6 +36,25 @@ typedef u64 freelist_full_t;
 #undef system_has_freelist_aba
 #endif
 
+#ifdef CONFIG_IEE
+extern struct kmem_cache *iee_stack_jar;
+extern struct kmem_cache *task_struct_cachep;
+extern void *fixup_red_left(struct kmem_cache *s, void *p);
+extern int iee_get_oo_objects(struct kmem_cache *s);
+#endif
+#ifdef CONFIG_IEE_SELINUX_P
+extern struct kmem_cache *policy_jar;
+#endif
+#ifdef CONFIG_CREDP
+extern struct kmem_cache *cred_jar;
+#endif
+#ifdef CONFIG_KEYP
+extern struct kmem_cache *key_jar;
+extern struct kmem_cache *key_union_jar;
+extern struct kmem_cache *key_struct_jar;
+extern struct kmem_cache *key_payload_jar;
+#endif
+
 /*
  * Freelist pointer and counter to cmpxchg together, avoids the typical ABA
  * problems with cmpxchg of just a pointer.
@@ -624,6 +643,10 @@ static inline void cache_random_seq_destroy(struct kmem_cache *cachep) { }
 
 static inline bool slab_want_init_on_alloc(gfp_t flags, struct kmem_cache *c)
 {
+	#ifdef CONFIG_IEE
+	if (c == iee_stack_jar)
+		return false;
+	#endif
 	if (static_branch_maybe(CONFIG_INIT_ON_ALLOC_DEFAULT_ON,
 				&init_on_alloc)) {
 		if (c->ctor)

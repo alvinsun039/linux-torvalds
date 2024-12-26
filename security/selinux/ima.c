@@ -12,6 +12,10 @@
 #include "security.h"
 #include "ima.h"
 
+#ifdef CONFIG_IEE_SELINUX_P
+#include <asm/iee-selinuxp.h>
+#endif
+
 /*
  * selinux_ima_collect_state - Read selinux configuration settings
  *
@@ -74,7 +78,11 @@ void selinux_ima_measure_state_locked(void)
 	size_t policy_len;
 	int rc = 0;
 
+#ifdef CONFIG_IEE_SELINUX_P
+	lockdep_assert_held(iee_get_selinux_policy_lock());
+#else
 	lockdep_assert_held(&selinux_state.policy_mutex);
+#endif
 
 	state_str = selinux_ima_collect_state();
 	if (!state_str) {
@@ -112,9 +120,21 @@ void selinux_ima_measure_state_locked(void)
  */
 void selinux_ima_measure_state(void)
 {
+#ifdef CONFIG_IEE_SELINUX_P
+	lockdep_assert_not_held(iee_get_selinux_policy_lock());
+#else
 	lockdep_assert_not_held(&selinux_state.policy_mutex);
+#endif
 
+#ifdef CONFIG_IEE_SELINUX_P
+	mutex_lock(iee_get_selinux_policy_lock());
+#else
 	mutex_lock(&selinux_state.policy_mutex);
+#endif
 	selinux_ima_measure_state_locked();
+#ifdef CONFIG_IEE_SELINUX_P
+	mutex_unlock(iee_get_selinux_policy_lock());
+#else
 	mutex_unlock(&selinux_state.policy_mutex);
+#endif
 }

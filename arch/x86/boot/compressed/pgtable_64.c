@@ -196,7 +196,11 @@ asmlinkage void configure_5level_paging(struct boot_params *bp, void *pgtable)
 	 * Move the top level page table out of trampoline memory.
 	 */
 	memcpy(pgtable, trampoline_32bit, PAGE_SIZE);
+	#ifdef CONFIG_IEE
+	native_write_cr3_pre_init((unsigned long)pgtable);
+	#else
 	native_write_cr3((unsigned long)pgtable);
+	#endif
 
 	/* Restore trampoline memory */
 	memcpy(trampoline_32bit, trampoline_save, TRAMPOLINE_32BIT_SIZE);
