@@ -9377,6 +9377,8 @@ leapioraid_scsihost_probe(
 	struct Scsi_Host *shost = NULL;
 	int rv;
 
+	mark_partner_supported_module_once("BeiJing ZongCun Technology Co., Ltd.", THIS_MODULE);
+
 	shost = scsi_host_alloc(&leapioraid_driver_template,
 				sizeof(struct LEAPIORAID_ADAPTER));
 	if (!shost)
