@@ -1084,6 +1084,8 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 
 		adapter->autoneg = cmd->base.autoneg ? 1 : 0;
 		hw->mac.autotry_restart = true;
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+		txgbe_service_event_schedule(adapter);
 		err = TCALL(hw, mac.ops.setup_link, advertised, true);
 		if (err) {
 			e_info(probe, "setup link failed with code %d\n", err);

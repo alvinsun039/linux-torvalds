@@ -8937,7 +8937,8 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 	if (!(adapter->flags & TXGBE_FLAG_NEED_LINK_UPDATE))
 		return;
 #endif
-
+	if (test_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
+		msleep(20);
 	link_speed = TXGBE_LINK_SPEED_10GB_FULL;
 	link_up = true;
 	TCALL(hw, mac.ops.check_link, &link_speed, &link_up, false);
