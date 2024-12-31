@@ -36,7 +36,6 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 	bool link_up = false;
 	bool autoneg = false;
 	s32 ret_status = 0;
-	int config_retry;
 	int i = 0;
 	s32 status = 0;
 
@@ -62,31 +61,20 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 	if ((link_speed == speed) && link_up)
 		goto out;
 
-	for (config_retry = 0; config_retry < 2; config_retry++) {
-		if (!adapter->phy_tx_ready) {
-			mutex_lock(&adapter->e56_lock);
-			ret_status = txgbe_set_link_to_amlite(hw, speed);
-			mutex_unlock(&adapter->e56_lock);
-			adapter->tx_speed = speed;
-		} else {
-			mutex_lock(&adapter->e56_lock);
-			/* this ret_status for workaorund not return to upper*/
-			ret_status = txgbe_e56_reconfig_rx(hw, speed);
-			mutex_unlock(&adapter->e56_lock);
-			adapter->phy_tx_ready = false;
-		}
+	mutex_lock(&adapter->e56_lock);
+	ret_status = txgbe_set_link_to_amlite(hw, speed);
+	mutex_unlock(&adapter->e56_lock);
+	adapter->tx_speed = speed;
 
-		if (ret_status == TXGBE_ERR_TIMEOUT) {
-			continue;
-		}
+	if (ret_status == TXGBE_ERR_TIMEOUT)
+		adapter->link_valid = false;
 
-		for (i = 0; i < 8; i++) {
-			TCALL(hw, mac.ops.check_link,
-					&link_speed, &link_up, false);
-			if (link_up)
-				goto out;
-			msleep(250);
-		}
+	for (i = 0; i < 4; i++) {
+		TCALL(hw, mac.ops.check_link,
+				&link_speed, &link_up, false);
+		if (link_up)
+			goto out;
+		msleep(250);
 	}
 
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
@@ -133,6 +121,7 @@ static s32 txgbe_get_link_capabilities_aml40(struct txgbe_hw *hw,
 static s32 txgbe_check_mac_link_aml40(struct txgbe_hw *hw, u32 *speed,
 				bool *link_up, bool link_up_wait_to_complete)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 links_reg = 0;
 	u32 i;
 
@@ -140,6 +129,14 @@ static s32 txgbe_check_mac_link_aml40(struct txgbe_hw *hw, u32 *speed,
 		for (i = 0; i < TXGBE_LINK_UP_TIME; i++) {
 			links_reg = rd32(hw,
 						TXGBE_CFG_PORT_ST);
+
+			if (!adapter->link_valid) {
+				*link_up = false;
+
+				msleep(100);
+				continue;
+			}
+
 			if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
 				*link_up = true;
 				break;
@@ -155,6 +152,9 @@ static s32 txgbe_check_mac_link_aml40(struct txgbe_hw *hw, u32 *speed,
 		else
 			*link_up = false;
 	}
+
+	if (!adapter->link_valid)
+		*link_up = false;
 
 	if (*link_up) {
 		if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==

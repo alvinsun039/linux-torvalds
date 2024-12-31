@@ -7722,6 +7722,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 
 	adapter->phy_tx_ready = false;
+	adapter->link_valid = true;
 out:
 	return err;
 }

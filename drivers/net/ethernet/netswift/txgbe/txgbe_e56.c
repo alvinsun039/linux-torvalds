@@ -3305,6 +3305,7 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 
 static int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	s32 status;
 
 	status = E56phyRxsCalibAdaptSeq40G(hw, speed);
@@ -3317,6 +3318,7 @@ static int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed)
 	//2.3.4 RXS post CDR lock temperature tracking sequence
 	txgbe_temp_track_seq_40g(hw, speed);
 
+	adapter->link_valid = true;
 	return 0;
 }
 
