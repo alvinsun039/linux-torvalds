@@ -8686,6 +8686,7 @@ void txgbe_update_stats(struct txgbe_adapter *adapter)
 #ifndef TXGBE_NO_LRO
 	u32 flushed = 0, coal = 0;
 #endif
+	u8 pf_queue_offset = 0;
 
 	if (test_bit(__TXGBE_DOWN, &adapter->state) ||
 	    test_bit(__TXGBE_RESETTING, &adapter->state))
@@ -8832,7 +8833,10 @@ void txgbe_update_stats(struct txgbe_adapter *adapter)
 	hwstats->tdmdc += rd32(hw, TXGBE_TDM_DRP_CNT);
 	hwstats->tdbpc += rd32(hw, TXGBE_TDB_OUT_PKT_CNT);
 
-	for (i = adapter->num_vfs; i < 128; i++)
+	pf_queue_offset = adapter->ring_feature[RING_F_VMDQ].offset *
+					 (adapter->ring_feature[RING_F_RSS].mask + 1);
+
+	for (i = pf_queue_offset; i < 128; i++)
 		hwstats->mprc += rd32(hw, TXGBE_PX_MPRC(i));
 
 	hwstats->roc += rd32(hw, TXGBE_RX_OVERSIZE_FRAMES_GOOD);
