@@ -1014,6 +1014,7 @@ void txgbe_ptp_reset(struct txgbe_adapter *adapter)
 static long txgbe_ptp_create_clock(struct txgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
+	struct txgbe_hw *hw = &adapter->hw;
 	long err;
 
 	/* do nothing if we already have a clock device */
@@ -1027,7 +1028,13 @@ static long txgbe_ptp_create_clock(struct txgbe_adapter *adapter)
 	adapter->ptp_caps.n_alarm = 0;
 	adapter->ptp_caps.n_ext_ts = 0;
 	adapter->ptp_caps.n_per_out = 0;
-	adapter->ptp_caps.pps = 1;
+
+	if (hw->mac.type == txgbe_mac_aml ||
+			hw->mac.type == txgbe_mac_aml40)
+		adapter->ptp_caps.pps = 1;
+	else
+		adapter->ptp_caps.pps = 0;
+
 	adapter->ptp_caps.adjfine = txgbe_ptp_adjfreq;
 	adapter->ptp_caps.adjtime = txgbe_ptp_adjtime;
 #ifdef HAVE_PTP_CLOCK_INFO_GETTIME64
