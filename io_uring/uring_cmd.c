@@ -16,10 +16,16 @@
 #include "rsrc.h"
 #include "uring_cmd.h"
 
+
 static void io_req_uring_cleanup(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_uring_cmd *ioucmd = io_kiocb_to_cmd(req, struct io_uring_cmd);
 	struct io_uring_cmd_data *cache = req->async_data;
+
+	if (cache->op_data) {
+		kfree(cache->op_data);
+		cache->op_data = NULL;
+	}
 
 	if (issue_flags & IO_URING_F_UNLOCKED)
 		return;
