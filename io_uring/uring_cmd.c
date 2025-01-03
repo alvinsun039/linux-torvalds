@@ -19,7 +19,7 @@
 static void io_req_uring_cleanup(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_uring_cmd *ioucmd = io_kiocb_to_cmd(req, struct io_uring_cmd);
-	struct uring_cache *cache = req->async_data;
+	struct io_uring_cmd_data *cache = req->async_data;
 
 	if (issue_flags & IO_URING_F_UNLOCKED)
 		return;
@@ -173,7 +173,7 @@ static int io_uring_cmd_prep_setup(struct io_kiocb *req,
 				   const struct io_uring_sqe *sqe)
 {
 	struct io_uring_cmd *ioucmd = io_kiocb_to_cmd(req, struct io_uring_cmd);
-	struct uring_cache *cache;
+	struct io_uring_cmd_data *cache;
 
 	cache = io_uring_alloc_async_data(&req->ctx->uring_cache, req, NULL);
 	if (!cache)
@@ -252,7 +252,7 @@ int io_uring_cmd(struct io_kiocb *req, unsigned int issue_flags)
 
 	ret = file->f_op->uring_cmd(ioucmd, issue_flags);
 	if (ret == -EAGAIN) {
-		struct uring_cache *cache = req->async_data;
+		struct io_uring_cmd_data *cache = req->async_data;
 
 		if (ioucmd->sqe != cache->sqes)
 			io_uring_cmd_cache_sqes(req);
