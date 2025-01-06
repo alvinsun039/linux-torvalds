@@ -6025,8 +6025,7 @@ static int txgbe_reset_misc(struct txgbe_hw *hw)
 	int i;
 
 	if (hw->mac.type == txgbe_mac_aml40) {
-		if ((rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK)
-								!= TXGBE_EPHY_STAT_PPL_LOCK) {
+		if (!(rd32(hw, TXGBE_EPHY_STAT) & TXGBE_EPHY_STAT_PPL_LOCK)) {
 			err = TCALL(hw, mac.ops.setup_link, TXGBE_LINK_SPEED_40GB_FULL, false);
 			if (err) {
 				e_dev_info("txgbe_reset_misc setup phy failed\n");
