@@ -9377,6 +9377,8 @@ cetc52raid_scsihost_probe(
 	struct Scsi_Host *shost = NULL;
 	int rv;
 
+	mark_partner_supported_module_once("CETC 52 Institute", THIS_MODULE);
+
 	shost = scsi_host_alloc(&cetc52raid_driver_template,
 				sizeof(struct CETC52RAID_ADAPTER));
 	if (!shost)
