@@ -710,6 +710,7 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_CFG_TEREDO                0x1441C
 #define TXGBE_CFG_TCP_TIME              0x14420
 #define TXGBE_LINKUP_FILTER             0x14428
+#define TXGBE_LINKUP_FILTER_TIME        30
 #define TXGBE_CFG_TAG_TPID(_i)          (0x14430 + ((_i) * 4))
 
 /*AML LINK STATUS OVERWRITE*/
@@ -1742,6 +1743,9 @@ enum TXGBE_MSCA_CMD_value {
 #define TXGBE_MSCC_SADDR                ((0x1U) << 18)
 #define TXGBE_MSCC_CR(v)                ((0x8U & (v)) << 19)
 #define TXGBE_MSCC_BUSY                 ((0x1U) << 22)
+
+#define TXGBE_MAC_MDIO_CLAUSE_22_PORT    0x11220
+#define TXGBE_MAC_MDIO_CLAUSE_ALL_PRTCL22    0xF
 
 /* EEE registers */
 

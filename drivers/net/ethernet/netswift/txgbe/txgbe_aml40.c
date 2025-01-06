@@ -210,7 +210,8 @@ s32 txgbe_init_phy_ops_aml40(struct txgbe_hw *hw)
 	s32 ret_val = 0;
 
 	txgbe_init_i2c(hw);
-	wr32(hw, 0x11220, 0xF);
+	wr32(hw, TXGBE_MAC_MDIO_CLAUSE_22_PORT,
+				TXGBE_MAC_MDIO_CLAUSE_ALL_PRTCL22);
 
 	/* Identify the PHY or SFP module */
 	ret_val = TCALL(hw, phy.ops.identify);
