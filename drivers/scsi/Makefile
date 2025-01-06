@@ -104,6 +104,7 @@ obj-$(CONFIG_SCSI_HISI_RAID)	+= hisi_raid/
 obj-$(CONFIG_SCSI_MPI3MR)	+= mpi3mr/
 obj-$(CONFIG_SCSI_3SNIC_SSSRAID)	+= sssraid/
 obj-$(CONFIG_SCSI_LEAPIORAID) += leapioraid/
+obj-$(CONFIG_SCSI_CETC52RAID) += cetc52raid/
 obj-$(CONFIG_SCSI_ACARD)	+= atp870u.o
 obj-$(CONFIG_SCSI_SUNESP)	+= esp_scsi.o	sun_esp.o
 obj-$(CONFIG_SCSI_INITIO)	+= initio.o
