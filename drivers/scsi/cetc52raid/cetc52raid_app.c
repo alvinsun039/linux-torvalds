@@ -53,7 +53,6 @@
 #include <linux/poll.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
-#include "cetc52raid_func.h"
 
 #ifdef __KERNEL__
 #include <linux/miscdevice.h>
