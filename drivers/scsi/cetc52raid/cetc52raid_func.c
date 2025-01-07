@@ -7017,7 +7017,11 @@ cetc52raid_config_get_volume_handle(struct CETC52RAID_ADAPTER *ioc,
 		r = -1;
 		ioc_status = le16_to_cpu(mpi_reply.IOCStatus) &
 		    CETC52RAID_IOCSTATUS_MASK;
-		if (ioc_status != CETC52RAID_IOCSTATUS_SUCCESS)
+		if (ioc_status == CETC52RAID_IOCSTATUS_CONFIG_INVALID_PAGE) {
+			*volume_handle = 0;
+			r = 0;
+			goto out;
+		} else if (ioc_status != CETC52RAID_IOCSTATUS_SUCCESS)
 			goto out;
 		for (i = 0; i < config_page->NumElements; i++) {
 			element_type =
