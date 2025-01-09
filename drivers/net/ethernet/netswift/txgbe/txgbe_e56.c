@@ -26,6 +26,46 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 	}
 }
 
+s32 txgbe_e56_check_phy_link(struct txgbe_hw *hw, u32 *speed,
+				bool *link_up)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	u32 rdata = 0;
+	u32 links_reg = 0;
+
+	/* must read it twice because the state may
+	 * not be correct the first time you read it
+	 */
+	rdata = txgbe_rd32_epcs(hw, 0x30001);
+	rdata = txgbe_rd32_epcs(hw, 0x30001);
+
+	if (rdata & TXGBE_E56_PHY_LINK_UP)
+		*link_up = true;
+	else
+		*link_up = false;
+
+	if (!adapter->link_valid)
+		*link_up = false;
+
+	links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
+	if (*link_up) {
+		if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==
+				TXGBE_CFG_PORT_ST_AML_LINK_40G)
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+		else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) ==
+				TXGBE_CFG_PORT_ST_AML_LINK_25G)
+			*speed = TXGBE_LINK_SPEED_25GB_FULL;
+		else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_10G) ==
+				TXGBE_CFG_PORT_ST_AML_LINK_10G)
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+	} else {
+		*speed = TXGBE_LINK_SPEED_UNKNOWN;
+	}
+
+	return 0;
+}
+
+
 static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
@@ -3693,7 +3733,6 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status = 0;
@@ -3992,8 +4031,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		status = txgbe_e56_config_rx(hw, speed);
 	}
 
-	adapter->phy_tx_ready = true;
-
 	value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
 	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
 	SetFields(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MIN, 0xa);
@@ -4021,7 +4058,7 @@ out:
 int txgbe_get_cur_fec_mode(struct txgbe_hw *hw)
 {
 	struct txgbe_adapter *adapter = hw->back;
-	int value = 0;
+	u32 value = 0;
 
 	mutex_lock(&adapter->e56_lock);
 	value = txgbe_rd32_epcs(hw, SR_PMA_RS_FEC_CTRL);
@@ -4039,3 +4076,91 @@ int txgbe_get_cur_fec_mode(struct txgbe_hw *hw)
 
 	return TXGBE_PHY_FEC_OFF;
 }
+
+int txgbe_e56_set_fec_mode(struct txgbe_hw *hw, u8 fec_mode)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	int value = 0;
+
+	mutex_lock(&adapter->e56_lock);
+	if (fec_mode & TXGBE_PHY_FEC_RS) {
+		//disable BASER FEC
+		value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+		SetFields(&value, 0, 0, 0);
+		txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+
+		//enable RS FEC
+		txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
+		txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
+		txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
+		txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
+
+		txgbe_wr32_epcs(hw, 0x38018, 1024);
+		value = txgbe_rd32_epcs(hw, 0x100c8);
+		SetFields(&value, 2, 2, 1);
+		txgbe_wr32_epcs(hw, 0x100c8, value);
+	} else if (fec_mode & TXGBE_PHY_FEC_BASER) {
+		//disable RS FEC
+		txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
+		txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
+		txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
+		txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
+		txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
+		value = txgbe_rd32_epcs(hw, 0x100c8);
+		SetFields(&value, 2, 2, 0);
+		txgbe_wr32_epcs(hw, 0x100c8, value);
+
+		//enable BASER FEC
+		value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+		SetFields(&value, 0, 0, 1);
+		txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+	} else {
+		//disable RS FEC
+		txgbe_wr32_epcs(hw, 0x180a3, 0x7690);
+		txgbe_wr32_epcs(hw, 0x180a4, 0x3347);
+		txgbe_wr32_epcs(hw, 0x180a5, 0x896f);
+		txgbe_wr32_epcs(hw, 0x180a6, 0xccb8);
+		txgbe_wr32_epcs(hw, 0x38018, 0x3fff);
+		value = txgbe_rd32_epcs(hw, 0x100c8);
+		SetFields(&value, 2, 2, 0);
+		txgbe_wr32_epcs(hw, 0x100c8, value);
+
+		//disable BASER FEC
+		value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
+		SetFields(&value, 0, 0, 0);
+		txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
+	}
+	mutex_unlock(&adapter->e56_lock);
+
+	return 0;
+}
+
+int txgbe_e56_fec_mode_polling(struct txgbe_hw *hw, bool *link_up)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	int i = 0, j = 0;
+	u32 speed;
+
+	do {
+		if (!(adapter->fec_link_mode & BIT(j))) {
+			j += 1;
+			continue;
+		}
+
+		adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
+
+		txgbe_e56_set_fec_mode(hw, adapter->cur_fec_link);
+
+		for (i = 0; i < 4; i++) {
+			msleep(250);
+			txgbe_e56_check_phy_link(hw, &speed, link_up);
+			if (*link_up)
+				return 0;
+		}
+
+		j += 1;
+	} while (j < 3);
+
+	return 0;
+}
+

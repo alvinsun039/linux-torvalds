@@ -4877,6 +4877,8 @@ void txgbe_disable_tx_laser_multispeed_fiber(struct txgbe_hw *hw)
 	if (hw->mac.type == txgbe_mac_aml40) {
 		wr32m(hw, TXGBE_GPIO_DDR, TXGBE_GPIO_DR_1, TXGBE_GPIO_DR_1);
 		esdp_reg &= ~TXGBE_GPIO_DR_1;
+	} else if (hw->mac.type == txgbe_mac_aml) {
+		esdp_reg |= TXGBE_GPIO_DR_1;
 	} else {
 		esdp_reg |= TXGBE_GPIO_DR_1 | TXGBE_GPIO_DR_0;
 	}

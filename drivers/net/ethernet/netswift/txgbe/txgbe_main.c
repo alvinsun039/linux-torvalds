@@ -7729,7 +7729,6 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->fec_link_mode = TXGBE_PHY_FEC_AUTO;
 	adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 
-	adapter->phy_tx_ready = false;
 	adapter->link_valid = true;
 out:
 	return err;
@@ -9127,6 +9126,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		adapter->speed = SPEED_1000;
 		break;
 	}
+
+	adapter->cur_fec_link = txgbe_get_cur_fec_mode(hw);
 
 	e_info(drv, "NIC Link is Up %s, Flow Control: %s%s\n",
 	       (link_speed == TXGBE_LINK_SPEED_40GB_FULL ?
