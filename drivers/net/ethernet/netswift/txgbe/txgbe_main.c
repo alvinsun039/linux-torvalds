@@ -3727,6 +3727,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	u32 eicr;
 	u32 ecc;
 	u32 value = 0;
+	u16 vid;
 
 	eicr = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
 
@@ -3766,11 +3767,18 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	if (eicr & TXGBE_PX_MISC_IC_PCIE_REQ_ERR) {
 		ERROR_REPORT1(TXGBE_ERROR_POLLING,
 			"lan id %d, PCIe request error founded.\n", hw->bus.lan_id);
-		if (hw->bus.lan_id == 0) {
-			adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
-			txgbe_service_event_schedule(adapter);
-		} else
-			wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
+		pci_read_config_word(adapter->pdev, PCI_VENDOR_ID, &vid);
+		if (vid == TXGBE_FAILED_READ_CFG_WORD) {
+			ERROR_REPORT1(TXGBE_ERROR_POLLING, "PCIe link is lost.\n");
+			/*when pci lose link, not check over heat*/
+			if (hw->bus.lan_id == 0) {
+				adapter->flags2 |= TXGBE_FLAG2_PCIE_NEED_RECOVER;
+				txgbe_service_event_schedule(adapter);
+			} else
+				wr32(&adapter->hw, TXGBE_MIS_PF_SM, 1);
+		} else {
+			adapter->flags2 |= TXGBE_FLAG2_DMA_RESET_REQUESTED;
+		}
 	}
 
 	if (eicr & TXGBE_PX_MISC_IC_INT_ERR) {
