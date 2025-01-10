@@ -11477,18 +11477,16 @@ netdev_tx_t txgbe_xmit_frame_ring(struct sk_buff *skb,
 		tx_flags |= ntohs(vhdr->h_vlan_TCI) <<
 				  TXGBE_TX_FLAGS_VLAN_SHIFT;
 		tx_flags |= TXGBE_TX_FLAGS_SW_VLAN;
+		vlan_addlen += VLAN_HLEN;
 	}
 
-	if (protocol == htons(ETH_P_8021Q) || protocol == htons(ETH_P_8021AD)) {
-		struct vlan_hdr *vhdr, _vhdr;
-		vhdr = skb_header_pointer(skb, ETH_HLEN, sizeof(_vhdr), &_vhdr);
-		if (!vhdr)
-			goto out_drop;
-
-		protocol = vhdr->h_vlan_encapsulated_proto;
+	if (protocol == htons(ETH_P_8021Q) ||
+				protocol == htons(ETH_P_8021AD)) {
 		tx_flags |= TXGBE_TX_FLAGS_SW_VLAN;
 		vlan_addlen += VLAN_HLEN;
 	}
+
+	protocol = vlan_get_protocol(skb);
 
 #ifdef HAVE_PTP_1588_CLOCK
 #ifdef SKB_SHARED_TX_IS_UNION
