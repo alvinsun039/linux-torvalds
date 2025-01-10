@@ -9178,7 +9178,7 @@ static void txgbe_link_down_flush_tx(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 
-	if (hw->mac.type != txgbe_mac_aml ||
+	if (hw->mac.type != txgbe_mac_aml &&
 			hw->mac.type != txgbe_mac_aml40)
 		return;
 
