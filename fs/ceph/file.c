@@ -1025,6 +1025,16 @@ ssize_t __ceph_sync_read(struct inode *inode, loff_t *ki_pos,
 			len = read_off + read_len - off;
 		more = len < iov_iter_count(to);
 
+		op = &req->r_ops[0];
+		if (sparse) {
+			ret = ceph_alloc_sparse_ext_map(op);
+			if (ret) {
+				ceph_osdc_put_request(req);
+				break;
+			}
+		}
+
+
 		num_pages = calc_pages_for(read_off, read_len);
 		page_off = offset_in_page(off);
 		pages = ceph_alloc_page_vector(num_pages, GFP_KERNEL);
@@ -1038,15 +1048,7 @@ ssize_t __ceph_sync_read(struct inode *inode, loff_t *ki_pos,
 						 offset_in_page(read_off),
 						 false, false);
 
-		op = &req->r_ops[0];
-		if (sparse) {
-			ret = ceph_alloc_sparse_ext_map(op);
-			if (ret) {
-				ceph_osdc_put_request(req);
-				break;
-			}
-		}
-
+		
 		ceph_osdc_start_request(osdc, req);
 		ret = ceph_osdc_wait_request(osdc, req);
 
@@ -1452,7 +1454,16 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 			ret = PTR_ERR(req);
 			break;
 		}
-
+		
+		op = &req->r_ops[0];
+		if (sparse) {
+			ret = ceph_alloc_sparse_ext_map(op);
+			if (ret) {
+				ceph_osdc_put_request(req);
+				break;
+			}
+		}
+		
 		len = iter_get_bvecs_alloc(iter, size, &bvecs, &num_pages);
 		if (len < 0) {
 			ceph_osdc_put_request(req);
@@ -1462,6 +1473,8 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 		if (len != size)
 			osd_req_op_extent_update(req, 0, len);
 
+		osd_req_op_extent_osd_data_bvecs(req, 0, bvecs, num_pages, len);
+		
 		/*
 		 * To simplify error handling, allow AIO when IO within i_size
 		 * or IO can be satisfied by single OSD request.
@@ -1493,15 +1506,7 @@ ceph_direct_read_write(struct kiocb *iocb, struct iov_iter *iter,
 			req->r_mtime = mtime;
 		}
 
-		osd_req_op_extent_osd_data_bvecs(req, 0, bvecs, num_pages, len);
-		op = &req->r_ops[0];
-		if (sparse) {
-			ret = ceph_alloc_sparse_ext_map(op);
-			if (ret) {
-				ceph_osdc_put_request(req);
-				break;
-			}
-		}
+		
 
 		if (aio_req) {
 			aio_req->total_len += len;
