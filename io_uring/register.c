@@ -402,8 +402,8 @@ static int io_register_resize_rings(struct io_ring_ctx *ctx, void __user *arg)
 	struct io_uring_region_desc rd;
 	struct io_ring_ctx_rings o = { }, n = { }, *to_free = NULL;
 	size_t size, sq_array_offset;
+	unsigned i, tail, old_head;
 	struct io_uring_params p;
-	unsigned i, tail;
 	int ret;
 
 	/* for single issuer, must be owner resizing */
@@ -520,9 +520,10 @@ static int io_register_resize_rings(struct io_ring_ctx *ctx, void __user *arg)
 	 * rings can't hold what is already there, then fail the operation.
 	 */
 	tail = READ_ONCE(o.rings->sq.tail);
-	if (tail - READ_ONCE(o.rings->sq.head) > p.sq_entries)
+	old_head = READ_ONCE(o.rings->sq.head);
+	if (tail - old_head > p.sq_entries)
 		goto overflow;
-	for (i = READ_ONCE(o.rings->sq.head); i < tail; i++) {
+	for (i = old_head; i < tail; i++) {
 		unsigned src_head = i & (ctx->sq_entries - 1);
 		unsigned dst_head = i & (p.sq_entries - 1);
 
@@ -532,7 +533,8 @@ static int io_register_resize_rings(struct io_ring_ctx *ctx, void __user *arg)
 	WRITE_ONCE(n.rings->sq.tail, READ_ONCE(o.rings->sq.tail));
 
 	tail = READ_ONCE(o.rings->cq.tail);
-	if (tail - READ_ONCE(o.rings->cq.head) > p.cq_entries) {
+	old_head = READ_ONCE(o.rings->cq.head);
+	if (tail - old_head > p.cq_entries) {
 overflow:
 		/* restore old rings, and return -EOVERFLOW via cleanup path */
 		ctx->rings = o.rings;
@@ -541,7 +543,7 @@ overflow:
 		ret = -EOVERFLOW;
 		goto out;
 	}
-	for (i = READ_ONCE(o.rings->cq.head); i < tail; i++) {
+	for (i = old_head; i < tail; i++) {
 		unsigned src_head = i & (ctx->cq_entries - 1);
 		unsigned dst_head = i & (p.cq_entries - 1);
 
