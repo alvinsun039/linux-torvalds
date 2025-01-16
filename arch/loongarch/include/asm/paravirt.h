@@ -19,6 +19,7 @@ static inline u64 paravirt_steal_clock(int cpu)
 
 int __init pv_ipi_init(void);
 int __init pv_time_init(void);
+int __init pv_spinlock_init(void);
 
 #else
 
