@@ -482,9 +482,13 @@ s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, u16 *link_state)
 s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 		      bool vlan_on, bool vlvf_bypass)
 {
+	struct txgbe_adapter *adapter = hw->back;
+	struct net_device *netdev = adapter->netdev;
 	struct txgbe_mbx_info *mbx = &hw->mbx;
+	bool vlan_offload = false;
 	u32 msgbuf[2];
 	s32 err;
+
 	UNREFERENCED_2PARAMETER(vind, vlvf_bypass);
 	UNREFERENCED_2PARAMETER(vlan_on, vlan);
 
@@ -492,6 +496,31 @@ s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 	msgbuf[1] = vlan;
 	/* Setting the 8 bit field MSG INFO to TRUE indicates "add" */
 	msgbuf[0] |= vlan_on << TXGBE_VT_MSGINFO_SHIFT;
+
+	/* define ctag and stag macros in same patch, no need to
+	 *judge code flow in different condition
+	 */
+#if defined(NETIF_F_HW_VLAN_STAG_TX) && defined(NETIF_F_HW_VLAN_CTAG_TX)
+	if ((netdev->features & NETIF_F_HW_VLAN_STAG_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_STAG_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_STAG_FILTER) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER))
+		vlan_offload = true;
+	else
+		vlan_offload = false;
+#else
+	if ((netdev->features & NETIF_F_HW_VLAN_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_FILTER))
+		vlan_offload = true;
+	else
+		vlan_offload = false;
+#endif
+
+	/* if vf vlan offload is disabled, allow to create vlan under pf port vlan */
+	msgbuf[0] |= vlan_offload << TXGBE_VT_MSGINFO_VLAN_OFFLOAD_SHIFT;
 
 	err = mbx->ops.write_posted(hw, msgbuf, 2, 0);
 	if (!err)

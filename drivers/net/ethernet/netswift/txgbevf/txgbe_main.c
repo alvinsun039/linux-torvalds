@@ -2571,11 +2571,11 @@ static void txgbe_vlan_rx_add_vid(struct net_device *netdev, u16 vid)
 
 	if (err) {
 #ifdef HAVE_INT_NDO_VLAN_RX_ADD_VID
+		e_warn(drv, "PF driver may enable port vlan, please off all vf vlan features\n");
 		return -EIO;
 #endif /* HAVE_INT_NDO_VLAN_RX_ADD_VID */
 	} else {
 #ifndef HAVE_NETDEV_VLAN_FEATURES
-
 		/*
 		 * Copy feature flags from netdev to the vlan netdev for this
 		 * vid.  This allows things like TSO to bubble down to our
