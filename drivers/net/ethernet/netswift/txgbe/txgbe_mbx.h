@@ -81,6 +81,7 @@
 #define TXGBE_VT_MSGTYPE_CTS    0x20000000 /* Indicates that VF is still
 					    * clear to send requests */
 #define TXGBE_VT_MSGINFO_SHIFT  16
+#define TXGBE_VT_MSGINFO_VLAN_OFFLOAD_SHIFT  17
 /* bits 23:16 are used for extra info for certain messages */
 #define TXGBE_VT_MSGINFO_MASK   (0xFF << TXGBE_VT_MSGINFO_SHIFT)
 

@@ -920,16 +920,21 @@ static int txgbe_set_vf_vlan_msg(struct txgbe_adapter *adapter,
 	struct txgbe_hw *hw = &adapter->hw;
 	int add = (msgbuf[0] & TXGBE_VT_MSGINFO_MASK) >> TXGBE_VT_MSGINFO_SHIFT;
 	int vid = (msgbuf[1] & TXGBE_PSR_VLAN_SWC_VLANID_MASK);
+	int vlan_offload = (msgbuf[0] & TXGBE_VT_MSGINFO_MASK) >> TXGBE_VT_MSGINFO_VLAN_OFFLOAD_SHIFT;
 	int err;
 	u8 tcs = netdev_get_num_tc(adapter->netdev);
 
 	if (adapter->vfinfo[vf].pf_vlan || tcs) {
-		e_warn(drv,
-		       "VF %d attempted to override administratively set VLAN "
-		       "configuration\n"
-		       "Reload the VF driver to resume operations\n",
-		       vf);
-		return 0;
+		if (!vlan_offload)
+			return 0;
+		else {
+			e_warn(drv,
+				"VF %d attempted to override administratively set VLAN "
+				"configuration\n"
+				"Reload the VF driver to resume operations\n",
+				vf);
+			return -1;
+		}
 	}
 
 	if (add)
