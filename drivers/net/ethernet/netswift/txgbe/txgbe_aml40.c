@@ -52,11 +52,12 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 		goto out;
 	}
 
-	status = TCALL(hw, mac.ops.check_link,
-		&link_speed, &link_up, false);
-
-	if (status != 0)
-		goto out;
+	for (i = 0; i < 4; i++) {
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
+		if (link_up)
+			break;
+		msleep(250);
+	}
 
 	if ((link_speed == speed) && link_up)
 		goto out;
@@ -70,8 +71,7 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 		adapter->link_valid = false;
 
 	for (i = 0; i < 4; i++) {
-		TCALL(hw, mac.ops.check_link,
-				&link_speed, &link_up, false);
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 		if (link_up)
 			goto out;
 		msleep(250);
