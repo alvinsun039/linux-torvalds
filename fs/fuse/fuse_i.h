@@ -931,6 +931,11 @@ struct fuse_conn {
 	struct idr backing_files_map;
 #endif
 
+#ifdef CONFIG_FUSE_IO_URING
+	/**  uring connection information*/
+	struct fuse_ring *ring;
+#endif
+
 	KY_KABI_RESERVE(1)
 	KY_KABI_RESERVE(2)
 	KY_KABI_RESERVE(3)
