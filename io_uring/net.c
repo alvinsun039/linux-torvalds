@@ -174,7 +174,7 @@ static struct io_async_msghdr *io_msg_alloc_async(struct io_kiocb *req)
 }
 
 /* assign new iovec to kmsg, if we need to */
-static int io_net_vec_assign(struct io_kiocb *req, struct io_async_msghdr *kmsg,
+static void io_net_vec_assign(struct io_kiocb *req, struct io_async_msghdr *kmsg,
 			     struct iovec *iov)
 {
 	if (iov) {
@@ -184,7 +184,6 @@ static int io_net_vec_assign(struct io_kiocb *req, struct io_async_msghdr *kmsg,
 			kfree(kmsg->free_iov);
 		kmsg->free_iov = iov;
 	}
-	return 0;
 }
 
 static inline void io_mshot_prep_retry(struct io_kiocb *req,
@@ -246,7 +245,8 @@ static int io_compat_msg_copy_hdr(struct io_kiocb *req,
 	if (unlikely(ret < 0))
 		return ret;
 
-	return io_net_vec_assign(req, iomsg, iov);
+	io_net_vec_assign(req, iomsg, iov);
+	return 0;
 }
 #endif
 
@@ -305,7 +305,8 @@ ua_end:
 	if (unlikely(ret < 0))
 		return ret;
 
-	return io_net_vec_assign(req, iomsg, iov);
+	io_net_vec_assign(req, iomsg, iov);
+	return 0;
 }
 
 static int io_sendmsg_copy_hdr(struct io_kiocb *req,
