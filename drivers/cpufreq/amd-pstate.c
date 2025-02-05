@@ -862,10 +862,6 @@ static void amd_pstate_update_limits(unsigned int cpu)
 		}
 	}
 	cpufreq_cpu_put(policy);
-
-	if (!highest_perf_changed)
-		cpufreq_update_policy(cpu);
-
 }
 
 /*
