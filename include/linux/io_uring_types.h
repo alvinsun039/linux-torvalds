@@ -356,7 +356,6 @@ struct io_ring_ctx {
 
 	spinlock_t		completion_lock;
 
-	struct list_head	io_buffers_comp;
 	struct list_head	cq_overflow_list;
 
 	struct hlist_head	waitid_list;
@@ -377,8 +376,6 @@ struct io_ring_ctx {
 
 	struct xarray		personalities;
 	u32			pers_next;
-
-	struct list_head	io_buffers_cache;
 
 	/* Keep this last, we don't need it for the fast path */
 	struct wait_queue_head		poll_wq;
