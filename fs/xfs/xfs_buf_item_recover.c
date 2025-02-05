@@ -976,6 +976,7 @@ xlog_recover_buf_commit_pass2(
 		 */
 		if (bp->b_maps[0].bm_bn == XFS_SB_DADDR && bp->b_ops) {
 			struct xfs_dsb *sb = bp->b_addr;
+			xfs_agnumber_t oagcount = mp->m_sb.sb_agcount;
 
 			bp->b_ops->verify_write(bp);
 			error = bp->b_error;
@@ -983,7 +984,7 @@ xlog_recover_buf_commit_pass2(
 				goto out_release;
 
 			if (be32_to_cpu(sb->sb_agcount) > mp->m_sb.sb_agcount) {
-				error = xfs_initialize_perag(mp,
+				error = xfs_initialize_perag(mp, oagcount,
 						be32_to_cpu(sb->sb_agcount),
 						be64_to_cpu(sb->sb_dblocks),
 						&mp->m_maxagi);
