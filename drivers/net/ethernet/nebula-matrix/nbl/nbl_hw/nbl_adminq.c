@@ -72,7 +72,7 @@ static void nbl_res_adminq_add_cmd_filter_res_write(struct nbl_resource_mgt *res
 {
 	struct nbl_adminq_mgt *adminq_mgt = NBL_RES_MGT_TO_ADMINQ_MGT(res_mgt);
 	struct nbl_common_info *common = NBL_RES_MGT_TO_COMMON(res_mgt);
-	struct nbl_res_fw_cmd_filter filter = {0};
+	struct nbl_res_fw_cmd_filter filter = {.in = NULL, .out = NULL};
 	u16 key = 0;
 
 	key = NBL_CHAN_MSG_ADMINQ_RESOURCE_WRITE;
