@@ -85,11 +85,12 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 	}
 
 	if (speed == TXGBE_LINK_SPEED_25GB_FULL &&
-			link_speed == TXGBE_LINK_SPEED_25GB_FULL)
+			link_speed == TXGBE_LINK_SPEED_25GB_FULL) {
 		txgbe_e56_fec_mode_polling(hw, &link_up);
 
-	if (link_up)
-		goto out;
+		if (link_up)
+			goto out;
+	}
 
 	mutex_lock(&adapter->e56_lock);
 	ret_status = txgbe_set_link_to_amlite(hw, speed);
