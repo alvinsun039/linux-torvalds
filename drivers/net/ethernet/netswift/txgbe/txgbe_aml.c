@@ -105,8 +105,16 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		goto out;
 	}
 
-	if (speed == TXGBE_LINK_SPEED_25GB_FULL)
+	if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
 		txgbe_e56_fec_mode_polling(hw, &link_up);
+	} else {
+		for (i = 0; i < 4; i++) {
+			txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
+			if (link_up)
+				goto out;
+			msleep(250);
+		}
+	}
 
 out:
 	return status;
@@ -259,10 +267,7 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 		highest_link_speed = TXGBE_LINK_SPEED_25GB_FULL;
 
 		/* If we already have link at this speed, just jump out */
-		status = TCALL(hw, mac.ops.check_link,
-					&link_speed, &link_up, false);
-		if (status != 0)
-			return status;
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 
 		adapter->cur_fec_link = txgbe_get_cur_fec_mode(hw);
 
@@ -281,10 +286,7 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 
 		/*aml wait link in setup,no need to repeatly wait*/
 		/* If we have link, just jump out */
-		status = TCALL(hw, mac.ops.check_link,
-					&link_speed, &link_up, false);
-		if (status != 0)
-			return status;
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 
 		if (link_up)
 			goto out;
@@ -296,10 +298,7 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 			highest_link_speed = TXGBE_LINK_SPEED_10GB_FULL;
 
 		/* If we already have link at this speed, just jump out */
-		status = TCALL(hw, mac.ops.check_link,
-					&link_speed, &link_up, false);
-		if (status != 0)
-			return status;
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 
 		if ((link_speed == TXGBE_LINK_SPEED_10GB_FULL) && link_up)
 			goto out;
@@ -315,10 +314,7 @@ static s32 txgbe_setup_mac_link_multispeed_fiber_aml(struct txgbe_hw *hw,
 
 		/*aml wait link in setup,no need to repeatly wait*/
 		/* If we have link, just jump out */
-		status = TCALL(hw, mac.ops.check_link,
-					&link_speed, &link_up, false);
-		if (status != 0)
-			return status;
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 
 		if (link_up) {
 			adapter->flags &= ~TXGBE_FLAG_NEED_LINK_CONFIG;
