@@ -3610,7 +3610,8 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 	/* enable misc interrupt */
 	mask = TXGBE_PX_MISC_IEN_MASK;
 
-	mask &= ~TXGBE_PX_MISC_IEN_ETH_EVENT;
+	if (hw->mac.type != txgbe_mac_sp)
+		mask &= ~TXGBE_PX_MISC_IEN_ETH_EVENT;
 
 	if (adapter->flags2 & TXGBE_FLAG2_TEMP_SENSOR_CAPABLE)
 		mask |= TXGBE_PX_MISC_IEN_OVER_HEAT;
@@ -3757,7 +3758,9 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 			if (eicr & TXGBE_PX_MISC_AML_ETH_PHY_EVENT)
 				txgbe_check_phy_event(adapter);
 		} else {
-			if (eicr & (TXGBE_PX_MISC_IC_ETH_LK | TXGBE_PX_MISC_IC_ETH_LKDN))
+			if (eicr & (TXGBE_PX_MISC_IC_ETH_LK |
+				    TXGBE_PX_MISC_IC_ETH_LKDN |
+				    TXGBE_PX_MISC_IC_ETH_EVENT))
 				txgbe_check_lsc(adapter);
 		}
 	}
@@ -3799,8 +3802,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 			txgbe_service_event_schedule(adapter);
 		}
 	}
-	if ((eicr & TXGBE_PX_MISC_IC_STALL) ||
-		(eicr & TXGBE_PX_MISC_IC_ETH_EVENT)) {
+	if (eicr & TXGBE_PX_MISC_IC_STALL) {
 		adapter->flags2 |= TXGBE_FLAG2_PF_RESET_REQUESTED;
 		txgbe_service_event_schedule(adapter);
 	}

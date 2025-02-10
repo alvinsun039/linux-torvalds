@@ -7871,6 +7871,7 @@ s32 txgbe_check_mac_link_sp(struct txgbe_hw *hw, u32 *speed,
 				bool *link_up, bool link_up_wait_to_complete)
 {
 	u32 links_reg = 0;
+	u32 status = 0;
 	u16 value = 0;
 	u32 i;
 
@@ -7966,6 +7967,31 @@ s32 txgbe_check_mac_link_sp(struct txgbe_hw *hw, u32 *speed,
 		}
 	} else {
 		*speed = TXGBE_LINK_SPEED_UNKNOWN;
+	}
+
+	if (TXGBE_LINK_FAULT) {
+		status = rd32(hw, 0x110b0);
+		switch (status & 0x3000001) {
+		case 0x3000001:
+		case 0x2000001:
+			*link_up = false;
+			break;
+		case 0x1:
+		case 0x0:
+			msleep(100);
+			status = rd32(hw, 0x110b0);
+			if ((status & 0x3000001) == 0x1 ||
+			    (status & 0x3000001) == 0x0)
+				*link_up = true;
+			else
+				*link_up = false;
+			break;
+		default:
+			*link_up = false;
+			break;
+		}
+		if (!(*link_up))
+			*speed = TXGBE_LINK_SPEED_UNKNOWN;
 	}
 
 	return 0;

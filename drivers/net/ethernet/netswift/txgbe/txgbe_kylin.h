@@ -124,6 +124,10 @@
 #define TXGBE_DIS_COMP_TIMEOUT 1 /* dis completion timeout, default 1 to dis */
 #endif
 
+#ifndef TXGBE_LINK_FAULT
+#define TXGBE_LINK_FAULT 0 /* Check single fiber inserted/removed, default 0 */
+#endif
+
 #ifndef TXGBE_TXHEAD_WB
 // default 1 to 64BYTE, 0 to 4BYTE, 2 to 64BYTE allign(for test), 3 to no use
 #define TXGBE_TXHEAD_WB 0
