@@ -69,6 +69,24 @@ struct mptcp_storage {
 	char ca_name[TCP_CA_NAME_MAX];
 };
 
+static struct nstoken *create_netns(void)
+{
+	SYS(fail, "ip netns add %s", NS_TEST);
+	SYS(fail, "ip -net %s link set dev lo up", NS_TEST);
+
+	return open_netns(NS_TEST);
+fail:
+	return NULL;
+}
+
+static void cleanup_netns(struct nstoken *nstoken)
+{
+	if (nstoken)
+		close_netns(nstoken);
+
+	SYS_NOFAIL("ip netns del %s &> /dev/null", NS_TEST);
+}
+
 static int verify_tsk(int map_fd, int client_fd)
 {
 	int err, cfd = client_fd;
@@ -178,15 +196,15 @@ out:
 
 static void test_base(void)
 {
-	struct netns_obj *netns = NULL;
+	struct nstoken *nstoken = NULL;
 	int server_fd, cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp");
 	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
-	netns = netns_new(NS_TEST, true);
-	if (!ASSERT_OK_PTR(netns, "netns_new"))
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		goto fail;
 
 	/* without MPTCP */
@@ -210,7 +228,7 @@ with_mptcp:
 	close(server_fd);
 
 fail:
-	netns_free(netns);
+	cleanup_netns(nstoken);
 	close(cgroup_fd);
 }
 
@@ -296,21 +314,21 @@ out:
 
 static void test_mptcpify(void)
 {
-	struct netns_obj *netns = NULL;
+	struct nstoken *nstoken = NULL;
 	int cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcpify");
 	if (!ASSERT_GE(cgroup_fd, 0, "test__join_cgroup"))
 		return;
 
-	netns = netns_new(NS_TEST, true);
-	if (!ASSERT_OK_PTR(netns, "netns_new"))
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns"))
 		goto fail;
 
 	run_mptcpify(cgroup_fd);
 
 fail:
-	netns_free(netns);
+	cleanup_netns(nstoken);
 	close(cgroup_fd);
 }
 
@@ -388,7 +406,7 @@ close_server:
 static void test_subflow(void)
 {
 	struct mptcp_subflow *skel;
-	struct netns_obj *netns;
+	struct nstoken *nstoken;
 	int cgroup_fd;
 
 	cgroup_fd = test__join_cgroup("/mptcp_subflow");
@@ -411,8 +429,8 @@ static void test_subflow(void)
 	if (!ASSERT_OK_PTR(skel->links._getsockopt_subflow, "attach _getsockopt_subflow"))
 		goto skel_destroy;
 
-	netns = netns_new(NS_TEST, true);
-	if (!ASSERT_OK_PTR(netns, "netns_new: mptcp_subflow"))
+	nstoken = create_netns();
+	if (!ASSERT_OK_PTR(nstoken, "create_netns: mptcp_subflow"))
 		goto skel_destroy;
 
 	if (endpoint_init("subflow") < 0)
@@ -421,7 +439,7 @@ static void test_subflow(void)
 	run_subflow();
 
 close_netns:
-	netns_free(netns);
+	cleanup_netns(nstoken);
 skel_destroy:
 	mptcp_subflow__destroy(skel);
 close_cgroup:
