@@ -1018,6 +1018,7 @@ struct txgbe_adapter {
 	u32 flags;
 	u32 flags2;
 	u32 flags3;
+	u8 tx_unidir_mode;
 	u8  an73_mode;
 	u8  backplane_an;
 	u8  an73;

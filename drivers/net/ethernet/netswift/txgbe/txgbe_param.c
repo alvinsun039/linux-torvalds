@@ -67,6 +67,15 @@
 	MODULE_PARM_DESC(X, desc);
 #endif /* module_param_array */
 
+/* Tx unidirectional mode
+ *
+ * Valid Range: [0, 1]
+ *
+ * Default Value: 0
+ */
+TXGBE_PARAM(TX_UNIDIR_MODE, "Tx Unidirectional Mode [0, 1]");
+#define TX_DEFAULT_UNIDIR_MODE              0
+
 /* ffe_main (KR/KX4/KX/SFI)
  *
  * Valid Range: 0-60
@@ -523,6 +532,33 @@ void __devinit txgbe_check_options(struct txgbe_adapter *adapter)
 		bd = TXGBE_MAX_NIC;
 #endif
 	}
+		{
+			u32 tx_unidir_mode;
+			static struct txgbe_option opt = {
+				.type = range_option,
+				.name = "TX_UNIDIR_MODE",
+				.err =
+				  "using default of "__MODULE_STRING(TX_DEFAULT_UNIDIR_MODE),
+				.def = 0,
+				.arg = { .r = { .min = 0,
+						.max = 1} }
+			};
+
+#ifdef module_param_array
+			if (num_TX_UNIDIR_MODE > bd) {
+#endif
+				tx_unidir_mode = TX_UNIDIR_MODE[bd];
+				if (tx_unidir_mode == OPTION_UNSET)
+					tx_unidir_mode = TX_UNIDIR_MODE[bd];
+				txgbe_validate_option(&tx_unidir_mode, &opt);
+				adapter->tx_unidir_mode = tx_unidir_mode;
+#ifdef module_param_array
+			} else {
+				adapter->tx_unidir_mode = 0;
+			}
+#endif
+		}
+
 		{ /* MAIN */
 			u32 ffe_main;
 			static struct txgbe_option opt = {
