@@ -94,54 +94,35 @@ void txgbe_bp_down_event(struct txgbe_adapter *adapter)
 	if (adapter->backplane_an == 0)
 		return;
 
-	switch (KR_RESTART_T_MODE) {
-	case 1:
-		txgbe_wr32_epcs(hw, TXGBE_VR_AN_KR_MODE_CL, 0x0000);
-		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x0000);
-		txgbe_wr32_epcs(hw, 0x78001, 0x0000);
+	val = txgbe_rd32_epcs(hw, 0x78002);
+	val1 = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_CTL);
+	kr_dbg(KR_MODE, "AN INT : %x - AN CTL : %x - PL : %x\n",
+	       val, val1, txgbe_rd32_epcs(hw, 0x70012));
+	switch (AN73_TRAINNING_MODE) {
+	case 0:
 		msleep(1000);
-		txgbe_set_link_to_kr(hw, 1);
+		if ((val & BIT(2)) == BIT(2)) {
+			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
+				adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+		} else {
+			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+		}
 		break;
+	case 1:
 	case 2:
-		txgbe_wr32_epcs(hw, TXGBE_VR_AN_KR_MODE_CL, 0x0000);
-		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x0000);
-		txgbe_wr32_epcs(hw, 0x78001, 0x0000);
-		msleep(1050);
-		txgbe_wr32_epcs(hw, TXGBE_VR_AN_KR_MODE_CL, 0x0001);
-		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3200);
-		txgbe_wr32_epcs(hw, 0x78001, 0x0007);
+		msleep(100);
+		if ((val & BIT(2)) == BIT(2)) {
+			if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
+				adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
+		} else {
+			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
+			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
+			txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+		}
 		break;
 	default:
-		val = txgbe_rd32_epcs(hw, 0x78002);
-		val1 = txgbe_rd32_epcs(hw, TXGBE_SR_AN_MMD_CTL);
-		kr_dbg(KR_MODE, "AN INT : %x - AN CTL : %x - PL : %x\n", val, val1, txgbe_rd32_epcs(hw, 0x70012));
-		switch (AN73_TRAINNING_MODE) {
-		case 0:
-			msleep(1000);
-			if ((val & BIT(2)) == BIT(2)) {
-				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
-					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-			} else {
-				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
-				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
-				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
-			}
-			break;
-		case 1:
-		case 2:
-			msleep(100);
-			if ((val & BIT(2)) == BIT(2)) {
-				if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING))
-					adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-			} else {
-				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0);
-				txgbe_wr32_epcs(hw, 0x78002, 0x0000);
-				txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
-			}
-			break;
-		default:
-			break;
-		}
 		break;
 	}
 }

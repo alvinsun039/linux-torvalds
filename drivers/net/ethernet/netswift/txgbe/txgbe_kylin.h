@@ -184,10 +184,6 @@
 #define KR_AN73_PRESET 0
 #endif
 
-#ifndef KR_RESTART_T_MODE
-#define KR_RESTART_T_MODE 0
-#endif
-
 #ifndef KR_SET
 #define KR_SET 0
 #define KR_MAIN 27
