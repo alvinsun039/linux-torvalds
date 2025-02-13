@@ -191,13 +191,6 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.proc_handler = proc_dointvec_jiffies,
 	},
 	{
-		.procname = "blackhole_timeout",
-		.maxlen = sizeof(unsigned int),
-		.mode = 0644,
-		.proc_handler = proc_blackhole_detect_timeout,
-		.extra1 = SYSCTL_ZERO,
-	},
-	{
 		.procname = "checksum_enabled",
 		.maxlen = sizeof(u8),
 		.mode = 0644,
@@ -244,6 +237,13 @@ static struct ctl_table mptcp_sysctl_table[] = {
 		.maxlen = sizeof(unsigned int),
 		.mode = 0644,
 		.proc_handler = proc_dointvec_jiffies,
+	},
+	{
+		.procname = "blackhole_timeout",
+		.maxlen = sizeof(unsigned int),
+		.mode = 0644,
+		.proc_handler = proc_blackhole_detect_timeout,
+		.extra1 = SYSCTL_ZERO,
 	},
 	{}
 };
