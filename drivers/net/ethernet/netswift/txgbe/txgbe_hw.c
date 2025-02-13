@@ -5054,10 +5054,8 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 	if (KR_AN73_PRESET == 1)
 		txgbe_wr32_epcs(hw, 0x18037, 0x80 | txgbe_rd32_epcs(hw, TXGBE_PHY_TX_EQ_CTL1));
 
-	if (KR_POLLING == 1) {
-		txgbe_wr32_epcs(hw, 0x18006, 0xffff);
-		txgbe_wr32_epcs(hw, 0x18008, 0xA697);
-	}
+	//txgbe_wr32_epcs(hw, 0x18006, 0xffff);
+	//txgbe_wr32_epcs(hw, 0x18008, 0xA697);
 
 	/* 3. Set VR_XS_PMA_Gen5_12G_MPLLA_CTRL3 Register */
 	/* Bit[10:0](MPLLA_BANDWIDTH) = 11'd123 (default: 11'd16) */

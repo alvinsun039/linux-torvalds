@@ -3736,7 +3736,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 		if (hw->mac.type == txgbe_mac_aml) {
 			txgbe_service_event_schedule(adapter);
 		} else {
-			if (adapter->backplane_an == 1 && (KR_POLLING == 0))
+			if (adapter->backplane_an)
 				txgbe_service_event_schedule(adapter);
 		}
 	}
@@ -4058,7 +4058,7 @@ static irqreturn_t txgbe_intr(int __always_unused irq, void *data)
 	
 	eicr_misc = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
 	if (eicr_misc & TXGBE_PX_MISC_IC_ETH_AN) {
-		if (adapter->backplane_an == 1 && (KR_POLLING == 0))
+		if (adapter->backplane_an)
 			txgbe_service_event_schedule(adapter);
 	}
 

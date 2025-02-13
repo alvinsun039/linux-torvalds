@@ -184,10 +184,6 @@
 #define KR_AN73_PRESET 0
 #endif
 
-#ifndef KR_POLLING
-#define KR_POLLING 0
-#endif 
-
 #ifndef KR_RESTART_T_MODE
 #define KR_RESTART_T_MODE 0
 #endif

@@ -66,30 +66,23 @@ int txgbe_bp_mode_setting(struct txgbe_adapter *adapter)
 
 void txgbe_bp_watchdog_event(struct txgbe_adapter *adapter)
 {
-	u32 value = 0;
 	struct txgbe_hw *hw = &adapter->hw;
-	struct net_device *netdev = adapter->netdev;
+	u32 value = 0;
 	int ret = 0;
 	
 	/* only continue if link is down */
-	if (netif_carrier_ok(netdev))
+	if (netif_carrier_ok(adapter->netdev))
 		return;
 
-	if (KR_POLLING == 1) {
+	if (adapter->flags2 & TXGBE_FLAG2_KR_TRAINING) {
 		value = txgbe_rd32_epcs(hw, 0x78002);
-		value = value & 0x4;
-		if (value == 0x4) {
-			e_info(hw, "Enter training\n");
-			handle_bkp_an73_flow(0, adapter);
-		}
-	} else {
-		if(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING){
+		if ((value & BIT(2)) == BIT(2)) {
 			e_info(hw, "Enter training\n");
 			ret = handle_bkp_an73_flow(0, adapter);
-			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 			if (ret)
 				txgbe_set_link_to_kr(hw, 1);
 		}
+		adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 	}
 }
 
