@@ -988,7 +988,8 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 advertised, old;
+	u32 advertised, old, link_support;
+	bool autoneg;
 	s32 err = 0;
 	struct ethtool_link_ksettings temp_ks;
 	u32 curr_autoneg = 2;
@@ -1076,6 +1077,15 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 			curr_autoneg = !!(curr_autoneg & (0x1 << 12));
 			if (old == advertised && (curr_autoneg == !!(cmd->base.autoneg)))
 				return 0;
+		}
+
+		err = TCALL(hw, mac.ops.get_link_capabilities,
+			&link_support, &autoneg);
+		if (err)
+			e_info(probe, "get link capabiliyies failed with code %d\n", err);
+		if (!(link_support & advertised)) {
+			e_info(probe, "unsupported advertised: %x", advertised);
+			return -EINVAL;
 		}
 
 		/* this sets the link speed and restarts auto-neg */
