@@ -7,7 +7,7 @@
  * Copyright (C) 2013-2021  Broadcom Inc.
  *  (mailto:MPT-FusionLinux.pdl@broadcom.com)
  *
- * Copyright (C) 2024 Cetc52 Tech Inc.
+ * Copyright (C) 2024 CETC 52nd Research Institute
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License

@@ -3,7 +3,7 @@
  *
  * Copyright 2000-2020 Broadcom Inc. All rights reserved.
  *
- * Copyright (C) 2024 Cetc52 Tech Inc.
+ * Copyright (C) 2024 CETC 52nd Research Institute
  *
  */
 
