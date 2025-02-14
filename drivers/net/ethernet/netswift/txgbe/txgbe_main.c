@@ -9160,6 +9160,12 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		((adapter->cur_fec_link == TXGBE_PHY_FEC_BASER) ? ", FEC: BASE-R" :\
 		 (adapter->cur_fec_link == TXGBE_PHY_FEC_RS) ? ", FEC: RS" : ", FEC: OFF") : ""));
 
+	if (!adapter->backplane_an &&
+	    (hw->dac_sfp ||
+	     (hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4)
+	    && hw->mac.type == txgbe_mac_sp)
+		txgbe_enable_rx_adapter(hw);
+
 	if (adapter->tx_unidir_mode) {
 		wr32m(hw, 0x11004, BIT(10), BIT(10));
 		wr32m(hw, 0x11004, BIT(0), BIT(0));

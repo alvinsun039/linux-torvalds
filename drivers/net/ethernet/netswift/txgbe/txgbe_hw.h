@@ -171,6 +171,32 @@ s32 txgbe_enable_sec_rx_path(struct txgbe_hw *hw);
 s32 txgbe_disable_sec_tx_path(struct txgbe_hw *hw);
 s32 txgbe_enable_sec_tx_path(struct txgbe_hw *hw);
 
+#ifndef read_poll_timeout
+#define read_poll_timeout(op, val, cond, sleep_us, timeout_us, \
+				sleep_before_read, args...) \
+({ \
+	u64 __timeout_us = (timeout_us); \
+	unsigned long __sleep_us = (sleep_us); \
+	ktime_t __timeout = ktime_add_us(ktime_get(), __timeout_us); \
+	might_sleep_if((__sleep_us) != 0); \
+	if (sleep_before_read && __sleep_us) \
+		usleep_range((__sleep_us >> 2) + 1, __sleep_us); \
+	for (;;) { \
+		(val) = op(args); \
+		if (cond) \
+			break; \
+		if (__timeout_us && \
+		    ktime_compare(ktime_get(), __timeout) > 0) { \
+			(val) = op(args); \
+			break; \
+		} \
+		if (__sleep_us) \
+			usleep_range((__sleep_us >> 2) + 1, __sleep_us); \
+		cpu_relax(); \
+	} \
+	(cond) ? 0 : -ETIMEDOUT; \
+})
+#endif
 
 s32 txgbe_fc_enable(struct txgbe_hw *hw);
 bool txgbe_device_supports_autoneg_fc(struct txgbe_hw *hw);
@@ -329,6 +355,7 @@ int txgbe_is_lldp(struct txgbe_hw *hw);
 s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw);
 int txgbe_set_pps(struct txgbe_hw *hw, bool enable, u64 nsec, u64 cycles);
 void txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg);
+int txgbe_enable_rx_adapter(struct txgbe_hw *hw);
 
 extern s32 txgbe_init_ops_aml(struct txgbe_hw *hw);
 extern s32 txgbe_init_ops_aml40(struct txgbe_hw *hw);

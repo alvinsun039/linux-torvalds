@@ -5010,6 +5010,27 @@ s32 txgbe_set_sgmii_an37_ability(struct txgbe_hw *hw)
 	return 0;
 }
 
+int txgbe_enable_rx_adapter(struct txgbe_hw *hw)
+{
+	int ret = 0;
+	u32 value;
+
+	value = txgbe_rd32_epcs(hw, TXGBE_PHY_RX_EQ_CTL);
+	value |= BIT(12);
+	txgbe_wr32_epcs(hw, TXGBE_PHY_RX_EQ_CTL, value);
+
+	value = 0;
+	ret = read_poll_timeout(txgbe_rd32_epcs, value, (value & BIT(11)), 1000,
+				200000, false, hw, TXGBE_PHY_RX_AD_ACK);
+	if (ret)
+		return -ETIMEDOUT;
+
+	value = txgbe_rd32_epcs(hw, TXGBE_PHY_RX_EQ_CTL);
+	value &= ~BIT(12);
+	txgbe_wr32_epcs(hw, TXGBE_PHY_RX_EQ_CTL, value);
+
+	return 0;
+}
 
 s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 {
@@ -5030,12 +5051,11 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 		status = TXGBE_ERR_XPCS_POWER_UP_FAILED;
 		goto out;
 	}
-	e_info(hw, "It is set to kr.\n");
 
 	txgbe_wr32_epcs(hw, 0x78002, 0x0);
 	txgbe_wr32_epcs(hw, 0x78001, 0x7);
-	if (AN73_TRAINNING_MODE == 1 || AN73_TRAINNING_MODE == 2)
-		txgbe_wr32_epcs(hw, 0x78003, 0x1);
+	if (AN73_TRAINNING_MODE == 1)
+		txgbe_wr32_epcs(hw, TXGBE_VR_AN_KR_MODE_CL, 0x1);
 
 	/* 2. Disable xpcs AN-73 */
 	if (adapter->backplane_an == 1){
