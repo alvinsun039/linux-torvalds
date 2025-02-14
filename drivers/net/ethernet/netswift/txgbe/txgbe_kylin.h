@@ -180,10 +180,6 @@
 #define KR_MODE 0
 #endif 
 
-#ifndef KR_AN73_PRESET
-#define KR_AN73_PRESET 0
-#endif
-
 #ifndef KR_SET
 #define KR_SET 0
 #define KR_MAIN 27

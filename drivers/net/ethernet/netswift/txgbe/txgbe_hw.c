@@ -5040,6 +5040,7 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 	/* 2. Disable xpcs AN-73 */
 	if (adapter->backplane_an == 1){
 		txgbe_wr32_epcs(hw, TXGBE_SR_AN_MMD_CTL, 0x3000);
+		/* bit8:CA_TX_EQ bit7:an_preset bit6:TX_EQ_OVR_RIDE */
 		value = txgbe_rd32_epcs(hw, TXGBE_PHY_TX_EQ_CTL1);
 		value &= ~0x40;
 		value |= BIT(8);
@@ -5051,8 +5052,6 @@ s32 txgbe_set_link_to_kr(struct txgbe_hw *hw, bool autoneg)
 
 	if (KR_FEC == 1)
 		txgbe_wr32_epcs(hw, 0x70012, 0xc000 | txgbe_rd32_epcs(hw, 0x70012));
-	if (KR_AN73_PRESET == 1)
-		txgbe_wr32_epcs(hw, 0x18037, 0x80 | txgbe_rd32_epcs(hw, TXGBE_PHY_TX_EQ_CTL1));
 
 	//txgbe_wr32_epcs(hw, 0x18006, 0xffff);
 	//txgbe_wr32_epcs(hw, 0x18008, 0xA697);
