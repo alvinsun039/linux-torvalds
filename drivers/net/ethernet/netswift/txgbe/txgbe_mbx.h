@@ -98,6 +98,7 @@ enum txgbe_pfvf_api_rev {
 	txgbe_mbox_api_13,	/* API version 1.3, linux/freebsd VF driver */
 	txgbe_mbox_api_20,      /* API version 2.0, solaris Phase1 VF driver */
 	txgbe_mbox_api_21,      /* API version 2.1 */
+	txgbe_mbox_api_22,      /* API version 2.2 */
 	txgbe_mbox_api_unknown, /* indicates that API version is not known */
 };
 
@@ -124,6 +125,8 @@ enum txgbe_pfvf_api_rev {
 
 /* mailbox API, version 2.1 VF requests */
 #define TXGBE_VF_SET_5TUPLE	0x20 /* VF request PF for 5-tuple filter */
+
+/* mailbox API, version 2.2 VF requests */
 #define TXGBE_VF_QUEUE_RATE_LIMIT 0x21 /* VF request PF to set vf-queue rate limit */
 
 #define TXGBE_VF_BACKUP		0x8001 /* VF requests backup */

@@ -617,6 +617,7 @@ static int txgbe_negotiate_vf_api(struct txgbe_adapter *adapter,
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
 	case txgbe_mbox_api_21:
+	case txgbe_mbox_api_22:
 		adapter->vfinfo[vf].vf_api = api;
 		return 0;
 	default:
@@ -638,6 +639,7 @@ static int txgbe_get_vf_queues(struct txgbe_adapter *adapter,
 
 	/* verify the PF is supporting the correct APIs */
 	switch (adapter->vfinfo[vf].vf_api) {
+	case txgbe_mbox_api_22:
 	case txgbe_mbox_api_21:
 	case txgbe_mbox_api_20:
 	case txgbe_mbox_api_13:
@@ -1049,6 +1051,7 @@ static int txgbe_update_vf_xcast_mode(struct txgbe_adapter *adapter,
 	case txgbe_mbox_api_13:
 	case txgbe_mbox_api_20:
 	case txgbe_mbox_api_21:
+	case txgbe_mbox_api_22:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1109,6 +1112,7 @@ static int txgbe_get_vf_link_state(struct txgbe_adapter *adapter,
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
 	case txgbe_mbox_api_21:
+	case txgbe_mbox_api_22:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1130,6 +1134,7 @@ static int txgbe_get_fw_version(struct txgbe_adapter *adapter,
 	case txgbe_mbox_api_12:
 	case txgbe_mbox_api_13:
 	case txgbe_mbox_api_21:
+	case txgbe_mbox_api_22:
 		break;
 	default:
 		return -EOPNOTSUPP;
@@ -1391,6 +1396,7 @@ void txgbe_ping_all_vfs(struct txgbe_adapter *adapter)
 		txgbe_write_mbx(hw, &ping, 1, i);
 	}
 }
+
 
 void txgbe_ping_all_vfs_with_link_status(struct txgbe_adapter *adapter, bool link_up)
 {
@@ -1824,7 +1830,7 @@ txgbe_set_queue_rate_limit_vf(struct txgbe_adapter *adapter,
 		return -EOPNOTSUPP;
 
 	/* verify the PF is supporting the correct API */
-	if (adapter->vfinfo[vf].vf_api < txgbe_mbox_api_21)
+	if (adapter->vfinfo[vf].vf_api < txgbe_mbox_api_22)
 		return -EOPNOTSUPP;
 
 	/* determine how many queues per pool based on VMDq mask */
