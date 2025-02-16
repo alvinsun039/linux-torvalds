@@ -629,23 +629,14 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 				}
 
 				if (comp_codes_25g == TXGBE_SFF_25GBASECR_91FEC ||
-					comp_codes_25g == TXGBE_SFF_25GBASECR_74FEC ||
-					comp_codes_25g == TXGBE_SFF_25GBASECR_NOFEC) {
-					if (hw->bus.lan_id == 0)
-						hw->phy.sfp_type =
-							     txgbe_sfp_type_25g_da_cu_core0;
-					else
-						hw->phy.sfp_type =
-							     txgbe_sfp_type_25g_da_cu_core1;
-
-					if (comp_copper_len == TXGBE_SFF_COPPER_5M) {
-						if (hw->bus.lan_id == 0)
-							hw->phy.sfp_type =
-								     txgbe_sfp_type_25g_5m_da_cu_core0;
-						else
-							hw->phy.sfp_type =
-								     txgbe_sfp_type_25g_5m_da_cu_core1;
-					}
+				    comp_codes_25g == TXGBE_SFF_25GBASECR_74FEC ||
+				    comp_codes_25g == TXGBE_SFF_25GBASECR_NOFEC) {
+					hw->phy.fiber_suppport_speed =
+						TXGBE_LINK_SPEED_25GB_FULL |
+						TXGBE_LINK_SPEED_10GB_FULL;
+				} else {
+					hw->phy.fiber_suppport_speed |=
+						TXGBE_LINK_SPEED_10GB_FULL;
 				}
 			} else if (cable_tech & TXGBE_SFF_DA_ACTIVE_CABLE) {
 				hw->dac_sfp = false;

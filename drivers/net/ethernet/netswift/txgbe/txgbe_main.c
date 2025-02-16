@@ -3733,12 +3733,8 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 	eicr = txgbe_misc_isb(adapter, TXGBE_ISB_MISC);
 
 	if (eicr & TXGBE_PX_MISC_IC_ETH_AN) {
-		if (hw->mac.type == txgbe_mac_aml) {
+		if (adapter->backplane_an)
 			txgbe_service_event_schedule(adapter);
-		} else {
-			if (adapter->backplane_an)
-				txgbe_service_event_schedule(adapter);
-		}
 	}
 
 	if(BOND_CHECK_LINK_MODE == 1){
@@ -9005,7 +9001,9 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 			wr32m(hw, TXGBE_MAC_RX_CFG,
 				TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 		} else if (hw->mac.type == txgbe_mac_aml) {
-			txgbe_reconfig_mac(hw);
+			if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+			      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+				txgbe_reconfig_mac(hw);
 
 			if (link_speed & TXGBE_LINK_SPEED_25GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
@@ -9235,11 +9233,7 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 			txgbe_bp_down_event(adapter);
 
 	if (hw->mac.type == txgbe_mac_aml)
-		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1)
-			txgbe_e65_bp_down_event(adapter);
+		txgbe_e65_bp_down_event(adapter);
 
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
@@ -9405,11 +9399,7 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 		    hw->dac_sfp)
 			txgbe_bp_watchdog_event(adapter);
 	if (hw->mac.type == txgbe_mac_aml)
-		if (hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_5m_da_cu_core1 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1)
-			txgbe_e56_bp_watchdog_event(adapter);
+		txgbe_e56_bp_watchdog_event(adapter);
 
 #ifndef POLL_LINK_STATUS
 	if(BOND_CHECK_LINK_MODE == 1){
@@ -9674,9 +9664,8 @@ static void txgbe_service_timer(struct timer_list *t)
 
 	/* poll faster when waiting for link */
 	if (adapter->flags & TXGBE_FLAG_NEED_LINK_UPDATE) {
-		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4 ||
-		    hw->dac_sfp)
-			next_event_offset = HZ ;
+		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4)
+			next_event_offset = HZ;
 		else if (BOND_CHECK_LINK_MODE == 1)
 			next_event_offset = HZ / 100;
 		else
@@ -10139,6 +10128,8 @@ static void txgbe_service_task(struct work_struct *work)
 	struct txgbe_adapter *adapter = container_of(work,
 						     struct txgbe_adapter,
 						     service_task);
+	struct txgbe_hw *hw = &adapter->hw;
+
 	if (TXGBE_REMOVED(adapter->hw.hw_addr)) {
 		if (!test_bit(__TXGBE_DOWN, &adapter->state)) {
 			rtnl_lock();
@@ -10167,8 +10158,10 @@ static void txgbe_service_task(struct work_struct *work)
 /*	txgbe_swfw_mbox_subtask(adapter); */
 	txgbe_reset_subtask(adapter);
 	txgbe_phy_event_subtask(adapter);
-	txgbe_watchdog_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
+	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+		txgbe_watchdog_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
 	txgbe_sfp_reset_eth_phy_subtask(adapter);
 	txgbe_check_overtemp_subtask(adapter);

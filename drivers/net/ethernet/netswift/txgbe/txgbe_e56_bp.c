@@ -2300,86 +2300,98 @@ int txgbe_e56_set_link_to_kr(struct txgbe_adapter *adapter, u8 byLinkMode,
 
 	kr_dbg(KR_MODE, "Setup to KR ==========\n");
 
-	/* pcs + phy rst */
-	rdata = rd32(hw, 0x1000c);
-	if (hw->bus.lan_id == 1)
-		rdata |= BIT(16);
-	else
-		rdata |= BIT(19);
-	wr32(hw, 0x1000c, rdata);
-	msleep(20);
+	if (adapter->backplane_an) {
+		/* pcs + phy rst */
+		rdata = rd32(hw, 0x1000c);
+		if (hw->bus.lan_id == 1)
+			rdata |= BIT(16);
+		else
+			rdata |= BIT(19);
+		wr32(hw, 0x1000c, rdata);
+		msleep(20);
 
-	/* clear interrupt */
-	txgbe_wr32_epcs(hw, 0x070000, 0);
-	txgbe_wr32_epcs(hw, 0x078002, 0x0000);
-	txgbe_wr32_epcs(hw, 0x030000, 0x8000);
-	rdata = txgbe_rd32_epcs(hw, 0x070000);
-	SetFields(&rdata, 12, 12, 0x1);
-	txgbe_wr32_epcs(hw, 0x070000, rdata);
-	txgbe_wr32_epcs(hw, 0x070010, 0x0001);
-	/* 25KR-S */
-	//txgbe_wr32_epcs(hw, 0x070011, 0x4080);
-	/* 25KR */
-	txgbe_wr32_epcs(hw, 0x070011, 0xC080);
+		/* clear interrupt */
+		txgbe_wr32_epcs(hw, 0x070000, 0);
+		txgbe_wr32_epcs(hw, 0x078002, 0x0000);
+		txgbe_wr32_epcs(hw, 0x030000, 0x8000);
+		rdata = txgbe_rd32_epcs(hw, 0x070000);
+		SetFields(&rdata, 12, 12, 0x1);
+		txgbe_wr32_epcs(hw, 0x070000, rdata);
+		txgbe_wr32_epcs(hw, 0x070010, 0x0001);
+		/* 10GKR-25KR */
+		txgbe_wr32_epcs(hw, 0x070011, 0xC080);
 
-	/* BASE-R FEC */
-	txgbe_wr32_epcs(hw, 0x070012, 0xc000);
-	txgbe_wr32_epcs(hw, 0x070016, 0x0000);
-	txgbe_wr32_epcs(hw, 0x070017, 0x0);
-	txgbe_wr32_epcs(hw, 0x070018, 0x0);
+		/* BASE-R FEC */
+		rdata = txgbe_rd32_epcs(hw, 0x70012);
+		if ((hw->phy.fiber_suppport_speed &
+		     TXGBE_LINK_SPEED_25GB_FULL) == TXGBE_LINK_SPEED_25GB_FULL)
+			rdata |= TXGBE_25G_RS_FEC_REQ | TXGBE_25G_BASE_FEC_REQ;
+		else if (hw->phy.fiber_suppport_speed ==
+			 TXGBE_LINK_SPEED_10GB_FULL)
+			rdata |= TXGBE_10G_FEC_ABL;
+		txgbe_wr32_epcs(hw, 0x70012, 0x4000 | rdata);
+		txgbe_wr32_epcs(hw, 0x070016, 0x0000);
+		txgbe_wr32_epcs(hw, 0x070017, 0x0);
+		txgbe_wr32_epcs(hw, 0x070018, 0x0);
 
-	/* config timer */
-	txgbe_wr32_epcs(hw, 0x078004, 0x003c);
-	txgbe_wr32_epcs(hw, 0x078005, CL74_KRTR_TRAINNING_TIMEOUT);
-	txgbe_wr32_epcs(hw, 0x078006, 25);
-	txgbe_wr32_epcs(hw, 0x078000, 0x0008);
+		/* config timer */
+		txgbe_wr32_epcs(hw, 0x078004, 0x003c);
+		txgbe_wr32_epcs(hw, 0x078005, CL74_KRTR_TRAINNING_TIMEOUT);
+		txgbe_wr32_epcs(hw, 0x078006, 25);
+		txgbe_wr32_epcs(hw, 0x078000, 0x0008);
 
-	rdata = txgbe_rd32_epcs(hw, 0x038000);
-	txgbe_wr32_epcs(hw, 0x038000, rdata | BIT(15));
+		rdata = txgbe_rd32_epcs(hw, 0x038000);
+		txgbe_wr32_epcs(hw, 0x038000, rdata | BIT(15));
 
-	kr_dbg(KR_MODE, "1.1 Wait PHY init ....\n");
-	status = read_poll_timeout(txgbe_rd32_epcs, rdata,
-				   (((rdata >> 15) & 1) == 0), 100, 200000,
-				   false, hw, 0x038000);
-	kr_dbg(KR_MODE, "Wait PHY VR_RST = %x, Wait VR_RST %s.\n", rdata,
-	       status ? "FAILED" : "SUCCESS");
-	if (status)
-		return status;
+		kr_dbg(KR_MODE, "1.1 Wait PHY init ....\n");
+		status = read_poll_timeout(txgbe_rd32_epcs, rdata,
+					   (((rdata >> 15) & 1) == 0), 100,
+					   200000, false, hw, 0x038000);
+		kr_dbg(KR_MODE, "Wait PHY VR_RST = %x, Wait VR_RST %s.\n",
+		       rdata, status ? "FAILED" : "SUCCESS");
+		if (status)
+			return status;
 
-	/* wait rx/tx/cm powerdn_st */
-	msleep(20);
-	/* set phy an status to 0 */
-	txgbe_wr32_ephy(hw, 0x1640, 0x0000);
-	rdata = rd32_ephy(hw, 0x1434);
-	SetFields(&rdata, 7, 4, 0xe);
-	txgbe_wr32_ephy(hw, 0x1434, rdata);
+		/* wait rx/tx/cm powerdn_st */
+		msleep(20);
+		/* set phy an status to 0 */
+		txgbe_wr32_ephy(hw, 0x1640, 0x0000);
+		rdata = rd32_ephy(hw, 0x1434);
+		SetFields(&rdata, 7, 4, 0xe);
+		txgbe_wr32_ephy(hw, 0x1434, rdata);
 
-	kr_dbg(KR_MODE, "1.2 Wait 10G KR phy/pcs mode init ....\n");
-	status = SetPhyLinkMode(adapter, 10, bypassCtle);
-	if (status)
-		return status;
+		kr_dbg(KR_MODE, "1.2 Wait 10G KR phy/pcs mode init ....\n");
+		status = SetPhyLinkMode(adapter, 10, bypassCtle);
+		if (status)
+			return status;
 
-	kr_dbg(KR_MODE, "1.3 Wait 10G PHY RXS....\n");
-	status = E56phyRxsOscInitForTempTrackRange(adapter, 10);
-	if (status)
-		return status;
+		kr_dbg(KR_MODE, "1.3 Wait 10G PHY RXS....\n");
+		status = E56phyRxsOscInitForTempTrackRange(adapter, 10);
+		if (status)
+			return status;
 
-	/* Wait an 10g fsm_rx_sts */
-	status = read_poll_timeout(rd32_ephy, rdata, ((rdata & 0x3f) == 0xb),
-				   1000, 200000, false, hw,
-				   E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
-	kr_dbg(KR_MODE, "Wait 10g fsm_rx_sts = %x, Wait rx_sts %s.\n", rdata,
-	       status ? "FAILED" : "SUCCESS");
+		/* Wait an 10g fsm_rx_sts */
+		status = read_poll_timeout(rd32_ephy, rdata,
+					   ((rdata & 0x3f) == 0xb), 1000,
+					   200000, false, hw,
+					   E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+		kr_dbg(KR_MODE, "Wait 10g fsm_rx_sts = %x, Wait rx_sts %s.\n",
+		       rdata, status ? "FAILED" : "SUCCESS");
 
-	kr_dbg(KR_MODE, "Setup the KR module...========end ==\n");
+		kr_dbg(KR_MODE, "Setup the KR module...========end ==\n");
+	} else {
+		if ((hw->phy.fiber_suppport_speed &
+		     TXGBE_LINK_SPEED_25GB_FULL) == TXGBE_LINK_SPEED_25GB_FULL)
+			txgbe_set_link_to_amlite(hw,
+						 TXGBE_LINK_SPEED_25GB_FULL);
+		else if (hw->phy.fiber_suppport_speed ==
+			 TXGBE_LINK_SPEED_10GB_FULL)
+			txgbe_set_link_to_amlite(hw,
+						 TXGBE_LINK_SPEED_10GB_FULL);
+	}
 
 	return status;
 }
-
-#define TXGBE_10G_FEC_REQ BIT(15)
-#define TXGBE_10G_FEC_ABL BIT(14)
-#define TXGBE_25G_BASE_FEC_REQ BIT(13)
-#define TXGBE_25G_RS_FEC_REQ BIT(12)
 
 static void txgbe_e56_print_page_status(struct txgbe_adapter *adapter,
 					bkpan73ability *tBkpAn73Ability,
@@ -2472,6 +2484,7 @@ static int chk_bkp_ability(struct txgbe_adapter *adapter,
 		kr_dbg(KR_MODE, "Do not support any compatible speed mode!\n");
 	} else if (comLinkAbility & BIT(ABILITY_25GBASE_KRCR_S)) {
 		kr_dbg(KR_MODE, "Link mode is [ABILITY_25GBASE_KRCR_S].\n");
+		adapter->fec_mode = TXGBE_25G_RS_FEC_REQ;
 		adapter->bp_link_mode = 25;
 	} else if (comLinkAbility & BIT(ABILITY_25GBASE_KRCR)) {
 		kr_dbg(KR_MODE, "Link mode is [ABILITY_25GBASE_KRCR].\n");
@@ -2597,7 +2610,6 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
-	//u8 bypassCtle = 0;
 	int status = 0;
 	u32 rdata;
 
@@ -2649,23 +2661,22 @@ static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 		txgbe_wr32_epcs(hw, 0x100c8, rdata);
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100c8,
 		       rdata);
-		e_dev_info("Advertised FEC modes : %s\n", "RS-FEC");
+		kr_dbg(KR_MODE, "Advertised FEC modes : %s\n", "RS-FEC");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
 	} else if (adapter->fec_mode & TXGBE_25G_BASE_FEC_REQ) {
 		/* FEC: FC-FEC/BASE-R */
 		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
-		e_dev_info("Advertised FEC modes : %s\n", "25GBASE-R");
+		kr_dbg(KR_MODE, "Advertised FEC modes : %s\n", "25GBASE-R");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_BASER;
-	} else if (adapter->fec_mode &
-		   (TXGBE_10G_FEC_REQ | TXGBE_10G_FEC_ABL)) {
+	} else if (adapter->fec_mode & (TXGBE_10G_FEC_REQ)) {
 		/* FEC: FC-FEC/BASE-R */
 		txgbe_wr32_epcs(hw, 0x100ab, BIT(0));
 		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100ab, 1);
-		e_dev_info("Advertised FEC modes : %s\n", "10GBASE-R");
+		kr_dbg(KR_MODE, "Advertised FEC modes : %s\n", "10GBASE-R");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_BASER;
 	} else {
-		e_dev_info("Advertised FEC modes : %s\n", "NONE");
+		kr_dbg(KR_MODE, "Advertised FEC modes : %s\n", "NONE");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 	}
 
@@ -2691,8 +2702,15 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	u32 value = 0;
 	int ret = 0;
 
+	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+		return;
+
 	/* only continue if link is down */
 	if (netif_carrier_ok(netdev))
+		return;
+
+	if (!adapter->backplane_an)
 		return;
 
 	value = txgbe_rd32_epcs(hw, 0x78002);
@@ -2700,16 +2718,19 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		txgbe_wr32_epcs(hw, 0x78002, 0);
 		return;
 	}
+	adapter->an_done = false;
 
 	if (value & TXGBE_E56_AN_PG_RCV) {
 		if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {
 			adapter->flags2 |= TXGBE_FLAG2_KR_TRAINING;
-			e_dev_info("Enter training\n");
+			kr_dbg(KR_MODE, "Enter training\n");
 			ret = handle_e56_bkp_an73_flow(adapter);
 			if (ret) {
 				mutex_lock(&adapter->e56_lock);
 				txgbe_e56_set_link_to_kr(adapter, 25, 0);
 				mutex_unlock(&adapter->e56_lock);
+			} else {
+				adapter->an_done = true;
 			}
 			adapter->flags2 &= ~TXGBE_FLAG2_KR_TRAINING;
 		}
@@ -2731,7 +2752,11 @@ void txgbe_e65_bp_down_event(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
 
-	if (adapter->backplane_an == 0)
+	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+		return;
+
+	if (!adapter->backplane_an)
 		return;
 
 	kr_dbg(KR_MODE, "RLU : %x - AN INT : %x - AN CTL : %x AN defsm: %x\n",

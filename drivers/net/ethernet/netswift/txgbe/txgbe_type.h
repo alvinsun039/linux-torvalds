@@ -3021,14 +3021,10 @@ enum txgbe_sfp_type {
 	txgbe_sfp_type_25g_sr_core1 = 18,
 	txgbe_sfp_type_25g_lr_core0 = 19,
 	txgbe_sfp_type_25g_lr_core1 = 20,
-	txgbe_sfp_type_25g_da_cu_core0 = 21,
-	txgbe_sfp_type_25g_da_cu_core1 = 22,
 	txgbe_sfp_type_25g_fcpi4_lmt_core0 = 23,
 	txgbe_sfp_type_25g_fcpi4_lmt_core1 = 24,
-	txgbe_sfp_type_25g_5m_da_cu_core0 = 25,
-	txgbe_sfp_type_25g_5m_da_cu_core1 = 26,
-	txgbe_sfp_type_40g_core0 = 27,
-	txgbe_sfp_type_40g_core1 = 28,
+	txgbe_sfp_type_40g_core0 = 25,
+	txgbe_sfp_type_40g_core1 = 26,
 	txgbe_sfp_type_not_present = 0xFFFE,
 	txgbe_sfp_type_unknown = 0xFFFF
 };
@@ -3419,6 +3415,7 @@ struct txgbe_phy_info {
 	u32 addr;
 	u32 id;
 	enum txgbe_sfp_type sfp_type;
+	u32 fiber_suppport_speed;
 	bool sfp_setup_needed;
 	u32 revision;
 	enum txgbe_media_type media_type;

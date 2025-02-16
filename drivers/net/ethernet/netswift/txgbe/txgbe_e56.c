@@ -26,8 +26,7 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 	}
 }
 
-s32 txgbe_e56_check_phy_link(struct txgbe_hw *hw, u32 *speed,
-				bool *link_up)
+s32 txgbe_e56_check_phy_link(struct txgbe_hw *hw, u32 *speed, bool *link_up)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	u32 rdata = 0;
@@ -50,13 +49,13 @@ s32 txgbe_e56_check_phy_link(struct txgbe_hw *hw, u32 *speed,
 	links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 	if (*link_up) {
 		if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) ==
-				TXGBE_CFG_PORT_ST_AML_LINK_40G)
+		    TXGBE_CFG_PORT_ST_AML_LINK_40G)
 			*speed = TXGBE_LINK_SPEED_40GB_FULL;
 		else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) ==
-				TXGBE_CFG_PORT_ST_AML_LINK_25G)
+			 TXGBE_CFG_PORT_ST_AML_LINK_25G)
 			*speed = TXGBE_LINK_SPEED_25GB_FULL;
 		else if ((links_reg & TXGBE_CFG_PORT_ST_AML_LINK_10G) ==
-				TXGBE_CFG_PORT_ST_AML_LINK_10G)
+			 TXGBE_CFG_PORT_ST_AML_LINK_10G)
 			*speed = TXGBE_LINK_SPEED_10GB_FULL;
 	} else {
 		*speed = TXGBE_LINK_SPEED_UNKNOWN;
@@ -64,7 +63,6 @@ s32 txgbe_e56_check_phy_link(struct txgbe_hw *hw, u32 *speed,
 
 	return 0;
 }
-
 
 static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 {
@@ -82,8 +80,8 @@ static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 		adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_PRE2;
 		adapter->aml_txeq.post = S25G_TX_FFE_CFG_POST;
 
-		if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+		if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
 			adapter->aml_txeq.main = S25G_TX_FFE_CFG_DAC_MAIN;
 			adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_DAC_PRE1;
 			adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
@@ -2935,8 +2933,8 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_hw *hw, u32 speed)
 	u32 rdata = 0x0;
 	u32 bypassCtle = true;
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_sfp_type_25g_da_cu_core1) {
+	if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
 		bypassCtle = false;
 	} else {
 		bypassCtle = true;
@@ -4168,4 +4166,3 @@ int txgbe_e56_fec_mode_polling(struct txgbe_hw *hw, bool *link_up)
 
 	return 0;
 }
-
