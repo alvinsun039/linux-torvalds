@@ -1666,9 +1666,6 @@ static void sec_aead_callback(struct sec_ctx *c, struct sec_req *req, int err)
 	size_t authsize = crypto_aead_authsize(tfm);
 	struct sec_aead_req *aead_req = &req->aead_req;
 	struct sec_cipher_req *c_req = &req->c_req;
-	struct sec_qp_ctx *qp_ctx = req->qp_ctx;
-	struct aead_request *backlog_aead_req;
-	struct sec_req *backlog_req;
 	size_t sz;
 
 	if (!err && c->c_ctx.c_mode == SEC_CMODE_CBC && c_req->encrypt)
