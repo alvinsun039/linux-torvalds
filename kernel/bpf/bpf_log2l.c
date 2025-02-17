@@ -66,25 +66,20 @@ static int __init bpf_log2l_kfunc_init(void)
 	 */
 	int prog_types[] = {
 		BPF_PROG_TYPE_SOCKET_FILTER,
-		BPF_PROG_TYPE_KPROBE,
-		BPF_PROG_TYPE_TRACEPOINT,
 		BPF_PROG_TYPE_TRACING,
 		BPF_PROG_TYPE_SYSCALL,
-		BPF_PROG_TYPE_PERF_EVENT,
 		BPF_PROG_TYPE_LSM,
-		BPF_PROG_TYPE_RAW_TRACEPOINT,
 		BPF_PROG_TYPE_STRUCT_OPS,
-		BPF_PROG_TYPE_EXT,
 		BPF_PROG_TYPE_UNSPEC,
 	};
 
 	for (int i = 0; i < ARRAY_SIZE(prog_types); i++) {
-		int ret = register_btf_kfunc_id_set(prog_types[i],
+		int err = register_btf_kfunc_id_set(prog_types[i],
 						    &log2l_kfunc_set);
-		if (ret) {
+		if (err) {
 			pr_err("Failed to register bpf_log2l for prog type %d: %d\n",
-			       prog_types[i], ret);
-			/* Continue attempting registration for other types */
+			       prog_types[i], err);
+			return err;
 		}
 	}
 
