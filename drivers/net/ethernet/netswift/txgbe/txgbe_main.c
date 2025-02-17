@@ -9117,6 +9117,9 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		     rd32(hw, TXGBE_RDB_RFCC));
 
 	switch (adapter->link_speed) {
+	case TXGBE_LINK_SPEED_40GB_FULL:
+		adapter->speed = SPEED_40000;
+		break;
 	case TXGBE_LINK_SPEED_25GB_FULL:
 		adapter->speed = SPEED_25000;
 		break;
