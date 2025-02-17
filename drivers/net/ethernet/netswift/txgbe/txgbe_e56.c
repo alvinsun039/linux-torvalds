@@ -4080,7 +4080,7 @@ int txgbe_get_cur_fec_mode(struct txgbe_hw *hw)
 int txgbe_e56_set_fec_mode(struct txgbe_hw *hw, u8 fec_mode)
 {
 	struct txgbe_adapter *adapter = hw->back;
-	int value = 0;
+	u32 value = 0;
 
 	mutex_lock(&adapter->e56_lock);
 	if (fec_mode & TXGBE_PHY_FEC_RS) {
