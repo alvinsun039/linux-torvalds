@@ -4240,6 +4240,7 @@ void vma_pgtable_walk_begin(struct vm_area_struct *vma);
 void vma_pgtable_walk_end(struct vm_area_struct *vma);
 
 int reserve_mem_find_by_name(const char *name, phys_addr_t *start, phys_addr_t *size);
+int reserve_mem_release_by_name(const char *name);
 
 #ifdef CONFIG_MEM_ALLOC_PROFILING
 static inline void pgalloc_tag_split(struct folio *folio, int old_order, int new_order)
