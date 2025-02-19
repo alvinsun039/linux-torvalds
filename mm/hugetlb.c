@@ -2948,6 +2948,14 @@ free_new:
 	return ret;
 }
 
+void wait_for_freed_hugetlb_folios(void)
+{
+	if (llist_empty(&hpage_freelist))
+		return;
+
+	flush_work(&free_hpage_work);
+}
+
 int isolate_or_dissolve_huge_page(struct page *page, struct list_head *list)
 {
 	struct folio *folio = page_folio(page);
