@@ -52,6 +52,22 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 		goto out;
 	}
 
+	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
+		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
+		if (!adapter->backplane_an) {
+			if ((link_speed == speed) && link_up)
+				goto out;
+		} else {
+			if (link_up && adapter->an_done)
+				goto out;
+		}
+		mutex_lock(&adapter->e56_lock);
+		txgbe_e56_set_link_to_kr(adapter, 40, 0);
+		mutex_unlock(&adapter->e56_lock);
+		goto out;
+	}
+
 	for (i = 0; i < 4; i++) {
 		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 		if (link_up)
@@ -92,15 +108,17 @@ out:
  *  Determines the link capabilities by reading the AUTOC register.
  **/
 static s32 txgbe_get_link_capabilities_aml40(struct txgbe_hw *hw,
-				      u32 *speed,
-				      bool *autoneg)
+					     u32 *speed,
+					     bool *autoneg)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	s32 status = 0;
 
-	if (hw->phy.sfp_type == txgbe_sfp_type_40g_core0 ||
-		hw->phy.sfp_type == txgbe_sfp_type_40g_core1) {
+	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
+		adapter->backplane_an = true;
+		*autoneg = true;
 		*speed = TXGBE_LINK_SPEED_40GB_FULL;
-		*autoneg = false;
 	} else {
 		*speed = TXGBE_LINK_SPEED_40GB_FULL;
 		*autoneg = true;

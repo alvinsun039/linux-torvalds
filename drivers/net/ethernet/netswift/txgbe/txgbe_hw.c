@@ -6232,6 +6232,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 		/* amlite: rdm_rsc_ctl_free_ctl set to 1 */
 		wr32m(hw, TXGBE_RDM_RSC_CTL, TXGBE_RDM_RSC_CTL_FREE_CTL,
 			  TXGBE_RDM_RSC_CTL_FREE_CTL);
+		adapter->an_done = false;
 	} else {
 		/*
 		 * Store the original AUTOC/AUTOC2 values if they have not been

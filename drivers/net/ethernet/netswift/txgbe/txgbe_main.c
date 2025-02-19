@@ -8989,7 +8989,9 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 
 #endif
 		if (hw->mac.type == txgbe_mac_aml40) {
-			txgbe_reconfig_mac(hw);
+			if (!(hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+			      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1))
+				txgbe_reconfig_mac(hw);
 
 			if (link_speed & TXGBE_LINK_SPEED_40GB_FULL) {
 				wr32(hw, TXGBE_MAC_TX_CFG,
@@ -9232,9 +9234,6 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 		    hw->dac_sfp)
 			txgbe_bp_down_event(adapter);
 
-	if (hw->mac.type == txgbe_mac_aml)
-		txgbe_e65_bp_down_event(adapter);
-
 	/* only continue if link was up previously */
 	if (!netif_carrier_ok(netdev))
 		return;
@@ -9398,7 +9397,8 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 		    hw->subsystem_device_id == TXGBE_ID_SP1000_KR_KX_KX4 ||
 		    hw->dac_sfp)
 			txgbe_bp_watchdog_event(adapter);
-	if (hw->mac.type == txgbe_mac_aml)
+	if (hw->mac.type == txgbe_mac_aml ||
+	    hw->mac.type == txgbe_mac_aml40)
 		txgbe_e56_bp_watchdog_event(adapter);
 
 #ifndef POLL_LINK_STATUS
@@ -10160,7 +10160,9 @@ static void txgbe_service_task(struct work_struct *work)
 	txgbe_phy_event_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
 	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
+	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1))
 		txgbe_watchdog_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
 	txgbe_sfp_reset_eth_phy_subtask(adapter);

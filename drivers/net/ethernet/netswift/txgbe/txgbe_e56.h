@@ -1844,13 +1844,13 @@ void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
 int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE);
 u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw);
 u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw);
-
-//u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed);
+u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw);
 
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed);
 u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw);
 int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData);
 int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed);
+int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed);
 int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed);
 int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed);
 int txgbe_get_cur_fec_mode(struct txgbe_hw *hw);

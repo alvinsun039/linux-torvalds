@@ -134,7 +134,7 @@ int txgbe_e56_get_temp(struct txgbe_hw *hw, int *pTempData)
 	return 0;
 }
 
-static u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
+u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 {
 	u32 addr;
 	u32 rdata = 0;
@@ -3341,7 +3341,7 @@ u32 txgbe_e56_cfg_temp(struct txgbe_hw *hw)
 	return 0;
 }
 
-static int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed)
+int txgbe_e56_config_rx_40G(struct txgbe_hw *hw, u32 speed)
 {
 	struct txgbe_adapter *adapter = hw->back;
 	s32 status;
