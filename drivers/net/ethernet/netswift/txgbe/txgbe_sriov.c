@@ -1117,8 +1117,7 @@ static int txgbe_get_vf_link_state(struct txgbe_adapter *adapter,
 	default:
 		return -EOPNOTSUPP;
 	}
-
-	*link_state = adapter->vfinfo[vf].link_enable;
+	*link_state = adapter->vfinfo[vf].link_state;
 
 	return 0;
 }
@@ -1397,6 +1396,23 @@ void txgbe_ping_all_vfs(struct txgbe_adapter *adapter)
 	}
 }
 
+
+void txgbe_ping_vf_with_link_status(struct txgbe_adapter *adapter, bool link_up, u16 vf)
+{
+	struct txgbe_hw *hw = &adapter->hw;
+	u32 msgbuf[2] = {0, 0};
+
+	if (vf > adapter->num_vfs)
+		return;
+
+	msgbuf[0] = TXGBE_PF_NOFITY_VF_LINK_STATUS | TXGBE_PF_CONTROL_MSG;
+	msgbuf[1] = (adapter->speed << 1) | link_up;
+	//if (adapter->notify_down)
+	//	msgbuf[1] |= TXGBE_PF_NOFITY_VF_NET_NOT_RUNNING;
+	if (adapter->vfinfo[vf].clear_to_send)
+		msgbuf[0] |= TXGBE_VT_MSGTYPE_CTS;
+	txgbe_write_mbx(hw, msgbuf, 2, vf);
+}
 
 void txgbe_ping_all_vfs_with_link_status(struct txgbe_adapter *adapter, bool link_up)
 {
@@ -1990,7 +2006,14 @@ static void txgbe_set_vf_rx_tx(struct txgbe_adapter *adapter, int vf)
 		if (reg_cur_rx & reg_req_rx)
 			wr32(hw, TXGBE_RDM_VFRE_CLR(reg_offset), reg_req_rx);
 	}
-
+	if (adapter->vfinfo[vf].link_state == IFLA_VF_LINK_STATE_ENABLE &&
+	    !(rd32(hw, TXGBE_MAC_TX_CFG) & TXGBE_MAC_TX_CFG_TE)) {
+		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
+		      TXGBE_MAC_TX_CFG_TE);
+		TXGBE_WRITE_FLUSH(hw);
+		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
+		      TXGBE_MAC_TX_CFG_TE);
+	}
 }
 
 /**
@@ -2003,26 +2026,33 @@ static void txgbe_set_vf_rx_tx(struct txgbe_adapter *adapter, int vf)
  **/
 void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state)
 {
+	bool link_up;
 	adapter->vfinfo[vf].link_state = state;
 
 	switch (state) {
 	case IFLA_VF_LINK_STATE_AUTO:
-		if (test_bit(__TXGBE_DOWN, &adapter->state))
+		if (test_bit(__TXGBE_DOWN, &adapter->state)) {
 			adapter->vfinfo[vf].link_enable = false;
-		else
+		} else {
+			link_up = adapter->link_up;
 			adapter->vfinfo[vf].link_enable = true;
+		}
 		break;
 	case IFLA_VF_LINK_STATE_ENABLE:
 		adapter->vfinfo[vf].link_enable = true;
+		link_up = true;
 		break;
 	case IFLA_VF_LINK_STATE_DISABLE:
 		adapter->vfinfo[vf].link_enable = false;
+		link_up = false;
 		break;
 	}
 
 	/* restart the VF */
 	adapter->vfinfo[vf].clear_to_send = false;
 	txgbe_ping_vf(adapter, vf);
+
+	txgbe_ping_vf_with_link_status(adapter, link_up, vf);
 
 	txgbe_set_vf_rx_tx(adapter, vf);
 }
@@ -2052,8 +2082,8 @@ int txgbe_ndo_set_vf_link_state(struct net_device *netdev, int vf, int state)
 	switch (state) {
 	case IFLA_VF_LINK_STATE_ENABLE:
 		dev_info(pci_dev_to_dev(adapter->pdev),
-			 "NDO set VF %d link state %d - not supported\n",
-			vf, state);
+			 "NDO set VF %d link state enable\n", vf);
+		txgbe_set_vf_link_state(adapter, vf, state);
 		break;
 	case IFLA_VF_LINK_STATE_DISABLE:
 		dev_info(pci_dev_to_dev(adapter->pdev),
