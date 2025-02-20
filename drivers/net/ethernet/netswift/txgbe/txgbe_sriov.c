@@ -2026,7 +2026,7 @@ static void txgbe_set_vf_rx_tx(struct txgbe_adapter *adapter, int vf)
  **/
 void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state)
 {
-	bool link_up;
+	bool link_up = adapter->link_up;
 	adapter->vfinfo[vf].link_state = state;
 
 	switch (state) {
