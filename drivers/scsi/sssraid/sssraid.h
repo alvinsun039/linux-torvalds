@@ -293,7 +293,7 @@ struct sssraid_fwevt {
 	bool process_evt;
 	u32 evt_ctx;
 	struct kref ref_count;
-	char event_data[];
+	char event_data[] __aligned(4);
 };
 
 /*
