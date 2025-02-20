@@ -4413,6 +4413,8 @@ int txgbe_open(struct net_device *netdev)
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct txgbe_hw *hw = &adapter->hw;
+	u16 mbx_size = TXGBE_VXMAILBOX_SIZE;
+	u32 msgbuf[TXGBE_VXMAILBOX_SIZE];
 	int err;
 
 	/* A previous failure to open the device because of a lack of
@@ -4423,6 +4425,12 @@ int txgbe_open(struct net_device *netdev)
 	 */
 	if (!adapter->num_q_vectors)
 		return -ENOMEM;
+
+	txgbe_read_mbx(hw, msgbuf, mbx_size, 0);
+
+	/*if CTS not in msgbuf, need do reset first*/
+	if (!(msgbuf[0] & TXGBE_VT_MSGTYPE_CTS))
+		hw->adapter_stopped = true;
 
 	if (hw->adapter_stopped) {
 		txgbe_reset(adapter);
