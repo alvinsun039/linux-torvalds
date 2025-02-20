@@ -2998,7 +2998,7 @@ void txgbe_up_complete(struct txgbe_adapter *adapter)
 	spin_lock_bh(&adapter->mbx_lock);
 	hw->mac.ops.get_link_state(hw, &adapter->link_state);
 	spin_unlock_bh(&adapter->mbx_lock);
-	if (state && state != adapter->link_state)
+	if (adapter->link_state == IFLA_VF_LINK_STATE_DISABLE)
 		e_info(drv, "VF is administratively disabled\n");
 
 	smp_mb__before_atomic();
@@ -3258,7 +3258,6 @@ void txgbe_reset(struct txgbe_adapter *adapter)
 
 	if (TXGBE_REMOVED(hw->hw_addr))
 		return;
-
 	err = TCALL(hw, mac.ops.reset_hw);
 	if (!err)
 		err = TCALL(hw, mac.ops.init_hw);
@@ -3857,7 +3856,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	/* enable rx csum by default */
 	adapter->flagsd |= TXGBE_F_CAP_RX_CSUM;
 
-	adapter->link_state = true;
+	adapter->link_state = IFLA_VF_LINK_STATE_AUTO;
 
 	set_bit(__TXGBE_DOWN, &adapter->state);
 
@@ -4127,7 +4126,7 @@ static void txgbe_watchdog_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	txgbe_watchdog_update_link(adapter);
-	if (adapter->link_up && adapter->link_state)
+	if (adapter->link_up)
 		txgbe_watchdog_link_is_up(adapter);
 	else
 		txgbe_watchdog_link_is_down(adapter);

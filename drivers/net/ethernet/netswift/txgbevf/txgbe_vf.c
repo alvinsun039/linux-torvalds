@@ -442,7 +442,7 @@ s32 txgbe_update_xcast_mode(struct txgbe_hw *hw, int xcast_mode)
  *
  * Returns state of the operation error or success.
  **/
-s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state)
+s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, u16 *link_state)
 {
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	u32 msgbuf[2];
@@ -451,7 +451,6 @@ s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state)
 
 	msgbuf[0] = TXGBE_VF_GET_LINK_STATE;
 	msgbuf[1] = 0x0;
-
 	err = mbx->ops.write_posted(hw, msgbuf, 2, 0);
 	if (err)
 		return err;
@@ -750,11 +749,19 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 		goto out;
 
 	/* test for link */
-	if (!txgbe_check_for_msg(hw, 0))
+	if (!txgbe_check_for_msg(hw, 0)) {
 		if (txgbe_rcv_msg_from_pf(hw)) {
 			err = -1;
 			goto out;
 		}
+	}
+	if (adapter->link_state == IFLA_VF_LINK_STATE_ENABLE) {
+		*link_up = true;
+		*speed = adapter->pf_speed;
+		return 0;
+	} else if (adapter->link_state == IFLA_VF_LINK_STATE_DISABLE) {
+		goto out;
+	}
 
 	if (adapter->link_status_flag) {
 		*link_up = adapter->pf_link_up;

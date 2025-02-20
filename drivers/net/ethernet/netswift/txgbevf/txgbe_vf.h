@@ -62,7 +62,7 @@ struct txgbe_mac_operations {
 	s32 (*update_mc_addr_list)(struct txgbe_hw *, u8 *, u32,
 				   txgbe_mc_addr_itr, bool);
 	s32 (*update_xcast_mode)(struct txgbe_hw *, int);
-	s32 (*get_link_state)(struct txgbe_hw *hw, bool *link_state);
+	s32 (*get_link_state)(struct txgbe_hw *hw, u16 *link_state);
 	s32 (*enable_mc)(struct txgbe_hw *);
 	s32 (*disable_mc)(struct txgbe_hw *);
 	s32 (*clear_vfta)(struct txgbe_hw *);
@@ -203,7 +203,7 @@ s32 txgbe_update_mc_addr_list_vf(struct txgbe_hw *hw, u8 *mc_addr_list,
 				 u32 mc_addr_count, txgbe_mc_addr_itr,
 				 bool clear);
 s32 txgbe_update_xcast_mode(struct txgbe_hw *hw, int xcast_mode);
-s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state);
+s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, u16 *link_state);
 s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 		      bool vlan_on, bool vlvf_bypass);
 s32 txgbe_rlpml_set_vf(struct txgbe_hw *hw, u16 max_size);

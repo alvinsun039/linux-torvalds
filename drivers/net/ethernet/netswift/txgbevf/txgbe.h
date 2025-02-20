@@ -603,7 +603,7 @@ struct txgbe_adapter {
 	u32* rss_key;
 	u8 rss_indir_tbl[TXGBE_VFRETA_SIZE];
 	u32 flags;
-	bool link_state;
+	u16 link_state;
 #define TXGBE_FLAG_RX_CSUM_ENABLED		BIT(1)
 #define TXGBE_FLAGS_LEGACY_RX			BIT(2)
 #define TXGBE_FLAG_RSS_FIELD_IPV4_UDP		BIT(4)
