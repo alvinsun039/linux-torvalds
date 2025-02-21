@@ -3733,6 +3733,7 @@ int txgbe_e56_reconfig_rx(struct txgbe_hw *hw, u32 speed)
 //Reference setting code for SFP mode
 int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 	u32 ppl_lock = false;
 	int status = 0;
@@ -4043,6 +4044,11 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	txgbe_wr32_ephy(hw, E56PHY_INTR_1_ENABLE_ADDR,
 			E56PHY_INTR_1_IDLE_EXIT1);
 
+	if (adapter->fec_link_mode != TXGBE_PHY_FEC_AUTO) {
+		adapter->cur_fec_link = adapter->fec_link_mode;
+		txgbe_e56_set_fec_mode(hw, adapter->cur_fec_link);
+	}
+
 	if (status)
 		goto out;
 
@@ -4079,10 +4085,8 @@ int txgbe_get_cur_fec_mode(struct txgbe_hw *hw)
 
 int txgbe_e56_set_fec_mode(struct txgbe_hw *hw, u8 fec_mode)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	u32 value = 0;
 
-	mutex_lock(&adapter->e56_lock);
 	if (fec_mode & TXGBE_PHY_FEC_RS) {
 		//disable BASER FEC
 		value = txgbe_rd32_epcs(hw, SR_PMA_KR_FEC_CTRL);
@@ -4130,7 +4134,6 @@ int txgbe_e56_set_fec_mode(struct txgbe_hw *hw, u8 fec_mode)
 		SetFields(&value, 0, 0, 0);
 		txgbe_wr32_epcs(hw, SR_PMA_KR_FEC_CTRL, value);
 	}
-	mutex_unlock(&adapter->e56_lock);
 
 	return 0;
 }
@@ -4149,7 +4152,9 @@ int txgbe_e56_fec_mode_polling(struct txgbe_hw *hw, bool *link_up)
 
 		adapter->cur_fec_link = adapter->fec_link_mode & BIT(j);
 
+		mutex_lock(&adapter->e56_lock);
 		txgbe_e56_set_fec_mode(hw, adapter->cur_fec_link);
+		mutex_unlock(&adapter->e56_lock);
 
 		for (i = 0; i < 4; i++) {
 			msleep(250);
