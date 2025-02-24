@@ -235,17 +235,6 @@ done:
 	return -ENOMEM;
 }
 
-static int io_prep_rw_setup(struct io_kiocb *req, int ddir, bool do_import)
-{
-	struct io_async_rw *rw;
-
-	if (!do_import || io_do_buffer_select(req))
-		return 0;
-
-	rw = req->async_data;
-	return io_import_rw_buffer(ddir, req, rw, 0);
-}
-
 static int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe,
 		      int ddir, bool do_import)
 {
@@ -280,7 +269,16 @@ static int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe,
 	rw->addr = READ_ONCE(sqe->addr);
 	rw->len = READ_ONCE(sqe->len);
 	rw->flags = READ_ONCE(sqe->rw_flags);
-	return io_prep_rw_setup(req, ddir, do_import);
+
+	if (do_import && !io_do_buffer_select(req)) {
+		struct io_async_rw *io = req->async_data;
+
+		ret = io_import_rw_buffer(ddir, req, io, 0);
+		if (unlikely(ret))
+			return ret;
+	}
+
+	return 0;
 }
 
 int io_prep_read(struct io_kiocb *req, const struct io_uring_sqe *sqe)
