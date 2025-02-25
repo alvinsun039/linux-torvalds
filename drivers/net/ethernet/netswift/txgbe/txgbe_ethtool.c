@@ -1137,7 +1137,7 @@ static int txgbe_set_link_ksettings(struct net_device *netdev,
 		return err;
 	} else {
 		/* in this case we currently only support 10Gb/FULL */
-		if (hw->mac.type == txgbe_mac_aml) {
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 			return -EINVAL;
 		} else if ((ethtool_link_ksettings_test_link_mode(
 				    cmd, advertising, 1000baseT_Full) ||
