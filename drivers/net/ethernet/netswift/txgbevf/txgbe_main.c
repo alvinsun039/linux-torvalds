@@ -2998,7 +2998,7 @@ void txgbe_up_complete(struct txgbe_adapter *adapter)
 	spin_lock_bh(&adapter->mbx_lock);
 	hw->mac.ops.get_link_state(hw, &adapter->link_state);
 	spin_unlock_bh(&adapter->mbx_lock);
-	if (adapter->link_state == IFLA_VF_LINK_STATE_DISABLE)
+	if (adapter->link_state == TXGBE_VF_LINK_STATE_DISABLE)
 		e_info(drv, "VF is administratively disabled\n");
 
 	smp_mb__before_atomic();

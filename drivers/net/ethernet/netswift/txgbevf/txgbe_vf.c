@@ -784,11 +784,11 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 			goto out;
 		}
 	}
-	if (adapter->link_state == IFLA_VF_LINK_STATE_ENABLE) {
+	if (adapter->link_state == TXGBE_VF_LINK_STATE_ENABLE) {
 		*link_up = true;
 		*speed = adapter->pf_speed;
 		return 0;
-	} else if (adapter->link_state == IFLA_VF_LINK_STATE_DISABLE) {
+	} else if (adapter->link_state == TXGBE_VF_LINK_STATE_DISABLE) {
 		goto out;
 	}
 

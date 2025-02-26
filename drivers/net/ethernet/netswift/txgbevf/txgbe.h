@@ -501,6 +501,11 @@ static inline u16 txgbe_desc_unused(struct txgbe_ring *ring)
 #define TXGBE_F_ENA_RSS_IPV4UDP         (1UL << 4)
 #define TXGBE_F_ENA_RSS_IPV6UDP         (1UL << 5)
 
+
+#define TXGBE_VF_LINK_STATE_DISABLE 0
+#define TXGBE_VF_LINK_STATE_AUTO 1
+#define TXGBE_VF_LINK_STATE_ENABLE 2
+
 struct txgbe_adapter {
 #if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
 #ifdef HAVE_VLAN_RX_REGISTER
