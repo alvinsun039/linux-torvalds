@@ -11722,6 +11722,11 @@ static netdev_tx_t txgbe_xmit_frame(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 
 #ifdef HAVE_TX_MQ
+	if (!adapter->num_tx_queues) {
+		dev_kfree_skb_any(skb);
+		return NETDEV_TX_OK;
+	}
+
 	if (r_idx >= adapter->num_tx_queues)
 		r_idx = r_idx % adapter->num_tx_queues;
 	tx_ring = adapter->tx_ring[r_idx];
