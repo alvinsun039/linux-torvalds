@@ -1,6 +1,6 @@
 /*
- * WangXun 25/10 Gigabit PCI Express Linux driver
- * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
+ * WangXun RP1000/RP2000/FF50XX PCI Express Linux driver
+ * Copyright (c) 2015 - 2025 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -821,7 +821,7 @@ static void txgbe_fcoe_ddp_disable(struct txgbe_adapter *adapter)
  * txgbe_fcoe_enable - turn on FCoE offload feature
  * @netdev: the corresponding netdev
  *
- * Turns on FCoE offload feature in sapphire.
+ * Turns on FCoE offload feature in sapphire/amber-lite.
  *
  * Returns : 0 indicates success or -EINVAL on failure
  */
@@ -868,7 +868,7 @@ int txgbe_fcoe_enable(struct net_device *netdev)
  * txgbe_fcoe_disable - turn off FCoE offload feature
  * @netdev: the corresponding netdev
  *
- * Turns off FCoE offload feature in sapphire.
+ * Turns off FCoE offload feature in sapphire/amber-lite.
  *
  * Returns : 0 indicates success or -EINVAL on failure
  */

@@ -1,6 +1,6 @@
 /*
- * WangXun 25/10 Gigabit PCI Express Linux driver
- * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
+ * WangXun RP1000/RP2000/FF50XX PCI Express Linux driver
+ * Copyright (c) 2015 - 2025 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -6416,8 +6416,9 @@ s32 txgbe_reinit_fdir_tables(struct txgbe_hw *hw)
 	wr32(hw, TXGBE_RDB_FDIR_FREE, 0);
 	TXGBE_WRITE_FLUSH(hw);
 	/*
-	 * sapphire adapters flow director init flow cannot be restarted,
-	 * Workaround sapphire silicon errata by performing the following steps
+	 * sapphire/amber-lite adapters flow director init flow cannot be
+	 * restarted, Workaround sapphire/amber-lite
+	 * silicon errata by performing the following steps
 	 * before re-writing the FDIRCTRL control register with the same value.
 	 * - write 1 to bit 8 of FDIRCMD register &
 	 * - write 0 to bit 8 of FDIRCMD register
@@ -7203,19 +7204,19 @@ int txgbe_set_pps(struct txgbe_hw *hw, bool enable, u64 nsec, u64 cycles)
 }
 
 /**
- *  txgbe_enable_rx_dma - Enable the Rx DMA unit on sapphire
+ *  txgbe_enable_rx_dma - Enable the Rx DMA unit on sapphire/amber-lite
  *  @hw: pointer to hardware structure
  *  @regval: register value to write to RXCTRL
  *
- *  Enables the Rx DMA unit for sapphire
+ *  Enables the Rx DMA unit for sapphire/amber-lite
  **/
 s32 txgbe_enable_rx_dma(struct txgbe_hw *hw, u32 regval)
 {
 	/*
-	 * Workaround for sapphire silicon errata when enabling the Rx datapath.
-	 * If traffic is incoming before we enable the Rx unit, it could hang
-	 * the Rx DMA unit.  Therefore, make sure the security engine is
-	 * completely disabled prior to enabling the Rx unit.
+	 * Workaround for sapphire/amber-lite silicon errata when enabling the
+	 * Rx datapath. If traffic is incoming before we enable the Rx unit, it
+	 * could hang the Rx DMA unit.  Therefore, make sure the security engine
+	 * is completely disabled prior to enabling the Rx unit.
 	 */
 
 	TCALL(hw, mac.ops.disable_sec_rx_path);

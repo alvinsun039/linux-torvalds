@@ -1,6 +1,6 @@
 /*
- * WangXun 40/25/10 Gigabit PCI Express Linux driver
- * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
+ * WangXun RP1000/RP2000/FF50XX PCI Express Linux driver
+ * Copyright (c) 2015 - 2025 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -86,7 +86,7 @@
 
 char txgbe_driver_name[32] = TXGBE_NAME;
 static const char txgbe_driver_string[] =
-			"WangXun 40/25/10 Gigabit PCI Express Network Driver";
+			"WangXun RP1000/RP2000/FF50XX PCI Express Network Driver";
 
 #define DRV_HW_PERF
 
@@ -109,7 +109,7 @@ static const char txgbe_driver_string[] =
 #endif
 const char txgbe_driver_version[32] = DRV_VERSION;
 static const char txgbe_copyright[] =
-		"Copyright (c) 2015 -2017 Beijing WangXun Technology Co., Ltd";
+		"Copyright (c) 2015 - 2025 Beijing WangXun Technology Co., Ltd";
 static const char txgbe_overheat_msg[] =
 		"Network adapter has been stopped because it has over heated. "
 		"If the problem persists, restart the computer, or "
@@ -141,7 +141,7 @@ MODULE_DEVICE_TABLE(pci, txgbe_pci_tbl);
 
 
 MODULE_AUTHOR("Beijing WangXun Technology Co., Ltd, <linux.nic@trustnetic.com>");
-MODULE_DESCRIPTION("WangXun(R) 25/10 Gigabit PCI Express Network Driver");
+MODULE_DESCRIPTION("WangXun(R) RP1000/RP2000/FF50XX PCI Express Network Driver");
 MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_VERSION);
 
@@ -13672,7 +13672,7 @@ no_info_string:
 	txgbe_add_sanmac_netdev(netdev);
 
 #endif /* (HAVE_NETDEV_STORAGE_ADDRESS) && (NETDEV_HW_ADDR_T_SAN) */
-	e_info(probe, "WangXun(R) 25/10 Gigabit Network Connection\n");
+	e_info(probe, "WangXun(R) RP1000/RP2000/FF50XX Network Connection\n");
 	cards_found++;
 #ifdef TXGBE_SYSFS
 	if (txgbe_sysfs_init(adapter))

@@ -1,6 +1,6 @@
 /*
- * WangXun 25/10 Gigabit PCI Express Linux driver
- * Copyright (c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
+ * WangXun RP1000/RP2000/FF50XX PCI Express Linux driver
+ * Copyright (c) 2015 - 2025 Beijing WangXun Technology Co., Ltd.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -280,9 +280,9 @@ void txgbe_enable_sriov(struct txgbe_adapter *adapter)
 	} else {
 		int err;
 		/*
-		 * The sapphire supports up to 64 VFs per physical function
-		 * but this implementation limits allocation to 63 so that
-		 * basic networking resources are still available to the
+		 * The sapphire/amber-lite supports up to 64 VFs per physical
+		 * function but this implementation limits allocation to 63 so
+		 * that basic networking resources are still available to the
 		 * physical function.  If the user requests greater thn
 		 * 63 VFs then it is an error - reset to default of zero.
 		 */
@@ -481,8 +481,8 @@ static int txgbe_set_vf_lpe(struct txgbe_adapter *adapter, u32 max_frame,
 	u32 max_frs, reg_val;
 
 	/*
-	 * For sapphire we have to keep all PFs and VFs operating with
-	 * the same max_frame value in order to avoid sending an oversize
+	 * For sapphire/amber-lite we have to keep all PFs and VFs operating
+	 * with the same max_frame value in order to avoid sending an oversize
 	 * frame to a VF.  In order to guarantee this is handled correctly
 	 * for all cases we have several special exceptions to take into
 	 * account before we can enable the VF for receive
