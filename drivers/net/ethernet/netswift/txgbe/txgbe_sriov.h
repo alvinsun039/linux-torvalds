@@ -24,6 +24,10 @@
  */
 #define TXGBE_MAX_VFS_DRV_LIMIT  (TXGBE_MAX_VF_FUNCTIONS - 1)
 
+#define TXGBE_VF_LINK_STATE_DISABLE 0
+#define TXGBE_VF_LINK_STATE_AUTO 1
+#define TXGBE_VF_LINK_STATE_ENABLE 2
+
 void txgbe_restore_vf_multicasts(struct txgbe_adapter *adapter);
 int txgbe_set_vf_vlan(struct txgbe_adapter *adapter, int add, int vid, u16 vf);
 void txgbe_set_vmolr(struct txgbe_hw *hw, u16 vf, bool aupe);

@@ -133,6 +133,7 @@ static int __txgbe_enable_sriov(struct txgbe_adapter *adapter,
 		/* enable spoof checking for all VFs */
 		adapter->vfinfo[i].spoofchk_enabled = true;
 		adapter->vfinfo[i].link_enable = true;
+		adapter->vfinfo[i].link_state = TXGBE_VF_LINK_STATE_AUTO;
 
 #ifdef HAVE_NDO_SET_VF_RSS_QUERY_EN
 		/* We support VF RSS querying only for 82599 and x540
@@ -2035,7 +2036,7 @@ void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state)
 	adapter->vfinfo[vf].link_state = state;
 
 	switch (state) {
-	case IFLA_VF_LINK_STATE_AUTO:
+	case TXGBE_VF_LINK_STATE_AUTO:
 		if (test_bit(__TXGBE_DOWN, &adapter->state)) {
 			adapter->vfinfo[vf].link_enable = false;
 		} else {
@@ -2043,11 +2044,11 @@ void txgbe_set_vf_link_state(struct txgbe_adapter *adapter, int vf, int state)
 			adapter->vfinfo[vf].link_enable = true;
 		}
 		break;
-	case IFLA_VF_LINK_STATE_ENABLE:
+	case TXGBE_VF_LINK_STATE_ENABLE:
 		adapter->vfinfo[vf].link_enable = true;
 		link_up = true;
 		break;
-	case IFLA_VF_LINK_STATE_DISABLE:
+	case TXGBE_VF_LINK_STATE_DISABLE:
 		adapter->vfinfo[vf].link_enable = false;
 		link_up = false;
 		break;
@@ -2088,17 +2089,17 @@ int txgbe_ndo_set_vf_link_state(struct net_device *netdev, int vf, int state)
 	case IFLA_VF_LINK_STATE_ENABLE:
 		dev_info(pci_dev_to_dev(adapter->pdev),
 			 "NDO set VF %d link state enable\n", vf);
-		txgbe_set_vf_link_state(adapter, vf, state);
+		txgbe_set_vf_link_state(adapter, vf, TXGBE_VF_LINK_STATE_ENABLE);
 		break;
 	case IFLA_VF_LINK_STATE_DISABLE:
 		dev_info(pci_dev_to_dev(adapter->pdev),
 			 "NDO set VF %d link state disable\n", vf);
-		txgbe_set_vf_link_state(adapter, vf, state);
+		txgbe_set_vf_link_state(adapter, vf, TXGBE_VF_LINK_STATE_DISABLE);
 		break;
 	case IFLA_VF_LINK_STATE_AUTO:
 		dev_info(pci_dev_to_dev(adapter->pdev),
 			 "NDO set VF %d link state auto\n", vf);
-		txgbe_set_vf_link_state(adapter, vf, state);
+		txgbe_set_vf_link_state(adapter, vf, TXGBE_VF_LINK_STATE_AUTO);
 		break;
 	default:
 		dev_err(pci_dev_to_dev(adapter->pdev),
