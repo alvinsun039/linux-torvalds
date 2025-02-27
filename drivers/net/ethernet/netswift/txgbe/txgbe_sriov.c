@@ -2111,6 +2111,18 @@ out:
 }
 #endif /* HAVE_NDO_SET_VF_LINK_STATE */
 
+int txgbe_trans_vf_link_state(int state)
+{
+	switch (state) {
+	case TXGBE_VF_LINK_STATE_ENABLE:
+		return IFLA_VF_LINK_STATE_ENABLE;
+	case TXGBE_VF_LINK_STATE_DISABLE:
+		return IFLA_VF_LINK_STATE_DISABLE;
+	case TXGBE_VF_LINK_STATE_AUTO:
+		return IFLA_VF_LINK_STATE_AUTO;
+	}
+	return IFLA_VF_LINK_STATE_AUTO;
+}
 
 int txgbe_ndo_get_vf_config(struct net_device *netdev,
 			    int vf, struct ifla_vf_info *ivi)
@@ -2140,7 +2152,7 @@ int txgbe_ndo_get_vf_config(struct net_device *netdev,
 	ivi->trusted = adapter->vfinfo[vf].trusted;
 #endif
 #ifdef HAVE_NDO_SET_VF_LINK_STATE
-	ivi->linkstate = adapter->vfinfo[vf].link_state;
+	ivi->linkstate = txgbe_trans_vf_link_state(adapter->vfinfo[vf].link_state);
 #endif
 
 	return 0;
