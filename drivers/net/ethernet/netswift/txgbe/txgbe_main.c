@@ -11356,7 +11356,6 @@ static void txgbe_xdp_flush(struct net_device *dev)
 #endif /*HAVE_XDP_SUPPORT*/
 
 #ifdef HAVE_NETDEV_SELECT_QUEUE
-#if IS_ENABLED(CONFIG_FCOE)
 
 #if defined(HAVE_NDO_SELECT_QUEUE_FALLBACK_REMOVED)
 static u16 txgbe_select_queue(struct net_device *dev, struct sk_buff *skb,
@@ -11377,40 +11376,32 @@ static u16 txgbe_select_queue(struct net_device *dev, struct sk_buff *skb)
 #endif /* HAVE_NDO_SELECT_QUEUE_ACCEL */
 {
 	struct txgbe_adapter *adapter = netdev_priv(dev);
+	int queue;
+#if IS_ENABLED(CONFIG_FCOE)
 	struct txgbe_ring_feature *f;
 	int txq;
-	int queue;
+#endif
 
 	if (adapter->vlan_rate_link_speed) {
-		if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED)
-			goto novlanlimit;
-		if (adapter->flags & TXGBE_FLAG_FCOE_ENABLED)
-			goto novlanlimit;
+		if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED ||
+		    adapter->flags & TXGBE_FLAG_FCOE_ENABLED)
+#if IS_ENABLED(CONFIG_FCOE)
+			goto fcoe;
+#else
+			goto skip_select;
+#endif
 
 		if (skb_vlan_tag_present(skb)) {
 			u16 vlan_id = skb_vlan_tag_get_id(skb);
-
 			if (test_bit(vlan_id, adapter->limited_vlans)) {
 				int r_idx = adapter->num_tx_queues - 1 -
 					txgbe_find_nth_limited_vlan(adapter, vlan_id);
 				return r_idx;
-			} else {
-#if defined(HAVE_NDO_SELECT_QUEUE_FALLBACK_REMOVED)
-				queue = netdev_pick_tx(dev, skb, sb_dev);
-#elif defined(HAVE_NDO_SELECT_QUEUE_SB_DEV)
-				queue = fallback(dev, skb, sb_dev);
-#elif defined(HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
-				queue = fallback(dev, skb);
-#else
-				queue = __netdev_pick_tx(dev, skb);
-#endif
-				queue = queue % (adapter->num_tx_queues -
-						 adapter->active_vlan_limited);
-				return queue;
 			}
 		}
 	}
-novlanlimit:
+#if IS_ENABLED(CONFIG_FCOE)
+fcoe:
 	/*
 	 * only execute the code below if protocol is FCoE
 	 * or FIP and we have FCoE enabled on the adapter
@@ -11424,28 +11415,35 @@ novlanlimit:
 			break;
 		fallthrough;
 	default:
-#if defined(HAVE_NDO_SELECT_QUEUE_FALLBACK_REMOVED)
-		return netdev_pick_tx(dev, skb, sb_dev);
-#elif defined(HAVE_NDO_SELECT_QUEUE_SB_DEV)
-		return fallback(dev, skb, sb_dev);
-#elif defined(HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
-		return fallback(dev, skb);
-#else
-		return __netdev_pick_tx(dev, skb);
-#endif
+		goto skip_select;
 	}
 
 	f = &adapter->ring_feature[RING_F_FCOE];
 
 	txq = skb_rx_queue_recorded(skb) ? skb_get_rx_queue(skb) :
-					   smp_processor_id();
+					smp_processor_id();
 
 	while (txq >= f->indices)
 		txq -= f->indices;
 
 	return txq + f->offset;
+#endif/*FCOE*/
+skip_select:
+#if defined(HAVE_NDO_SELECT_QUEUE_FALLBACK_REMOVED)
+	queue = netdev_pick_tx(dev, skb, sb_dev);
+#elif defined(HAVE_NDO_SELECT_QUEUE_SB_DEV)
+	queue = fallback(dev, skb, sb_dev);
+#elif defined(HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
+	queue = fallback(dev, skb);
+#else
+	queue = __netdev_pick_tx(dev, skb);
+#endif
+	if (adapter->vlan_rate_link_speed)
+		queue = queue % (adapter->num_tx_queues -
+				adapter->active_vlan_limited);
+
+	return queue;
 }
-#endif /* CONFIG_FCOE */
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 
 /**
@@ -12987,13 +12985,9 @@ static const struct net_device_ops txgbe_netdev_ops = {
 	.ndo_stop               = txgbe_close,
 	.ndo_start_xmit         = txgbe_xmit_frame,
 #ifdef HAVE_NETDEV_SELECT_QUEUE
-#if IS_ENABLED(CONFIG_FCOE)
 	.ndo_select_queue       = txgbe_select_queue,
 #else
-#ifndef HAVE_MQPRIO
 	.ndo_select_queue       = __netdev_pick_tx,
-#endif
-#endif
 #endif /* HAVE_NETDEV_SELECT_QUEUE */
 	.ndo_set_rx_mode        = txgbe_set_rx_mode,
 	.ndo_validate_addr      = eth_validate_addr,
@@ -13189,7 +13183,7 @@ void txgbe_assign_netdev_ops(struct net_device *dev)
 	dev->poll_controller = &txgbe_netpoll;
 #endif
 #ifdef HAVE_NETDEV_SELECT_QUEUE
-#if IS_ENABLED(CONFIG_FCOE)
+#if HAVE_NETDEV_SELECT_QUEUE
 	dev->select_queue = &txgbe_select_queue;
 #else
 	dev->select_queue = &__netdev_pick_tx;
