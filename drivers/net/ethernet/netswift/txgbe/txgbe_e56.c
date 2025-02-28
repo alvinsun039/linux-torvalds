@@ -87,6 +87,19 @@ static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 			adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
 			adapter->aml_txeq.post = S25G_TX_FFE_CFG_DAC_POST;
 		}
+	}  else if (speed == TXGBE_LINK_SPEED_40GB_FULL) {
+		adapter->aml_txeq.main = S10G_TX_FFE_CFG_MAIN;
+		adapter->aml_txeq.pre1 = S10G_TX_FFE_CFG_PRE1;
+		adapter->aml_txeq.pre2 = S10G_TX_FFE_CFG_PRE2;
+		adapter->aml_txeq.post = S10G_TX_FFE_CFG_POST;
+
+		if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+		    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
+			adapter->aml_txeq.main = 0x2a2a2a2a;
+			adapter->aml_txeq.pre1 = 0x03030303;
+			adapter->aml_txeq.pre2 = 0;
+			adapter->aml_txeq.post = 0x11111111;
+		}
 	} else {
 		return 0;
 	}
@@ -195,7 +208,7 @@ u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 		txgbe_wr32_ephy(hw, addr, rdata);
 	}
 	//Setting TX FFE
-	E56phyTxFfeCfg(hw, TXGBE_LINK_SPEED_10GB_FULL);
+	E56phyTxFfeCfg(hw, TXGBE_LINK_SPEED_40GB_FULL);
 
 	//RXS Config master
 	for (i = 0; i < 4; i++) {

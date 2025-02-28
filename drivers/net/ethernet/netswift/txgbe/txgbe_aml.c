@@ -152,7 +152,6 @@ static s32 txgbe_get_link_capabilities_aml(struct txgbe_hw *hw,
 			adapter->backplane_an = false;
 			*autoneg = false;
 		} else {
-			adapter->backplane_an = true;
 			*autoneg = true;
 		}
 		*speed = hw->phy.fiber_suppport_speed;

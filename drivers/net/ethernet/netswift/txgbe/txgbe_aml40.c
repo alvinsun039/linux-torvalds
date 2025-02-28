@@ -111,12 +111,10 @@ static s32 txgbe_get_link_capabilities_aml40(struct txgbe_hw *hw,
 					     u32 *speed,
 					     bool *autoneg)
 {
-	struct txgbe_adapter *adapter = hw->back;
 	s32 status = 0;
 
 	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
-		adapter->backplane_an = true;
 		*autoneg = true;
 		*speed = TXGBE_LINK_SPEED_40GB_FULL;
 	} else {

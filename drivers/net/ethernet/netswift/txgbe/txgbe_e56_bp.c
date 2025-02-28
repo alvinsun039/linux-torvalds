@@ -1339,12 +1339,12 @@ static int E56phyRxsCalibAdaptSeq(struct txgbe_adapter *adapter, u8 byLinkMode,
 
 static int E56phyRxsOscInitForTempTrackRange_40G(struct txgbe_hw *hw, u32 speed)
 {
-	int OFFSET_CENTRE_RANGE_H, OFFSET_CENTRE_RANGE_L, RANGE_FINAL;
+	int OFFSET_CENTRE_RANGE_H[4] = {0}, OFFSET_CENTRE_RANGE_L[4] = {}, RANGE_FINAL[4] = {};
 	int RX_COARSE_MID_TD, CMVAR_RANGE_H = 0, CMVAR_RANGE_L = 0;
 	struct txgbe_adapter *adapter = hw->back;
-	int osc_freq_err_occur, status = 0;
-	u32 addr, rdata, timer;
-	int T = 40, i = 0;
+	int status = 0;
+	u32 addr, rdata;
+	int T = 40, lane_id = 0;
 	int lane_num = 1;
 	//1. Read the temperature T just before RXS is enabled.
 	txgbe_e56_get_temp(hw, &T);
@@ -1362,315 +1362,151 @@ static int E56phyRxsOscInitForTempTrackRange_40G(struct txgbe_hw *hw, u32 speed)
 		RX_COARSE_MID_TD = 6;
 
 	//Set CMVAR_RANGE_H/L based on the link speed mode
-	if (speed == TXGBE_LINK_SPEED_10GB_FULL ||
-	    speed == TXGBE_LINK_SPEED_40GB_FULL) {
-		CMVAR_RANGE_H = S10G_CMVAR_RANGE_H;
-		CMVAR_RANGE_L = S10G_CMVAR_RANGE_L;
-	} else if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
-		CMVAR_RANGE_H = S25G_CMVAR_RANGE_H;
-		CMVAR_RANGE_L = S25G_CMVAR_RANGE_L;
-	}
+	CMVAR_RANGE_H = S10G_CMVAR_RANGE_H;
+	CMVAR_RANGE_L = S10G_CMVAR_RANGE_L;
+	lane_num = 4;
 
-	if (speed == TXGBE_LINK_SPEED_40GB_FULL)
-		lane_num = 4;
-	// TBD select all lane
-	//3. Program ALIAS::RXS::RANGE_SEL = CMVAR::RANGE_H
-	// RXS0_ANA_OVRDVAL[5]
-	// ana_bbcdr_osc_range_sel_i[1:0]
-	for (i = 0; i < lane_num; i++) {
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR + (E56PHY_RXS_OFFSET * i);
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		addr  = 0x0b4 + (0x200 * lane_id);
 		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS_ANA_OVRDVAL_5_ANA_BBCDR_OSC_RANGE_SEL_I,
-			  CMVAR_RANGE_H);
+		SetFields(&rdata, 1, 0, CMVAR_RANGE_H);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
-		// RXS0_ANA_OVRDEN[0]
-		// [29] ovrd_en_ana_bbcdr_osc_range_sel_i
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDEN_0_ADDR + (E56PHY_RXS_OFFSET * i);
+		addr  = 0x08c + (0x200 * lane_id);
 		rdata = rd32_ephy(hw, addr);
-		SetFields(
-			&rdata,
-			E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_BBCDR_OSC_RANGE_SEL_I,
-			0x1);
+		SetFields(&rdata, 29, 29, 0x1);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
-		// RXS0_OVRDVAL[0]
-		// [22] rxs0_rx0_samp_cal_done_o
-		rdata = 0x0000;
-		addr = E56PHY_RXS0_OVRDVAL_0_ADDR + (E56PHY_PMD_RX_OFFSET * i);
+		addr = 0x1540 + (0x02c * lane_id);
 		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS0_OVRDVAL_0_RXS0_RX0_SAMP_CAL_DONE_O, 0x0);
+		SetFields(&rdata, 22, 22, 0x0);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
-		// RXS0_OVRDEN[0]
-		// [27] ovrd_en_rxs0_rx0_samp_cal_done_o
-		rdata = 0x0000;
-		addr = E56PHY_RXS0_OVRDEN_0_ADDR + (E56PHY_PMD_RX_OFFSET * i);
+		addr  = 0x1530 + (0x02c * lane_id);
 		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS0_OVRDEN_0_OVRD_EN_RXS0_RX0_SAMP_CAL_DONE_O,
-			  0x1);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		//Do SEQ::RX_ENABLE to enable RXS
-		rdata = 0;
-		addr = E56PHY_PMD_CFG_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, (0x1 << i));
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		//b. Poll ALIAS::PDIG::CTRL_FSM_RX_ST and confirm its value is RX_SAMP_CAL_ST
-		// poll CTRL_FSM_RX_ST
-		rdata = 0;
-		timer = 0;
-		osc_freq_err_occur = 0;
-		while ((rdata >> (i * 8) & 0x3f) != 0x9) { //Bit[5:0]!= 0x9
-			udelay(500);
-			// INTR[0]
-			// [11:8] intr_rx_osc_freq_err
-			rdata = 0;
-			addr = E56PHY_INTR_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-			// TBD is always osc_freq_err occur?
-			if (rdata & (0x100 << i)) {
-				osc_freq_err_occur = 1;
-				break;
-			}
-			rdata = 0;
-			addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-
-			if (timer++ > PHYINIT_TIMEOUT) {
-				kr_dbg(KR_MODE, "FSM_RX_STAT_0_ADDR Timeout\n");
-				break;
-			}
-		}
-
-		//5/6.Define software variable as OFFSET_CENTRE_RANGE_H = ALIAS::RXS::COARSE
-		//- RX_COARSE_MID_TD. Clear the INTR.
-		rdata = 0;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		OFFSET_CENTRE_RANGE_H = (rdata >> 4) & 0xf;
-		if (OFFSET_CENTRE_RANGE_H > RX_COARSE_MID_TD)
-			OFFSET_CENTRE_RANGE_H =
-				OFFSET_CENTRE_RANGE_H - RX_COARSE_MID_TD;
-		else
-			OFFSET_CENTRE_RANGE_H =
-				RX_COARSE_MID_TD - OFFSET_CENTRE_RANGE_H;
-
-		//7. Do SEQ::RX_DISABLE to disable RXS.
-		rdata = 0;
-		addr = E56PHY_PMD_CFG_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		timer = 0;
-		while (1) {
-			udelay(500);
-			rdata = 0;
-			addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-			if (((rdata >> (i * 8)) & 0x3f) == 0x21)
-				break;
-			if (timer++ > PHYINIT_TIMEOUT) {
-				kr_dbg(KR_MODE, "FSM_RX_STAT_0_ADDR Timeout\n");
-				break;
-			}
-		}
-
-		//8. Since RX power-up fsm is stopped in RX_SAMP_CAL_ST
-		//Clear the same by clearing ALIAS::PDIG::INTR_CTRL_FSM_RX_ERR.
-		//clear ALIAS::PDIG::INTR_RX_OSC_FREQ_ERR could also be set.
-		udelay(500);
-		rdata = 0;
-		addr = E56PHY_INTR_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-
-		udelay(500);
-		addr = E56PHY_INTR_0_ADDR;
-		txgbe_wr32_ephy(hw, addr, rdata);
-		udelay(500);
-		rdata = 0;
-		addr = E56PHY_INTR_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		// next round
-
-		//9. Program ALIAS::RXS::RANGE_SEL = CMVAR::RANGE_L
-		// RXS0_ANA_OVRDVAL[5]
-		// ana_bbcdr_osc_range_sel_i[1:0]
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS_ANA_OVRDVAL_5_ANA_BBCDR_OSC_RANGE_SEL_I,
-			  CMVAR_RANGE_L);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		// RXS0_ANA_OVRDEN[0]
-		// [29] ovrd_en_ana_bbcdr_osc_range_sel_i
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDEN_0_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(
-			&rdata,
-			E56PHY_RXS_ANA_OVRDEN_0_OVRD_EN_ANA_BBCDR_OSC_RANGE_SEL_I,
-			0x1);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		/* 10. Do SEQ::RX_ENABLE to enable RXS,
-		 * and let it stop after oscillator calibration.
-		 * RXS0_OVRDVAL[0]
-		 * [22] rxs0_rx0_samp_cal_done_o
-		 */
-		rdata = 0x0000;
-		addr = E56PHY_RXS0_OVRDVAL_0_ADDR + (E56PHY_PMD_RX_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS0_OVRDVAL_0_RXS0_RX0_SAMP_CAL_DONE_O, 0x0);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		// RXS0_OVRDEN[0]
-		// [27] ovrd_en_rxs0_rx0_samp_cal_done_o
-		rdata = 0x0000;
-		addr = E56PHY_RXS0_OVRDEN_0_ADDR + (E56PHY_PMD_RX_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS0_OVRDEN_0_OVRD_EN_RXS0_RX0_SAMP_CAL_DONE_O,
-			  0x1);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		rdata = 0;
-		addr = E56PHY_PMD_CFG_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, (0x1 << i));
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		// poll CTRL_FSM_RX_ST
-		timer = 0;
-		osc_freq_err_occur = 0;
-		while (((rdata >> (i * 8)) & 0x3f) != 0x9) {
-			udelay(500);
-			// INTR[0]
-			// [11:8] intr_rx_osc_freq_err
-			rdata = 0;
-			addr = E56PHY_INTR_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-			// TBD is always osc_freq_err occur?
-			if ((rdata & 0x100) == 0x100) {
-				osc_freq_err_occur = 1;
-				break;
-			}
-			rdata = 0;
-			addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-			if (timer++ > PHYINIT_TIMEOUT) {
-				kr_dbg(KR_MODE, "FSM_RX_STAT_0_ADDR Timeout\n");
-				break;
-			}
-		}
-
-		//11/12.Define software variable as OFFSET_CENTRE_RANGE_L = ALIAS::RXS::COARSE -
-		//RX_COARSE_MID_TD. Clear the INTR.
-		rdata = 0;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		OFFSET_CENTRE_RANGE_L = (rdata >> 4) & 0xf;
-		if (OFFSET_CENTRE_RANGE_L > RX_COARSE_MID_TD)
-			OFFSET_CENTRE_RANGE_L =
-				OFFSET_CENTRE_RANGE_L - RX_COARSE_MID_TD;
-		else
-			OFFSET_CENTRE_RANGE_L =
-				RX_COARSE_MID_TD - OFFSET_CENTRE_RANGE_L;
-
-		/* 13. Perform below calculation in software.
-		 * Goal is to pick range value which is closer to RX_COARSE_MID_TD
-		 */
-		if (OFFSET_CENTRE_RANGE_L < OFFSET_CENTRE_RANGE_H)
-			RANGE_FINAL = CMVAR_RANGE_L;
-		else
-			RANGE_FINAL = CMVAR_RANGE_H;
-
-		//14. Do SEQ::RX_DISABLE to disable RXS. Poll ALIAS::PDIG::CTRL_FSM_RX_ST
-		//and confirm its value is POWERDN_ST
-		rdata = 0;
-		addr = E56PHY_PMD_CFG_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x0);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		timer = 0;
-		while (1) {
-			udelay(500);
-			rdata = 0;
-			addr = E56PHY_CTRL_FSM_RX_STAT_0_ADDR;
-			rdata = rd32_ephy(hw, addr);
-			if (((rdata >> (i * 8)) & 0x3f) == 0x21)
-				break;
-			if (timer++ > PHYINIT_TIMEOUT) {
-				kr_dbg(KR_MODE, "FSM_RX_STAT_0_ADDR Timeout\n");
-				break;
-			}
-		}
-
-		/* 15. Since RX power-up fsm is stopped in RX_SAMP_CAL_ST,
-		 * it is possible the timeout interrupt is set.
-		 * ALIAS::PDIG::INTR_CTRL_FSM_RX_ERR.
-		 * Also clear ALIAS::PDIG::INTR_RX_OSC_FREQ_ERR.
-		 */
-		udelay(500);
-		rdata = 0;
-		addr = E56PHY_INTR_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-		udelay(500);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		udelay(500);
-		rdata = 0;
-		addr = E56PHY_INTR_0_ADDR;
-		rdata = rd32_ephy(hw, addr);
-
-		//16. Program ALIAS::RXS::RANGE_SEL = RANGE_FINAL
-		rdata = 0x0000;
-		addr = E56PHY_RXS_ANA_OVRDVAL_5_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS_ANA_OVRDVAL_5_ANA_BBCDR_OSC_RANGE_SEL_I,
-			  RANGE_FINAL);
-		txgbe_wr32_ephy(hw, addr, rdata);
-
-		/* 17. Program following before enabling RXS. Purpose is to
-		 * disable power-up FSM control on ADC offset adaptation
-		 * Note: this step will be done in 2.3.3 RXS calibration
-		 * and adaptation sequence.
-		 * 18. After this SEQ::RX_ENABLE can be done at any time.
-		 * Note to ensure that ALIAS::RXS::RANGE_SEL = RANGE_FINAL
-		 * configuration is retained.
-		 * Rmove the OVRDEN on rxs0_rx0_samp_cal_done_o
-		 */
-
-		rdata = 0x0000;
-		addr = E56PHY_RXS0_OVRDEN_0_ADDR + (E56PHY_PMD_RX_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		SetFields(&rdata,
-			  E56PHY_RXS0_OVRDEN_0_OVRD_EN_RXS0_RX0_SAMP_CAL_DONE_O,
-			  0x0);
+		SetFields(&rdata, 27, 27, 0x1);
 		txgbe_wr32_ephy(hw, addr, rdata);
 	}
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 19, 16, 0xf);
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
+	status |= read_poll_timeout(rd32_ephy, rdata,
+		  ((rdata & 0x3f3f3f3f) == 0x09090909),
+		  100, 200000, false, hw,
+		  E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+	if (status)
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		       rdata, status, status ? "FAILED" : "SUCCESS");
+
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		addr  = 0x0b4 + (0x0200 * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		OFFSET_CENTRE_RANGE_H[lane_id] = (rdata >> 4) & 0xf;
+		if (OFFSET_CENTRE_RANGE_H[lane_id] > RX_COARSE_MID_TD)
+			OFFSET_CENTRE_RANGE_H[lane_id] = OFFSET_CENTRE_RANGE_H[lane_id] -
+							 RX_COARSE_MID_TD;
+		else
+			OFFSET_CENTRE_RANGE_H[lane_id] = RX_COARSE_MID_TD -
+							 OFFSET_CENTRE_RANGE_H[lane_id];
+	}
+
+	//7. Do SEQ::RX_DISABLE to disable RXS.
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 19, 16, 0x0);
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
+	status |= read_poll_timeout(rd32_ephy, rdata,
+		((rdata & 0x3f3f3f3f) == 0x21212121),
+		100, 200000, false, hw,
+		E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+	if (status)
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		       rdata, status, status ? "FAILED" : "SUCCESS");
+	rdata = rd32_ephy(hw, 0x15ec);
+	txgbe_wr32_ephy(hw, 0x15ec, rdata);
+
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		addr  = 0x0b4 + (0x200 * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 1, 0, CMVAR_RANGE_L);
+		txgbe_wr32_ephy(hw, addr, rdata);
+
+		addr  = 0x08c + (0x200 * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 29, 29, 0x1);
+		txgbe_wr32_ephy(hw, addr, rdata);
+
+		addr = 0x1540 + (0x02c * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 22, 22, 0x0);
+		txgbe_wr32_ephy(hw, addr, rdata);
+
+		addr  = 0x1530 + (0x02c * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 27, 27, 0x1);
+		txgbe_wr32_ephy(hw, addr, rdata);
+	}
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 19, 16, 0xf);
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
+	status |= read_poll_timeout(rd32_ephy, rdata,
+		  ((rdata & 0x3f3f3f3f) == 0x09090909),
+		  100, 200000, false, hw,
+		  E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+	if (status)
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		       rdata, status, status ? "FAILED" : "SUCCESS");
+
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		addr  = 0x0b4 + (0x0200 * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		OFFSET_CENTRE_RANGE_L[lane_id] = (rdata >> 4) & 0xf;
+		if (OFFSET_CENTRE_RANGE_L[lane_id] > RX_COARSE_MID_TD)
+			OFFSET_CENTRE_RANGE_L[lane_id] = OFFSET_CENTRE_RANGE_L[lane_id] -
+							 RX_COARSE_MID_TD;
+		else
+			OFFSET_CENTRE_RANGE_L[lane_id] = RX_COARSE_MID_TD -
+							 OFFSET_CENTRE_RANGE_L[lane_id];
+	}
+
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		RANGE_FINAL[lane_id] = OFFSET_CENTRE_RANGE_L[lane_id] <
+				       OFFSET_CENTRE_RANGE_H[lane_id] ?
+				       CMVAR_RANGE_L : CMVAR_RANGE_H;
+		kr_dbg(KR_MODE, "lane_id:%d-RANGE_L:%x-RANGE_H:%x-RANGE_FINAL:%x\n",
+		       lane_id, OFFSET_CENTRE_RANGE_L[lane_id],
+		       OFFSET_CENTRE_RANGE_H[lane_id], RANGE_FINAL[lane_id]);
+	}
+
+	//7. Do SEQ::RX_DISABLE to disable RXS.
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, 19, 16, 0x0);
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
+	status |= read_poll_timeout(rd32_ephy, rdata,
+		((rdata & 0x3f3f3f3f) == 0x21212121),
+		100, 200000, false, hw,
+		E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
+	if (status)
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		       rdata, status, status ? "FAILED" : "SUCCESS");
+	rdata = rd32_ephy(hw, 0x15ec);
+	txgbe_wr32_ephy(hw, 0x15ec, rdata);
+
+	for (lane_id = 0; lane_id < lane_num; lane_id++) {
+		addr  = 0x0b4 + (0x0200 * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 1, 0, RANGE_FINAL[lane_id]);
+		txgbe_wr32_ephy(hw, addr, rdata);
+
+		addr  = 0x1530 + (0x02c * lane_id);
+		rdata = rd32_ephy(hw, addr);
+		SetFields(&rdata, 27, 27, 0x0);
+		txgbe_wr32_ephy(hw, addr, rdata);
+	}
+
 	//Do SEQ::RX_ENABLE
-	rdata = 0;
-	addr = E56PHY_PMD_CFG_0_ADDR;
-	rdata = rd32_ephy(hw, addr);
-	if (speed == TXGBE_LINK_SPEED_40GB_FULL)
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0xf);
-	else
-		SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0x1);
-	txgbe_wr32_ephy(hw, addr, rdata);
+	rdata = rd32_ephy(hw, 0x1400);
+	SetFields(&rdata, E56PHY_PMD_CFG_0_RX_EN_CFG, 0xf);
+	txgbe_wr32_ephy(hw, 0x1400, rdata);
 
 	return status;
 }
@@ -3669,6 +3505,7 @@ static int txgbe_e56_cl72_trainning_40G(struct txgbe_adapter *adapter)
 	u32 bylinkmode = adapter->bp_link_mode;
 	struct txgbe_hw *hw = &adapter->hw;
 	int status = 0, pTempData = 0;
+	u32 txffe = 0, lane_id = 0;
 	u8 bypassCtle = 0;
 	int ret = 0;
 	u32 rdata;
@@ -3709,6 +3546,17 @@ static int txgbe_e56_cl72_trainning_40G(struct txgbe_adapter *adapter)
 	kr_dbg(KR_MODE, "KR TRAINNING CHECK = %x, %s.\n", rdata,
 	       status ? "FAILED" : "SUCCESS");
 	ret |= status;
+
+	kr_dbg(KR_MODE, "before: %x-%x-%x-%x\n",
+	       rd32_ephy(hw, 0x141c), rd32_ephy(hw, 0x1420),
+	       rd32_ephy(hw, 0x1424), rd32_ephy(hw, 0x1428));
+
+	for (lane_id = 0; lane_id < 4; lane_id++) {
+		txffe = rd32_ephy(hw, 0x828 + lane_id * 0x100);
+		kr_dbg(KR_MODE, "after[%x]: %x-%x-%x-%x\n", lane_id,
+		       txffe & 0x7f, (txffe >> 16) & 0x3f,
+		       (txffe >> 24) & 0x3f, (txffe >> 8) & 0x3f);
+	}
 
 	kr_dbg(KR_MODE, "2.7 Wait %dG phy Rx adc....\n", bylinkmode);
 	status = E56phyRxsAdcAdaptSeq_40G(adapter, bypassCtle);
@@ -3819,7 +3667,8 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 value = 0;
+	u32 value = 0, mac_link = 0;
+	u32 rlu = 0;
 	int ret = 0;
 
 	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
@@ -3835,16 +3684,23 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	if (!adapter->backplane_an)
 		return;
 
-	kr_dbg(KR_MODE, "RLU : %x - AN INT : %x - AN CTL : %x AN defsm: %x\n",
-	       txgbe_rd32_epcs(hw, 0x30001), txgbe_rd32_epcs(hw, 0x78002),
-	       txgbe_rd32_epcs(hw, 0x70000), txgbe_rd32_epcs(hw, 0x78010));
+	rlu = txgbe_rd32_epcs(hw, 0x30001);
+	mac_link = rd32(hw, 0x14404);
+	kr_dbg(KR_MODE, "RLU:%x - MLU:%x - ANINT:%x - ANCTL:%x - ANdefsm: %x\n",
+	       rlu, mac_link,
+	       txgbe_rd32_epcs(hw, 0x78002),
+	       txgbe_rd32_epcs(hw, 0x70000),
+	       txgbe_rd32_epcs(hw, 0x78010));
+
+
+	if ((!(mac_link & 0x1)) && (!(rlu & 0x4)))
+		adapter->an_done = false;
 
 	value = txgbe_rd32_epcs(hw, 0x78002);
 	if (value & TXGBE_E56_AN_INT_CMPLT) {
 		txgbe_wr32_epcs(hw, 0x78002, 0);
 		return;
 	}
-	adapter->an_done = false;
 
 	if (value & TXGBE_E56_AN_PG_RCV) {
 		if (!(adapter->flags2 & TXGBE_FLAG2_KR_TRAINING)) {

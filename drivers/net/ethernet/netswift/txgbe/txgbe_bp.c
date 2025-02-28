@@ -16,8 +16,19 @@ int txgbe_bp_mode_setting(struct txgbe_adapter *adapter)
 	/*default to open an73*/
 	if ((hw->subsystem_device_id & TXGBE_DEV_MASK) == TXGBE_ID_KR_KX_KX4)
 		adapter->backplane_an = AUTO ? 1 : 0;
-	if (AUTO > 1)
+
+	switch (hw->mac.type) {
+	case txgbe_mac_sp:
+		if (AUTO > 1)
+			adapter->backplane_an = AUTO ? 1 : 0;
+		break;
+	case txgbe_mac_aml40:
+	case txgbe_mac_aml:
+	default:
 		adapter->backplane_an = AUTO ? 1 : 0;
+		break;
+	}
+
 	adapter->autoneg = AUTO?1:0;
 	switch (adapter->backplane_mode) {
 	case TXGBE_BP_M_KR:

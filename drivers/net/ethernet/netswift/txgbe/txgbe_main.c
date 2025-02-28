@@ -9255,6 +9255,10 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 		txgbe_ptp_start_cyclecounter(adapter);
 
 #endif
+	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
+	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1)
+		adapter->an_done = false;
+
 	e_info(drv, "NIC Link is Down\n");
 	netif_carrier_off(netdev);
 	netif_tx_stop_all_queues(netdev);
