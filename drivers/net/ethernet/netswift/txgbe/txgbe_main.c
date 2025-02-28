@@ -7731,6 +7731,9 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->cur_fec_link = TXGBE_PHY_FEC_OFF;
 
 	adapter->link_valid = true;
+
+	bitmap_zero(adapter->limited_vlans, 4096);
+
 out:
 	return err;
 }
@@ -9176,6 +9179,7 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 		e_dev_info("Enable loopback and disable rx : %x\n.",
 			   rd32(hw, 0x11004));
 	}
+	txgbe_check_vlan_rate_limit(adapter);
 	netif_carrier_on(netdev);
 	txgbe_check_vf_rate_limit(adapter);
 
@@ -11371,7 +11375,38 @@ static u16 txgbe_select_queue(struct net_device *dev, struct sk_buff *skb)
 	struct txgbe_adapter *adapter = netdev_priv(dev);
 	struct txgbe_ring_feature *f;
 	int txq;
+	int queue;
 
+	if (adapter->vlan_rate_link_speed) {
+		if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED)
+			goto novlanlimit;
+		if (adapter->flags & TXGBE_FLAG_FCOE_ENABLED)
+			goto novlanlimit;
+
+		if (skb_vlan_tag_present(skb)) {
+			u16 vlan_id = skb_vlan_tag_get_id(skb);
+
+			if (test_bit(vlan_id, adapter->limited_vlans)) {
+				int r_idx = adapter->num_tx_queues - 1 -
+					txgbe_find_nth_limited_vlan(adapter, vlan_id);
+				return r_idx;
+			} else {
+#if defined(HAVE_NDO_SELECT_QUEUE_FALLBACK_REMOVED)
+				queue = netdev_pick_tx(dev, skb, sb_dev);
+#elif defined(HAVE_NDO_SELECT_QUEUE_SB_DEV)
+				queue = fallback(dev, skb, sb_dev);
+#elif defined(HAVE_NDO_SELECT_QUEUE_ACCEL_FALLBACK)
+				queue = fallback(dev, skb);
+#else
+				queue = __netdev_pick_tx(dev, skb);
+#endif
+				queue = queue % (adapter->num_tx_queues -
+						 adapter->active_vlan_limited);
+				return queue;
+			}
+		}
+	}
+novlanlimit:
 	/*
 	 * only execute the code below if protocol is FCoE
 	 * or FIP and we have FCoE enabled on the adapter
@@ -11817,6 +11852,195 @@ static int txgbe_mii_ioctl(struct net_device *netdev, struct ifreq *ifr,
 	}
 }
 
+int txgbe_find_nth_limited_vlan(struct txgbe_adapter *adapter, int vlan)
+{
+	return bitmap_weight(adapter->limited_vlans, vlan+1) - 1;
+}
+
+void txgbe_del_vlan_limit(struct txgbe_adapter *adapter, int vlan)
+{
+	int new_queue_rate_limit[64];
+	int idx = 0;
+	int i = 0, j = 0;
+
+	if (!test_bit(vlan, adapter->limited_vlans))
+		return;
+
+	idx = txgbe_find_nth_limited_vlan(adapter, vlan);
+	for (; i < bitmap_weight(adapter->limited_vlans, 4096); i++) {
+		if (i != idx)
+			new_queue_rate_limit[j++] = adapter->queue_rate_limit[i];
+	}
+
+	memcpy(adapter->queue_rate_limit, new_queue_rate_limit, sizeof(int) * 64);
+	clear_bit(vlan, adapter->limited_vlans);
+
+}
+
+void txgbe_set_vlan_limit(struct txgbe_adapter *adapter, int vlan, int rate_limit)
+{
+	int new_queue_rate_limit[64];
+	int idx = 0;
+	int i = 0, j = 0;
+
+	if (test_and_set_bit(vlan, adapter->limited_vlans)) {
+		idx = txgbe_find_nth_limited_vlan(adapter, vlan);
+		adapter->queue_rate_limit[idx] = rate_limit;
+		return;
+	}
+
+	idx = txgbe_find_nth_limited_vlan(adapter, vlan);
+	for (; j < bitmap_weight(adapter->limited_vlans, 4096); j++) {
+		if (j == idx)
+			new_queue_rate_limit[j] = rate_limit;
+		else
+			new_queue_rate_limit[j] = adapter->queue_rate_limit[i++];
+	}
+
+	memcpy(adapter->queue_rate_limit, new_queue_rate_limit, sizeof(int) * 64);
+
+}
+
+void txgbe_check_vlan_rate_limit(struct txgbe_adapter *adapter)
+{
+	int i;
+
+	if (!adapter->vlan_rate_link_speed)
+		return;
+
+	if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED ||
+	    adapter->flags & TXGBE_FLAG_FCOE_ENABLED) {
+		e_dev_info("Can't limit vlan rate when enable SRIOV or FCOE");
+		goto resume_rate;
+	}
+
+	if (txgbe_link_mbps(adapter) != adapter->vlan_rate_link_speed) {
+		dev_info(pci_dev_to_dev(adapter->pdev),
+			 "Link speed has been changed. vlan Transmit rate is disabled\n");
+		goto resume_rate;
+	}
+
+	if (adapter->active_vlan_limited > adapter->num_tx_queues) {
+		e_dev_err("limited vlan bigger than num of tx ring, "
+			   "disabled vlan limit\n");
+		goto resume_rate;
+	}
+
+	for (i = 0; i < adapter->active_vlan_limited; i++) {
+		txgbe_set_queue_rate_limit(&adapter->hw,
+			(adapter->num_tx_queues - i - 1), adapter->queue_rate_limit[i]);
+	}
+	return;
+resume_rate:
+	adapter->vlan_rate_link_speed = 0;
+	for (i = 0; i < adapter->active_vlan_limited; i++)
+		txgbe_set_queue_rate_limit(&adapter->hw, (adapter->num_tx_queues - i - 1), 0);
+
+}
+
+struct vlan_rate_param {
+	int count;                    // VLAN/速率数量
+	unsigned short vlans[64];     // VLAN ID 数组（示例最多支持64个）
+	unsigned int rates[64];       // 速率数组（单位：Mbps）
+};
+
+#define SIOCSVLANRATE (SIOCDEVPRIVATE+0xe)
+#define SIOCGVLANRATE (SIOCDEVPRIVATE+0xf)
+
+static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
+{
+	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	struct vlan_rate_param param;
+	int i, ret = 0;
+	int link_speed;
+	int set_num = 0;
+
+	if (cmd != SIOCSVLANRATE)
+		return -EOPNOTSUPP;
+
+	if (adapter->flags & TXGBE_FLAG_SRIOV_ENABLED ||
+	    adapter->flags & TXGBE_FLAG_FCOE_ENABLED){
+		e_dev_err("Not support vlan limit when enable SRIOV of FCOE");
+		return -EINVAL;
+	}
+
+	if (!adapter->link_up ||
+	     adapter->link_speed < TXGBE_LINK_SPEED_1GB_FULL) {
+		e_dev_info("please set vlan rate limit when link up, speed 1G not support");
+		return -EINVAL;
+	}
+
+	link_speed = txgbe_link_mbps(adapter);
+
+	if (copy_from_user(&param, ifr->ifr_data, sizeof(param)))
+		return -EFAULT;
+
+	for (i = 0; i < param.count; i++) {
+		if ((param.vlans[i] > 4095) ||
+		    (param.rates[i] != 0 && param.rates[i] <= 10) ||
+		    (param.rates[i] > link_speed)) {
+			e_dev_err("Invalid param: VLAN_ID(0~4095): %d, rate(0,10~linkspeed):%d\n",
+				 param.vlans[i], param.rates[i]);
+			ret = -EINVAL;
+			break;
+		}
+	}
+
+	for (i = 0; i < param.count; i++)
+		if (param.rates[i])
+			set_num++;
+		else
+			if (test_bit(param.vlans[i], adapter->limited_vlans))
+				set_num--;
+
+	if (param.count <= 0 || param.count > 64 ||
+	    (set_num + adapter->active_vlan_limited > adapter->num_tx_queues - 1)) {
+		e_dev_err("Invalid VLAN set count: %d, now active limited vlan count:%d "
+				"total num of limited vlan should nont bigger than num of txring:%d",
+				set_num, adapter->active_vlan_limited, adapter->num_tx_queues);
+		return -EINVAL;
+	}
+
+	adapter->vlan_rate_link_speed = link_speed;
+	for (i = 0; i < param.count; i++)
+		if (param.rates[i])
+			txgbe_set_vlan_limit(adapter, param.vlans[i], param.rates[i]);
+		else
+			txgbe_del_vlan_limit(adapter, param.vlans[i]);
+
+	adapter->active_vlan_limited = bitmap_weight(adapter->limited_vlans, 4096);
+
+	for (i = 0; i < adapter->active_vlan_limited; i++) {
+		txgbe_set_queue_rate_limit(&adapter->hw,
+			adapter->num_tx_queues - i - 1, adapter->queue_rate_limit[i]);
+	}
+	return ret;
+}
+
+static int txgbe_get_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
+{
+	struct txgbe_adapter *adapter = netdev_priv(netdev);
+	struct vlan_rate_param param;
+	int i = 0, n = 0;
+
+	if (cmd != SIOCGVLANRATE)
+		return -EOPNOTSUPP;
+
+	pr_info("get");
+
+	for_each_set_bit(i, adapter->limited_vlans, 4096) {
+		param.vlans[n] = i;
+		param.rates[n] = adapter->queue_rate_limit[n];
+		n++;
+	}
+	param.count = n;
+
+	if (copy_to_user(ifr->ifr_data, &param, sizeof(param)))
+		return -EFAULT;
+
+	return 0;
+}
+
 static int txgbe_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
@@ -11830,9 +12054,20 @@ static int txgbe_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	case SIOCGMIIREG:
 	case SIOCSMIIREG:
 		return txgbe_mii_ioctl(netdev, ifr, cmd);
+	case SIOCSVLANRATE:
+		return txgbe_vlan_rate_ioctl(netdev, ifr, cmd);
+	case SIOCGVLANRATE:
+		return txgbe_get_vlan_rate_ioctl(netdev, ifr, cmd);
 	default:
 		return -EOPNOTSUPP;
 	}
+}
+
+
+static int txgbe_siocdevprivate(struct net_device *netdev, struct ifreq *ifr,
+				void __user *data, int cmd)
+{
+	return txgbe_ioctl(netdev, ifr, cmd);
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
@@ -12766,6 +13001,7 @@ static const struct net_device_ops txgbe_netdev_ops = {
 	.ndo_vlan_rx_kill_vid   = txgbe_vlan_rx_kill_vid,
 #endif
 	.ndo_eth_ioctl           = txgbe_ioctl,
+	.ndo_siocdevprivate	= txgbe_siocdevprivate,
 #ifdef HAVE_RHEL7_NET_DEVICE_OPS_EXT
 	/* RHEL7 requires this to be defined to enable extended ops.  RHEL7 uses the
 	 * function get_ndo_ext to retrieve offsets for extended fields from with the

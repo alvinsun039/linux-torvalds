@@ -901,10 +901,8 @@ struct txgbe_therm_proc_data {
 #define TXGBE_FLAG_NEED_LINK_CONFIG             (u32)(1 << 14)
 #define TXGBE_FLAG_FDIR_HASH_CAPABLE            (u32)(1 << 15)
 #define TXGBE_FLAG_FDIR_PERFECT_CAPABLE         (u32)(1 << 16)
-#if IS_ENABLED(CONFIG_FCOE)
 #define TXGBE_FLAG_FCOE_CAPABLE                 (u32)(1 << 17)
 #define TXGBE_FLAG_FCOE_ENABLED                 (u32)(1 << 18)
-#endif /* CONFIG_FCOE */
 #define TXGBE_FLAG_SRIOV_CAPABLE                (u32)(1 << 19)
 #define TXGBE_FLAG_SRIOV_ENABLED                (u32)(1 << 20)
 #define TXGBE_FLAG_SRIOV_REPLICATION_ENABLE     (u32)(1 << 21)
@@ -1276,6 +1274,11 @@ struct txgbe_adapter {
 	u8 swfw_index;
 
 	int amlite_temp;
+
+	int vlan_rate_link_speed;
+	DECLARE_BITMAP(limited_vlans, 4096);
+	int active_vlan_limited;
+	int queue_rate_limit[64]; // From back to front
 };
 
 static inline u32 txgbe_misc_isb(struct txgbe_adapter *adapter,
@@ -1528,6 +1531,13 @@ void txgbe_clean_tx_ring(struct txgbe_ring *tx_ring);
 void txgbe_clean_rx_ring(struct txgbe_ring *rx_ring);
 u32 txgbe_tx_cmd_type(u32 tx_flags);
 void txgbe_free_headwb_resources(struct txgbe_ring *ring);
+u16 txgbe_frac_to_bi(u16 frac, u16 denom, int max_bits);
+int txgbe_link_mbps(struct txgbe_adapter *adapter);
+
+int txgbe_find_nth_limited_vlan(struct txgbe_adapter *adapter, int vlan);
+void txgbe_del_vlan_limit(struct txgbe_adapter *adapter, int vlan);
+void txgbe_set_vlan_limit(struct txgbe_adapter *adapter, int vlan, int rate_limit);
+void txgbe_check_vlan_rate_limit(struct txgbe_adapter *adapter);
 
 /**
  * interrupt masking operations. each bit in PX_ICn correspond to a interrupt.

@@ -8133,3 +8133,56 @@ void txgbe_hic_write_autoneg_status(struct txgbe_hw *hw, bool autoneg)
 	txgbe_host_interface_command(hw, (u32 *)&buffer,
 				      sizeof(buffer), 5000, false);
 }
+
+void txgbe_set_queue_rate_limit(struct txgbe_hw *hw, int queue, u16 max_tx_rate)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	int factor_int;
+	int factor_fra;
+	int link_speed;
+	int bcnrc_val;
+
+	/*
+	 * Set global transmit compensation time to the MMW_SIZE in RTTBCNRM
+	 * register. Typically MMW_SIZE=0x014 if 9728-byte jumbo is supported
+	 * and 0x004 otherwise.
+	 */
+
+	wr32(hw, TXGBE_TDM_MMW, 0x14);
+
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
+		if (max_tx_rate) {
+			u16 frac;
+
+			link_speed = txgbe_link_mbps(adapter) / 1000 * 1024;
+
+			/* Calculate the rate factor values to set */
+			factor_int = link_speed / max_tx_rate;
+			frac = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
+			factor_fra = txgbe_frac_to_bi(frac, 10000, 14);
+
+			wr32(hw, TXGBE_TDM_RL_QUEUE_IDX, queue);
+			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			      TXGBE_TDM_FACTOR_INT_MASK, factor_int << TXGBE_TDM_FACTOR_INT_SHIFT);
+			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			      TXGBE_TDM_FACTOR_FRA_MASK, factor_fra << TXGBE_TDM_FACTOR_FRA_SHIFT);
+			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			      TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
+		} else {
+			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
+			      TXGBE_TDM_RL_EN, 0);
+		}
+	} else {
+		bcnrc_val = TXGBE_TDM_RP_RATE_MAX(max_tx_rate);
+
+		wr32(hw, TXGBE_TDM_RP_IDX, queue);
+		wr32(hw, TXGBE_TDM_RP_RATE, bcnrc_val);
+		if (max_tx_rate)
+			wr32m(hw, TXGBE_TDM_RP_CTL,
+			      TXGBE_TDM_RP_CTL_RLEN, TXGBE_TDM_RP_CTL_RLEN);
+		else
+			wr32m(hw, TXGBE_TDM_RP_CTL,
+			      TXGBE_TDM_RP_CTL_RLEN, 0);
+	}
+
+}

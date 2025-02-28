@@ -1716,7 +1716,7 @@ out:
 }
 #endif /* IFLA_VF_MAX */
 
-static int txgbe_link_mbps(struct txgbe_adapter *adapter)
+int txgbe_link_mbps(struct txgbe_adapter *adapter)
 {
 	switch (adapter->link_speed) {
 	case TXGBE_LINK_SPEED_40GB_FULL:
@@ -1732,7 +1732,7 @@ static int txgbe_link_mbps(struct txgbe_adapter *adapter)
 	}
 }
 
-static u16 txgbe_frac_to_bi(u16 frac, u16 denom, int max_bits)
+u16 txgbe_frac_to_bi(u16 frac, u16 denom, int max_bits)
 {
 	u16 value = 0;
 
