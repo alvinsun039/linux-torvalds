@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. $(dirname $0)/init-functions
+. "$(dirname "$0")/init-functions"
 
 SEVERITY_LEVEL="Low"
 K2CI_ARCH=""
@@ -12,9 +12,9 @@ K2CI_ARCH=""
 function do_exit()
 {
 	if [ $1 == 0 ];then
-		echo -e "${GREEN}Successed.${NC}"
+		log_info "Successed."
 	else
-		echo -e "${BLUE}Something wrong, please check it.${NC}"
+		log_warn "Something wrong, please check it."
 	fi
 	exit $1
 }
@@ -23,8 +23,8 @@ find_fixes () {
 	local commit_id="$1"
 
 	# verify commit_id
-	if ! git show "$commit_id" >& /dev/null ; then
-		echo "invalid git id or not in git tree"
+	if ! validate_commit "$commit_id"; then
+		log_error "Invalid git id or not in git tree"
 		exit 1
 	fi
 
@@ -64,8 +64,12 @@ function usage()
 	echo "  sync-stable -c CVE-2022-23456 -b 10243 -t 6009 -a \"Arm64|Amd64\" upstream-commit-id"
 }
 
-ARGS=`getopt -o hib:t:c:sa:l: -a --long help,insert-head-only,cve:,bug:,task:,stable,k2ci-arch,fixes,level:,force -- "$@"`
-[ $? != 0 ] && echo "Terminating..." && usage && exit -1
+ARGS=`getopt -o hib:t:c:sa:l: -a --long help,insert-head-only,cve:,bug:,task:,stable,k2ci-arch:,fixes,level:,force -- "$@"`
+if [ $? != 0 ]; then
+	log_error "Terminating..."
+	usage
+	exit 1
+fi
 
 eval set -- "${ARGS}"
 
@@ -117,19 +121,20 @@ do
 done
 
 # check args
-[ $# -lt 1 ] && usage && exit -1
+if [ $# -lt 1 ]; then
+	usage
+	exit 1
+fi
 
 # sanity check commitid
-if test -z "$(git log -1 --pretty=%s $1 2> /dev/null)"
-then
-        echo -e "${YELLOW}Skipping: Bad commit ID: $1${NC}"
-	do_exit -2;
+if ! validate_commit "$1"; then
+	log_warn "Skipping: Bad commit ID: $1"
+	do_exit -2
 fi
 
 # test in tree ?
-$(dirname $0)/test-commit-in-tree -q $1
-if [ $? == 0 -a x"$IHO" != x"true" -a x"$FORCE" != x"true" ]; then
-	echo -e "${GREEN}backported before, not need.${NC}"
+if "$(dirname "$0")/test-commit-in-tree" "$1" >/dev/null 2>&1 && [ x"$IHO" != x"true" ] && [ x"$FORCE" != x"true" ]; then
+	log_info "backported before, not need."
 	exit 0
 fi
 
@@ -143,8 +148,8 @@ mainline_commit=$(git log -1 --format="%b" $1 \
 
 # Now get the mainline commit
 tag=$(gdct $mainline_commit)
-if [ -z "$tag" ];then
-	echo -e "${RED}Not found tag, fallback to 'git describe'.${NC}"
+if [ -z "$tag" ]; then
+	log_warn "Not found tag, fallback to 'git describe'."
 	tag=$(git describe $mainline_commit)
 fi
 
