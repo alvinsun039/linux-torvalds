@@ -8154,12 +8154,16 @@ void txgbe_set_queue_rate_limit(struct txgbe_hw *hw, int queue, u16 max_tx_rate)
 		if (max_tx_rate) {
 			u16 frac;
 
-			link_speed = txgbe_link_mbps(adapter) / 1000 * 1024;
-
+			link_speed = txgbe_link_mbps(adapter);
+			max_tx_rate  = max_tx_rate * 105 / 100; //necessary offset by test
 			/* Calculate the rate factor values to set */
 			factor_int = link_speed / max_tx_rate;
 			frac = (link_speed % max_tx_rate) * 10000 / max_tx_rate;
 			factor_fra = txgbe_frac_to_bi(frac, 10000, 14);
+			if (max_tx_rate > link_speed) {
+				factor_int = 1;
+				factor_fra = 0;
+			}
 
 			wr32(hw, TXGBE_TDM_RL_QUEUE_IDX, queue);
 			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,

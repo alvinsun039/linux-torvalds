@@ -11958,7 +11958,7 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct vlan_rate_param param;
-	int i, ret = 0;
+	int i;
 	int link_speed;
 	int set_num = 0;
 
@@ -11973,7 +11973,7 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 
 	if (!adapter->link_up ||
 	     adapter->link_speed < TXGBE_LINK_SPEED_1GB_FULL) {
-		e_dev_info("please set vlan rate limit when link up, speed 1G not support");
+		e_dev_err("please set vlan rate limit when link up, speed 1G not support");
 		return -EINVAL;
 	}
 
@@ -11982,14 +11982,21 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 	if (copy_from_user(&param, ifr->ifr_data, sizeof(param)))
 		return -EFAULT;
 
+	if (param.count == 0) {
+		e_dev_info("clear all vlan limit");
+		bitmap_zero(adapter->limited_vlans, 4096);
+		adapter->vlan_rate_link_speed = 0;
+		memset(adapter->queue_rate_limit, 0, sizeof(int) * 64);
+		goto after_set;
+	}
+
 	for (i = 0; i < param.count; i++) {
 		if ((param.vlans[i] > 4095) ||
 		    (param.rates[i] != 0 && param.rates[i] <= 10) ||
 		    (param.rates[i] > link_speed)) {
-			e_dev_err("Invalid param: VLAN_ID(0~4095): %d, rate(0,10~linkspeed):%d\n",
+			e_dev_err("Invalid param: VLAN_ID(0~4095): %d, rate(0,11~linkspeed):%d\n",
 				 param.vlans[i], param.rates[i]);
-			ret = -EINVAL;
-			break;
+			return -EINVAL;
 		}
 	}
 
@@ -11997,14 +12004,15 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 		if (param.rates[i])
 			set_num++;
 		else
-			if (test_bit(param.vlans[i], adapter->limited_vlans))
+			if (test_bit(param.vlans[i], adapter->limited_vlans) &&
+			    param.rates[i] == 0)
 				set_num--;
 
 	if (param.count <= 0 || param.count > 64 ||
 	    (set_num + adapter->active_vlan_limited > adapter->num_tx_queues - 1)) {
 		e_dev_err("Invalid VLAN set count: %d, now active limited vlan count:%d "
-				"total num of limited vlan should nont bigger than num of txring:%d",
-				set_num, adapter->active_vlan_limited, adapter->num_tx_queues);
+				"total num of limited vlan should not bigger than (num_of_txring - 1):%d",
+				set_num, adapter->active_vlan_limited, adapter->num_tx_queues - 1);
 		return -EINVAL;
 	}
 
@@ -12014,6 +12022,10 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 			txgbe_set_vlan_limit(adapter, param.vlans[i], param.rates[i]);
 		else
 			txgbe_del_vlan_limit(adapter, param.vlans[i]);
+after_set:
+	/*clear all rate limit*/
+	for (i = 0; i < adapter->num_tx_queues; i++)
+		txgbe_set_queue_rate_limit(&adapter->hw, i, 0);
 
 	adapter->active_vlan_limited = bitmap_weight(adapter->limited_vlans, 4096);
 
@@ -12021,7 +12033,7 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 		txgbe_set_queue_rate_limit(&adapter->hw,
 			adapter->num_tx_queues - i - 1, adapter->queue_rate_limit[i]);
 	}
-	return ret;
+	return 0;
 }
 
 static int txgbe_get_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)

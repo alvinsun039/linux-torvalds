@@ -5193,6 +5193,11 @@ static int txgbe_set_channels(struct net_device *dev,
 	if (count > txgbe_max_channels(adapter))
 		return -EINVAL;
 
+	if (count < adapter->active_vlan_limited + 1) {
+		e_dev_info("vlan rate limit active, can't set less than active "
+			   "limited vlan + 1:%d", (adapter->active_vlan_limited + 1));
+		return -EINVAL;
+	}
 	/* update feature limits from largest to smallest supported values */
 	adapter->ring_feature[RING_F_FDIR].limit = count;
 
