@@ -1790,9 +1790,11 @@ static void txgbe_set_vf_rate_limit(struct txgbe_adapter *adapter, int vf)
 				TXGBE_TDM_FACTOR_FRA_MASK, factor_fra << TXGBE_TDM_FACTOR_FRA_SHIFT);
 			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
 				TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
-		} else
+		} else {
+			wr32(hw, TXGBE_TDM_RL_VM_IDX, vf);
 			wr32m(hw, TXGBE_TDM_RL_VM_CFG,
 				TXGBE_TDM_RL_EN, 0);
+		}
 	} else {
 		max_tx_rate /= queues_per_pool;
 		bcnrc_val = TXGBE_TDM_RP_RATE_MAX(max_tx_rate);
@@ -1888,9 +1890,11 @@ txgbe_set_queue_rate_limit_vf(struct txgbe_adapter *adapter,
 			TXGBE_TDM_FACTOR_FRA_MASK, factor_fra << TXGBE_TDM_FACTOR_FRA_SHIFT);
 		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
 			TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
-	} else
+	} else {
+		wr32(hw, TXGBE_TDM_RL_QUEUE_IDX, reg_idx);
 		wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
 			TXGBE_TDM_RL_EN, 0);
+	}
 
 	adapter->vfinfo[vf].queue_max_tx_rate[queue] = max_tx_rate;
 	e_info(drv, "set vf %d queue %d max_tx_rate to %d Mbps",
