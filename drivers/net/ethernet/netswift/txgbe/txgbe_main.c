@@ -11939,9 +11939,14 @@ void txgbe_check_vlan_rate_limit(struct txgbe_adapter *adapter)
 	}
 	return;
 resume_rate:
+	e_dev_info("clear all vlan limit");
+	bitmap_zero(adapter->limited_vlans, 4096);
+	adapter->active_vlan_limited = bitmap_weight(adapter->limited_vlans, 4096);
 	adapter->vlan_rate_link_speed = 0;
-	for (i = 0; i < adapter->active_vlan_limited; i++)
-		txgbe_set_queue_rate_limit(&adapter->hw, (adapter->num_tx_queues - i - 1), 0);
+	memset(adapter->queue_rate_limit, 0, sizeof(int) * 64);
+	adapter->vlan_rate_link_speed = 0;
+	for (i = 0; i < adapter->num_tx_queues; i++)
+		txgbe_set_queue_rate_limit(&adapter->hw, i, 0);
 
 }
 
@@ -12044,8 +12049,6 @@ static int txgbe_get_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *if
 
 	if (cmd != SIOCGVLANRATE)
 		return -EOPNOTSUPP;
-
-	pr_info("get");
 
 	for_each_set_bit(i, adapter->limited_vlans, 4096) {
 		param.vlans[n] = i;

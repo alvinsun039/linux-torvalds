@@ -8173,6 +8173,7 @@ void txgbe_set_queue_rate_limit(struct txgbe_hw *hw, int queue, u16 max_tx_rate)
 			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
 			      TXGBE_TDM_RL_EN, TXGBE_TDM_RL_EN);
 		} else {
+			wr32(hw, TXGBE_TDM_RL_QUEUE_IDX, queue);
 			wr32m(hw, TXGBE_TDM_RL_QUEUE_CFG,
 			      TXGBE_TDM_RL_EN, 0);
 		}
