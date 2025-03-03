@@ -86,7 +86,7 @@ DECLARE_STATIC_KEY_FALSE(txgbe_xdp_locking_key);
 #define TXGBE_DEFAULT_TXD               DEFAULT_TXD
 #define TXGBE_DEFAULT_TX_WORK           DEFAULT_TX_WORK
 #else
-#define TXGBE_DEFAULT_TXD               512
+#define TXGBE_DEFAULT_TXD               1024
 #define TXGBE_DEFAULT_TX_WORK   256
 #endif
 #define TXGBE_MAX_TXD                   8192
@@ -292,6 +292,8 @@ struct txgbe_lro_list {
 #define DESC_NEEDED     (MAX_SKB_FRAGS + 4)
 #endif
 
+#define DESC_RESERVED 96
+
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
 struct txgbe_tx_buffer {
@@ -459,6 +461,7 @@ struct txgbe_ring {
 					 */
 	u16 next_to_use;
 	u16 next_to_clean;
+	u16 next_to_free;
 	u16 rx_offset;
 
 #ifdef HAVE_PTP_1588_CLOCK

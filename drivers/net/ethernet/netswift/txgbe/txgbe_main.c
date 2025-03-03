@@ -722,6 +722,12 @@ static void txgbe_tx_timeout(struct net_device *netdev)
 	return;
 }
 
+
+static inline u16 txgbe_desc_buf_unmapped(struct txgbe_ring *ring, u16 ntc, u16 ntf)
+{
+	return ((ntc >= ntf) ? 0 : ring->count) + ntc - ntf;
+}
+
 /**
  * txgbe_ - Reclaim resources after transmit completes
  * @q_vector: structure containing interrupt and ring information
@@ -746,6 +752,10 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 #endif
 	int j = 0;
 	u32 size;
+	unsigned int ntf;
+	struct txgbe_tx_buffer *free_tx_buffer;
+	u32 unmapped_descs = 0;
+	bool first_dma;
 
 	if (test_bit(__TXGBE_DOWN, &adapter->state))
 		return true;
@@ -753,6 +763,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 	tx_buffer = &tx_ring->tx_buffer_info[i];
 	tx_desc = TXGBE_TX_DESC(tx_ring, i);
 	i -= tx_ring->count;
+
 
 	do {
 		union txgbe_tx_desc *eop_desc = tx_buffer->next_to_watch;
@@ -787,38 +798,10 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 		total_bytes += tx_buffer->bytecount;
 		total_packets += tx_buffer->gso_segs;
 
-#ifdef HAVE_XDP_SUPPORT
-		if (ring_is_xdp(tx_ring))
-#ifdef HAVE_XDP_FRAME_STRUCT
-			xdp_return_frame(tx_buffer->xdpf);
-#else
-			page_frag_free(tx_buffer->data);
-#endif
+		if (tx_buffer->skb)
+			skb_orphan(tx_buffer->skb);
 		else
-			napi_consume_skb(tx_buffer->skb, napi_budget);
-#else
-		napi_consume_skb(tx_buffer->skb, napi_budget);
-#endif
-
-		/* unmap skb header data */
-		dma_unmap_single(tx_ring->dev,
-				 dma_unmap_addr(tx_buffer, dma),
-				 dma_unmap_len(tx_buffer, len),
-				 DMA_TO_DEVICE);
-
-		/* clear tx_buffer data */
-#ifdef HAVE_XDP_SUPPORT
-		if (ring_is_xdp(tx_ring))
-#ifdef HAVE_XDP_FRAME_STRUCT
-			tx_buffer->xdpf = NULL;
-#else
-			tx_buffer->data = NULL;
-#endif
-		else
-#endif
-		tx_buffer->skb = NULL;
-		dma_unmap_len_set(tx_buffer, len, 0);
-		tx_buffer->va = NULL;
+			dev_err(tx_ring->dev, "skb is NULL.\n");
 
 		/* unmap remaining buffers */
 		while (tx_desc != eop_desc) {
@@ -831,17 +814,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 				tx_desc = TXGBE_TX_DESC(tx_ring, 0);
 			}
 
-			/* unmap any remaining paged data */
-			if (dma_unmap_len(tx_buffer, len)) {
-				dma_unmap_page(tx_ring->dev,
-					       dma_unmap_addr(tx_buffer, dma),
-					       dma_unmap_len(tx_buffer, len),
-					       DMA_TO_DEVICE);
-				dma_unmap_len_set(tx_buffer, len, 0);
-				tx_buffer->va = NULL;
-			}
 		}
-
 		/* move us one more past the eop_desc for start of next pkt */
 		tx_buffer++;
 		tx_desc++;
@@ -860,7 +833,89 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 	} while (likely(budget));
 
 	i += tx_ring->count;
+
+	first_dma = false;
+	ntf = tx_ring->next_to_free;
+	free_tx_buffer = &tx_ring->tx_buffer_info[ntf];
+	ntf -= tx_ring->count;
+	unmapped_descs = txgbe_desc_buf_unmapped(tx_ring, i, tx_ring->next_to_free);
+	while (unmapped_descs > DESC_RESERVED) {
+#ifdef HAVE_XDP_SUPPORT
+		if (ring_is_xdp(tx_ring)) {
+#ifdef HAVE_XDP_FRAME_STRUCT
+			if (free_tx_buffer->xdpf) {
+				xdp_return_frame(free_tx_buffer->xdpf);
+				first_dma = true;
+			}
+#else
+			if (free_tx_buffer->xdpf) {
+				page_frag_free(free_tx_buffer->data);
+				first_dma = true;
+			}
+#endif
+		} else
+			if (free_tx_buffer->skb) {
+				dev_consume_skb_any(free_tx_buffer->skb);
+				first_dma = true;
+			}
+#else
+		if (free_tx_buffer->skb) {
+			dev_consume_skb_any(free_tx_buffer->skb);
+			first_dma = true;
+		}
+#endif
+		if (first_dma) {
+			if (dma_unmap_len(free_tx_buffer, len)) {
+				/* unmap skb header data */
+				dma_unmap_single(tx_ring->dev,
+					 dma_unmap_addr(free_tx_buffer, dma),
+					 dma_unmap_len(free_tx_buffer, len),
+					 DMA_TO_DEVICE);
+			}
+					/* clear tx_buffer data */
+#ifdef HAVE_XDP_SUPPORT
+			if (ring_is_xdp(tx_ring))
+#ifdef HAVE_XDP_FRAME_STRUCT
+				free_tx_buffer->xdpf = NULL;
+#else
+				free_tx_buffer->data = NULL;
+#endif
+			else
+#endif
+			/* clear tx_buffer data */
+			free_tx_buffer->skb = NULL;
+			dma_unmap_len_set(free_tx_buffer, len, 0);
+			free_tx_buffer->va = NULL;
+			first_dma = false;
+		} else {
+			/* unmap any remaining paged data */
+			if (dma_unmap_len(free_tx_buffer, len)) {
+				dma_unmap_page(tx_ring->dev,
+					       dma_unmap_addr(free_tx_buffer, dma),
+					       dma_unmap_len(free_tx_buffer, len),
+					       DMA_TO_DEVICE);
+				dma_unmap_len_set(free_tx_buffer, len, 0);
+				free_tx_buffer->va = NULL;
+			}
+
+		}
+
+		free_tx_buffer++;
+		ntf++;
+		if (unlikely(!ntf)) {
+			ntf -= tx_ring->count;
+			free_tx_buffer = tx_ring->tx_buffer_info;
+		}
+
+		unmapped_descs--;
+	};
+
+	ntf += tx_ring->count;
+	tx_ring->next_to_free = ntf;
+	/* need update next_to_free before next_to_clean */
+	wmb();
 	tx_ring->next_to_clean = i;
+
 	u64_stats_update_begin(&tx_ring->syncp);
 	tx_ring->stats.bytes += total_bytes;
 	tx_ring->stats.packets += total_packets;
@@ -4283,6 +4338,7 @@ void txgbe_configure_tx_ring(struct txgbe_adapter *adapter,
 	/* reset ntu and ntc to place SW in sync with hardwdare */
 	ring->next_to_clean = 0;
 	ring->next_to_use = 0;
+	ring->next_to_free = 0;
 
 	txdctl |= TXGBE_RING_SIZE(ring) << TXGBE_PX_TR_CFG_TR_SIZE_SHIFT;
 
@@ -10969,9 +11025,10 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 
 	tx_ring->next_to_use = i;
 
-	txgbe_maybe_stop_tx(tx_ring, DESC_NEEDED);
+	txgbe_maybe_stop_tx(tx_ring, DESC_RESERVED + DESC_NEEDED);
 
-	if (netif_xmit_stopped(txring_txq(tx_ring)) || !netdev_xmit_more()) {
+	if (netif_xmit_stopped(txring_txq(tx_ring)) || !netdev_xmit_more() ||
+		(txgbe_desc_unused(tx_ring) <= (tx_ring->count >> 1))) {
 		writel(i, tx_ring->tail);
 #ifndef SPIN_UNLOCK_IMPLIES_MMIOWB
 
@@ -11531,7 +11588,7 @@ netdev_tx_t txgbe_xmit_frame_ring(struct sk_buff *skb,
 		count += TXD_USE_COUNT(skb_frag_size(&skb_shinfo(skb)->
 						     frags[f]));
 
-	if (txgbe_maybe_stop_tx(tx_ring, count + 3)) {
+	if (txgbe_maybe_stop_tx(tx_ring, count + DESC_RESERVED + 3)) {
 		tx_ring->tx_stats.tx_busy++;
 		return NETDEV_TX_BUSY;
 	}

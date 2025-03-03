@@ -90,7 +90,7 @@
 #endif 
 
 #ifndef DEFAULT_TXD
-#define DEFAULT_TXD 512				/*deepinsw : 1024	default to 512*/
+#define DEFAULT_TXD 1024	/* deepinsw 1024 */
 #endif 
 
 #ifndef DEFAULT_TX_WORK
