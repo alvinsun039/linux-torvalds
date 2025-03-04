@@ -5893,6 +5893,9 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #define HAVE_INCLUDE_LINUX_TIMECOUNTER_H
 #define HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
 #endif /* 3.20.0 */
+#ifdef NEED_GET_VLAN_ID
+#define skb_vlan_tag_get_id(__skb)      ((__skb)->vlan_tci & VLAN_VID_MASK)
+#endif
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0) )
