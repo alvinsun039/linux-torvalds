@@ -225,7 +225,7 @@ void xsc_eswitch_enable_pf_vf_vports(struct xsc_eswitch *esw,
 					XSC_VPORT_PROMISC_CHANGE | \
 					XSC_VPORT_VLAN_CHANGE)
 
-int esw_legacy_enable(struct xsc_eswitch *esw)
+static int esw_legacy_enable(struct xsc_eswitch *esw)
 {
 	struct xsc_vport *vport;
 	unsigned long i;
