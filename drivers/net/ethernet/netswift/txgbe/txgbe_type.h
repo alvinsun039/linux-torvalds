@@ -2799,6 +2799,11 @@ struct txgbe_hic_set_pps {
 	u64 cycles;
 };
 
+struct txgbe_led_active_set {
+	struct txgbe_hic_hdr hdr;
+	u32 active_flag;
+};
+
 /* Number of 100 microseconds we wait for PCI Express master disable */
 #define TXGBE_PCI_MASTER_DISABLE_TIMEOUT        800
 

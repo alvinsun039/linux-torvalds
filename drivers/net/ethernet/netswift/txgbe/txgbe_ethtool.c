@@ -3531,6 +3531,8 @@ static int txgbe_set_phys_id(struct net_device *netdev,
 	
 	switch (state) {
 	case ETHTOOL_ID_ACTIVE:
+		if (hw->mac.type == txgbe_mac_aml || (hw->mac.type == txgbe_mac_aml40))
+			txgbe_hic_notify_led_active(hw, 1);
 		adapter->led_reg = rd32(hw, TXGBE_CFG_LED_CTL);
 		return 2;
 
@@ -3582,6 +3584,8 @@ static int txgbe_set_phys_id(struct net_device *netdev,
 
 	case ETHTOOL_ID_INACTIVE:
 		/* Restore LED settings */
+		if (hw->mac.type == txgbe_mac_aml || (hw->mac.type == txgbe_mac_aml40))
+			txgbe_hic_notify_led_active(hw, 0);
 		wr32(&adapter->hw, TXGBE_CFG_LED_CTL,
 				adapter->led_reg);
 		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_XAUI) {

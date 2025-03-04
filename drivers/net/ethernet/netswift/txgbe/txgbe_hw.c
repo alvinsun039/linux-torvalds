@@ -8193,3 +8193,19 @@ void txgbe_set_queue_rate_limit(struct txgbe_hw *hw, int queue, u16 max_tx_rate)
 	}
 
 }
+
+int txgbe_hic_notify_led_active(struct txgbe_hw *hw, int active_flag)
+{
+	int status;
+	struct txgbe_led_active_set buffer;
+
+	buffer.hdr.cmd = 0xf8;
+	buffer.hdr.buf_len = 0x1;
+	buffer.hdr.cmd_or_resp.cmd_resv = FW_CEM_CMD_RESERVED;
+	buffer.active_flag = active_flag;
+
+	status = txgbe_host_interface_command(hw, (u32 *)&buffer,
+					      sizeof(buffer), 5000, true);
+
+	return 0;
+}
