@@ -798,11 +798,12 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 		total_bytes += tx_buffer->bytecount;
 		total_packets += tx_buffer->gso_segs;
 
-		if (tx_buffer->skb)
-			skb_orphan(tx_buffer->skb);
-		else
+		if (tx_buffer->skb) {
+			if (!ring_is_xdp(tx_ring))
+				skb_orphan(tx_buffer->skb);
+		} else {
 			dev_err(tx_ring->dev, "skb is NULL.\n");
-
+		}
 		/* unmap remaining buffers */
 		while (tx_desc != eop_desc) {
 			tx_buffer++;
