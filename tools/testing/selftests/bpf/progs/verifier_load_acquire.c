@@ -6,8 +6,7 @@
 #include "../../../include/linux/filter.h"
 #include "bpf_misc.h"
 
-#if __clang_major__ >= 18 && defined(ENABLE_ATOMICS_TESTS) && \
-	(defined(__TARGET_ARCH_arm64) || defined(__TARGET_ARCH_x86))
+#ifdef CAN_USE_LOAD_ACQ_STORE_REL
 
 SEC("socket")
 __description("load-acquire, 8-bit")
@@ -204,7 +203,7 @@ __naked void load_acquire_with_invalid_reg(void)
 	: __clobber_all);
 }
 
-#else
+#else /* CAN_USE_LOAD_ACQ_STORE_REL */
 
 SEC("socket")
 __description("Clang version < 18, ENABLE_ATOMICS_TESTS not defined, and/or JIT doesn't support load-acquire, use a dummy test")
@@ -214,6 +213,6 @@ int dummy_test(void)
 	return 0;
 }
 
-#endif
+#endif /* CAN_USE_LOAD_ACQ_STORE_REL */
 
 char _license[] SEC("license") = "GPL";
