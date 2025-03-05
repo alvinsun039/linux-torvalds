@@ -6017,7 +6017,7 @@ int txgbe_reconfig_mac(struct txgbe_hw *hw)
 		wr32(hw, TXGBE_MIS_RST, TXGBE_MIS_RST_LAN1_MAC_RST);
 
 	/* wait for mac rst complete */
-	msleep(100);
+	usec_delay(1500);
 	wr32m(hw, TXGBE_MAC_MISC_CTL, TXGBE_MAC_MISC_LINK_STS_MOD,
 				TXGBE_LINK_BOTH_PCS_MAC);
 
