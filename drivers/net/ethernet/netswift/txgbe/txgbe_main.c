@@ -9168,7 +9168,8 @@ static void txgbe_watchdog_link_is_up(struct txgbe_adapter *adapter)
 	       (flow_tx ? "TX" : "None"))),
 	       ((hw->mac.type == txgbe_mac_aml && link_speed == TXGBE_LINK_SPEED_25GB_FULL) ?
 		((adapter->cur_fec_link == TXGBE_PHY_FEC_BASER) ? ", FEC: BASE-R" :\
-		 (adapter->cur_fec_link == TXGBE_PHY_FEC_RS) ? ", FEC: RS" : ", FEC: OFF") : ""));
+		 (adapter->cur_fec_link == TXGBE_PHY_FEC_RS) ? ", FEC: RS" :\
+		 (adapter->cur_fec_link == TXGBE_PHY_FEC_OFF) ? ", FEC: OFF":"") : ""));
 
 	if (!adapter->backplane_an &&
 	    (hw->dac_sfp ||

@@ -6238,6 +6238,7 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 		wr32m(hw, TXGBE_RDM_RSC_CTL, TXGBE_RDM_RSC_CTL_FREE_CTL,
 			  TXGBE_RDM_RSC_CTL_FREE_CTL);
 		adapter->an_done = false;
+		adapter->cur_fec_link = TXGBE_PHY_FEC_AUTO;
 	} else {
 		/*
 		 * Store the original AUTOC/AUTOC2 values if they have not been
