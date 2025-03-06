@@ -5329,6 +5329,7 @@ static int txgbe_xmit_frame_ring(struct sk_buff *skb,
 		protocol = vhdr->h_vlan_encapsulated_proto;
 	}
 
+	protocol = vlan_get_protocol(skb);
 
 	/* record initial flags and protocol */
 	first->tx_flags = tx_flags;
