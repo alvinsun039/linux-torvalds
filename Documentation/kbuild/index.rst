@@ -22,6 +22,8 @@ Kernel Build System
     gcc-plugins
     llvm
 
+    bash-completion
+
 .. only::  subproject and html
 
    Indices

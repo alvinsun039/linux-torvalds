@@ -11479,6 +11479,7 @@ F:	Makefile
 F:	scripts/*vmlinux*
 F:	scripts/Kbuild*
 F:	scripts/Makefile*
+F:	scripts/bash-completion/
 F:	scripts/basic/
 F:	scripts/dummy-tools/
 F:	scripts/mk*
