@@ -157,6 +157,11 @@ u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 	field_set(&rdata, 23, 0, 0x260000);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
+	addr = E56G_CMS_ANA_OVRDEN_1_ADDR;
+	rdata = rd32_ephy(hw, addr);
+	((E56G_CMS_ANA_OVRDEN_1 *)&rdata)->ovrd_en_ana_lcpll_lf_test_in_i = 0x1;
+	txgbe_wr32_ephy(hw, addr, rdata);
+
 	//TXS Config Master
 	for (i = 0; i < 4; i++) {
 		addr = E56PHY_TXS_TXS_CFG_1_ADDR + (E56PHY_TXS_OFFSET * i);
@@ -199,12 +204,6 @@ u32 txgbe_e56_cfg_40g(struct txgbe_hw *hw)
 
 	//RXS Config master
 	for (i = 0; i < 4; i++) {
-		addr = E56G__RXS0_ANA_OVRDEN_1_ADDR + (E56PHY_RXS_OFFSET * i);
-		rdata = rd32_ephy(hw, addr);
-		((E56G_CMS_ANA_OVRDEN_1 *)&rdata)
-			->ovrd_en_ana_lcpll_lf_test_in_i = 0x1;
-		txgbe_wr32_ephy(hw, addr, rdata);
-
 		addr = E56PHY_RXS_RXS_CFG_0_ADDR + (E56PHY_RXS_OFFSET * i);
 		rdata = rd32_ephy(hw, addr);
 		field_set(&rdata, E56PHY_RXS_RXS_CFG_0_DSER_DATA_SEL, 0x0);
@@ -1075,7 +1074,7 @@ u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw)
 	field_set(&rdata, 23, 0, 0x260000);
 	txgbe_wr32_ephy(hw, addr, rdata);
 
-	addr = E56G__RXS0_ANA_OVRDEN_1_ADDR;
+	addr = E56G_CMS_ANA_OVRDEN_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	((E56G_CMS_ANA_OVRDEN_1 *)&rdata)->ovrd_en_ana_lcpll_lf_test_in_i = 0x1;
 	txgbe_wr32_ephy(hw, addr, rdata);
@@ -3790,7 +3789,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, ANA_OVRDVAL0, value);
 
 		value = rd32_ephy(hw, ANA_OVRDVAL5);
-		field_set(&value, 24, 24, 0x1);
+		field_set(&value, 24, 24, 0x0);
 		txgbe_wr32_ephy(hw, ANA_OVRDVAL5, value);
 
 		value = rd32_ephy(hw, ANA_OVRDEN0);
@@ -3963,7 +3962,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		txgbe_wr32_ephy(hw, ANA_OVRDVAL0, value);
 
 		value = rd32_ephy(hw, ANA_OVRDVAL5);
-		field_set(&value, 24, 24, 0x1);
+		field_set(&value, 24, 24, 0x0);
 		txgbe_wr32_ephy(hw, ANA_OVRDVAL5, value);
 
 		value = rd32_ephy(hw, ANA_OVRDEN0);

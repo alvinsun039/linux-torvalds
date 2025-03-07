@@ -2313,7 +2313,7 @@ static int E56phy10gCfg(struct txgbe_adapter *adapter)
 	txgbe_wr32_ephy(hw, addr, rdata);
 
 	rdata = 0x0000;
-	addr = E56G__RXS0_ANA_OVRDEN_1_ADDR;
+	addr = E56G__CMS_ANA_OVRDEN_1_ADDR;
 	rdata = rd32_ephy(hw, addr);
 	((E56G__CMS_ANA_OVRDEN_1 *)&rdata)->ovrd_en_ana_lcpll_lf_test_in_i =
 		0x1;
