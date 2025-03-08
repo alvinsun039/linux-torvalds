@@ -2,6 +2,7 @@
 #include "amd64_edac.h"
 #include <asm/amd_nb.h>
 #include "amd64_edac_hygon.h"
+#include <linux/machine_t.h>
 
 static struct edac_pci_ctl_info *pci_ctl;
 
@@ -3752,6 +3753,20 @@ static int dct_hw_info_get(struct amd64_pvt *pvt)
 	return 0;
 }
 
+static int umc_hw_info_get_hygon(struct amd64_pvt *pvt)
+{
+	pvt->umc = kcalloc(pvt->max_mcs, sizeof(struct amd64_umc), GFP_KERNEL);
+	if (!pvt->umc)
+		return -ENOMEM;
+
+	umc_prep_chip_selects(pvt);
+	umc_read_base_mask_hygon(pvt);
+	umc_read_mc_regs_hygon(pvt);
+	umc_determine_memory_type_hygon(pvt);
+
+	return 0;
+}
+
 static int umc_hw_info_get(struct amd64_pvt *pvt)
 {
 	pvt->umc = kcalloc(pvt->max_mcs, sizeof(struct amd64_umc), GFP_KERNEL);
@@ -3759,15 +3774,9 @@ static int umc_hw_info_get(struct amd64_pvt *pvt)
 		return -ENOMEM;
 
 	umc_prep_chip_selects(pvt);
-	if (hygon_f18h_m4h() || hygon_f18h_m10h()) {
-		umc_read_base_mask_hygon(pvt);
-		umc_read_mc_regs_hygon(pvt);
-		umc_determine_memory_type_hygon(pvt);
-	} else {
-		umc_read_base_mask(pvt);
-		umc_read_mc_regs(pvt);
-		umc_determine_memory_type(pvt);
-	}
+	umc_read_base_mask(pvt);
+	umc_read_mc_regs(pvt);
+	umc_determine_memory_type(pvt);
 
 	return 0;
 }
@@ -4000,6 +4009,14 @@ static void hw_info_put(struct amd64_pvt *pvt)
 	kfree(pvt->umc);
 }
 
+static struct low_ops umc_ops_hygon = {
+	.hw_info_get			= umc_hw_info_get_hygon,
+	.ecc_enabled			= umc_ecc_enabled,
+	.setup_mci_misc_attrs		= umc_setup_mci_misc_attrs,
+	.dump_misc_regs			= umc_dump_misc_regs,
+	.get_err_info			= umc_get_err_info,
+};
+
 static struct low_ops umc_ops = {
 	.hw_info_get			= umc_hw_info_get,
 	.ecc_enabled			= umc_ecc_enabled,
@@ -4122,6 +4139,8 @@ static int per_family_init(struct amd64_pvt *pvt)
 		break;
 
 	case 0x18:
+		if (is_vendor_hygon())
+			pvt->ops = &umc_ops_hygon;
 		if (pvt->model == 0x4) {
 			pvt->ctl_name			= "F18h_M04h";
 			pvt->max_mcs			= 3;
@@ -4495,7 +4514,7 @@ static void __exit amd64_edac_exit(void)
 	/* unregister from EDAC MCE */
 	if (boot_cpu_data.x86 >= 0x17) {
 		if (hygon_f18h_m4h() || hygon_f18h_m10h())
-			amd_register_ecc_decoder(decode_umc_error_hygon);
+			amd_unregister_ecc_decoder(decode_umc_error_hygon);
 		else
 			amd_unregister_ecc_decoder(decode_umc_error);
 	} else {
