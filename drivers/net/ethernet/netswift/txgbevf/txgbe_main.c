@@ -3856,7 +3856,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	/* enable rx csum by default */
 	adapter->flagsd |= TXGBE_F_CAP_RX_CSUM;
 
-	adapter->link_state = IFLA_VF_LINK_STATE_AUTO;
+	adapter->link_state = TXGBE_VF_LINK_STATE_AUTO;
 
 	set_bit(__TXGBE_DOWN, &adapter->state);
 
