@@ -1839,8 +1839,7 @@ typedef union {
 
 #define TXGBE_E56_PHY_LINK_UP 0x4
 
-void SetFields(unsigned int *pSrcData, unsigned int bitHigh,
-	       unsigned int bitLow, unsigned int setValue);
+void field_set(u32 *psrcdata, u32 bithigh, u32 bitlow, u32 setvalue);
 int E56phyRxRdSecondCode(struct txgbe_hw *hw, int *SECOND_CODE);
 u32 txgbe_e56_cfg_25g(struct txgbe_hw *hw);
 u32 txgbe_e56_cfg_10g(struct txgbe_hw *hw);
