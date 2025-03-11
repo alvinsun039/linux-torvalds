@@ -10175,7 +10175,8 @@ static void txgbe_service_task(struct work_struct *work)
 	txgbe_reset_subtask(adapter);
 	txgbe_phy_event_subtask(adapter);
 	txgbe_sfp_detection_subtask(adapter);
-	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
+	if (!(hw->mac.type == txgbe_mac_sp ||
+	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
 	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
 	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1))
