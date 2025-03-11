@@ -678,6 +678,9 @@ struct txgbe_thermal_sensor_data {
 #define TXGBE_I2C_TXFLR                 0x14974 /* Transmit FIFO Level Reg */
 #define TXGBE_I2C_RXFLR                 0x14978 /* Receive FIFO Level Reg */
 #define TXGBE_I2C_SDA_HOLD              0x1497C /* SDA hold time length reg */
+#define TXGBE_I2C_SDA_RX_HOLD           0xff0000 /* SDA rx hold time length reg */
+#define TXGBE_I2C_SDA_TX_HOLD           0xffff /* SDA tx hold time length reg */
+
 #define TXGBE_I2C_TX_ABRT_SOURCE        0x14980 /* I2C TX Abort Status Reg */
 #define TXGBE_I2C_SDA_SETUP             0x14994 /* I2C SDA Setup Register */
 #define TXGBE_I2C_ENABLE_STATUS         0x1499C /* I2C Enable Status Register */

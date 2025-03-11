@@ -961,6 +961,9 @@ s32 txgbe_init_i2c(struct txgbe_hw *hw)
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 2000);
 		wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 2000);
+
+		wr32m(hw, TXGBE_I2C_SDA_HOLD,
+			TXGBE_I2C_SDA_RX_HOLD | TXGBE_I2C_SDA_TX_HOLD, 0x640064);
 	} else if (hw->mac.type == txgbe_mac_sp) {
 		wr32(hw, TXGBE_I2C_SS_SCL_HCNT, 780);
 		wr32(hw, TXGBE_I2C_SS_SCL_LCNT, 780);
