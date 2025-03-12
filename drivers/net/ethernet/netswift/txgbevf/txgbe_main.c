@@ -3015,6 +3015,7 @@ void txgbe_up_complete(struct txgbe_adapter *adapter)
 	txgbe_save_reset_stats(adapter);
 	txgbe_init_last_counter_stats(adapter);
 
+	adapter->link_status_flag = false;
 	hw->mac.get_link_status = 1;
 	mod_timer(&adapter->service_timer, jiffies);
 }
