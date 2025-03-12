@@ -9784,7 +9784,7 @@ static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 	s32 status = 0;
 	int temp;
 
-	if (hw->mac.type != txgbe_mac_aml ||
+	if (hw->mac.type != txgbe_mac_aml &&
 			hw->mac.type != txgbe_mac_aml40)
 		return;
 

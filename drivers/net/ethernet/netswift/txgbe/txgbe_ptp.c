@@ -96,7 +96,8 @@ static void txgbe_ptp_setup_sdp(struct txgbe_adapter *adapter)
 	u64 ns = 0;
 	unsigned long flags;
 
-	if (hw->mac.type != txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
+	if (hw->mac.type != txgbe_mac_aml &&
+				hw->mac.type != txgbe_mac_aml40)
 		return;
 
 	if (TXGBE_1588_PPS_WIDTH >= NS_PER_SEC) {
