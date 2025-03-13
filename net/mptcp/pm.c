@@ -1030,6 +1030,7 @@ void mptcp_pm_data_init(struct mptcp_sock *msk)
 void __init mptcp_pm_init(void)
 {
 	mptcp_pm_kernel_register();
+	mptcp_pm_userspace_register();
 	mptcp_pm_nl_init();
 }
 
@@ -1073,6 +1074,10 @@ int mptcp_pm_register(struct mptcp_pm_ops *pm_ops)
 
 void mptcp_pm_unregister(struct mptcp_pm_ops *pm_ops)
 {
+	/* skip unregistering the default path manager */
+	if (WARN_ON_ONCE(pm_ops == &mptcp_pm_kernel))
+		return;
+
 	spin_lock(&mptcp_pm_list_lock);
 	list_del_rcu(&pm_ops->list);
 	spin_unlock(&mptcp_pm_list_lock);
