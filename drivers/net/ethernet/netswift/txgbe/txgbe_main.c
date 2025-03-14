@@ -99,13 +99,13 @@ static const char txgbe_driver_string[] =
 #define RELEASE_TAG
 
 #if (defined(TXGBE_SUPPORT_KYLIN_FT) || defined(TXGBE_SUPPORT_KYLIN_LX))
-#define DRV_VERSION     __stringify(2.1.0rc3-kylin)
+#define DRV_VERSION     __stringify(2.1.0-kylin)
 #elif defined(CONFIG_EULER_KERNEL)
-#define DRV_VERSION     __stringify(2.1.0rc3-kylin)
+#define DRV_VERSION     __stringify(2.1.0-kylin)
 #elif defined(CONFIG_UOS_KERNEL)
-#define DRV_VERSION     __stringify(2.1.0rc3-kylin)
+#define DRV_VERSION     __stringify(2.1.0-kylin)
 #else
-#define DRV_VERSION     __stringify(2.1.0rc3-kylin)
+#define DRV_VERSION     __stringify(2.1.0-kylin)
 #endif
 const char txgbe_driver_version[32] = DRV_VERSION;
 static const char txgbe_copyright[] =
