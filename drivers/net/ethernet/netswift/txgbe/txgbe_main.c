@@ -2453,6 +2453,9 @@ int txgbe_xmit_xdp_ring(struct txgbe_ring *ring, struct xdp_buff *xdp)
 		i = 0;
 
 	tx_buffer->next_to_watch = tx_desc;
+#ifdef TXGBE_TXHEAD_WB
+	tx_buffer->next_eop = i;
+#endif
 	ring->next_to_use = i;
 
 	return TXGBE_XDP_TX;
