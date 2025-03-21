@@ -78,6 +78,8 @@ enum csv_comm_state {
 #define CSV_RING_BUFFER_ALIGN		(4 * 1024)
 #define CSV_RING_BUFFER_LEN		(CSV_RING_BUFFER_SIZE + CSV_RING_BUFFER_ALIGN)
 #define CSV_RING_BUFFER_ESIZE		16
+#define CSV_RING_BUFFER_ELEMENT_NUM	(CSV_RING_BUFFER_SIZE / CSV_RING_BUFFER_ESIZE)
+#define PSP_RING_BUFFER_OVERCOMMIT_SIZE	1024
 
 /**
  * struct csv_data_hgsc_cert_import - HGSC_CERT_IMPORT command parameters

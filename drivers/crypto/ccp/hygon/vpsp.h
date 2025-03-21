@@ -81,10 +81,10 @@ struct vpsp_dev_ctx {
 
 struct vpsp_cmd_ctx {
 	void *data;		// copy forward mode only
-	uint32_t data_size;	// copy forward mode only
-	uint8_t rb_prio;
-	uint32_t rb_index;
-	uint32_t statval;
+	u32 data_size;	// copy forward mode only
+	u8 rb_prio;
+	u32 rb_index;
+	u32 statval;
 	phys_addr_t psp_cmdbuf_paddr;
 	refcount_t ref;
 
@@ -128,56 +128,21 @@ struct vpsp_dev_ctrl {
 	} __packed data;
 };
 
-/* defination of variabled used by virtual psp */
-enum VPSP_RB_CHECK_STATUS {
-	RB_NOT_CHECK = 0,
-	RB_CHECKING,
-	RB_CHECKED,
-	RB_CHECK_MAX
-};
-
-struct tkm_cmdresp_head {
-	u32 buf_size; //including this header
-	u32 cmdresp_size; //including this header
-	u32 cmdresp_code;
-} __packed;
-
-struct tkm_device_info {
-	u32 api_version;
-	u32 fw_version;
-	u32 kek_sm4_total;
-	u32 isk_sm2_sign_total;
-	u32 isk_sm2_enc_total;
-	u8 chip_id[32];
-} __packed;
-struct tkm_cmdresp_device_info_get {
-	struct tkm_cmdresp_head head;
-	struct tkm_device_info dev_info;
-} __packed;
-
-#define VPSP_RB_IS_SUPPORTED(buildid)		(buildid >= 1913)
-#define VPSP_RB_OC_IS_SUPPORTED(buildid)	(buildid >= 2167)
-#define VPSP_CMD_STATUS_RUNNING		0xffff
-#define VPSP_RB_OVERCOMMIT_SIZE		1024
-#define TKM_DEVICE_INFO_GET		0x1001
-
 extern struct hygon_psp_hooks_table hygon_psp_hooks;
 extern struct kmem_cache *vpsp_cmd_ctx_slab;
 extern int is_hygon_psp;
-extern unsigned int psp_int_rcvd;
-extern bool vpsp_in_ringbuffer_mode;
+extern struct csv_ringbuffer_queue vpsp_ring_buffer[CSV_COMMAND_PRIORITY_NUM];
 
-void vpsp_worker_handler(struct work_struct *unused);
 int vpsp_try_get_result(struct vpsp_cmd_ctx *cmd_ctx, struct vpsp_ret *psp_ret);
 int vpsp_try_do_cmd(int cmd, phys_addr_t phy_addr,
-		struct vpsp_cmd_ctx *cmd_ctx, struct vpsp_ret *psp_ret);
+		    struct vpsp_cmd_ctx *cmd_ctx, struct vpsp_ret *psp_ret);
 void vpsp_cmd_ctx_obj_get(struct vpsp_cmd_ctx *cmd_ctx);
 
 void vpsp_cmd_ctx_obj_put(struct vpsp_cmd_ctx *cmd_ctx, bool force);
 int vpsp_get_dev_ctx(struct vpsp_dev_ctx **ctx, pid_t pid);
 int vpsp_get_default_vid_permission(void);
 int do_vpsp_op_ioctl(struct vpsp_dev_ctrl *ctrl);
-int vpsp_rb_check_and_cmd_prio_parse(uint8_t *prio,
-		struct vpsp_cmd *vcmd);
+int vpsp_parse_ringbuffer_cmd_prio(u8 *prio,
+				   struct vpsp_cmd *vcmd);
 
 #endif	/* __CCP_HYGON_VPSP_H__ */
