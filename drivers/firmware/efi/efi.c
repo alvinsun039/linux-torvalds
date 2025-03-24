@@ -809,6 +809,7 @@ int __init efi_systab_check_header(const efi_table_hdr_t *systab_hdr)
 	return 0;
 }
 
+#ifndef CONFIG_SW64
 static const efi_char16_t *__init map_fw_vendor(unsigned long fw_vendor,
 						size_t size)
 {
@@ -824,6 +825,10 @@ static void __init unmap_fw_vendor(const void *fw_vendor, size_t size)
 {
 	early_memunmap((void *)fw_vendor, size);
 }
+#else
+#define map_fw_vendor(p, s)     __va(p)
+#define unmap_fw_vendor(v, s)
+#endif
 
 void __init efi_systab_report_header(const efi_table_hdr_t *systab_hdr,
 				     unsigned long fw_vendor)
