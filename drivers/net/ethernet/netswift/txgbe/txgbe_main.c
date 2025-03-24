@@ -849,7 +849,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 	free_tx_buffer = &tx_ring->tx_buffer_info[ntf];
 	ntf -= tx_ring->count;
 	unmapped_descs = txgbe_desc_buf_unmapped(tx_ring, i, tx_ring->next_to_free);
-	while (unmapped_descs > DESC_RESERVED) {
+	while (unmapped_descs > adapter->desc_reserved) {
 #ifdef HAVE_XDP_SUPPORT
 		if (ring_is_xdp(tx_ring)) {
 #ifdef HAVE_XDP_FRAME_STRUCT
@@ -7800,6 +7800,11 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 
 	adapter->link_valid = true;
 
+	if (hw->mac.type == txgbe_mac_sp)
+		adapter->desc_reserved = DESC_RESERVED;
+	else
+		adapter->desc_reserved = DESC_RESERVED_AML;
+
 	bitmap_zero(adapter->limited_vlans, 4096);
 
 out:
@@ -10919,6 +10924,7 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 	u32 tx_flags = first->tx_flags;
 	u32 cmd_type = txgbe_tx_cmd_type(tx_flags);
 	u16 i = tx_ring->next_to_use;
+	struct txgbe_adapter *adapter = tx_ring->q_vector->adapter;
 
 	tx_desc = TXGBE_TX_DESC(tx_ring, i);
 
@@ -11037,7 +11043,7 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 
 	tx_ring->next_to_use = i;
 
-	txgbe_maybe_stop_tx(tx_ring, DESC_RESERVED + DESC_NEEDED);
+	txgbe_maybe_stop_tx(tx_ring, adapter->desc_reserved + DESC_NEEDED);
 
 	if (netif_xmit_stopped(txring_txq(tx_ring)) || !netdev_xmit_more() ||
 		(txgbe_desc_unused(tx_ring) <= (tx_ring->count >> 1))) {
@@ -11600,7 +11606,7 @@ netdev_tx_t txgbe_xmit_frame_ring(struct sk_buff *skb,
 		count += TXD_USE_COUNT(skb_frag_size(&skb_shinfo(skb)->
 						     frags[f]));
 
-	if (txgbe_maybe_stop_tx(tx_ring, count + DESC_RESERVED + 3)) {
+	if (txgbe_maybe_stop_tx(tx_ring, count + adapter->desc_reserved + 3)) {
 		tx_ring->tx_stats.tx_busy++;
 		return NETDEV_TX_BUSY;
 	}

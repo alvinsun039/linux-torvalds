@@ -292,7 +292,8 @@ struct txgbe_lro_list {
 #define DESC_NEEDED     (MAX_SKB_FRAGS + 4)
 #endif
 
-#define DESC_RESERVED 96
+#define DESC_RESERVED        96
+#define DESC_RESERVED_AML    192
 
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
@@ -1275,6 +1276,7 @@ struct txgbe_adapter {
 	/* amlite: new SW-FW mbox */
 /*	u32 swfw_mbox_buf[64]; */
 	u8 swfw_index;
+	u8 desc_reserved;
 
 	int amlite_temp;
 
