@@ -22,6 +22,8 @@
 #include <asm/iee-selinuxp.h>
 #endif
 
+bool __iee_si_data iee_si_enabled = false;
+
 typedef void (*iee_func)(void);
 iee_func iee_funcs[] = {
 	(iee_func)_iee_memcpy,

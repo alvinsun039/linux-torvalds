@@ -16,8 +16,6 @@ extern void iee_rwx_gate(int flag, ...);
 extern const unsigned long cr4_pinned_mask;
 extern struct static_key_false cr_pinning;
 extern unsigned long cr4_pinned_bits;
-// Handler function for sensitive inst
-u64 iee_si_handler(int flag, ...);
 
 #define IEE_SI_TEST     0
 #define IEE_WRITE_CR0   1

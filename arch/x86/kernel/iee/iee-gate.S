@@ -133,7 +133,7 @@ SYM_FUNC_START(iee_read_freeptr)
     jmp __x86_return_thunk  /* ret */
 SYM_FUNC_END(iee_read_freeptr)
 
-SYM_FUNC_START(iee_rwx_gate)
+SYM_FUNC_START(iee_rwx_gate_inner)
     pushq %r12
 
     /* save Interrupt flag*/
@@ -180,6 +180,16 @@ SYM_FUNC_START(iee_rwx_gate)
 
     popq %r12
     jmp __x86_return_thunk  /* ret */
+SYM_FUNC_END(iee_rwx_gate_inner)
+
+SYM_FUNC_START(iee_rwx_gate)
+	cmpb $0, iee_si_enabled(%rip)
+	jz disabled
+	call iee_rwx_gate_inner
+	jmp __x86_return_thunk  /* ret */
+disabled:
+	call iee_si_handler
+	jmp __x86_return_thunk  /* ret */
 SYM_FUNC_END(iee_rwx_gate)
 
 #ifdef CONFIG_PTP
