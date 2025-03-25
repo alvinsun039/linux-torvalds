@@ -200,5 +200,6 @@ source "drivers/net/ethernet/bzwx/Kconfig"
 source "drivers/net/ethernet/mucse/Kconfig"
 
 source "drivers/net/ethernet/nebula-matrix/Kconfig"
+source "drivers/net/ethernet/grtnic_xgb/Kconfig"
 
 endif # ETHERNET
