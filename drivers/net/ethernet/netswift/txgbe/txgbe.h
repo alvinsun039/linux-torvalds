@@ -1170,7 +1170,6 @@ struct txgbe_adapter {
 	char eeprom_id[32];
 	char fl_version[16];
 	char fw_version[64];
-	u16 eeprom_cap;
 	bool netdev_registered;
 	u32 interrupt_event;
 #ifdef HAVE_ETHTOOL_SET_PHYS_ID

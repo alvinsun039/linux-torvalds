@@ -13318,30 +13318,6 @@ void txgbe_assign_netdev_ops(struct net_device *dev)
 }
 
 /**
- * txgbe_wol_supported - Check whether device supports WoL
- * @adapter: the adapter private structure
- * @device_id: the device ID
- * @subdev_id: the subsystem device ID
- *
- * This function is used by probe and ethtool to determine
- * which devices have WoL support
- *
- **/
-int txgbe_wol_supported(struct txgbe_adapter *adapter)
-{
-	struct txgbe_hw *hw = &adapter->hw;
-	u16 wol_cap = adapter->eeprom_cap & TXGBE_DEVICE_CAPS_WOL_MASK;
-
-	/* check eeprom to see if WOL is enabled */
-	if ((wol_cap == TXGBE_DEVICE_CAPS_WOL_PORT0_1) ||
-	    ((wol_cap == TXGBE_DEVICE_CAPS_WOL_PORT0) &&
-	     (hw->bus.func == 0)))
-		return true;
-	else
-		return false;
-}
-
-/**
  * txgbe_probe - Device Initialization Routine
  * @pdev: PCI device information struct
  * @ent: entry in txgbe_pci_tbl
@@ -13812,12 +13788,8 @@ static int __devinit txgbe_probe(struct pci_dev *pdev,
 
 	/* WOL not supported for all devices */
 	adapter->wol = 0;
-	TCALL(hw, eeprom.ops.read,
-		hw->eeprom.sw_region_offset + TXGBE_DEVICE_CAPS,
-		&adapter->eeprom_cap);
 
-	if((hw->subsystem_device_id & TXGBE_WOL_MASK) == TXGBE_WOL_SUP &&
-		txgbe_wol_supported(adapter)) {
+	if ((hw->subsystem_device_id & TXGBE_WOL_MASK) == TXGBE_WOL_SUP) {
 		adapter->wol = TXGBE_PSR_WKUP_CTL_MAG;
 		wr32(hw, TXGBE_PSR_WKUP_CTL, adapter->wol);
 	}

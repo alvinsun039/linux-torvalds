@@ -3540,21 +3540,6 @@ skip_ol_tests:
 	msleep_interruptible(4 * 1000);
 }
 
-
-static int txgbe_wol_exclusion(struct txgbe_adapter *adapter,
-			       struct ethtool_wolinfo *wol)
-{
-	int retval = 0;
-
-	/* WOL not supported for all devices */
-	if (!txgbe_wol_supported(adapter)) {
-		retval = 1;
-		wol->supported = 0;
-	}
-
-	return retval;
-}
-
 static void txgbe_get_wol(struct net_device *netdev,
 			  struct ethtool_wolinfo *wol)
 {
@@ -3565,9 +3550,9 @@ static void txgbe_get_wol(struct net_device *netdev,
 			 WAKE_BCAST | WAKE_MAGIC;
 	wol->wolopts = 0;
 
-	if (txgbe_wol_exclusion(adapter, wol) ||
-	    !device_can_wakeup(pci_dev_to_dev(adapter->pdev)))
+	if (!device_can_wakeup(pci_dev_to_dev(adapter->pdev)))
 		return;
+
 	if((hw->subsystem_device_id & TXGBE_WOL_MASK) != TXGBE_WOL_SUP)
 		return;
 
@@ -3585,16 +3570,12 @@ static void txgbe_get_wol(struct net_device *netdev,
 
 static int txgbe_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
-
-
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 	struct txgbe_hw *hw = &adapter->hw;
 
 	if (wol->wolopts & (WAKE_PHY | WAKE_ARP | WAKE_MAGICSECURE))
 		return -EOPNOTSUPP;
 
-	if (txgbe_wol_exclusion(adapter, wol))
-		return wol->wolopts ? -EOPNOTSUPP : 0;
 	if((hw->subsystem_device_id & TXGBE_WOL_MASK) != TXGBE_WOL_SUP)
 		return -EOPNOTSUPP;
 
