@@ -10915,6 +10915,7 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 			 struct txgbe_tx_buffer *first,
 			 const u8 hdr_len)
 {
+	struct txgbe_adapter *adapter = netdev_priv(tx_ring->netdev);
 	struct sk_buff *skb = first->skb;
 	struct txgbe_tx_buffer *tx_buffer;
 	union txgbe_tx_desc *tx_desc;
@@ -10924,7 +10925,6 @@ static int txgbe_tx_map(struct txgbe_ring *tx_ring,
 	u32 tx_flags = first->tx_flags;
 	u32 cmd_type = txgbe_tx_cmd_type(tx_flags);
 	u16 i = tx_ring->next_to_use;
-	struct txgbe_adapter *adapter = tx_ring->q_vector->adapter;
 
 	tx_desc = TXGBE_TX_DESC(tx_ring, i);
 
