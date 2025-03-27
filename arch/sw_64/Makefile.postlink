@@ -9,7 +9,7 @@ PHONY := __archpost
 __archpost:
 
 -include include/config/auto.conf
-include scripts/Kbuild.include
+include $(srctree)/scripts/Kbuild.include
 
 CMD_RELOCS = arch/sw_64/tools/relocs
 quiet_cmd_relocs = RELOCS $@
