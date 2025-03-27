@@ -1642,6 +1642,8 @@ static int grtnic_pci_probe(struct pci_dev *pdev, const struct pci_device_id *en
 
 	const struct grt_gigeth_info *ei = grt_gigeth_info_tbl[ent->driver_data]; //根据vidpid来配置对应的driver_data
 
+	mark_partner_supported_module_once("Beijing GRT Corporation.", THIS_MODULE);
+
 	dev_info(dev, "adapter PCI probe");
 
     // Enable device
