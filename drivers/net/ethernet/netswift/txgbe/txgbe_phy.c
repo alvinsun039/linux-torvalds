@@ -23,6 +23,7 @@
 
 #include "txgbe_phy.h"
 #include "txgbe_mtd.h"
+#include "txgbe.h"
 
 /**
  * txgbe_check_reset_blocked - check status of MNG FW veto bit
@@ -525,6 +526,7 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	s32 status = TXGBE_ERR_PHY_ADDR_INVALID;
 	u32 vendor_oui = 0;
 	enum txgbe_sfp_type stored_sfp_type = hw->phy.sfp_type;
+	struct txgbe_adapter *adapter = hw->back;
 	u8 identifier = 0;
 	u8 comp_codes_1g = 0;
 	u8 comp_codes_10g = 0;
@@ -535,8 +537,11 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 	u8 cable_spec = 0;
 	u8 vendor_name[3] = {0, 0, 0};
 	u16 phy_data = 0;
+	u8 sff8472_rev, addr_mode, databyte;
+	bool page_swap = false;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 	u32 value;
+	int i;
 
 	if (hw->mac.type == txgbe_mac_aml) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
@@ -840,6 +845,50 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 			status = TXGBE_ERR_SFP_NOT_SUPPORTED;
 			goto out;
 		}
+	}
+	/*record eeprom info*/
+	status = TCALL(hw, phy.ops.read_i2c_eeprom,
+		       TXGBE_SFF_SFF_8472_COMP,
+		       &sff8472_rev);
+	if (status != 0)
+		goto err_read_i2c_eeprom;
+
+	/* addressing mode is not supported */
+	status = TCALL(hw, phy.ops.read_i2c_eeprom,
+					     TXGBE_SFF_SFF_8472_SWAP,
+					     &addr_mode);
+	if (status != 0)
+		goto err_read_i2c_eeprom;
+
+	if (addr_mode & TXGBE_SFF_ADDRESSING_MODE) {
+		e_err(drv, "Address change required to access page 0xA2, "
+		      "but not supported. Please report the module type to the "
+		      "driver maintainers.\n");
+		page_swap = true;
+	}
+
+	if (sff8472_rev == TXGBE_SFF_SFF_8472_UNSUP || page_swap ||
+		!(addr_mode & TXGBE_SFF_DDM_IMPLEMENTED)) {
+		/* We have a SFP, but it does not support SFF-8472 */
+		adapter->eeprom_type = ETH_MODULE_SFF_8079;
+		adapter->eeprom_len = ETH_MODULE_SFF_8079_LEN;
+	} else {
+		/* We have a SFP which supports a revision of SFF-8472. */
+		adapter->eeprom_type = ETH_MODULE_SFF_8472;
+		adapter->eeprom_len = ETH_MODULE_SFF_8472_LEN;
+	}
+	for (i = 0; i < adapter->eeprom_len; i++) {
+		if (i < ETH_MODULE_SFF_8079_LEN)
+			status = TCALL(hw, phy.ops.read_i2c_eeprom, i,
+				       &databyte);
+		else
+			status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+				       &databyte);
+
+		if (status != 0)
+			goto err_read_i2c_eeprom;
+
+		adapter->i2c_eeprom[i] = databyte;
 	}
 
 out:

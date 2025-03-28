@@ -1271,6 +1271,9 @@ struct txgbe_adapter {
 	u16 num_xsk_pools;
 #endif
 	bool cmplt_to_dis;
+	u8 i2c_eeprom[512];
+	u32 eeprom_len;
+	u32 eeprom_type;
 
 	/* amlite: new SW-FW mbox */
 /*	u32 swfw_mbox_buf[64]; */

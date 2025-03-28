@@ -7812,6 +7812,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	adapter->num_vmdqs = 1;
 	set_bit(0, &adapter->fwd_bitmask);
 	set_bit(__TXGBE_DOWN, &adapter->state);
+	memset(adapter->i2c_eeprom, 0, sizeof(u8)*512);
 
 	adapter->fec_link_mode = TXGBE_PHY_FEC_AUTO;
 	adapter->cur_fec_link = TXGBE_PHY_FEC_AUTO;
@@ -9618,6 +9619,10 @@ static void txgbe_sfp_detection_subtask(struct txgbe_adapter *adapter)
 	/* wait for sfp module ready*/
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
 		msleep(200);
+
+	adapter->eeprom_type = 0;
+	adapter->eeprom_len = 0;
+	memset(adapter->i2c_eeprom, 0, sizeof(u8)*512);
 
 	err = TCALL(hw, phy.ops.identify_sfp);
 	if (err == TXGBE_ERR_SFP_NOT_SUPPORTED)

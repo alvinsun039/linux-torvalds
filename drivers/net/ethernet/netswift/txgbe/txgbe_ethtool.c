@@ -5329,6 +5329,11 @@ static int txgbe_get_module_info(struct net_device *dev,
 		if (value & TXGBE_SFP1_MOD_PRST_LS) {
 			return -EIO;
 		}
+
+		if (!netif_carrier_ok(dev)) {
+			e_err(drv, "\"Ethool -m\" is supported only when link is up for 40G.\n");
+			return -EIO;
+		}
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
@@ -5338,75 +5343,81 @@ static int txgbe_get_module_info(struct net_device *dev,
 		}
 	}
 
-	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
-	   return -EBUSY;
+	if (hw->mac.type != txgbe_mac_sp) {
+		if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
+		return -EBUSY;
 
-	if (!test_bit(__TXGBE_DOWN, &adapter->state))
-		cancel_work_sync(&adapter->sfp_sta_task);
+		if (!test_bit(__TXGBE_DOWN, &adapter->state))
+			cancel_work_sync(&adapter->sfp_sta_task);
 
-	status = TCALL(hw, phy.ops.read_i2c_eeprom,
-					     TXGBE_SFF_IDENTIFIER,
-					     &identifier);
-	if (status != 0)
-		goto ERROR_IO;
-
-	switch (identifier) {
-	case TXGBE_SFF_IDENTIFIER_SFP:
-		/* Check whether we support SFF-8472 or not */
 		status = TCALL(hw, phy.ops.read_i2c_eeprom,
-						     TXGBE_SFF_SFF_8472_COMP,
-						     &sff8472_rev);
+							TXGBE_SFF_IDENTIFIER,
+							&identifier);
 		if (status != 0)
 			goto ERROR_IO;
 
-		/* addressing mode is not supported */
-		status = TCALL(hw, phy.ops.read_i2c_eeprom,
-						     TXGBE_SFF_SFF_8472_SWAP,
-						     &addr_mode);
-		if (status != 0)
-			goto ERROR_IO;
+		switch (identifier) {
+		case TXGBE_SFF_IDENTIFIER_SFP:
+			/* Check whether we support SFF-8472 or not */
+			status = TCALL(hw, phy.ops.read_i2c_eeprom,
+								TXGBE_SFF_SFF_8472_COMP,
+								&sff8472_rev);
+			if (status != 0)
+				goto ERROR_IO;
 
-		if (addr_mode & TXGBE_SFF_ADDRESSING_MODE) {
-			e_err(drv, "Address change required to access page 0xA2, "
-			"but not supported. Please report the module type to the "
-			"driver maintainers.\n");
-			page_swap = true;
+			/* addressing mode is not supported */
+			status = TCALL(hw, phy.ops.read_i2c_eeprom,
+								TXGBE_SFF_SFF_8472_SWAP,
+								&addr_mode);
+			if (status != 0)
+				goto ERROR_IO;
+
+			if (addr_mode & TXGBE_SFF_ADDRESSING_MODE) {
+				e_err(drv, "Address change required to access page 0xA2, "
+					"but not supported. Please report the module type to the "
+					"driver maintainers.\n");
+				page_swap = true;
+			}
+
+			if (sff8472_rev == TXGBE_SFF_SFF_8472_UNSUP || page_swap ||
+				!(addr_mode & TXGBE_SFF_DDM_IMPLEMENTED)) {
+				/* We have a SFP, but it does not support SFF-8472 */
+				modinfo->type = ETH_MODULE_SFF_8079;
+				modinfo->eeprom_len = ETH_MODULE_SFF_8079_LEN;
+			} else {
+				/* We have a SFP which supports a revision of SFF-8472. */
+				modinfo->type = ETH_MODULE_SFF_8472;
+				modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
+			}
+			break;
+		case TXGBE_SFF_IDENTIFIER_QSFP:
+		case TXGBE_SFF_IDENTIFIER_QSFP_PLUS:
+			status = TCALL(hw, phy.ops.read_i2c_eeprom,
+								TXGBE_SFF_SFF_REVISION_ADDR,
+								&sff8636_rev);
+			if (status != 0)
+				goto ERROR_IO;
+
+			/* Check revision compliance */
+			if (sff8636_rev > 0x02) {
+				/* Module is SFF-8636 compliant */
+				modinfo->type = ETH_MODULE_SFF_8636;
+				modinfo->eeprom_len = TXGBE_MODULE_QSFP_MAX_LEN;
+			} else {
+				modinfo->type = ETH_MODULE_SFF_8436;
+				modinfo->eeprom_len = TXGBE_MODULE_QSFP_MAX_LEN;
+			}
+			break;
+		default:
+			e_err(drv, "SFF Module Type not recognized.\n");
+			return -EINVAL;
 		}
 
-		if (sff8472_rev == TXGBE_SFF_SFF_8472_UNSUP || page_swap ||
-			!(addr_mode & TXGBE_SFF_DDM_IMPLEMENTED)) {
-			/* We have a SFP, but it does not support SFF-8472 */
-			modinfo->type = ETH_MODULE_SFF_8079;
-			modinfo->eeprom_len = ETH_MODULE_SFF_8079_LEN;
-		} else {
-			/* We have a SFP which supports a revision of SFF-8472. */
-			modinfo->type = ETH_MODULE_SFF_8472;
-			modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
-		}
-		break;
-	case TXGBE_SFF_IDENTIFIER_QSFP:
-	case TXGBE_SFF_IDENTIFIER_QSFP_PLUS:
-		status = TCALL(hw, phy.ops.read_i2c_eeprom,
-						     TXGBE_SFF_SFF_REVISION_ADDR,
-						     &sff8636_rev);
-		if (status != 0)
-			goto ERROR_IO;
-
-		/* Check revision compliance */
-		if (sff8636_rev > 0x02) {
-			/* Module is SFF-8636 compliant */
-			modinfo->type = ETH_MODULE_SFF_8636;
-			modinfo->eeprom_len = TXGBE_MODULE_QSFP_MAX_LEN;
-		} else {
-			modinfo->type = ETH_MODULE_SFF_8436;
-			modinfo->eeprom_len = TXGBE_MODULE_QSFP_MAX_LEN;
-		}
-		break;
-	default:
-		e_err(drv, "SFF Module Type not recognized.\n");
-		return -EINVAL;
+		TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
+	} else {
+		modinfo->type = adapter->eeprom_type;
+		modinfo->eeprom_len = adapter->eeprom_len;
 	}
-	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
 
 	return 0;
 
@@ -5415,21 +5426,24 @@ ERROR_IO:
 	return -EIO;
 }
 
+#define SFF_A2_ALRM_FLG			0x170
+#define SFF_A2_WARN_FLG			0x174
+#define SFF_A2_TEMP			0x160
+#define SFF_A2_RX_PWR			0x169
+
 static int txgbe_get_module_eeprom(struct net_device *dev,
 					 struct ethtool_eeprom *ee,
 					 u8 *data)
 {
 	struct txgbe_adapter *adapter = netdev_priv(dev);
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 status = TXGBE_ERR_PHY_ADDR_INVALID;
-	u8 databyte = 0xFF;
 	int i = 0;
 	bool is_sfp = false;
 	u32 value;
 	u8 identifier = 0;
-	u16 offset;
-	u8 page = 0;
 	u32 swfw_mask = hw->phy.phy_semaphore_mask;
+	u8 databyte;
+	s32 status = 0;
 
 	if (hw->mac.type == txgbe_mac_aml40) {
 		value = rd32(hw, TXGBE_GPIO_EXT);
@@ -5445,70 +5459,136 @@ static int txgbe_get_module_eeprom(struct net_device *dev,
 		}
 	}
 
-	if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
-	   return -EBUSY;
+	if (hw->mac.type != txgbe_mac_sp) {
+		if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
+			return -EBUSY;
 
-	if (!test_bit(__TXGBE_DOWN, &adapter->state))
-		cancel_work_sync(&adapter->sfp_sta_task);
+		if (!test_bit(__TXGBE_DOWN, &adapter->state))
+			cancel_work_sync(&adapter->sfp_sta_task);
 
-	if (ee->len == 0)
-		goto ERROR_INVAL;
+		if (ee->len == 0)
+			goto ERROR_INVAL;
 
-	status = TCALL(hw, phy.ops.read_i2c_eeprom,
-					     TXGBE_SFF_IDENTIFIER,
-					     &identifier);
-	if (status != 0)
-		goto ERROR_IO;
+		status = TCALL(hw, phy.ops.read_i2c_eeprom,
+							TXGBE_SFF_IDENTIFIER,
+							&identifier);
+		if (status != 0)
+			goto ERROR_IO;
 
-	if (identifier == TXGBE_SFF_IDENTIFIER_SFP)
-		is_sfp = true;
+		if (identifier == TXGBE_SFF_IDENTIFIER_SFP)
+			is_sfp = true;
 
-	memset(data, 0, ee->len);
-	for (i = ee->offset; i < ee->offset + ee->len; i++) {
-		/* I2C reads can take long time */
-		if (test_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
-			goto ERROR_BUSY;
+		memset(data, 0, ee->len);
+		for (i = 0; i < ee->len; i++) {
+			u32 offset = i + ee->offset;
+			u32 page = 0;
 
-		if (is_sfp) {
-			if (i < ETH_MODULE_SFF_8079_LEN)
-				status = TCALL(hw, phy.ops.read_i2c_eeprom, i,
-					       &databyte);
-			else
-				status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
-					       &databyte);
+			/* I2C reads can take long time */
+			if (test_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
+				goto ERROR_BUSY;
 
-			if (status != 0)
-				goto ERROR_IO;
-		} else {
-			offset = i;
-			while (offset >= ETH_MODULE_SFF_8436_LEN) {
-				offset -= ETH_MODULE_SFF_8436_LEN / 2;
-				page++;
-			}
-			if (page == 0 || !(data[0x2] & 0x4)) {
-				status = TCALL(hw, phy.ops.read_i2c_sff8636, page, offset,
-					       &databyte);
+			if (is_sfp) {
+				if (offset < ETH_MODULE_SFF_8079_LEN)
+					status = TCALL(hw, phy.ops.read_i2c_eeprom, offset,
+								&databyte);
+				else
+					status = TCALL(hw, phy.ops.read_i2c_sff8472, offset,
+								&databyte);
 
 				if (status != 0)
 					goto ERROR_IO;
+			} else {
+				while (offset >= ETH_MODULE_SFF_8436_LEN) {
+					offset -= ETH_MODULE_SFF_8436_LEN / 2;
+					page++;
+				}
+
+				if (page == 0 || !(data[0x2] & 0x4)) {
+					status = TCALL(hw, phy.ops.read_i2c_sff8636, page, offset,
+								&databyte);
+
+					if (status != 0)
+						goto ERROR_IO;
+				}
 			}
+			data[i] = databyte;
 		}
-		data[i - ee->offset] = databyte;
+	} else {
+		if (ee->len == 0)
+			goto ERROR_INVAL;
+
+		if (0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
+			return -EBUSY;
+
+		/*when down, can't know sfp change, get eeprom from i2c*/
+		if (test_bit(__TXGBE_DOWN, &adapter->state)) {
+			for (i = ee->offset; i < ee->offset + ee->len; i++) {
+				/* I2C reads can take long time */
+				if (test_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
+					goto ERROR_BUSY;
+
+				if (i < ETH_MODULE_SFF_8079_LEN)
+					status = TCALL(hw, phy.ops.read_i2c_eeprom, i,
+						&databyte);
+				else
+					status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+						&databyte);
+
+				if (status != 0)
+					goto ERROR_IO;
+
+				data[i - ee->offset] = databyte;
+			}
+		} else {
+			if (adapter->eeprom_type == ETH_MODULE_SFF_8472) {
+
+				cancel_work_sync(&adapter->sfp_sta_task);
+
+				/*alarm flag*/
+				for (i = SFF_A2_ALRM_FLG; i <= SFF_A2_ALRM_FLG + 1; i++) {
+					status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+						&databyte);
+
+					if (status != 0)
+						goto ERROR_IO;
+
+					adapter->i2c_eeprom[i] = databyte;
+				}
+				/*warm flag*/
+				for (i = SFF_A2_WARN_FLG; i <= SFF_A2_WARN_FLG + 1; i++) {
+					status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+						&databyte);
+
+					if (status != 0)
+						goto ERROR_IO;
+
+					adapter->i2c_eeprom[i] = databyte;
+				}
+				/*dom monitor value*/
+				for (i = SFF_A2_TEMP; i <= SFF_A2_RX_PWR + 1; i++) {
+					status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+						&databyte);
+
+					if (status != 0)
+						goto ERROR_IO;
+
+					adapter->i2c_eeprom[i] = databyte;
+				}
+			}
+			for (i = ee->offset; i < ee->offset + ee->len; i++)
+				data[i - ee->offset] = adapter->i2c_eeprom[i];
+		}
 	}
-
 	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
-
 	return 0;
-
-ERROR_INVAL:
-	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
-	return -EINVAL;
 ERROR_BUSY:
 	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
 	return -EBUSY;
 ERROR_IO:
 	TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
 	return -EIO;
+ERROR_INVAL:
+	return -EINVAL;
 }
 #endif /* ETHTOOL_GMODULEINFO */
 
