@@ -16,6 +16,7 @@
 #include <linux/err.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/syscall.h>
 #include <libelf.h>
 #include "relo_core.h"
 
@@ -659,6 +660,15 @@ static inline int ensure_good_fd(int fd)
 		}
 	}
 	return fd;
+}
+
+/* Some versions of Android don't provide memfd_create() in their libc
+ * implementation, so avoid complications and just go straight to Linux
+ * syscall.
+ */
+static inline int sys_memfd_create(const char *name, unsigned flags)
+{
+	return syscall(__NR_memfd_create, name, flags);
 }
 
 /* Point *fixed_fd* to the same file that *tmp_fd* points to.
