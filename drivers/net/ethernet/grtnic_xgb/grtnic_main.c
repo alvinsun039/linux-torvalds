@@ -234,7 +234,9 @@ static int grtnic_map_bars(struct grtnic_adapter *adapter, struct pci_dev *pdev)
 		dev_err(dev, "Could not map USER BAR");
 		return -1;
 	}
-	dev_info(dev, "USER BAR mapped at 0x%p with length %llu", hw->user_bar, bar_len);
+
+	dev_info(dev, "USER BAR mapped at 0x%p with length %llu",
+		 hw->user_bar, (unsigned long long)bar_len);
 
 	bar_start = pci_resource_start(pdev, 1);
 	bar_end = pci_resource_end(pdev, 1);
@@ -248,7 +250,8 @@ static int grtnic_map_bars(struct grtnic_adapter *adapter, struct pci_dev *pdev)
 		return -1;
 	}
 
-	dev_info(dev, "DMA BAR mapped at 0x%p with length %llu", hw->dma_bar, bar_len);
+	dev_info(dev, "DMA BAR mapped at 0x%p with length %llu",
+		 hw->dma_bar, (unsigned long long)bar_len);
 
 	return 0;
 }
