@@ -12031,9 +12031,9 @@ resume_rate:
 }
 
 struct vlan_rate_param {
-	int count;                    // VLAN/速率数量
-	unsigned short vlans[64];     // VLAN ID 数组（示例最多支持64个）
-	unsigned int rates[64];       // 速率数组（单位：Mbps）
+	int count;
+	unsigned short vlans[64];
+	unsigned int rates[64];
 };
 
 #define SIOCSVLANRATE (SIOCDEVPRIVATE+0xe)

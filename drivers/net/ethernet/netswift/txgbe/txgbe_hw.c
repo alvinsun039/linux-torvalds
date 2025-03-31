@@ -3674,8 +3674,8 @@ s32 txgbe_init_thermal_sensor_thresh(struct txgbe_hw *hw)
 		wr32(hw, TXGBE_AML_INTR_LOW_EN, TXGBE_AML_INTR_EN_LO);
 
 		wr32m(hw, TXGBE_AML_TS_CTL1, TXGBE_AML_EVAL_MODE_MASK, 0x10);
-		wr32m(hw, TXGBE_AML_TS_CTL1, TXGBE_AML_ALARM_THRE_MASK, 0x186a0000);     //100℃
-		wr32m(hw, TXGBE_AML_TS_CTL1, TXGBE_AML_DALARM_THRE_MASK, 0x16f60);    //90℃
+		wr32m(hw, TXGBE_AML_TS_CTL1, TXGBE_AML_ALARM_THRE_MASK, 0x186a0000);     //100 degree centigrade
+		wr32m(hw, TXGBE_AML_TS_CTL1, TXGBE_AML_DALARM_THRE_MASK, 0x16f60);    //90 degree centigrade
 		wr32(hw, TXGBE_AML_TS_ENA, 0x1);
 	} else {
 		wr32(hw, TXGBE_TS_CTL, TXGBE_TS_CTL_EVAL_MD);
