@@ -1260,11 +1260,33 @@ static bool txgbe_alloc_mapped_page(struct txgbe_ring *rx_ring,
 #endif
 
 /**
+ * txgbe_release_rx_desc - Store the new tail and head values
+ * @rx_ring: ring to bump
+ * @val: new head index
+ **/
+void txgbe_release_rx_desc(struct txgbe_ring *rx_ring, u32 val)
+{
+	rx_ring->next_to_use = val;
+#ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
+	/* update next to alloc since we have filled the ring */
+	rx_ring->next_to_alloc = val;
+#endif
+
+	/* Force memory writes to complete before letting h/w
+	 * know there are new descriptors to fetch.  (Only
+	 * applicable for weak-ordered memory model archs,
+	 * such as IA-64).
+	 */
+	wmb();
+	writel(val, rx_ring->tail);
+}
+
+/**
  * txgbe_alloc_rx_buffers - Replace used receive buffers
  * @rx_ring: ring to place buffers on
  * @cleaned_count: number of buffers to replace
  **/
-void txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
+bool txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
 {
 	union txgbe_rx_desc *rx_desc;
 	struct txgbe_rx_buffer *bi;
@@ -1272,7 +1294,7 @@ void txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
 
 	/* nothing to do */
 	if (!cleaned_count)
-		return;
+		return false;
 
 	rx_desc = TXGBE_RX_DESC(rx_ring, i);
 	bi = &rx_ring->rx_buffer_info[i];
@@ -1281,18 +1303,18 @@ void txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
 	do {
 #ifdef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
 		if (!txgbe_alloc_mapped_skb(rx_ring, bi))
-			break;
+			goto no_buffers;
 		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma);
 
 #else
 		if (ring_is_hs_enabled(rx_ring)) {
 			if (!txgbe_alloc_mapped_skb(rx_ring, bi))
-				break;
+				goto no_buffers;
 			rx_desc->read.hdr_addr = cpu_to_le64(bi->dma);
 		}
 
 		if (!txgbe_alloc_mapped_page(rx_ring, bi))
-			break;
+			goto no_buffers;
 
 		/* sync the buffer for use by the device */
 		dma_sync_single_range_for_device(rx_ring->dev, bi->page_dma,
@@ -1323,20 +1345,16 @@ void txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
 
 	i += rx_ring->count;
 
-	if (rx_ring->next_to_use != i) {
-		rx_ring->next_to_use = i;
-#ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT
-		/* update next to alloc since we have filled the ring */
-		rx_ring->next_to_alloc = i;
-#endif
-		/* Force memory writes to complete before letting h/w
-		 * know there are new descriptors to fetch.  (Only
-		 * applicable for weak-ordered memory model archs,
-		 * such as IA-64).
-		 */
-		wmb();
-		writel(i, rx_ring->tail);
-	}
+	if (rx_ring->next_to_use != i)
+		txgbe_release_rx_desc(rx_ring, i);
+
+	return false;
+
+no_buffers:
+	if (rx_ring->next_to_use != i)
+		txgbe_release_rx_desc(rx_ring, i);
+
+	return true;
 }
 
 static inline u16 txgbe_get_hlen(struct txgbe_ring *rx_ring,
@@ -7951,6 +7969,9 @@ int txgbe_setup_rx_resources(struct txgbe_ring *rx_ring)
 						   &rx_ring->dma, GFP_KERNEL);
 	if (!rx_ring->desc)
 		goto err;
+
+	rx_ring->next_to_clean = 0;
+	rx_ring->next_to_use = 0;
 
 	if (!rx_ring->q_vector)
 		return 0;

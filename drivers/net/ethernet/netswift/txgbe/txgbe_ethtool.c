@@ -2064,10 +2064,10 @@ static int txgbe_set_ringparam(struct net_device *netdev,
 				struct ethtool_ringparam *ring)
 #endif
 {
+	struct txgbe_ring *tx_ring = NULL, *rx_ring = NULL;
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
-	struct txgbe_ring *temp_ring;
-	int i, err = 0;
 	u32 new_rx_count, new_tx_count;
+	int i, j, err = 0;
 
 	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
@@ -2108,19 +2108,11 @@ static int txgbe_set_ringparam(struct net_device *netdev,
 		adapter->tx_ring_count = new_tx_count;
 		adapter->xdp_ring_count = new_tx_count;
 		adapter->rx_ring_count = new_rx_count;
-		goto clear_reset;
+		goto done;
 	}
 
-	/* allocate temporary buffer to store rings in */
-	i = max_t(int, adapter->num_tx_queues, adapter->num_rx_queues);
-	temp_ring = vmalloc(i * sizeof(struct txgbe_ring));
-
-	if (!temp_ring) {
-		err = -ENOMEM;
-		goto clear_reset;
-	}
-
-	txgbe_down(adapter);
+	i = max_t(int, adapter->num_tx_queues + adapter->num_xdp_queues,
+		  adapter->num_rx_queues);
 
 	/*
 	 * Setup new Tx resources and free the old Tx resources in that order.
@@ -2129,66 +2121,181 @@ static int txgbe_set_ringparam(struct net_device *netdev,
 	 * have resources even in the case of an allocation failure.
 	 */
 	if (new_tx_count != adapter->tx_ring_count) {
+		netdev_info(netdev,
+			"Changing Tx descriptor count from %d to %d.\n",
+			adapter->tx_ring[0]->count, new_tx_count);
+		tx_ring = kcalloc(i, sizeof(struct txgbe_ring), GFP_KERNEL);
+		if (!tx_ring) {
+			err = -ENOMEM;
+			goto done;
+		}
+
 		for (i = 0; i < adapter->num_tx_queues; i++) {
-			memcpy(&temp_ring[i], adapter->tx_ring[i],
+			memcpy(&tx_ring[i], adapter->tx_ring[i],
 			       sizeof(struct txgbe_ring));
 
-			temp_ring[i].count = new_tx_count;
-			err = txgbe_setup_tx_resources(&temp_ring[i]);
+			tx_ring[i].count = new_tx_count;
+			/* the desc and bi pointers will be reallocated
+			 * in the setup call
+			 */
+			tx_ring[i].desc = NULL;
+			tx_ring[i].tx_buffer_info = NULL;
+			err = txgbe_setup_tx_resources(&tx_ring[i]);
 			if (err) {
 				while (i) {
 					i--;
-					txgbe_free_tx_resources(&temp_ring[i]);
+					txgbe_free_tx_resources(&tx_ring[i]);
 				}
-				goto err_setup;
+
+				kfree(tx_ring);
+				tx_ring = NULL;
+				err = -ENOMEM;
+
+				goto done;
 			}
 		}
 
-		for (i = 0; i < adapter->num_tx_queues; i++) {
-			txgbe_free_tx_resources(adapter->tx_ring[i]);
-
-			memcpy(adapter->tx_ring[i], &temp_ring[i],
+		for (j = 0; j < adapter->num_xdp_queues; j++, i++) {
+			memcpy(&tx_ring[i], adapter->xdp_ring[j],
 			       sizeof(struct txgbe_ring));
-		}
 
-		adapter->tx_ring_count = new_tx_count;
+			tx_ring[i].count = new_tx_count;
+			/* the desc and bi pointers will be reallocated
+			 * in the setup call
+			 */
+			tx_ring[i].desc = NULL;
+			tx_ring[i].tx_buffer_info = NULL;
+			err = txgbe_setup_tx_resources(&tx_ring[i]);
+			if (err) {
+				while (i) {
+					i--;
+					txgbe_free_tx_resources(&tx_ring[i]);
+				}
+
+				kfree(tx_ring);
+				tx_ring = NULL;
+				err = -ENOMEM;
+
+				goto done;
+			}
+		}
 	}
 
 	/* Repeat the process for the Rx rings if needed */
 	if (new_rx_count != adapter->rx_ring_count) {
+		netdev_info(netdev,
+			"Changing Rx descriptor count from %d to %d\n",
+			adapter->rx_ring[0]->count, new_rx_count);
+		rx_ring = kcalloc(i, sizeof(struct txgbe_ring), GFP_KERNEL);
+		if (!rx_ring) {
+			err = -ENOMEM;
+			goto free_tx;
+		}
+
 		for (i = 0; i < adapter->num_rx_queues; i++) {
-			memcpy(&temp_ring[i], adapter->rx_ring[i],
+			u16 unused;
+
+			memcpy(&rx_ring[i], adapter->rx_ring[i],
 			       sizeof(struct txgbe_ring));
 #ifdef HAVE_XDP_BUFF_RXQ
-			xdp_rxq_info_unreg(&temp_ring[i].xdp_rxq);
+			xdp_rxq_info_unreg(&rx_ring[i].xdp_rxq);
 #endif
-			temp_ring[i].count = new_rx_count;
-			err = txgbe_setup_rx_resources(&temp_ring[i]);
+			rx_ring[i].count = new_rx_count;
+			/* the desc and bi pointers will be reallocated
+			 * in the setup call
+			 */
+			rx_ring[i].desc = NULL;
+			rx_ring[i].rx_buffer_info = NULL;
+			err = txgbe_setup_rx_resources(&rx_ring[i]);
+			if (err)
+				goto rx_unwind;
+
+			unused = txgbe_desc_unused(&rx_ring[i]);
+			err = txgbe_alloc_rx_buffers(&rx_ring[i], unused);
+rx_unwind:
 			if (err) {
-				while (i) {
-					i--;
-					txgbe_free_rx_resources(&temp_ring[i]);
-				}
-				goto err_setup;
+				err = -ENOMEM;
+
+				do {
+					txgbe_free_rx_resources(&rx_ring[i]);
+				} while (i--);
+				kfree(rx_ring);
+				rx_ring = NULL;
+
+				goto free_tx;
 			}
 		}
-
-
-		for (i = 0; i < adapter->num_rx_queues; i++) {
-			txgbe_free_rx_resources(adapter->rx_ring[i]);
-
-			memcpy(adapter->rx_ring[i], &temp_ring[i],
-			       sizeof(struct txgbe_ring));
-		}
-
-		adapter->rx_ring_count = new_rx_count;
 	}
 
-err_setup:
+	/* Bring interface down, copy in the new ring info,
+	 * then restore the interface
+	 */
+	txgbe_down(adapter);
+
+	if (tx_ring) {
+		for (i = 0; i < adapter->num_tx_queues; i++) {
+			txgbe_free_tx_resources(adapter->tx_ring[i]);
+			memcpy(adapter->tx_ring[i], &tx_ring[i],
+				sizeof(struct txgbe_ring));
+		}
+
+		for (j = 0; j < adapter->num_xdp_queues; j++, i++) {
+			txgbe_free_tx_resources(adapter->xdp_ring[j]);
+			memcpy(adapter->xdp_ring[j], &tx_ring[i],
+				sizeof(struct txgbe_ring));
+		}
+
+		kfree(tx_ring);
+		tx_ring = NULL;
+	}
+
+	if (rx_ring) {
+		for (i = 0; i < adapter->num_rx_queues; i++) {
+			txgbe_free_rx_resources(adapter->rx_ring[i]);
+			/* this is to fake out the allocation routine
+			 * into thinking it has to realloc everything
+			 * but the recycling logic will let us re-use
+			 * the buffers allocated above
+			 */
+			rx_ring[i].next_to_use = 0;
+			rx_ring[i].next_to_clean = 0;
+			rx_ring[i].next_to_alloc = 0;
+			/* do a struct copy */
+			memcpy(adapter->rx_ring[i], &rx_ring[i],
+				sizeof(struct txgbe_ring));
+		}
+		kfree(rx_ring);
+		rx_ring = NULL;
+	}
+
+	adapter->tx_ring_count = new_tx_count;
+	adapter->xdp_ring_count = new_tx_count;
+	adapter->rx_ring_count = new_rx_count;
+
 	txgbe_up(adapter);
-	vfree(temp_ring);
-clear_reset:
+
+free_tx:
+/* error cleanup if the Rx allocations failed after getting Tx */
+	if (tx_ring) {
+		for (i = 0; i < adapter->num_tx_queues; i++) {
+			txgbe_free_tx_resources(adapter->tx_ring[i]);
+			memcpy(adapter->tx_ring[i], &tx_ring[i],
+				sizeof(struct txgbe_ring));
+		}
+
+		for (j = 0; j < adapter->num_xdp_queues; j++, i++) {
+			txgbe_free_tx_resources(adapter->xdp_ring[j]);
+			memcpy(adapter->xdp_ring[j], &tx_ring[i],
+				sizeof(struct txgbe_ring));
+		}
+
+		kfree(tx_ring);
+		tx_ring = NULL;
+	}
+
+done:
 	clear_bit(__TXGBE_RESETTING, &adapter->state);
+
 	return err;
 }
 

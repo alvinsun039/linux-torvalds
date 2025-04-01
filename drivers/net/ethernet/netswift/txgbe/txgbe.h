@@ -1413,7 +1413,7 @@ netdev_tx_t txgbe_xmit_frame_ring(struct sk_buff *,
 					 struct txgbe_ring *);
 void txgbe_unmap_and_free_tx_resource(struct txgbe_ring *,
 					     struct txgbe_tx_buffer *);
-void txgbe_alloc_rx_buffers(struct txgbe_ring *, u16);
+bool txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count);
 void txgbe_configure_rscctl(struct txgbe_adapter *adapter,
 				   struct txgbe_ring *);
 void txgbe_clear_rscctl(struct txgbe_adapter *adapter,
