@@ -3819,7 +3819,7 @@ static irqreturn_t txgbe_msix_other(int __always_unused irq, void *data)
 
 	if (eicr & TXGBE_PX_MISC_IC_ETH_AN) {
 		if (adapter->backplane_an)
-			txgbe_service_event_schedule(adapter);
+			txgbe_check_lsc(adapter);
 	}
 
 	if(BOND_CHECK_LINK_MODE == 1){
@@ -6852,16 +6852,6 @@ static bool txgbe_is_sfp(struct txgbe_hw *hw)
 	}
 }
 
-static bool txgbe_is_backplane(struct txgbe_hw *hw)
-{
-	switch (TCALL(hw, mac.ops.get_media_type)) {
-	case txgbe_media_type_backplane:
-		return true;
-	default:
-		return false;
-	}
-}
-
 /**
  * txgbe_sfp_link_config - set up SFP+ link
  * @adapter: pointer to private adapter struct
@@ -9094,7 +9084,8 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 #endif
 		if (hw->mac.type == txgbe_mac_aml40) {
 			if (!(hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
-			      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1))
+			      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1 ||
+			      txgbe_is_backplane(hw)))
 				txgbe_reconfig_mac(hw);
 
 			if (link_speed & TXGBE_LINK_SPEED_40GB_FULL) {
@@ -9108,7 +9099,8 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 				TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 		} else if (hw->mac.type == txgbe_mac_aml) {
 			if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-			      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1))
+			      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
+			      txgbe_is_backplane(hw)))
 				txgbe_reconfig_mac(hw);
 
 			if (link_speed & TXGBE_LINK_SPEED_25GB_FULL) {
@@ -9357,7 +9349,8 @@ static void txgbe_watchdog_link_is_down(struct txgbe_adapter *adapter)
 
 #endif
 	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1)
+	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1 ||
+	    txgbe_is_backplane(hw))
 		adapter->an_done = false;
 
 	e_info(drv, "NIC Link is Down\n");
@@ -9782,7 +9775,7 @@ static void txgbe_service_timer(struct timer_list *t)
 	/* poll faster when waiting for link */
 	if (adapter->flags & TXGBE_FLAG_NEED_LINK_UPDATE) {
 		if ((hw->subsystem_device_id & 0xF0) == TXGBE_ID_KR_KX_KX4)
-			next_event_offset = HZ;
+			next_event_offset = HZ / 10;
 		else if (BOND_CHECK_LINK_MODE == 1)
 			next_event_offset = HZ / 100;
 		else
@@ -10280,7 +10273,8 @@ static void txgbe_service_task(struct work_struct *work)
 	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 	      hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
 	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
-	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1))
+	      hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1 ||
+	      txgbe_is_backplane(hw)))
 		txgbe_watchdog_subtask(adapter);
 	txgbe_sfp_link_config_subtask(adapter);
 	txgbe_sfp_reset_eth_phy_subtask(adapter);

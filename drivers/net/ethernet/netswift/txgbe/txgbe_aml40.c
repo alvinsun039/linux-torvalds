@@ -15,7 +15,22 @@
  **/
 enum txgbe_media_type txgbe_get_media_type_aml40(struct txgbe_hw *hw)
 {
-	return txgbe_media_type_fiber_qsfp;
+	u8 device_type = hw->subsystem_device_id & 0xF0;
+	enum txgbe_media_type media_type;
+
+	switch (device_type) {
+	case TXGBE_ID_KR_KX_KX4:
+		media_type = txgbe_media_type_backplane;
+		break;
+	case TXGBE_ID_SFP:
+		media_type = txgbe_media_type_fiber_qsfp;
+		break;
+	default:
+		media_type = txgbe_media_type_unknown;
+		break;
+	}
+
+	return media_type;
 }
 
 /**
@@ -55,7 +70,8 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 	adapter->tx_speed = speed;
 
 	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
-	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
+	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1 ||
+	    txgbe_is_backplane(hw)) {
 		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
 		if (!adapter->backplane_an) {
 			if ((link_speed == speed) && link_up)
@@ -65,7 +81,7 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 				goto out;
 		}
 		mutex_lock(&adapter->e56_lock);
-		txgbe_e56_set_link_to_kr(adapter, 40, 0);
+		txgbe_e56_set_phylinkmode(adapter, 40, 0);
 		mutex_unlock(&adapter->e56_lock);
 		goto out;
 	}
@@ -118,6 +134,9 @@ static s32 txgbe_get_link_capabilities_aml40(struct txgbe_hw *hw,
 	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
 		*autoneg = true;
 		*speed = TXGBE_LINK_SPEED_40GB_FULL;
+	} else if (txgbe_is_backplane(hw)) {
+		*speed = TXGBE_LINK_SPEED_40GB_FULL;
+		*autoneg = true;
 	} else {
 		*speed = TXGBE_LINK_SPEED_40GB_FULL;
 		*autoneg = true;
@@ -179,6 +198,13 @@ static s32 txgbe_check_mac_link_aml40(struct txgbe_hw *hw, u32 *speed,
 			*speed = TXGBE_LINK_SPEED_40GB_FULL;
 	} else {
 		*speed = TXGBE_LINK_SPEED_UNKNOWN;
+	}
+
+	if (txgbe_is_backplane(hw)) {
+		if (!adapter->an_done) {
+			*link_up = false;
+			*speed = TXGBE_LINK_SPEED_UNKNOWN;
+		}
 	}
 
 	return 0;

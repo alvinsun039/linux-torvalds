@@ -1014,6 +1014,7 @@ struct txgbe_adapter {
 
 	unsigned long state;
 	u32 bp_link_mode;
+	u32 curbp_link_mode;
 	/* Some features need tri-state capability,
 	 * thus the additional *_CAPABLE flags.
 	 */

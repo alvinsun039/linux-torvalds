@@ -8210,3 +8210,10 @@ int txgbe_hic_notify_led_active(struct txgbe_hw *hw, int active_flag)
 
 	return 0;
 }
+
+bool txgbe_is_backplane(struct txgbe_hw *hw)
+{
+
+	return hw->mac.ops.get_media_type(hw) == txgbe_media_type_backplane ?
+						 true : false;
+}

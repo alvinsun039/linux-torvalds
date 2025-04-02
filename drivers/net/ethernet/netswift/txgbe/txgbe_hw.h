@@ -363,5 +363,6 @@ extern s32 txgbe_init_ops_aml40(struct txgbe_hw *hw);
 void txgbe_set_queue_rate_limit(struct txgbe_hw *hw, int queue, u16 max_tx_rate);
 
 int txgbe_hic_notify_led_active(struct txgbe_hw *hw, int active_flag);
+bool txgbe_is_backplane(struct txgbe_hw *hw);
 
 #endif /* _TXGBE_HW_H_ */

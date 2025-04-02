@@ -68,7 +68,8 @@ static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 		adapter->aml_txeq.post = S25G_TX_FFE_CFG_POST;
 
 		if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
+		    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
+		    txgbe_is_backplane(hw)) {
 			adapter->aml_txeq.main = S25G_TX_FFE_CFG_DAC_MAIN;
 			adapter->aml_txeq.pre1 = S25G_TX_FFE_CFG_DAC_PRE1;
 			adapter->aml_txeq.pre2 = S25G_TX_FFE_CFG_DAC_PRE2;
@@ -81,8 +82,9 @@ static u32 E56phyTxFfeCfg(struct txgbe_hw *hw, u32 speed)
 		adapter->aml_txeq.post = S10G_TX_FFE_CFG_POST;
 
 		if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
-		    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
-			adapter->aml_txeq.main = 0x2a2a2a2a;
+		    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1 ||
+		    txgbe_is_backplane(hw)) {
+			adapter->aml_txeq.main = 0x2b2b2b2b;
 			adapter->aml_txeq.pre1 = 0x03030303;
 			adapter->aml_txeq.pre2 = 0;
 			adapter->aml_txeq.post = 0x11111111;
