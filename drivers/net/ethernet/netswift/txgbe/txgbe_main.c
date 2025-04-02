@@ -9004,6 +9004,20 @@ static void txgbe_fdir_reinit_subtask(struct txgbe_adapter *adapter)
 }
 #endif /* HAVE_TX_MQ */
 
+void txgbe_irq_rearm_queues(struct txgbe_adapter *adapter,
+			    u64 qmask)
+{
+	u32 mask;
+
+	mask = (qmask & 0xFFFFFFFF);
+	wr32(&adapter->hw, TXGBE_PX_IMC(0), mask);
+	wr32(&adapter->hw, TXGBE_PX_ICS(0), mask);
+
+	mask = (qmask >> 32);
+	wr32(&adapter->hw, TXGBE_PX_IMC(1), mask);
+	wr32(&adapter->hw, TXGBE_PX_ICS(1), mask);
+}
+
 /**
  * txgbe_check_hang_subtask - check for hung queues and dropped interrupts
  * @adapter - pointer to the device adapter structure
@@ -9016,6 +9030,7 @@ static void txgbe_fdir_reinit_subtask(struct txgbe_adapter *adapter)
 static void txgbe_check_hang_subtask(struct txgbe_adapter *adapter)
 {
 	int i;
+	u64 eics = 0;
 
 	/* If we're down or resetting, just bail */
 	if (test_bit(__TXGBE_DOWN, &adapter->state) ||
@@ -9030,6 +9045,17 @@ static void txgbe_check_hang_subtask(struct txgbe_adapter *adapter)
 		for (i = 0; i < adapter->num_xdp_queues; i++)
 			set_check_for_tx_hang(adapter->xdp_ring[i]);
 	}
+
+	if (adapter->flags & TXGBE_FLAG_MSIX_ENABLED) {
+		/* get one bit for every active tx/rx interrupt vector */
+		for (i = 0; i < adapter->num_q_vectors; i++) {
+			struct txgbe_q_vector *qv = adapter->q_vector[i];
+			if (qv->rx.ring || qv->tx.ring)
+				eics |= BIT_ULL(i);
+		}
+	}
+	/* Cause software interrupt to ensure rings are cleaned */
+	txgbe_irq_rearm_queues(adapter, eics);
 
 }
 
