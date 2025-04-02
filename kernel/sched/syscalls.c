@@ -57,7 +57,7 @@ static int effective_prio(struct task_struct *p)
 	 * keep the priority unchanged. Otherwise, update priority
 	 * to the normal priority:
 	 */
-	if (!realtime_prio(p->prio))
+	if (!rt_or_dl_prio(p->prio))
 		return p->normal_prio;
 	return p->prio;
 }
@@ -426,7 +426,7 @@ static void __setscheduler_params(struct task_struct *p,
 		p->static_prio = NICE_TO_PRIO(attr->sched_nice);
 
 	/* rt-policy tasks do not have a timerslack */
-	if (realtime_task_policy(p)) {
+	if (rt_or_dl_task_policy(p)) {
 		p->timer_slack_ns = 0;
 	} else if (p->timer_slack_ns == 0) {
 		/* when switching back to non-rt policy, restore timerslack */
