@@ -2468,6 +2468,7 @@ static int __klp_disable_patch(struct klp_patch *patch)
 		return ret;
 
 	klp_mem_recycle(patch);
+	pr_notice("'%s': unpatching complete\n", patch->mod->name);
 	return 0;
 }
 
@@ -2675,6 +2676,7 @@ move_patch_to_tail:
 	list_add_tail(&patch->list, &klp_patches);
 #endif
 
+	pr_notice("'%s': patching complete\n", patch->mod->name);
 	return 0;
 
 err_out:
