@@ -9889,7 +9889,7 @@ static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 
 	status = txgbe_e56_get_temp(hw, &temp);
 	if (status)
-		temp = DEFAULT_TEMP;
+		return;
 
 	if (!(temp - adapter->amlite_temp > 4 ||
 		adapter->amlite_temp - temp > 4))

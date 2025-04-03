@@ -2016,6 +2016,10 @@ int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed)
 	int CMVAR_FINE_FMIN_WRAP;
 	int i;
 	u32 addr;
+	int temp;
+
+	struct txgbe_adapter *adapter = hw->back;
+
 	for (i = 0; i < 4; i++) {
 		if (speed == TXGBE_LINK_SPEED_10GB_FULL ||
 		    speed == TXGBE_LINK_SPEED_40GB_FULL) {
@@ -2048,7 +2052,16 @@ int txgbe_temp_track_seq_40g(struct txgbe_hw *hw, u32 speed)
 			CMVAR_COARSE_MIN = S25G_CMVAR_COARSE_MIN;
 			CMVAR_UFINE_FMIN_WRAP = S25G_CMVAR_UFINE_FMIN_WRAP;
 			CMVAR_FINE_FMIN_WRAP = S25G_CMVAR_FINE_FMIN_WRAP;
+		} else {
+			printk("Error Speed\n");
+			return 0;
 		}
+
+		status = txgbe_e56_get_temp(hw, &temp);
+		if (status)
+			return 0;
+
+		adapter->amlite_temp = temp;
 
 		//Assign software defined variables as below �C
 		//a. SECOND_CODE = ALIAS::RXS::SECOND_ORDER
@@ -2268,12 +2281,13 @@ int txgbe_temp_track_seq(struct txgbe_hw *hw, u32 speed)
 		CMVAR_UFINE_FMIN_WRAP = S25G_CMVAR_UFINE_FMIN_WRAP;
 		CMVAR_FINE_FMIN_WRAP = S25G_CMVAR_FINE_FMIN_WRAP;
 	} else {
+		printk("Error Speed\n");
 		return 0;
 	}
 
 	status = txgbe_e56_get_temp(hw, &temp);
 	if (status)
-		temp = DEFAULT_TEMP;
+		return 0;
 
 	adapter->amlite_temp = temp;
 

@@ -52,6 +52,8 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		goto out;
 	}
 
+	adapter->tx_speed = speed;
+
 	if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1) {
 		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
@@ -84,10 +86,8 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 
 	if ((link_speed == speed) && link_up &&
 			!(speed == TXGBE_LINK_SPEED_25GB_FULL &&
-			!(adapter->fec_link_mode & adapter->cur_fec_link))) {
-		adapter->tx_speed = speed;
+			!(adapter->fec_link_mode & adapter->cur_fec_link)))
 		goto out;
-	}
 
 	if (speed == TXGBE_LINK_SPEED_25GB_FULL &&
 			link_speed == TXGBE_LINK_SPEED_25GB_FULL) {
@@ -100,7 +100,6 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 	mutex_lock(&adapter->e56_lock);
 	ret_status = txgbe_set_link_to_amlite(hw, speed);
 	mutex_unlock(&adapter->e56_lock);
-	adapter->tx_speed = speed;
 
 	if (ret_status == TXGBE_ERR_PHY_INIT_NOT_DONE)
 		goto out;

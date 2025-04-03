@@ -52,6 +52,8 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 		goto out;
 	}
 
+	adapter->tx_speed = speed;
+
 	if (hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_qsfp_type_40g_cu_core1) {
 		txgbe_e56_check_phy_link(hw, &link_speed, &link_up);
@@ -81,7 +83,6 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 	mutex_lock(&adapter->e56_lock);
 	ret_status = txgbe_set_link_to_amlite(hw, speed);
 	mutex_unlock(&adapter->e56_lock);
-	adapter->tx_speed = speed;
 
 	if (ret_status == TXGBE_ERR_TIMEOUT)
 		adapter->link_valid = false;
