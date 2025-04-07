@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright(c) 1999 - 2021 Intel Corporation.
 
-ifneq ($(KERNELRELEASE),)
+ifeq ($(KBUILD_SRC),)
 # kbuild part of makefile
 #
 # Makefile for the Intel(R) 10GbE PCI Express Linux Network Driver
@@ -21,7 +21,7 @@ endef
 grtnic_xgb-y := $(strip ${grtnic_xgb-y})
 grtnic_xgb-y += kcompat.o
 
-else	# ifneq($(KERNELRELEASE),)
+else	# ifeq($(KBUILD_SRC),)
 # normal makefile
 
 DRIVER := grtnic_xgb
@@ -263,4 +263,4 @@ help:
 
 .PHONY: default noisy clean manfile silent sparse ccc install uninstall help
 
-endif	# ifneq($(KERNELRELEASE),)
+endif	# ifeq($(KBUILD_SRC),)
