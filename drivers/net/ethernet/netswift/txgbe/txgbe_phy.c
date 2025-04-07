@@ -1375,15 +1375,11 @@ s32 txgbe_read_i2c_word(struct txgbe_hw *hw, u16 byte_offset,
  *  a specified device address.
  **/
 STATIC s32 txgbe_write_i2c_byte_int(struct txgbe_hw *hw, u8 byte_offset,
-					    u8 dev_addr, u8 data, bool lock)
+					    u8 dev_addr, u8 data)
 {
 	s32 status = 0;
-	u32 swfw_mask = hw->phy.phy_semaphore_mask;
 
 	UNREFERENCED_PARAMETER(dev_addr);
-
-	if (lock && 0 != TCALL(hw, mac.ops.acquire_swfw_sync, swfw_mask))
-		return TXGBE_ERR_SWFW_SYNC;
 
 	/* wait tx empty */
 	status = po32m(hw, TXGBE_I2C_RAW_INTR_STAT,
@@ -1401,11 +1397,7 @@ STATIC s32 txgbe_write_i2c_byte_int(struct txgbe_hw *hw, u8 byte_offset,
 	status = po32m(hw, TXGBE_I2C_RAW_INTR_STAT,
 		TXGBE_I2C_INTR_STAT_RX_FULL, TXGBE_I2C_INTR_STAT_RX_FULL,
 		TXGBE_I2C_TIMEOUT, 10);
-
 out:
-	if (lock)
-		TCALL(hw, mac.ops.release_swfw_sync, swfw_mask);
-
 	return status;
 }
 
@@ -1422,7 +1414,7 @@ s32 txgbe_write_i2c_byte(struct txgbe_hw *hw, u8 byte_offset,
 				 u8 dev_addr, u8 data)
 {
 	return txgbe_write_i2c_byte_int(hw, byte_offset, dev_addr,
-						data, true);
+						data);
 }
 
 
