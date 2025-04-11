@@ -2468,10 +2468,10 @@ static inline void put_prev_set_next_task(struct rq *rq,
 {
 	WARN_ON_ONCE(rq->curr != prev);
 
+	__put_prev_set_next_dl_server(rq, prev, next);
+
 	if (next == prev)
 		return;
-
-	__put_prev_set_next_dl_server(rq, prev, next);
 
 	prev->sched_class->put_prev_task(rq, prev, next);
 	next->sched_class->set_next_task(rq, next, true);
