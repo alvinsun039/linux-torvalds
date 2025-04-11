@@ -146,6 +146,7 @@ enum idpf_vport_state {
  * @vport: Vport back pointer
  * @vport_id: Vport identifier
  * @vport_idx: Relative vport index
+ * @max_tx_hdr_size: Max header length hardware can support
  * @state: See enum idpf_vport_state
  * @netstats: Packet and byte stats
  * @stats_lock: Lock to protect stats update
@@ -155,6 +156,7 @@ struct idpf_netdev_priv {
 	struct idpf_vport *vport;
 	u32 vport_id;
 	u16 vport_idx;
+	u16 max_tx_hdr_size;
 	enum idpf_vport_state state;
 	struct rtnl_link_stats64 netstats;
 	spinlock_t stats_lock;
