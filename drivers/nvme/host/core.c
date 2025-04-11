@@ -52,6 +52,14 @@ module_param_named(io_timeout, nvme_io_timeout, uint, 0644);
 MODULE_PARM_DESC(io_timeout, "timeout in seconds for I/O");
 EXPORT_SYMBOL_GPL(nvme_io_timeout);
 
+static bool reset_timeout_enable;
+module_param(reset_timeout_enable, bool, 0644);
+MODULE_PARM_DESC(reset_timeout_enable, "Default use of register reset timeout value");
+
+static unsigned int reset_timeout = 60;
+module_param(reset_timeout, uint, 0644);
+MODULE_PARM_DESC(reset_timeout, "timeout in seconds for controller reset");
+
 static unsigned char shutdown_timeout = 5;
 module_param(shutdown_timeout, byte, 0644);
 MODULE_PARM_DESC(shutdown_timeout, "timeout in seconds for controller shutdown");
@@ -2196,6 +2204,14 @@ static int nvme_wait_ready(struct nvme_ctrl *ctrl, u32 mask, u32 val,
 	unsigned long timeout_jiffies = jiffies + timeout * HZ;
 	u32 csts;
 	int ret;
+
+	/* Use user settings to reset timeout */
+	if (strcmp(op, "reset") && reset_timeout_enable) {
+		timeout = reset_timeout * HZ + jiffies;
+		dev_info(ctrl->device,
+			 "Reset timeout set to %u seconds\n",
+			 reset_timeout);
+	}
 
 	while ((ret = ctrl->ops->reg_read32(ctrl, NVME_REG_CSTS, &csts)) == 0) {
 		if (csts == ~0)
