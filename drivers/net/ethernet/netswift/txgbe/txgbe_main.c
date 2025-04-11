@@ -5669,6 +5669,7 @@ int txgbe_add_mac_filter(struct txgbe_adapter *adapter, const u8 *addr, u16 pool
 		{
 			if (ether_addr_equal(addr, adapter->mac_table[i].addr)) {
 				if (adapter->mac_table[i].pools != (1ULL << pool)) {
+					adapter->mac_table[i].state |= TXGBE_MAC_STATE_MODIFIED;
 					memcpy(adapter->mac_table[i].addr, addr, ETH_ALEN);
 					adapter->mac_table[i].pools |= (1ULL << pool);
 					txgbe_sync_mac_table(adapter);
@@ -5717,7 +5718,8 @@ int txgbe_del_mac_filter(struct txgbe_adapter *adapter, const u8 *addr, u16 pool
 		if (ether_addr_equal(addr, adapter->mac_table[i].addr)){
 			if (adapter->mac_table[i].pools & (1ULL << pool)) {
 				adapter->mac_table[i].state |= TXGBE_MAC_STATE_MODIFIED;
-				adapter->mac_table[i].state &= ~TXGBE_MAC_STATE_IN_USE;
+				if (adapter->mac_table[i].pools == (1ULL << pool))
+					adapter->mac_table[i].state &= ~TXGBE_MAC_STATE_IN_USE;
 
 				adapter->mac_table[i].pools &= ~(1ULL << pool) ;
 				txgbe_sync_mac_table(adapter);
