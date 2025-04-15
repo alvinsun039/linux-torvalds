@@ -4914,6 +4914,10 @@ static inline bool __kc_is_link_local_ether_addr(const u8 *addr)
 #define HAVE_SRIOV_CONFIGURE
 #endif
 
+#if (SLE_VERSION_CODE && SLE_VERSION_CODE <= SLE_VERSION(11, 4, 0))
+#define NEED_DIV64_U64_REM
+#endif
+
 #ifndef PCI_EXP_LNKCAP_SLS_2_5GB
 #define PCI_EXP_LNKCAP_SLS_2_5GB 0x00000001 /* LNKCAP2 SLS Vector bit 0 */
 #endif
@@ -5852,6 +5856,18 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #endif
 #if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2))
 #define HAVE_NDO_FDB_ADD_VID
+#endif
+#ifndef ETH_MODULE_SFF_8079
+#define ETH_MODULE_SFF_8079		0x1
+#endif
+#ifndef ETH_MODULE_SFF_8079_LEN
+#define ETH_MODULE_SFF_8079_LEN		256
+#endif
+#ifndef ETH_MODULE_SFF_8472
+#define ETH_MODULE_SFF_8472		0x2
+#endif
+#ifndef ETH_MODULE_SFF_8472_LEN
+#define ETH_MODULE_SFF_8472_LEN		512
 #endif
 #ifndef ETH_MODULE_SFF_8636
 #define ETH_MODULE_SFF_8636		0x3

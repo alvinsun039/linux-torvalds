@@ -802,7 +802,7 @@ static bool txgbe_clean_tx_irq(struct txgbe_q_vector *q_vector,
 #ifdef HAVE_PTP_1588_CLOCK
 			if (!ring_is_xdp(tx_ring) &&
 #ifdef SKB_SHARED_TX_IS_UNION
-			   !(skb_tx(skb)->in_progress == 1))
+			   !(skb_tx(tx_buffer->skb)->in_progress == 1))
 #else
 			   !(skb_shinfo(tx_buffer->skb)->tx_flags & SKBTX_IN_PROGRESS))
 #endif
