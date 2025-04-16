@@ -512,6 +512,7 @@
 /* HYGON-defined CPU features, CPUID level 0x8c860000:0 (EDX), word 23 */
 #define X86_FEATURE_SM3			(23*32 + 1) /* SM3 instructions */
 #define X86_FEATURE_SM4			(23*32 + 2) /* SM4 instructions */
+#define X86_FEATURE_APX			(21*32+ 9) /* Advanced Performance Extensions */
 
 /*
  * BUG word(s)
