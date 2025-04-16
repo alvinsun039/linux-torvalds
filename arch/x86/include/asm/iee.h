@@ -4,6 +4,7 @@
 #include <asm/pgtable_types.h>
 #include <linux/sched.h>
 
+extern bool iee_si_enabled;
 extern unsigned long iee_offset;
 extern unsigned long IEE_OFFSET;
 #define __iee_code		__section(".iee.text")

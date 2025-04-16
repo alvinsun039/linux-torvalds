@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
+#include <asm/iee.h>
 #include <linux/memory.h>
 #include <linux/mm.h>
 #include <linux/hugetlb.h>
@@ -350,13 +351,20 @@ void unset_iee_stack_page(unsigned long addr, int order)
 
 void __init iee_rest_init(void)
 {
-	// Prepare data for iee rwx gate
-	unsigned long addr;
-	/* Map .iee.text as U RWX pages */
-	addr = (unsigned long)__iee_si_text_start;
-	for (; addr < (unsigned long)__iee_si_text_end; addr += PAGE_SIZE) {
-		iee_set_kernel_upage((unsigned long)addr);
-		iee_set_kernel_upage((unsigned long)__va(__pa(addr)));
+	unsigned long cr4 = native_read_cr4();
+
+	if ((cr4 & X86_CR4_SMAP) != 0 && (cr4 & X86_CR4_SMEP) != 0) {
+		// Prepare data for iee rwx gate
+		unsigned long addr;
+		/* Map .iee.text as U RWX pages */
+		addr = (unsigned long)__iee_si_text_start;
+		for (; addr < (unsigned long)__iee_si_text_end; addr += PAGE_SIZE) {
+			iee_set_kernel_upage((unsigned long)addr);
+			iee_set_kernel_upage((unsigned long)__va(__pa(addr)));
+		}
+		iee_si_enabled = true;
+	} else {
+		pr_err("IEE SI disabled because SMAP or SMEP is not available");
 	}
 	iee_init_done = true;
 	/* Map .iee.data as RO pages */
