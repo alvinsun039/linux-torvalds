@@ -1305,12 +1305,9 @@ struct key *find_keyring_by_name(const char *name, bool uid_keyring)
 	 * grants Search permission and that hasn't been revoked
 	 */
 	#ifdef CONFIG_KEYP
-	for (keyring = list_first_entry(&ns->keyring_name_list,
-					struct key_struct, name_link)->key;
-		!(&(((struct key_struct *)(keyring->name_link.prev))->name_link) ==
-					(&ns->keyring_name_list));
-		keyring = list_entry(((struct key_struct *)(keyring->name_link.prev))->name_link.next,
-					struct key_struct, name_link)->key) {
+	struct key_struct *key_struct;
+	list_for_each_entry(key_struct, &ns->keyring_name_list, name_link) {
+		keyring = key_struct->key;
 	#else
 	list_for_each_entry(keyring, &ns->keyring_name_list, name_link) {
 	#endif
