@@ -31,12 +31,6 @@ static bool debug;
 module_param(debug, bool, 0444);
 MODULE_PARM_DESC(debug, "print debug information");
 
-#define pin_zx_dbg(pctrl, fmt, arg...)					  \
-do {									  \
-	if (debug)							  \
-		dev_info(pctrl->dev, fmt, ##arg); \
-} while (0)
-
 static int pin_to_hwgpio(struct pinctrl_gpio_range *range, unsigned int pin)
 {
 	int offset = 0;
@@ -45,59 +39,51 @@ static int pin_to_hwgpio(struct pinctrl_gpio_range *range, unsigned int pin)
 		for (offset = 0; offset < range->npins; offset++)
 			if (pin == range->pins[offset])
 				break;
-		return range->base+offset-range->gc->base;
+		return range->base + offset - range->gc->base;
 	} else
-		return pin-range->pin_base+range->base-range->gc->base;
+		return pin - range->pin_base + range->base - range->gc->base;
 }
 
 static u16 zx_pad_read16(struct zhaoxin_pinctrl *pctrl, u8 index)
 {
-	outb(index, pctrl->pmio_rx90+pctrl->pmio_base);
-	return inw(pctrl->pmio_rx8c+pctrl->pmio_base);
+	outb(index, pctrl->pmio_rx90 + pctrl->pmio_base);
+	return inw(pctrl->pmio_rx8c + pctrl->pmio_base);
 }
 
 static void zx_pad_write16(struct zhaoxin_pinctrl *pctrl, u8 index, u16 value)
 {
-	outb(index, pctrl->pmio_rx90+pctrl->pmio_base);
-	outw(value, pctrl->pmio_rx8c+pctrl->pmio_base);
+	outb(index, pctrl->pmio_rx90 + pctrl->pmio_base);
+	outw(value, pctrl->pmio_rx8c + pctrl->pmio_base);
 }
 
 static int zhaoxin_get_groups_count(struct pinctrl_dev *pctldev)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return pctrl->soc->ngroups;
 }
 
-static const char *zhaoxin_get_group_name(struct pinctrl_dev *pctldev,
-			unsigned int group)
+static const char *zhaoxin_get_group_name(struct pinctrl_dev *pctldev, unsigned int group)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return pctrl->soc->groups[group].name;
 }
 
-static int zhaoxin_get_group_pins(struct pinctrl_dev *pctldev,
-			unsigned int group,
-			const unsigned int **pins, unsigned int *npins)
+static int zhaoxin_get_group_pins(struct pinctrl_dev *pctldev, unsigned int group,
+				  const unsigned int **pins, unsigned int *npins)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
 	*pins = pctrl->soc->groups[group].pins;
 	*npins = pctrl->soc->groups[group].npins;
-	pin_zx_dbg(pctrl, "%s\n", __func__);
+
 	return 0;
 }
 
-static void zhaoxin_pin_dbg_show(struct pinctrl_dev *pctldev,
-			struct seq_file *s,
-			unsigned int pin)
+static void zhaoxin_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s, unsigned int pin)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 }
 
 static const struct pinctrl_ops zhaoxin_pinctrl_ops = {
@@ -111,57 +97,53 @@ static int zhaoxin_get_functions_count(struct pinctrl_dev *pctldev)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return pctrl->soc->nfunctions;
 }
 
-static const char *zhaoxin_get_function_name(struct pinctrl_dev *pctldev,
-				unsigned int function)
+static const char *zhaoxin_get_function_name(struct pinctrl_dev *pctldev, unsigned int function)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return pctrl->soc->functions[function].name;
 }
 
 static int zhaoxin_get_function_groups(struct pinctrl_dev *pctldev, unsigned int function,
-				     const char * const **groups, unsigned int *const ngroups)
+				       const char *const **groups, unsigned int *const ngroups)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
 	*groups = pctrl->soc->functions[function].groups;
 	*ngroups = pctrl->soc->functions[function].ngroups;
-	pin_zx_dbg(pctrl, "%s\n", __func__);
+
 	return 0;
 }
 
-static int zhaoxin_pinmux_set_mux(struct pinctrl_dev *pctldev,
-				unsigned int function, unsigned int group)
+static int zhaoxin_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned int function,
+				  unsigned int group)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s,group=%d,func=%d\n", __func__, group, function);
 	return 0;
 }
 
-#define ZHAOXIN_PULL_UP_20K		0x80
-#define ZHAOXIN_PULL_UP_10K		0x40
-#define ZHAOXIN_PULL_UP_47K		0x20
-#define ZHAOXIN_PULL_DOWN		0x10
+#define ZHAOXIN_PULL_UP_20K 0x80
+#define ZHAOXIN_PULL_UP_10K 0x40
+#define ZHAOXIN_PULL_UP_47K 0x20
+#define ZHAOXIN_PULL_DOWN 0x10
 
-#define ZHAOXIN_PULL_UP	0xe0
+#define ZHAOXIN_PULL_UP 0xe0
 
-static void zhaoxin_gpio_set_gpio_mode_and_pull(
-	struct zhaoxin_pinctrl *pctrl, unsigned int pin, bool isup)
+static void zhaoxin_gpio_set_gpio_mode_and_pull(struct zhaoxin_pinctrl *pctrl, unsigned int pin,
+						bool isup)
 {
 	u16 tmp = 0;
 	u16 value;
 	u16 value_back = 0;
 
 	if (isup)
-		tmp = ZHAOXIN_PULL_UP_10K|1;
+		tmp = ZHAOXIN_PULL_UP_10K | 1;
 	else
-		tmp = ZHAOXIN_PULL_DOWN|1;
+		tmp = ZHAOXIN_PULL_DOWN | 1;
 	value = zx_pad_read16(pctrl, pin);
 
 	//for gpio
@@ -176,7 +158,7 @@ static void zhaoxin_gpio_set_gpio_mode_and_pull(
 		value &= ~(0x1);
 		zx_pad_write16(pctrl, pin, value);
 		value_back = zx_pad_read16(pctrl, pin);
-	} else {// for pgpio
+	} else { // for pgpio
 		if (isup) {
 			value &= (~(ZHAOXIN_PULL_DOWN));
 			value |= tmp;
@@ -188,20 +170,17 @@ static void zhaoxin_gpio_set_gpio_mode_and_pull(
 		zx_pad_write16(pctrl, pin, value);
 		value_back = zx_pad_read16(pctrl, pin);
 	}
-
-	pin_zx_dbg(pctrl, "%s,pin=%d,value=0x%x,tmp=0x%x,value_back=0x%x\n",
-		__func__, pin, value, tmp, value_back);
 }
 
-
 static int zhaoxin_gpio_request_enable(struct pinctrl_dev *pctldev,
-				struct pinctrl_gpio_range *range, unsigned int pin)
+				       struct pinctrl_gpio_range *range, unsigned int pin)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-	int hwgpio = pin_to_hwgpio(range, pin);
+	unsigned long flags;
 
-	pin_zx_dbg(pctrl, "%s,hwgpio=%d,pin=%d\n", __func__, hwgpio, pin);
+	raw_spin_lock_irqsave(&pctrl->lock, flags);
 	zhaoxin_gpio_set_gpio_mode_and_pull(pctrl, pin, true);
+	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 	return 0;
 }
 
@@ -213,21 +192,18 @@ static const struct pinmux_ops zhaoxin_pinmux_ops = {
 	.gpio_request_enable = zhaoxin_gpio_request_enable,
 };
 
-static int zhaoxin_config_get(struct pinctrl_dev *pctldev, unsigned int pin,
-			    unsigned long *config)
+static int zhaoxin_config_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return 0;
 }
 
-static int zhaoxin_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
-			  unsigned long *configs, unsigned int nconfigs)
+static int zhaoxin_config_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *configs,
+			      unsigned int nconfigs)
 {
 	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return 0;
 }
 
@@ -244,10 +220,9 @@ static const struct pinctrl_desc zhaoxin_pinctrl_desc = {
 	.owner = THIS_MODULE,
 };
 
-static int zhaoxin_gpio_to_pin(struct zhaoxin_pinctrl *pctrl,
-	unsigned int offset,
-	const struct zhaoxin_pin_topology **community,
-	const struct zhaoxin_pin_map2_gpio **padgrp)
+static int zhaoxin_gpio_to_pin(struct zhaoxin_pinctrl *pctrl, unsigned int offset,
+			       const struct zhaoxin_pin_topology **community,
+			       const struct zhaoxin_pin_map2_gpio **padgrp)
 {
 	int i;
 
@@ -257,7 +232,7 @@ static int zhaoxin_gpio_to_pin(struct zhaoxin_pinctrl *pctrl,
 		if (map->zhaoxin_range_gpio_base == ZHAOXIN_GPIO_BASE_NOMAP)
 			continue;
 		if (offset >= map->zhaoxin_range_gpio_base &&
-			offset < map->zhaoxin_range_gpio_base + map->zhaoxin_range_pin_size) {
+		    offset < map->zhaoxin_range_gpio_base + map->zhaoxin_range_pin_size) {
 			int pin;
 
 			pin = map->zhaoxin_range_pin_base + offset - map->zhaoxin_range_gpio_base;
@@ -269,12 +244,9 @@ static int zhaoxin_gpio_to_pin(struct zhaoxin_pinctrl *pctrl,
 	return -EINVAL;
 }
 
-static __maybe_unused int zhaoxin_pin_to_gpio(
-	struct zhaoxin_pinctrl *pctrl, int pin)
+static __maybe_unused int zhaoxin_pin_to_gpio(struct zhaoxin_pinctrl *pctrl, int pin)
 {
 	const struct zhaoxin_pin_map2_gpio *pin_maps;
-
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 
 	pin_maps = pctrl->pin_maps;
 	if (!pin_maps)
@@ -283,27 +255,27 @@ static __maybe_unused int zhaoxin_pin_to_gpio(
 	return pin - pin_maps->zhaoxin_range_pin_base + pin_maps->zhaoxin_range_gpio_base;
 }
 
-static int zhaoxin_gpio_get(struct gpio_chip *chip,
-	unsigned int offset)
+static int zhaoxin_gpio_get(struct gpio_chip *chip, unsigned int offset)
 {
 	struct zhaoxin_pinctrl *pctrl = gpiochip_get_data(chip);
 	const struct index_cal_array *gpio_in_cal;
-	int gap = offset/16;
-	int bit = offset%16;
+	unsigned long flags;
+	int gap = offset / 16;
+	int bit = offset % 16;
 	int pin;
 	int value;
 
 	gpio_in_cal = pctrl->pin_topologys->gpio_in_cal;
 	pin = zhaoxin_gpio_to_pin(pctrl, offset, NULL, NULL);
-	value = zx_pad_read16(pctrl, gpio_in_cal->index+gap);
-	pin_zx_dbg(pctrl, "%s:offset=%d,pin=%d,gap=%d,bit=%d,value=%d\n",
-		__func__, offset, pin, gap, bit, value);
-	value &= (1<<bit);
+	raw_spin_lock_irqsave(&pctrl->lock, flags);
+	value = zx_pad_read16(pctrl, gpio_in_cal->index + gap);
+	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
+
+	value &= (1 << bit);
 	return !!value;
 }
 
-static void zhaoxin_gpio_set(struct gpio_chip *chip,
-	unsigned int offset, int value)
+static void zhaoxin_gpio_set(struct gpio_chip *chip, unsigned int offset, int value)
 {
 	struct zhaoxin_pinctrl *pctrl = gpiochip_get_data(chip);
 	const struct index_cal_array *gpio_out_cal;
@@ -316,34 +288,28 @@ static void zhaoxin_gpio_set(struct gpio_chip *chip,
 	gpio_out_cal = pctrl->pin_topologys->gpio_out_cal;
 	pin = zhaoxin_gpio_to_pin(pctrl, offset, NULL, NULL);
 
-	pin_zx_dbg(pctrl, "%s:offset=%d,pin=%d,gap=%d,bit=%d,value=%d\n",
-		__func__, offset, pin, gap, bit, value);
-
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
 
-	org = zx_pad_read16(pctrl, gpio_out_cal->index+gap);
+	org = zx_pad_read16(pctrl, gpio_out_cal->index + gap);
 	if (value)
-		org |= (1<<bit);
+		org |= (1 << bit);
 	else
-		org &= (~(1<<bit));
-	zx_pad_write16(pctrl, gpio_out_cal->index+gap, org);
+		org &= (~(1 << bit));
+	zx_pad_write16(pctrl, gpio_out_cal->index + gap, org);
 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 }
 
-static int zhaoxin_gpio_direction_input(struct gpio_chip *chip,
-	unsigned int offset)
+static int zhaoxin_gpio_direction_input(struct gpio_chip *chip, unsigned int offset)
 {
 	return pinctrl_gpio_direction_input(chip->base + offset);
 }
 
-static int zhaoxin_gpio_direction_output(struct gpio_chip *chip,
-	unsigned int offset, int value)
+static int zhaoxin_gpio_direction_output(struct gpio_chip *chip, unsigned int offset, int value)
 {
 	return pinctrl_gpio_direction_output(chip->base + offset);
 }
 
-static int zhaoxin_gpio_request(struct gpio_chip *gc,
-	unsigned int offset)
+static int zhaoxin_gpio_request(struct gpio_chip *gc, unsigned int offset)
 {
 	return gpiochip_generic_request(gc, offset);
 }
@@ -380,7 +346,6 @@ static void zhaoxin_gpio_irq_ack(struct irq_data *d)
 	int base_offset = 0;
 	int bit_off = 0;
 	u16 value;
-	u16 value_read;
 
 	status_cal = pctrl->pin_topologys->status_cal;
 	if (gpio >= 0) {
@@ -392,16 +357,13 @@ static void zhaoxin_gpio_irq_ack(struct irq_data *d)
 				break;
 			offset += status_cal->reg[j].size;
 		}
-		reg_off = &status_cal->reg[j-1];
-		bit_off = i-(offset-reg_off->size);
+		reg_off = &status_cal->reg[j - 1];
+		bit_off = i - (offset - reg_off->size);
 		base_offset = reg_off->pmio_offset;
-		value = readw(pctrl->pm_pmio_base+reg_off->pmio_offset);
-		value_read = value;
-		value |= (1<<bit_off);
-		writew(value, pctrl->pm_pmio_base+reg_off->pmio_offset);
-
-		pin_zx_dbg(pctrl, "%s base_offset=0x%x i=%d,j=%d,bit_off=%d,value=0x%x,offset=%d,gpio=%d\n",
-			__func__, base_offset, i, j, bit_off, value, offset, gpio);
+		value = (1 << bit_off);
+		raw_spin_lock(&pctrl->lock);
+		writew(value, pctrl->pm_pmio_base + reg_off->pmio_offset);
+		raw_spin_unlock(&pctrl->lock);
 	}
 }
 
@@ -419,10 +381,11 @@ static void zhaoxin_gpio_irq_mask_unmask(struct irq_data *d, bool mask)
 	int bit_off = 0;
 	u16 value;
 	u16 value1;
+	unsigned long flags;
 
 	int_cal = pctrl->pin_topologys->int_cal;
 	mod_sel_cal = pctrl->pin_topologys->mod_sel_cal;
-	pin_zx_dbg(pctrl, "%s gpio=%d,mask=%d\n", __func__, gpio, mask);
+
 	if (gpio >= 0) {
 		for (i = 0; i < int_cal->size; i++)
 			if (gpio == int_cal->cal_array[i])
@@ -432,34 +395,29 @@ static void zhaoxin_gpio_irq_mask_unmask(struct irq_data *d, bool mask)
 				break;
 			offset += int_cal->reg[j].size;
 		}
-		reg_off = &(int_cal->reg[j-1]);
-		mod = &(mod_sel_cal->reg[j-1]);
-		bit_off = i-(offset-reg_off->size);
+		reg_off = &(int_cal->reg[j - 1]);
+		mod = &(mod_sel_cal->reg[j - 1]);
+		bit_off = i - (offset - reg_off->size);
 		base_offset = reg_off->pmio_offset;
-		pin_zx_dbg(pctrl, "write pmio_base:0x%x,offset:0x%x,bit_off:%d\n",
-			pctrl->pmio_base, base_offset, bit_off);
-		value = inw(pctrl->pmio_base+reg_off->pmio_offset);
-		if (mask)
-			value &= (~(1<<bit_off));
-		else
-			value |= (1<<bit_off);
 
-		outw(value, pctrl->pmio_base+reg_off->pmio_offset);
+		raw_spin_lock_irqsave(&pctrl->lock, flags);
+		value = inw(pctrl->pmio_base + reg_off->pmio_offset);
+		if (mask)
+			value &= (~(1 << bit_off));
+		else
+			value |= (1 << bit_off);
+
+		outw(value, pctrl->pmio_base + reg_off->pmio_offset);
 		if (mask) {
-			value1 = readw(pctrl->pm_pmio_base+mod->pmio_offset);
-			value1 |= (1<<bit_off);
-			writew(value1, pctrl->pm_pmio_base+mod->pmio_offset);
+			value1 = readw(pctrl->pm_pmio_base + mod->pmio_offset);
+			value1 |= (1 << bit_off);
+			writew(value1, pctrl->pm_pmio_base + mod->pmio_offset);
 		} else {
-			value1 = readw(pctrl->pm_pmio_base+mod->pmio_offset);
-			value1 |= (1<<bit_off);
-			writew(value1, pctrl->pm_pmio_base+mod->pmio_offset);
-			pin_zx_dbg(pctrl, "write mod_offset:0x%x,value1:0x%x,pmio_offset=0x%x,value=%d\n",
-				mod->pmio_offset, value1,
-				reg_off->pmio_offset, value);
+			value1 = readw(pctrl->pm_pmio_base + mod->pmio_offset);
+			value1 |= (1 << bit_off);
+			writew(value1, pctrl->pm_pmio_base + mod->pmio_offset);
 		}
-		pin_zx_dbg(pctrl, "base_offset=0x%x i=%d,j=%d,bit_off=%d,value=0x%x,offset=%d,pmio_offset=%d,value1=0x%x\n",
-			base_offset, i, j, bit_off, value,
-			offset, mod->pmio_offset, value1);
+		raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 	}
 }
 
@@ -489,17 +447,20 @@ static irqreturn_t zhaoxin_gpio_irq(int irq, void *data)
 	int ret = 0;
 	int subirq;
 	unsigned int hwirq;
+	unsigned long flags;
 
 	init = pctrl->pin_topologys->int_cal;
 	stat_cal = pctrl->pin_topologys->status_cal;
 	for (i = 0; i < init->reg_cal_size; i++) {
 		pending = 0;
+		raw_spin_lock_irqsave(&pctrl->lock, flags);
 		status = readw(pctrl->pm_pmio_base + stat_cal->reg[i].pmio_offset);
 		enable = inw(pctrl->pmio_base + init->reg[i].pmio_offset);
+		raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 		enable &= status;
 		pending = enable;
 		for_each_set_bit(bit_offset, &pending, init->reg[i].size) {
-			hwirq = init->cal_array[index + bit_offset] ;
+			hwirq = init->cal_array[index + bit_offset];
 			//find the son irq
 			subirq = irq_find_mapping(gc->irq.domain, hwirq);
 			generic_handle_irq(subirq);
@@ -535,15 +496,14 @@ static int zhaoxin_gpio_irq_type(struct irq_data *d, unsigned int type)
 		isup = true;
 	else if (type & IRQ_TYPE_LEVEL_HIGH)
 		isup = false;
-	pin_zx_dbg(pctrl, "%s,pin=%d,hwirq=%ld,isup=%d\n",
-		__func__, pin, irqd_to_hwirq(d), isup);
+
 	zhaoxin_gpio_set_gpio_mode_and_pull(pctrl, pin, isup);
 	//find the gpio position
 	for (position = 0; position < trigger_cal->size; position++)
 		if (trigger_cal->cal_array[position] == gpio)
 			break;
 
-	index = trigger_cal->index + ALIGN(position+1, 4)/4-1;
+	index = trigger_cal->index + ALIGN(position + 1, 4) / 4 - 1;
 	point = position % 4;
 
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
@@ -551,20 +511,17 @@ static int zhaoxin_gpio_irq_type(struct irq_data *d, unsigned int type)
 	value = zx_pad_read16(pctrl, index);
 
 	if ((type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-		value |= TRIGGER_BOTH_EDGE << (point*4);
+		value |= TRIGGER_BOTH_EDGE << (point * 4);
 	else if (type & IRQ_TYPE_EDGE_FALLING)
-		value |= TRIGGER_FALL_EDGE << (point*4);
+		value |= TRIGGER_FALL_EDGE << (point * 4);
 	else if (type & IRQ_TYPE_EDGE_RISING)
-		value |= TRIGGER_RISE_EDGE << (point*4);
+		value |= TRIGGER_RISE_EDGE << (point * 4);
 	else if (type & IRQ_TYPE_LEVEL_LOW)
-		value |= TRIGGER_LOW_LEVEL << (point*4);
+		value |= TRIGGER_LOW_LEVEL << (point * 4);
 	else if (type & IRQ_TYPE_LEVEL_HIGH)
-		value |= TRIGGER_HIGH_LEVEL << (point*4);
+		value |= TRIGGER_HIGH_LEVEL << (point * 4);
 	else
-		pin_zx_dbg(pctrl, "%s wrang type\n", __func__);
-
-	pin_zx_dbg(pctrl, "%s value=%d,0x%x,index=%d,type=%d\n",
-		__func__, value, value, index, type);
+		pr_debug("%s wrang type\n", __func__);
 
 	//write back
 	zx_pad_write16(pctrl, index, value);
@@ -585,7 +542,7 @@ static int zhaoxin_gpio_irq_wake(struct irq_data *d, unsigned int on)
 	unsigned int pin;
 
 	pin = zhaoxin_gpio_to_pin(pctrl, irqd_to_hwirq(d), NULL, NULL);
-	pin_zx_dbg(pctrl, "%s,pin=%d\n", __func__, pin);
+
 	if (pin) {
 		//father irq
 		if (on)
@@ -594,7 +551,6 @@ static int zhaoxin_gpio_irq_wake(struct irq_data *d, unsigned int on)
 			disable_irq_wake(pctrl->irq);
 	}
 
-	pin_zx_dbg(pctrl, "%sable wake for pin %u\n", on ? "en" : "dis", pin);
 	return 0;
 }
 
@@ -603,15 +559,15 @@ static int zhaoxin_gpio_add_pin_ranges(struct gpio_chip *gc)
 	struct zhaoxin_pinctrl *pctrl = gpiochip_get_data(gc);
 	int ret, i;
 
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	for (i = 0; i < pctrl->pin_map_size; i++) {
 		struct zhaoxin_pin_map2_gpio *map = &pctrl->pin_maps[i];
 
 		if (map->zhaoxin_range_gpio_base == ZHAOXIN_GPIO_BASE_NOMAP)
 			continue;
 		ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
-				map->zhaoxin_range_gpio_base, map->zhaoxin_range_pin_base,
-				map->zhaoxin_range_pin_size);
+					     map->zhaoxin_range_gpio_base,
+					     map->zhaoxin_range_pin_base,
+					     map->zhaoxin_range_pin_size);
 		if (ret) {
 			dev_err(pctrl->dev, "failed to add GPIO pin range\n");
 			return ret;
@@ -632,7 +588,8 @@ static unsigned int zhaoxin_gpio_ngpio(const struct zhaoxin_pinctrl *pctrl)
 		if (pin_maps->zhaoxin_range_gpio_base == ZHAOXIN_GPIO_BASE_NOMAP)
 			continue;
 		if (pin_maps->zhaoxin_range_gpio_base + pin_maps->zhaoxin_range_pin_size > ngpio)
-			ngpio = pin_maps->zhaoxin_range_gpio_base + pin_maps->zhaoxin_range_pin_size;
+			ngpio = pin_maps->zhaoxin_range_gpio_base +
+				pin_maps->zhaoxin_range_pin_size;
 	}
 
 	return ngpio;
@@ -663,9 +620,8 @@ static int zhaoxin_gpio_probe(struct zhaoxin_pinctrl *pctrl, int irq)
 	/*
 	 * father domain irq
 	 */
-	ret = devm_request_irq(pctrl->dev, irq, zhaoxin_gpio_irq,
-				IRQF_SHARED | IRQF_NO_THREAD,
-				dev_name(pctrl->dev), pctrl);
+	ret = devm_request_irq(pctrl->dev, irq, zhaoxin_gpio_irq, IRQF_SHARED | IRQF_NO_THREAD,
+			       dev_name(pctrl->dev), pctrl);
 	if (ret) {
 		dev_err(pctrl->dev, "failed to request interrupt\n");
 		return ret;
@@ -692,10 +648,10 @@ static int zhaoxin_pinctrl_pm_init(struct zhaoxin_pinctrl *pctrl)
 }
 
 static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
-			       const struct zhaoxin_pinctrl_soc_data *soc_data)
+				 const struct zhaoxin_pinctrl_soc_data *soc_data)
 {
 	struct zhaoxin_pinctrl *pctrl;
-	int  ret, i, irq;
+	int ret, i, irq;
 	struct resource *res;
 	void __iomem *regs;
 
@@ -707,8 +663,8 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 	raw_spin_lock_init(&pctrl->lock);
 	pctrl->pin_topologys = pctrl->soc->pin_topologys;
 	pctrl->pin_map_size = pctrl->soc->pin_map_size;
-	pctrl->pin_maps = devm_kcalloc(&pdev->dev, pctrl->pin_map_size,
-				sizeof(*pctrl->pin_maps), GFP_KERNEL);
+	pctrl->pin_maps =
+		devm_kcalloc(&pdev->dev, pctrl->pin_map_size, sizeof(*pctrl->pin_maps), GFP_KERNEL);
 	if (!pctrl->pin_maps)
 		return -ENOMEM;
 	for (i = 0; i < pctrl->pin_map_size; i++) {
@@ -728,8 +684,6 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 	if (irq < 0)
 		return irq;
 
-	pin_zx_dbg(pctrl, "%s irq=%d,start=0x%llx,end=0x%llx,pctrl->pm_pmio_base=%p\n",
-		__func__, irq, res?res->start:0, res?res->end:0, pctrl->pm_pmio_base);
 	ret = zhaoxin_pinctrl_pm_init(pctrl);
 	if (ret)
 		return ret;
@@ -743,7 +697,7 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 		return PTR_ERR(pctrl->pctldev);
 	}
 	ret = zhaoxin_gpio_probe(pctrl, irq);
-	pin_zx_dbg(pctrl, "%s end\n", __func__);
+
 	if (ret)
 		return ret;
 	platform_set_drvdata(pdev, pctrl);
@@ -773,7 +727,6 @@ int zhaoxin_pinctrl_probe_by_uid(struct platform_device *pdev)
 	return zhaoxin_pinctrl_probe(pdev, data);
 }
 EXPORT_SYMBOL_GPL(zhaoxin_pinctrl_probe_by_uid);
-
 
 const struct zhaoxin_pinctrl_soc_data *zhaoxin_pinctrl_get_soc_data(struct platform_device *pdev)
 {
@@ -812,18 +765,12 @@ EXPORT_SYMBOL_GPL(zhaoxin_pinctrl_get_soc_data);
 
 int zhaoxin_pinctrl_suspend_noirq(struct device *dev)
 {
-	struct zhaoxin_pinctrl *pctrl = dev_get_drvdata(dev);
-
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(zhaoxin_pinctrl_suspend_noirq);
 
 int zhaoxin_pinctrl_resume_noirq(struct device *dev)
 {
-	struct zhaoxin_pinctrl *pctrl = dev_get_drvdata(dev);
-
-	pin_zx_dbg(pctrl, "%s\n", __func__);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(zhaoxin_pinctrl_resume_noirq);

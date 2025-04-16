@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
-# Intel pin control drivers
+# Zhaoxin pin control drivers
 
 if (X86 || COMPILE_TEST)
 
