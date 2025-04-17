@@ -3379,16 +3379,19 @@ static int txgbe_e56_config_rx(struct txgbe_hw *hw, u32 speed)
 {
 	s32 status;
 
-	status = E56phyRxsCalibAdaptSeq(hw, speed);
-	if (status)
-		return status;
+	if (speed == TXGBE_LINK_SPEED_40GB_FULL) {
+		txgbe_e56_config_rx_40G(hw, speed);
+	} else {
+		status = E56phyRxsCalibAdaptSeq(hw, speed);
+		if (status)
+			return status;
 
-	//Step 2 of 2.3.4
-	E56phySetRxsUfineLeMax(hw, speed);
+		//Step 2 of 2.3.4
+		E56phySetRxsUfineLeMax(hw, speed);
 
-	//2.3.4 RXS post CDR lock temperature tracking sequence
-	txgbe_temp_track_seq(hw, speed);
-
+		//2.3.4 RXS post CDR lock temperature tracking sequence
+		txgbe_temp_track_seq(hw, speed);
+	}
 	return 0;
 }
 
@@ -3783,6 +3786,7 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 	value = txgbe_rd32_epcs(hw, VR_PCS_DIG_CTRL1);
 	if ((value & 0x8000)) {
 		status = TXGBE_ERR_PHY_INIT_NOT_DONE;
+		TCALL(hw, mac.ops.enable_tx_laser);
 		goto out;
 	}
 
@@ -3868,8 +3872,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		field_set(&value, 8, 8, 0x0);
 		field_set(&value, 1, 1, 0x1);
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
-
-		status = txgbe_e56_config_rx_40G(hw, speed);
 	}
 
 	if (speed == TXGBE_LINK_SPEED_25GB_FULL) {
@@ -3956,7 +3958,6 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		field_set(&value, 1, 1, 0x1);
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
 
-		status = txgbe_e56_config_rx(hw, speed);
 	}
 
 	if (speed == TXGBE_LINK_SPEED_10GB_FULL) {
@@ -4042,8 +4043,11 @@ int txgbe_set_link_to_amlite(struct txgbe_hw *hw, u32 speed)
 		field_set(&value, 1, 1, 0x1);
 		txgbe_wr32_ephy(hw, PMD_CFG0, value);
 
-		status = txgbe_e56_config_rx(hw, speed);
 	}
+
+	TCALL(hw, mac.ops.enable_tx_laser);
+
+	status = txgbe_e56_config_rx(hw, speed);
 
 	value = rd32_ephy(hw, E56PHY_RXS_IDLE_DETECT_1_ADDR);
 	field_set(&value, E56PHY_RXS_IDLE_DETECT_1_IDLE_TH_ADC_PEAK_MAX, 0x28);
@@ -4069,7 +4073,6 @@ out:
 	if (ppl_lock) {
 		TCALL(hw, mac.ops.enable_sec_tx_path);
 	}
-	TCALL(hw, mac.ops.enable_tx_laser);
 
 	return status;
 }
