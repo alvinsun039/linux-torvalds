@@ -193,13 +193,13 @@ restart_check:
 		msleep(20);
 
 	for (i = rptr; i < wptr; i += 1) {
-		if (le32_to_cpu(ih->ring[i]) == 0xDEADBEFF)
+		if (le32_to_cpu(ih->ring[i]) == 0xDEADBEFF && (i % 4) != 3)
 			goto restart_check;
 	}
 
 	if (rptr > wptr) {
 		for (i = 0; i < wptr; i += 1) {
-			if (le32_to_cpu(ih->ring[i]) == 0xDEADBEFF)
+			if (le32_to_cpu(ih->ring[i]) == 0xDEADBEFF && (i % 4) != 3)
 				goto restart_check;
 		}
 	}
@@ -372,7 +372,8 @@ restart_ih:
 	old_rptr = adev->irq.ih.rptr;
 	r = amdgpu_ih_fix_loongarch_pcie_order_start(&adev->irq.ih, old_rptr, wptr, false);
 	if (r) {
-		if (old_rptr == ((wptr + 16) & adev->irq.ih.ptr_mask))
+		if (old_rptr == ((wptr + 16) & adev->irq.ih.ptr_mask) ||
+		    old_rptr == ((wptr + 32) & adev->irq.ih.ptr_mask))
 			return IRQ_NONE;
 
 		atomic_xchg(&adev->irq.cs_lock, 1);
@@ -459,5 +460,7 @@ uint64_t amdgpu_ih_decode_iv_ts_helper(struct amdgpu_ih_ring *ih, u32 rptr,
 
 	dw1 = le32_to_cpu(ih->ring[ring_index + 1]);
 	dw2 = le32_to_cpu(ih->ring[ring_index + 2]);
-	return dw1 | ((u64)(dw2 & 0xffff) << 32);
+	return (dw1 | ((u64)(dw2 & 0xffff) << 32));
+
 }
+
