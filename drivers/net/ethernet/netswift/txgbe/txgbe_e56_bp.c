@@ -1,11 +1,10 @@
-#include "txgbe.h"
 #include "txgbe_e56.h"
 #include "txgbe_hw.h"
+
+#include "txgbe.h"
 #include "txgbe_type.h"
 #include "txgbe_e56_bp.h"
 #include "txgbe_bp.h"
-
-#include <linux/bitfield.h>
 
 static int E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
 {
@@ -38,7 +37,7 @@ static int E56phySetRxsUfineLeMax(struct txgbe_adapter *adapter, u32 speed)
 		addr = E56G__RXS0_ANA_OVRDVAL_5_ADDR +
 		       (E56PHY_RXS_OFFSET * lane_idx);
 		rdata = rd32_ephy(hw, addr);
-		ULTRAFINE_CODE[lane_idx] = FIELD_GET(GENMASK(14, 12), rdata);
+		ULTRAFINE_CODE[lane_idx] = FIELD_GET_M(GENMASK(14, 12), rdata);
 		kr_dbg(KR_MODE,
 		       "ULTRAFINE_CODE[%d] = %d, CMVAR_UFINE_MAX: %x\n",
 		       lane_idx, ULTRAFINE_CODE[lane_idx], CMVAR_UFINE_MAX);
@@ -2217,6 +2216,8 @@ int txgbe_e56_set_phylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 		field_set(&rdata, 12, 12, 0x1);
 		txgbe_wr32_epcs(hw, 0x070000, rdata);
 		txgbe_wr32_epcs(hw, 0x078002, 0x0000);
+		/* pcs case fec en to work around first */
+		txgbe_wr32_epcs(hw, 0x100ab, 1);
 
 		if (txgbe_is_backplane(hw)) {
 			if ((hw->device_id & 0xFF) == 0x10) {
@@ -2271,14 +2272,14 @@ int txgbe_e56_set_phylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 		txgbe_wr32_epcs(hw, 0x078004, 0x003c);
 		txgbe_wr32_epcs(hw, 0x078005, CL74_KRTR_TRAINNING_TIMEOUT);
 		txgbe_wr32_epcs(hw, 0x078006, 25);
-		txgbe_wr32_epcs(hw, 0x078000, 0x0008);
+		txgbe_wr32_epcs(hw, 0x078000, 0x0008 | BIT(2));
 
 		rdata = txgbe_rd32_epcs(hw, 0x038000);
 		txgbe_wr32_epcs(hw, 0x038000, rdata | BIT(15));
 
 		kr_dbg(KR_MODE, "1.1 Wait PHY init ....\n");
 		status = read_poll_timeout(txgbe_rd32_epcs, rdata,
-					   FIELD_GET(BIT(15), rdata) == 0, 100,
+					   FIELD_GET_M(BIT(15), rdata) == 0, 100,
 					   200000, false, hw, 0x038000);
 		if (status) {
 			kr_dbg(KR_MODE,
@@ -2482,8 +2483,9 @@ static int txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 
 	/* 500ms timeout */
 	for (count = 0; count < 5000; count++) {
-		kr_dbg(KR_MODE, "-----count----- %d - fsm: %x\n", count,
-		       txgbe_rd32_epcs(hw, 0x78010));
+		u32 fsm = txgbe_rd32_epcs(hw, 0x78010);
+		kr_dbg(KR_MODE, "-----count----- %d - fsm: %x\n",
+		       count, fsm);
 		if (an_int & TXGBE_E56_AN_PG_RCV) {
 			u8 next_page = 0;
 			u32 rdata, addr;
@@ -2510,10 +2512,16 @@ static int txgbe_e56_exchange_page(struct txgbe_adapter *adapter)
 				base_page = 1;
 			}
 			/* clear an pacv int */
-			txgbe_wr32_epcs(hw, 0x78002, 0x0000);
-			kr_dbg(KR_MODE, "write 78002 0x%0x\n", 0x0000);
-			if (next_page == 0)
-				goto check_ability;
+			rdata = txgbe_rd32_epcs(hw, 0x78002);
+			kr_dbg(KR_MODE, "read 78002 data %0x and clear pacv\n", rdata);
+			field_set(&rdata, 2, 2, 0x0);
+			txgbe_wr32_epcs(hw, 0x78002, rdata);
+			if (next_page == 0) {
+				if ((fsm & 0x8) == 0x8) {
+					adapter->fsm = 0x8;
+					goto check_ability;
+				}
+			}
 		}
 		usec_delay(100);
 	}
@@ -2593,7 +2601,8 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 	status = E56phyRxsCalibAdaptSeq(adapter, bylinkmode, bypassCtle);
 	ret |= status;
 	/* 20 */
-	kr_dbg(KR_MODE, "2.5 Wait %dG phy calibration....\n", bylinkmode);
+	kr_dbg(KR_MODE, "2.5 Wait %dG phy calibration.... fsm: %x\n",
+	       bylinkmode, txgbe_rd32_epcs(hw, 0x78010));
 	E56phySetRxsUfineLeMax(adapter, bylinkmode);
 	status = txgbe_e56_get_temp(hw, &pTempData);
 	if (bylinkmode == 40)
@@ -2602,7 +2611,8 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 	else
 		status = E56phyRxsPostCdrLockTempTrackSeq(adapter, bylinkmode);
 	/* 21 */
-	kr_dbg(KR_MODE, "2.6 Wait %dG phy kr training check....\n", bylinkmode);
+	kr_dbg(KR_MODE, "2.6 Wait %dG phy kr training check.... fsm: %x\n",
+	       bylinkmode, txgbe_rd32_epcs(hw, 0x78010));
 	status = read_poll_timeout(rd32_ephy, rdata,
 				   ((rdata & 0xe) & GENMASK(lane_num, 1)) ==
 					   (0xe & GENMASK(lane_num, 1)),
@@ -2611,10 +2621,10 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 	kr_dbg(KR_MODE,
 	       "KR TRAINNING CHECK = %x, %s. pmd_ctrl:%lx-%lx-%lx-%lx\n", rdata,
 	       status ? "FAILED" : "SUCCESS",
-	       FIELD_GET(GENMASK(3, 0), pmd_ctrl),
-	       FIELD_GET(GENMASK(7, 4), pmd_ctrl),
-	       FIELD_GET(GENMASK(11, 8), pmd_ctrl),
-	       FIELD_GET(GENMASK(15, 12), pmd_ctrl));
+	       FIELD_GET_M(GENMASK(3, 0), pmd_ctrl),
+	       FIELD_GET_M(GENMASK(7, 4), pmd_ctrl),
+	       FIELD_GET_M(GENMASK(11, 8), pmd_ctrl),
+	       FIELD_GET_M(GENMASK(15, 12), pmd_ctrl));
 	ret |= status;
 	kr_dbg(KR_MODE, "before: %x-%x-%x-%x\n", rd32_ephy(hw, 0x141c),
 	       rd32_ephy(hw, 0x1420), rd32_ephy(hw, 0x1424),
@@ -2623,10 +2633,10 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 	for (lane_idx = 0; lane_idx < lane_num; lane_idx++) {
 		txffe = rd32_ephy(hw, 0x828 + lane_idx * 0x100);
 		kr_dbg(KR_MODE, "after[%x]: %lx-%lx-%lx-%lx\n", lane_idx,
-		       FIELD_GET(GENMASK(6, 0), txffe),
-		       FIELD_GET(GENMASK(21, 16), txffe),
-		       FIELD_GET(GENMASK(29, 24), txffe),
-		       FIELD_GET(GENMASK(13, 8), txffe));
+		       FIELD_GET_M(GENMASK(6, 0), txffe),
+		       FIELD_GET_M(GENMASK(21, 16), txffe),
+		       FIELD_GET_M(GENMASK(29, 24), txffe),
+		       FIELD_GET_M(GENMASK(13, 8), txffe));
 	}
 
 	/* 22 */
@@ -2651,7 +2661,7 @@ static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 	}
 
 	kr_dbg(KR_MODE, "2.2 Wait page changed ..done..\n");
-
+	txgbe_wr32_epcs(hw, 0x100ab, 0);
 	if (AN_TRAINNING_MODE) {
 		rdata = txgbe_rd32_epcs(hw, 0x70000);
 		kr_dbg(KR_MODE, "read 0x70000 data %0x\n", rdata);
@@ -2660,9 +2670,9 @@ static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 	}
 
 	rdata = txgbe_rd32_epcs(hw, 0x78002);
-	kr_dbg(KR_MODE, "read 78002 data %0x\n", rdata);
-	txgbe_wr32_epcs(hw, 0x78002, 0);
-	kr_dbg(KR_MODE, "write 78002 0x%0x\n", 0);
+	kr_dbg(KR_MODE, "read 78002 data %0x and clear page int\n", rdata);
+	field_set(&rdata, 2, 2, 0x0);
+	txgbe_wr32_epcs(hw, 0x78002, rdata);
 
 	/* 10  RXS_DISABLE - TXS_DISABLE - CMS_DISABLE */
 	/* dis phy tx/rx lane */
@@ -2681,26 +2691,14 @@ static int handle_e56_bkp_an73_flow(struct txgbe_adapter *adapter)
 
 	if (adapter->fec_mode & TXGBE_25G_RS_FEC_REQ) {
 		txgbe_wr32_epcs(hw, 0x180a3, 0x68c1);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a3,
-		       0x68c1);
 		txgbe_wr32_epcs(hw, 0x180a4, 0x3321);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a4,
-		       0x3321);
 		txgbe_wr32_epcs(hw, 0x180a5, 0x973e);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a5,
-		       0x973e);
 		txgbe_wr32_epcs(hw, 0x180a6, 0xccde);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x180a6,
-		       0xccde);
 
 		txgbe_wr32_epcs(hw, 0x38018, 1024);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x38018,
-		       1024);
 		rdata = txgbe_rd32_epcs(hw, 0x100c8);
 		field_set(&rdata, 2, 2, 1);
 		txgbe_wr32_epcs(hw, 0x100c8, rdata);
-		kr_dbg(KR_MODE, "Epcs Write A: 0x%x,  D: 0x%x\n", 0x100c8,
-		       rdata);
 		kr_dbg(KR_MODE, "Advertised FEC modes : %s\n", "RS-FEC");
 		adapter->cur_fec_link = TXGBE_PHY_FEC_RS;
 	} else if (adapter->fec_mode & TXGBE_25G_BASE_FEC_REQ) {
@@ -2763,23 +2761,6 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		adapter->an_done = true;
 		field_set(&value, 0, 0, 0);
 		txgbe_wr32_epcs(hw, 0x78002, value);
-		goto an_status;
-	}
-
-	if (value & TXGBE_E56_AN_PG_RCV) {
-		kr_dbg(KR_MODE, "Enter training\n");
-		ret = handle_e56_bkp_an73_flow(adapter);
-		if (!AN_TRAINNING_MODE)
-			goto an_status;
-
-		if (ret) {
-			mutex_lock(&adapter->e56_lock);
-			txgbe_e56_set_phylinkmode(adapter, 25, 0);
-			mutex_unlock(&adapter->e56_lock);
-		} else {
-			adapter->an_done = true;
-		}
-		goto an_status;
 	}
 
 	if (value & TXGBE_E56_AN_INC_LINK) {
@@ -2790,10 +2771,22 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	if (value & TXGBE_E56_AN_TXDIS) {
 		field_set(&value, 3, 3, 0);
 		txgbe_wr32_epcs(hw, 0x78002, value);
-		if (!AN_TRAINNING_MODE) {
+		mutex_lock(&adapter->e56_lock);
+		txgbe_e56_set_phylinkmode(adapter, 10, 0);
+		mutex_unlock(&adapter->e56_lock);
+		goto an_status;
+	}
+
+	if (value & TXGBE_E56_AN_PG_RCV) {
+		kr_dbg(KR_MODE, "Enter training\n");
+		ret = handle_e56_bkp_an73_flow(adapter);
+		if (ret & AN_TRAINNING_MODE) {
 			mutex_lock(&adapter->e56_lock);
-			txgbe_e56_set_phylinkmode(adapter, 25, 0);
+			txgbe_e56_set_phylinkmode(adapter, 10, 0);
 			mutex_unlock(&adapter->e56_lock);
+		} else {
+			if (AN_TRAINNING_MODE)
+				adapter->an_done = true;
 		}
 	}
 
@@ -2801,7 +2794,6 @@ an_status:
 	an_int1 = txgbe_rd32_epcs(hw, 0x78002);
 	if (an_int1 & TXGBE_E56_AN_INT_CMPLT)
 		adapter->an_done = true;
-	txgbe_wr32_epcs(hw, 0x78002, 0);
 	rlu = txgbe_rd32_epcs(hw, 0x30001);
 	kr_dbg(KR_MODE,
 	       "RLU:%x MLU:%x INT:%x-%x CTL:%x fsm:%x pmd_cfg0:%x an_done:%d\n",
