@@ -67,8 +67,6 @@ static s32 txgbe_setup_mac_link_aml(struct txgbe_hw *hw,
 		goto out;
 	}
 
-	adapter->tx_speed = speed;
-
 	if (hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
 	    hw->phy.sfp_type == txgbe_sfp_type_da_cu_core1 ||
 	    txgbe_is_backplane(hw)) {

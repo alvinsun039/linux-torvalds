@@ -9875,11 +9875,15 @@ RELEASE_SEM:
 static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 {
 	struct txgbe_hw *hw = &adapter->hw;
+	u32 link_speed = 0, val = 0;
 	s32 status = 0;
 	int temp;
 
 	if (hw->mac.type != txgbe_mac_aml &&
-			hw->mac.type != txgbe_mac_aml40)
+	    hw->mac.type != txgbe_mac_aml40)
+		return;
+
+	if (netif_running(adapter->netdev))
 		return;
 
 	status = txgbe_e56_get_temp(hw, &temp);
@@ -9887,15 +9891,23 @@ static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	if (!(temp - adapter->amlite_temp > 4 ||
-		adapter->amlite_temp - temp > 4))
+	      adapter->amlite_temp - temp > 4))
 		return;
 
 	adapter->amlite_temp = temp;
+	val = rd32(hw, TXGBE_CFG_PORT_ST);
+	if (val & TXGBE_AMLITE_CFG_LED_CTL_LINK_40G_SEL)
+		link_speed = TXGBE_LINK_SPEED_40GB_FULL;
+	else if (val & TXGBE_AMLITE_CFG_LED_CTL_LINK_25G_SEL)
+		link_speed = TXGBE_LINK_SPEED_25GB_FULL;
+	else
+		link_speed = TXGBE_LINK_SPEED_10GB_FULL;
+
 	mutex_lock(&adapter->e56_lock);
 	if (hw->mac.type == txgbe_mac_aml)
-		txgbe_temp_track_seq(hw, adapter->tx_speed);
+		txgbe_temp_track_seq(hw, link_speed);
 	else if (hw->mac.type == txgbe_mac_aml40)
-		txgbe_temp_track_seq_40g(hw, adapter->tx_speed);
+		txgbe_temp_track_seq_40g(hw, link_speed);
 	mutex_unlock(&adapter->e56_lock);
 
 }
