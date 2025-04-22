@@ -5240,6 +5240,12 @@ static void txgbe_configure_rx(struct txgbe_adapter *adapter)
 	/* set_rx_buffer_len must be called before ring initialization */
 	txgbe_set_rx_buffer_len(adapter);
 
+	wr32(hw, TXGBE_RDM_DCACHE_CTL, TXGBE_RDM_DCACHE_CTL_EN);
+	wr32m(hw, TXGBE_RDM_RSC_CTL, TXGBE_RDM_RSC_CTL_FREE_CTL,
+					 TXGBE_RDM_RSC_CTL_FREE_CTL);
+	wr32m(hw, TXGBE_RDM_RSC_CTL, TXGBE_RDM_RSC_CTL_FREE_CNT_DIS,
+					 ~TXGBE_RDM_RSC_CTL_FREE_CNT_DIS);
+
 	/*
 	 * Setup the HW Rx Head and Tail Descriptor Pointers and
 	 * the Base and Length of the Rx Descriptor Ring

@@ -942,6 +942,10 @@ struct txgbe_thermal_sensor_data {
 /* VFRE bitmask */
 #define TXGBE_RDM_VF_RE_ENABLE_ALL  0xFFFFFFFFU
 
+#define TXGBE_RDM_DCACHE_CTL             0x120A8
+#define TXGBE_RDM_DCACHE_CTL_EN          0x1
+#define TXGBE_RDM_RSC_CTL_FREE_CNT_DIS   0x100
+
 /* amlite: rdm_rsc_ctl_free_ctl */
 #define TXGBE_RDM_RSC_CTL_FREE_CTL  0x00000080U
 
