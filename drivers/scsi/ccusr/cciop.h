@@ -78,6 +78,16 @@ struct cciop_if_regs {
 	VRC_U64 q[];
 };
 
+#define CCIOP_IF_EXT_SIG 0x504F4943
+
+struct cciop_if_ext {
+	VRC_LE32 signature;
+	char fw_version[24];
+	char driver_name[8];
+	char driver_version[24];
+	/* ... */
+};
+
 union cciop_inbound_entry {
 	struct {
 		VRC_U32 dword0;
@@ -161,6 +171,14 @@ struct cciop_request {
 	VRC_U8 cdb[16];
 	struct cciop_prd prdt[];
 };
+
+enum cciop_request_type {
+	CCIOP_REQUEST_TYPE_SCSI = 0,
+	CCIOP_REQUEST_TYPE_MAX,
+};
+
+#define CCIOP_REQUEST_FLAG_DATA_IN  1
+#define CCIOP_REQUEST_FLAG_DATA_OUT 2
 
 enum cciop_inbound_message {
 	CCIOP_INBOUND_MSG_NOP = 0,

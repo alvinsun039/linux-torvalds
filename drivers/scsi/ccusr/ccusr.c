@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ *  Linux driver for C*Core IOP based controllers
+ *
+ *  Copyright (c) 2023-2024 C*Core Technology Co.,Ltd.
+ *  Copyright (c) 2023-2024 VolansComputer S&T Co.,Ltd.
+ */
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -33,24 +40,32 @@
 static int use_msi = 1;
 module_param(use_msi, int, 0444);
 
+static int scmd_timeout = 30;
+module_param(scmd_timeout, int, 0444);
+
 static char driver_name[] = KBUILD_MODNAME;
 static const char driver_ver[] = DRIVER_VERSION;
 
-static int os_schedule_sd_change(struct Scsi_Host *, int id,
+static int os_schedule_sd_change(struct Scsi_Host *shost, int id,
 				 void (*action)(struct Scsi_Host *, int));
-static void os_revalidate_sdev(struct Scsi_Host *, int id);
-static void os_add_sdev(struct Scsi_Host *, int id);
-static void os_remove_sdev(struct Scsi_Host *, int id);
+static void os_revalidate_sdev(struct Scsi_Host *shost, int id);
+static void os_add_sdev(struct Scsi_Host *shost, int id);
+static void os_remove_sdev(struct Scsi_Host *shost, int id);
 
 static void inbound_write(struct ccusr_hba *hba,
 			  union cciop_inbound_entry *entry)
 {
 	volatile struct cciop_if_regs __iomem *regs = hba->regs;
-	u32 wptr = hba->inbound_wptr;
+	u32 wptr;
 	u32 i;
+	unsigned long flags;
 
-	dprintk("inbound_write: 0x%x <- 0x%llx 0x%llx\n", wptr,
-		entry->data.qword0, entry->data.qword1);
+	spin_lock_irqsave(&hba->inbound_lock, flags);
+
+	wptr = hba->inbound_wptr;
+
+	dprintk("0x%x <- 0x%llx 0x%llx\n", wptr, entry->data.qword0,
+		entry->data.qword1);
 
 	while ((wptr ^ readl(&regs->inbound_rptr)) == 0x80000000)
 		udelay(1);
@@ -66,6 +81,8 @@ static void inbound_write(struct ccusr_hba *hba,
 	writeq(entry->data.qword1, &regs->q[i + 1]);
 	writel(wptr, &regs->inbound_wptr);
 	hba->inbound_wptr = wptr;
+
+	spin_unlock_irqrestore(&hba->inbound_lock, flags);
 }
 
 static int outbound_read(struct ccusr_hba *hba,
@@ -90,7 +107,7 @@ static int outbound_read(struct ccusr_hba *hba,
 	if (entry->general.type)
 		entry->data.qword1 = readq(&regs->q[i + 1]);
 
-	dprintk("outbound_read: 0x%x -> 0x%llx 0x%llx\n", hba->outbound_rptr,
+	dprintk("0x%x -> 0x%llx 0x%llx\n", hba->outbound_rptr,
 		entry->data.qword0, entry->data.qword1);
 
 	writel(rptr, &regs->outbound_rptr);
@@ -130,7 +147,7 @@ static int ccusr_map_pci_bar(struct ccusr_hba *hba)
 	struct pci_dev *pcidev = hba->pcidev;
 
 	if (!(pci_resource_flags(pcidev, 0) & IORESOURCE_MEM)) {
-		ccusr_printk(KERN_ERR, "scsi%d: pci resource invalid\n",
+		ccusr_printk(KERN_ERR, "host%d: pci resource invalid\n",
 			     hba->host->host_no);
 		return -EINVAL;
 	}
@@ -138,7 +155,7 @@ static int ccusr_map_pci_bar(struct ccusr_hba *hba)
 	hba->regs = pci_ioremap_bar(pcidev, 0);
 
 	if (!hba->regs) {
-		ccusr_printk(KERN_ERR, "scsi%d: Fail to ioremap memory space\n",
+		ccusr_printk(KERN_ERR, "host%d: Fail to ioremap memory space\n",
 			     hba->host->host_no);
 		return -EINVAL;
 	}
@@ -146,7 +163,7 @@ static int ccusr_map_pci_bar(struct ccusr_hba *hba)
 	hba->ctl_regs = pci_ioremap_bar(pcidev, 1);
 
 	if (!hba->ctl_regs) {
-		ccusr_printk(KERN_ERR, "scsi%d: Fail to ioremap ctl regs\n",
+		ccusr_printk(KERN_ERR, "host%d: Fail to ioremap ctl regs\n",
 			     hba->host->host_no);
 		iounmap(hba->regs);
 		hba->regs = NULL;
@@ -165,7 +182,7 @@ static void ccusr_unmap_pci_bar(struct ccusr_hba *hba)
 static int ccusr_wait_ready(struct ccusr_hba *hba, u32 timeout)
 {
 	while (1) {
-		if (readw(&hba->regs->iop_state) == 1)
+		if (readb(&hba->regs->iop_state) == 1)
 			return 0;
 		if (timeout == 0)
 			return -ETIMEDOUT;
@@ -176,22 +193,32 @@ static int ccusr_wait_ready(struct ccusr_hba *hba, u32 timeout)
 
 static inline struct ccusr_req_tracker *get_req(struct ccusr_hba *hba)
 {
-	struct ccusr_req_tracker *ret;
+	struct ccusr_req_tracker *req;
+	unsigned long flags;
 
-	ret = hba->req_list;
-	if (ret) {
-		hba->req_list = ret->next;
-		ret->next = NULL;
+	spin_lock_irqsave(&hba->req_list_lock, flags);
+
+	req = hba->req_list;
+	if (req) {
+		hba->req_list = req->next;
+		req->next = NULL;
+		atomic_inc(&hba->outstanding_reqs);
 	}
 
-	return ret;
+	spin_unlock_irqrestore(&hba->req_list_lock, flags);
+	return req;
 }
 
 static inline void put_req(struct ccusr_hba *hba, struct ccusr_req_tracker *req)
 {
+	unsigned long flags;
+
+	spin_lock_irqsave(&hba->req_list_lock, flags);
 	req->srb = NULL;
 	req->next = hba->req_list;
 	hba->req_list = req;
+	atomic_dec(&hba->outstanding_reqs);
+	spin_unlock_irqrestore(&hba->req_list_lock, flags);
 }
 
 static void finish_req(struct ccusr_hba *hba, struct ccusr_req_tracker *req,
@@ -199,13 +226,8 @@ static void finish_req(struct ccusr_hba *hba, struct ccusr_req_tracker *req,
 {
 	struct scsi_cmnd *srb = req->srb;
 
-	dprintk("finish_req: req=%px, iop_status=0x%x scsi_status=0x%x xferlen=0x%x\n",
-		req, iop_status, scsi_status, xferlen);
-
-	if (!srb) {
-		put_req(hba, req);
-		return;
-	}
+	dprintk("req=%p, iop_status=0x%x scsi_status=0x%x xferlen=0x%x\n", req,
+		iop_status, scsi_status, xferlen);
 
 	if (srb_dmamap_cnt(srb)) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 23)
@@ -336,16 +358,12 @@ static irqreturn_t ccusr_intr(int irq, void *dev_id)
 #endif
 {
 	struct ccusr_hba *hba = dev_id;
-	unsigned long flags;
 
-	dprintk("ccusr_intr(%d)\n", irq);
-
-	spin_lock_irqsave(hba->host->host_lock, flags);
+	dprintk("irq %d\n", irq);
 
 	while (handle_outbound_queue(hba))
 		writel(0, hba->ctl_regs + CCUSR_INTCTL_REG);
 
-	spin_unlock_irqrestore(hba->host->host_lock, flags);
 	return IRQ_RETVAL(IRQ_HANDLED);
 }
 
@@ -362,7 +380,7 @@ static int ccusr_build_prd(struct scsi_cmnd *srb, struct cciop_prd *prd)
 		goto done;
 	BUG_ON(nseg > hba->max_sg_count);
 
-	dprintk("build_prd: nseg=%d\n", nseg);
+	dprintk("nseg=%d\n", nseg);
 
 	scsi_for_each_sg(srb, sg, nseg, idx) {
 		prd[idx].address = cpu_to_le64(sg_dma_address(sg));
@@ -399,28 +417,15 @@ done:
 	return nseg;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
-static int ccusr_qcmd(struct scsi_cmnd *srb, void (*done)(struct scsi_cmnd *))
-#elif LINUX_VERSION_CODE < KERNEL_VERSION(5, 16, 0)
-static int ccusr_qcmd_lck(struct scsi_cmnd *srb,
-			  void (*done)(struct scsi_cmnd *))
-#else
-static int ccusr_qcmd_lck(struct scsi_cmnd *srb)
-#endif
+static int __ccusr_qcmd(struct Scsi_Host *host, struct scsi_cmnd *srb)
 {
-	struct Scsi_Host *host = srb->device->host;
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
 	struct ccusr_req_tracker *req;
 	union cciop_inbound_entry entry;
-	u32 nprd;
+	int nprd;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 16, 0)
-	BUG_ON(!done);
-	srb->scsi_done = done;
-#endif
-
-	dprintk("ccusr_queuecmd(srb=%px) %d/%d/%d/%d cdb=(%08x-%08x-%08x-%08x)\n",
-		srb, host->host_no, srb->device->channel, srb->device->id,
+	dprintk("srb=%p %d/%d/%d/%d cdb=(%08x-%08x-%08x-%08x)\n", srb,
+		host->host_no, srb->device->channel, srb->device->id,
 		(int)srb->device->lun, cpu_to_be32(((u32 *)srb->cmnd)[0]),
 		cpu_to_be32(((u32 *)srb->cmnd)[1]),
 		cpu_to_be32(((u32 *)srb->cmnd)[2]),
@@ -431,7 +436,8 @@ static int ccusr_qcmd_lck(struct scsi_cmnd *srb)
 	if (srb->device->channel || srb->device->lun ||
 	    srb->device->id > hba->max_devices) {
 		srb->result = DID_BAD_TARGET << 16;
-		goto cmd_done;
+		scsi_done(srb);
+		return 0;
 	}
 
 	req = get_req(hba);
@@ -441,8 +447,24 @@ static int ccusr_qcmd_lck(struct scsi_cmnd *srb)
 	}
 
 	req->srb = srb;
-	req->request->type = cpu_to_le32(0);
-	req->request->flags = cpu_to_le32(0);
+	req->request->type = cpu_to_le32(CCIOP_REQUEST_TYPE_SCSI);
+
+	switch (srb->sc_data_direction) {
+	case DMA_FROM_DEVICE:
+		req->request->flags = cpu_to_le32(CCIOP_REQUEST_FLAG_DATA_IN);
+		break;
+	case DMA_TO_DEVICE:
+		req->request->flags = cpu_to_le32(CCIOP_REQUEST_FLAG_DATA_OUT);
+		break;
+	case DMA_BIDIRECTIONAL:
+		req->request->flags = cpu_to_le32(CCIOP_REQUEST_FLAG_DATA_IN |
+						  CCIOP_REQUEST_FLAG_DATA_OUT);
+		break;
+	default:
+		req->request->flags = cpu_to_le32(0);
+		break;
+	}
+
 	req->request->reply_context = cpu_to_le64((unsigned long)req);
 	req->request->devid = cpu_to_le32(srb->device->id);
 	req->request->dataxfer_length = cpu_to_le32(scsi_bufflen(srb));
@@ -452,8 +474,7 @@ static int ccusr_qcmd_lck(struct scsi_cmnd *srb)
 	nprd = ccusr_build_prd(srb, req->request->prdt);
 	if (nprd < 0) {
 		put_req(hba, req);
-		srb->result = DID_ERROR << 16;
-		goto cmd_done;
+		return SCSI_MLQUEUE_HOST_BUSY;
 	}
 
 	req->request->prd_length = cpu_to_le32(nprd);
@@ -465,46 +486,49 @@ static int ccusr_qcmd_lck(struct scsi_cmnd *srb)
 	entry.request.request_address = cpu_to_le64(req->request_phy);
 	inbound_write(hba, &entry);
 	return 0;
-
-cmd_done:
-	dprintk("scsi_done(%px)\n", srb);
-	scsi_done(srb);
-	return 0;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
-static DEF_SCSI_QCMD(ccusr_qcmd)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37)
+static int ccusr_qcmd(struct scsi_cmnd *srb, void (*done)(struct scsi_cmnd *))
+{
+	struct Scsi_Host *host = srb->device->host;
+
+	srb->scsi_done = done;
+	return __ccusr_qcmd(host, srb);
+}
+#else
+#define ccusr_qcmd __ccusr_qcmd
 #endif
 
-	static const char *ccusr_info(struct Scsi_Host *host)
+static const char *ccusr_info(struct Scsi_Host *host)
 {
 	return driver_name;
 }
 
-static int ccusr_reset_hba(struct ccusr_hba *hba)
+static void __ccusr_reset_hba(struct ccusr_hba *hba, u8 *reply)
 {
 	union cciop_inbound_entry entry;
-
-	hba->msg_status = CCIOP_STATUS_PENDING;
+	unsigned long flags;
 
 	entry.data.qword0 = 0;
 	entry.general.type = 1;
 	entry.message.code = CCIOP_INBOUND_MSG_RESET;
 	entry.message.param = cpu_to_le32(0xFFFFFFFF);
-	entry.message.reply_context = cpu_to_le64((u64)(long)&hba->msg_status);
+	entry.message.reply_context = cpu_to_le64((u64)(long)reply);
 
+	spin_lock_irqsave(&hba->inbound_lock, flags);
 	writeq(entry.data.qword1, &hba->regs->highpri_request_qword1);
 	writeq(entry.data.qword0, &hba->regs->highpri_request_qword0);
+	spin_unlock_irqrestore(&hba->inbound_lock, flags);
+}
 
-	wait_event(hba->msg_wq, hba->msg_status != CCIOP_STATUS_PENDING);
+static int ccusr_reset_hba(struct ccusr_hba *hba)
+{
+	u8 status = CCIOP_STATUS_PENDING;
 
-	if (hba->msg_status != CCIOP_STATUS_SUCCESS) {
-		/* IOP is in unknown state, abort reset */
-		ccusr_printk(KERN_ERR, "reset failed\n");
-		return -1;
-	}
-
-	return 0;
+	__ccusr_reset_hba(hba, &status);
+	wait_event(hba->msg_wq, status != CCIOP_STATUS_PENDING);
+	return status != CCIOP_STATUS_SUCCESS;
 }
 
 static int ccusr_reset(struct scsi_cmnd *srb)
@@ -512,10 +536,21 @@ static int ccusr_reset(struct scsi_cmnd *srb)
 	struct Scsi_Host *host = srb->device->host;
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
 
-	ccusr_printk(KERN_WARNING, "ccusr_reset: host %d, target %d, srb=%px\n",
-		     srb->device->host->host_no, srb->device->id, srb);
+	ccusr_printk(KERN_WARNING, "resetting host%d, target %d, active %d\n",
+		     host->host_no, srb->device->id,
+		     atomic_read(&hba->outstanding_reqs));
 
-	return ccusr_reset_hba(hba) ? FAILED : SUCCESS;
+	while (atomic_read(&hba->outstanding_reqs)) {
+		if (ccusr_reset_hba(hba)) {
+			/* IOP is in unknown state, abort reset */
+			ccusr_printk(KERN_ERR, "reset failed\n");
+			return FAILED;
+		}
+		msleep(1000);
+	}
+
+	ccusr_printk(KERN_INFO, "reset complete\n");
+	return SUCCESS;
 }
 
 static void os_revalidate_sdev(struct Scsi_Host *shost, int id)
@@ -547,7 +582,8 @@ static void os_add_sdev(struct Scsi_Host *shost, int id)
 }
 
 /* scsi_device_lookup() will fail when a deleted device exists with
-   the same ID. so do own version */
+   the same ID. so do own version
+*/
 static struct scsi_device *__os_scsi_device_lookup(struct Scsi_Host *shost,
 						   uint channel, uint id,
 						   uint lun)
@@ -594,7 +630,7 @@ static void os_remove_sdev(struct Scsi_Host *shost, int id)
 
 struct sd_change_work {
 	struct work_struct work;
-	void (*action)(struct Scsi_Host *, int);
+	void (*action)(struct Scsi_Host *shost, int id);
 	struct Scsi_Host *shost;
 	int id;
 };
@@ -614,10 +650,8 @@ static int os_schedule_sd_change(struct Scsi_Host *shost, int id,
 	struct sd_change_work *sd_change;
 
 	sd_change = kmalloc(sizeof(*sd_change), GFP_ATOMIC);
-	if (!sd_change) {
-		printk(KERN_ERR KBUILD_MODNAME ": out of memory\n");
+	if (!sd_change)
 		return -ENOMEM;
-	}
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 20)
 	INIT_WORK(&sd_change->work, (void (*)(void *))sd_change_worker,
@@ -630,6 +664,19 @@ static int os_schedule_sd_change(struct Scsi_Host *shost, int id,
 	sd_change->id = id;
 	sd_change->action = action;
 	schedule_work(&sd_change->work);
+	return 0;
+}
+
+static int ccusr_slave_configure(struct scsi_device *sdev)
+{
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 25)
+	blk_queue_update_dma_alignment(sdev->request_queue, 0xF);
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 28)
+	blk_queue_rq_timeout(sdev->request_queue, scmd_timeout * HZ);
+#else
+	sdev->timeout = scmd_timeout * HZ;
+#endif
 	return 0;
 }
 
@@ -683,7 +730,8 @@ static ssize_t ccusr_show_fw_version(struct class_device *dev, char *buf)
 	struct Scsi_Host *host = class_to_shost(dev);
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
 
-	return snprintf(buf, PAGE_SIZE, "0x%x\n", hba->iop_version);
+	return snprintf(buf, PAGE_SIZE, "%s\n",
+			hba->ext_regs ? hba->ext_regs->fw_version : "N/A");
 }
 
 static ccusr_device_attribute ccusr_attr_version = {
@@ -816,14 +864,14 @@ free_kbuf:
 }
 
 static int ccusr_ioctl_unmap(struct Scsi_Host *host, void __user *arg,
-			     struct ccusr_map_data *md, int r)
+			     struct ccusr_map_data *md)
 {
-	if (r == 0) {
-		md->hdr.host_status = (md->srb.result >> 16) & 0xff;
-		md->hdr.resid = scsi_get_resid(&md->srb);
-		if (copy_to_user(arg, &md->hdr, sizeof(struct sg_io_hdr)))
-			r = -EFAULT;
-	}
+	int r = 0;
+
+	md->hdr.host_status = (md->srb.result >> 16) & 0xff;
+	md->hdr.resid = scsi_get_resid(&md->srb);
+	if (copy_to_user(arg, &md->hdr, sizeof(struct sg_io_hdr)))
+		r = -EFAULT;
 
 	if (md->buflen) {
 		dma_unmap_single(host->dma_dev, md->dma_handle, md->buflen,
@@ -843,7 +891,6 @@ static int ccusr_ioctl(struct scsi_device *dev, unsigned int cmd,
 {
 	struct Scsi_Host *host = dev->host;
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
-	unsigned long flags;
 	struct ccusr_req_tracker *req;
 	union cciop_inbound_entry entry;
 	struct ccusr_map_data *md;
@@ -862,9 +909,7 @@ static int ccusr_ioctl(struct scsi_device *dev, unsigned int cmd,
 	if (r)
 		goto unlock_ret;
 
-	spin_lock_irqsave(host->host_lock, flags);
 	req = get_req(hba);
-	spin_unlock_irqrestore(host->host_lock, flags);
 
 	if (!req) {
 		ccusr_printk(KERN_ERR, "no free req\n");
@@ -877,8 +922,10 @@ static int ccusr_ioctl(struct scsi_device *dev, unsigned int cmd,
 	entry.request.request_address = cpu_to_le64(req->request_phy);
 
 	req->srb = &md->srb;
-	req->request->type = cpu_to_le32(0);
-	req->request->flags = cpu_to_le32(0);
+	req->request->type = cpu_to_le32(CCIOP_REQUEST_TYPE_SCSI);
+	req->request->flags =
+		cpu_to_le32((md->outsize ? CCIOP_REQUEST_FLAG_DATA_IN : 0) |
+			    (md->insize ? CCIOP_REQUEST_FLAG_DATA_OUT : 0));
 	req->request->reply_context = cpu_to_le64((unsigned long)req);
 	req->request->devid = cpu_to_le32(dev->id);
 	req->request->dataxfer_length = cpu_to_le32(md->buflen);
@@ -898,22 +945,15 @@ static int ccusr_ioctl(struct scsi_device *dev, unsigned int cmd,
 			cpu_to_le16(offsetof(struct cciop_request, prdt));
 	}
 
-	spin_lock_irqsave(host->host_lock, flags);
 	inbound_write(hba, &entry);
-	spin_unlock_irqrestore(host->host_lock, flags);
+	while (!wait_event_interruptible_timeout(hba->ioctl_wq, md->srb.result != -1,
+			msecs_to_jiffies(md->hdr.timeout))) {
+		ccusr_printk(KERN_ERR, "ioctl timeout\n");
+		__ccusr_reset_hba(hba, NULL);
+	}
 
-	wait_event_interruptible_timeout(hba->ioctl_wq, md->srb.result != -1,
-					 msecs_to_jiffies(md->hdr.timeout));
-
-	spin_lock_irqsave(host->host_lock, flags);
-	if (md->srb.result == -1) {
-		req->srb = NULL;
-		r = -ETIMEDOUT;
-	} else
-		r = 0;
-	spin_unlock_irqrestore(host->host_lock, flags);
 unmap:
-	r = ccusr_ioctl_unmap(host, arg, md, r);
+	r = ccusr_ioctl_unmap(host, arg, md);
 unlock_ret:
 	mutex_unlock(&hba->ioctl_lock);
 	kfree(md);
@@ -926,6 +966,7 @@ static struct scsi_host_template driver_template = {
 	.name = driver_name,
 	.queuecommand = ccusr_qcmd,
 	.eh_host_reset_handler = ccusr_reset,
+	.slave_configure = ccusr_slave_configure,
 	.info = ccusr_info,
 	.emulated = 0,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0)
@@ -998,7 +1039,8 @@ static int ccusr_memalloc(struct ccusr_hba *hba)
 		req = alloc_req(hba);
 		if (!req)
 			goto alloc_err;
-		put_req(hba, req);
+		req->next = hba->req_list;
+		hba->req_list = req;
 	}
 
 	return 0;
@@ -1022,7 +1064,9 @@ static void ccusr_memfree(struct ccusr_hba *hba)
 {
 	struct ccusr_req_tracker *req;
 
-	while ((req = get_req(hba))) {
+	while (hba->req_list) {
+		req = hba->req_list;
+		hba->req_list = req->next;
 		dma_pool_free(hba->req_pool, req->request, req->request_phy);
 		dma_pool_free(hba->sense_pool, req->sense, req->sense_phy);
 		kfree(req);
@@ -1100,9 +1144,13 @@ static int ccusr_probe(struct pci_dev *pcidev, const struct pci_device_id *id)
 	hba->pcidev = pcidev;
 	hba->host = host;
 
+	spin_lock_init(&hba->req_list_lock);
+	spin_lock_init(&hba->inbound_lock);
+
 	init_waitqueue_head(&hba->msg_wq);
 	init_waitqueue_head(&hba->ioctl_wq);
 	mutex_init(&hba->ioctl_lock);
+	atomic_set(&hba->outstanding_reqs, 0);
 
 	host->max_lun = 1;
 	host->max_channel = 0;
@@ -1116,19 +1164,17 @@ static int ccusr_probe(struct pci_dev *pcidev, const struct pci_device_id *id)
 
 	err = ccusr_wait_ready(hba, 200);
 	if (err) {
-		ccusr_printk(KERN_ERR, "scsi%d: firmware not ready\n",
+		ccusr_printk(KERN_ERR, "host%d: firmware not ready\n",
 			     hba->host->host_no);
 		goto unmap_pci_bar;
 	}
 
-	hba->iop_version = readw(&hba->regs->iop_version);
-	if (hba->iop_version != CCIOP_VERSION) {
-		ccusr_printk(KERN_ERR, "scsi%d: CCIOP_VERSION mismatch\n",
+	if (readw(&hba->regs->iop_version) != CCIOP_VERSION) {
+		ccusr_printk(KERN_ERR, "host%d: CCIOP_VERSION mismatch\n",
 			     hba->host->host_no);
 		goto unmap_pci_bar;
 	}
 
-	hba->iop_state = readw(&hba->regs->iop_state);
 	hba->max_requests = readl(&hba->regs->max_requests);
 	hba->max_sg_count = readl(&hba->regs->max_sg_count);
 	hba->dataxfer_length = readl(&hba->regs->dataxfer_length);
@@ -1136,18 +1182,30 @@ static int ccusr_probe(struct pci_dev *pcidev, const struct pci_device_id *id)
 	hba->inbound_wptr = readl(&hba->regs->inbound_wptr);
 	hba->outbound_rptr = readl(&hba->regs->outbound_rptr);
 
+	hba->ext_regs = (void *)&hba->regs->q[hba->max_requests * 4];
+	if (readl(&hba->ext_regs->signature) == CCIOP_IF_EXT_SIG) {
+		ccusr_printk(KERN_INFO, "fw_version: %s\n",
+			     hba->ext_regs->fw_version);
+		memcpy_toio(hba->ext_regs->driver_name, driver_name,
+			    min(sizeof(hba->ext_regs->driver_name),
+				strlen(driver_name)));
+		memcpy_toio(hba->ext_regs->driver_version, driver_ver,
+			    min(sizeof(hba->ext_regs->driver_version),
+				strlen(driver_ver)));
+	} else {
+		hba->ext_regs = NULL;
+	}
+
 	host->max_sectors = hba->dataxfer_length >> 9;
 	host->max_id = hba->max_devices + 1;
 	host->sg_tablesize =
-		max_t(u32, hba->max_sg_count,
+		min_t(u32, hba->max_sg_count,
 		      (PAGE_SIZE - offsetof(struct cciop_request, prdt)) /
 			      sizeof(struct cciop_prd));
 	host->can_queue = hba->max_requests - CONFIG_CCUSR_IOCTL;
 	host->cmd_per_lun = hba->max_requests - CONFIG_CCUSR_IOCTL;
 	host->max_cmd_len = 16;
 
-	ccusr_printk(KERN_INFO, "iop_version: 0x%x\n", hba->iop_version);
-	ccusr_printk(KERN_INFO, "iop_state: 0x%x\n", hba->iop_state);
 	ccusr_printk(KERN_INFO, "max_requests: 0x%x\n", hba->max_requests);
 	ccusr_printk(KERN_INFO, "max_sg_count: 0x%x\n", hba->max_sg_count);
 	ccusr_printk(KERN_INFO, "dataxfer_length: 0x%x\n",
@@ -1156,7 +1214,7 @@ static int ccusr_probe(struct pci_dev *pcidev, const struct pci_device_id *id)
 
 	err = ccusr_memalloc(hba);
 	if (err) {
-		ccusr_printk(KERN_ERR, "scsi%d: memalloc failed\n",
+		ccusr_printk(KERN_ERR, "host%d: memalloc failed\n",
 			     hba->host->host_no);
 		goto unmap_pci_bar;
 	}
@@ -1180,14 +1238,14 @@ static int ccusr_probe(struct pci_dev *pcidev, const struct pci_device_id *id)
 
 	err = scsi_add_host(host, &pcidev->dev);
 	if (err) {
-		ccusr_printk(KERN_ERR, "scsi%d: scsi_add_host failed\n",
+		ccusr_printk(KERN_ERR, "host%d: scsi_add_host failed\n",
 			     hba->host->host_no);
 		goto disable_irq;
 	}
 
 	scsi_scan_host(host);
 
-	dprintk("scsi%d: ccusr_probe successfully\n", hba->host->host_no);
+	dprintk("host%d probed successfully\n", hba->host->host_no);
 	return 0;
 
 	free_irq(hba->pcidev->irq, hba);
@@ -1225,18 +1283,16 @@ static void ccusr_shutdown(struct pci_dev *pcidev)
 #endif
 	struct Scsi_Host *host = pci_get_drvdata(pcidev);
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
+	u8 status = CCIOP_STATUS_PENDING;
 
 	ccusr_printk(KERN_INFO, "shutdown\n");
 
-	hba->msg_status = CCIOP_STATUS_PENDING;
 	post_message(hba, CCIOP_INBOUND_MSG_SHUTDOWN, 0xFFFFFFFF,
-		     (long)&hba->msg_status);
+		     (long)&status);
 
-	wait_event(hba->msg_wq, hba->msg_status != CCIOP_STATUS_PENDING);
-	if (hba->msg_status != CCIOP_STATUS_SUCCESS) {
-		ccusr_printk(KERN_ERR, "shutdown failed status %d\n",
-			     hba->msg_status);
-	}
+	wait_event(hba->msg_wq, status != CCIOP_STATUS_PENDING);
+	if (status != CCIOP_STATUS_SUCCESS)
+		ccusr_printk(KERN_ERR, "shutdown failed status %d\n", status);
 
 	/* disable interrupts */
 	ccusr_disable_intr(hba);
@@ -1247,7 +1303,7 @@ static void ccusr_remove(struct pci_dev *pcidev)
 	struct Scsi_Host *host = pci_get_drvdata(pcidev);
 	struct ccusr_hba *hba = (struct ccusr_hba *)host->hostdata;
 
-	dprintk("scsi%d: ccusr_remove\n", hba->host->host_no);
+	dprintk("remove host%d\n", hba->host->host_no);
 
 	scsi_remove_host(host);
 
@@ -1289,7 +1345,7 @@ static int __maybe_unused ccusr_resume(struct device *dev)
 
 	err = ccusr_wait_ready(hba, 2000);
 	if (err) {
-		ccusr_printk(KERN_ERR, "scsi%d: firmware not ready\n",
+		ccusr_printk(KERN_ERR, "host%d: firmware not ready\n",
 			     hba->host->host_no);
 		return -ENODEV;
 	}
@@ -1321,6 +1377,8 @@ static struct pci_device_id ccusr_id_table[] = {
 	{ PCI_DEVICE(0x9000, 0x8108), 0, 0, 0 },
 	{ PCI_DEVICE(0x9000, 0x8116), 0, 0, 0 },
 	{ PCI_DEVICE(0x9000, 0x6104), 0, 0, 0 },
+	{ PCI_DEVICE(0x9000, 0x8016), 0, 0, 0 },
+	{ PCI_DEVICE(0x9000, 0x6004), 0, 0, 0 },
 	{ PCI_DEVICE(0xFACE, 0x6316), 0, 0, 0 },
 	{},
 };
@@ -1335,7 +1393,7 @@ static struct pci_driver ccusr_pci_driver = {
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 15)
 	.driver = {
 			.shutdown = ccusr_shutdown,
-		}
+		},
 #else
 	.shutdown = ccusr_shutdown,
 #endif
