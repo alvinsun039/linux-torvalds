@@ -10,7 +10,7 @@
 #include <linux/acpi.h>
 #include <linux/bits.h>
 
-static struct acpi_table_header *acpi_get_rhct(void)
+static struct acpi_table_rhct *acpi_get_rhct(void)
 {
 	static struct acpi_table_header *rhct;
 	acpi_status status;
@@ -27,7 +27,7 @@ static struct acpi_table_header *acpi_get_rhct(void)
 		}
 	}
 
-	return rhct;
+	return (struct acpi_table_rhct *)rhct;
 }
 
 /*
@@ -49,7 +49,7 @@ int acpi_get_riscv_isa(struct acpi_table_header *table, unsigned int cpu, const 
 	BUG_ON(acpi_disabled);
 
 	if (!table) {
-		rhct = (struct acpi_table_rhct *)acpi_get_rhct();
+		rhct = acpi_get_rhct();
 		if (!rhct)
 			return -ENOENT;
 	} else {
