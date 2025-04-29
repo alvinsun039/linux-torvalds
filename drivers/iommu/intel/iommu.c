@@ -4460,7 +4460,6 @@ static void intel_iommu_remove_dev_pasid(struct device *dev, ioasid_t pasid,
 		intel_iommu_debugfs_remove_dev_pasid(dev_pasid);
 		kfree(dev_pasid);
 	}
-out_tear_down:
 	intel_pasid_tear_down_entry(iommu, dev, pasid, false);
 	intel_drain_pasid_prq(dev, pasid);
 }
