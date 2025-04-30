@@ -45,6 +45,9 @@ static struct irq_chip dw_pcie_msi_irq_chip = {
 	.irq_ack = dw_msi_ack_irq,
 	.irq_mask = dw_msi_mask_irq,
 	.irq_unmask = dw_msi_unmask_irq,
+#ifdef CONFIG_SMP
+	.irq_set_affinity = irq_chip_set_affinity_parent,
+#endif
 };
 
 static struct msi_domain_info dw_pcie_msi_domain_info = {
@@ -119,6 +122,17 @@ static void dw_pci_setup_msi_msg(struct irq_data *d, struct msi_msg *msg)
 static int dw_pci_msi_set_affinity(struct irq_data *d,
 				   const struct cpumask *mask, bool force)
 {
+	struct irq_domain *domain = d->domain;
+	struct dw_pcie_rp *pp = domain->host_data;
+	struct irq_desc *desc;
+	struct irq_data *data;
+
+	desc = irq_to_desc(pp->msi_irq[0]);
+	data = &(desc->irq_data);
+
+	if (data->chip->irq_set_affinity)
+		return data->chip->irq_set_affinity(data, mask, force);
+
 	return -EINVAL;
 }
 
@@ -643,8 +657,8 @@ EXPORT_SYMBOL_GPL(dw_pcie_own_conf_map_bus);
 
 static struct pci_ops dw_pcie_ops = {
 	.map_bus = dw_pcie_own_conf_map_bus,
-	.read = pci_generic_config_read,
-	.write = pci_generic_config_write,
+	.read = pci_generic_config_read32,
+	.write = pci_generic_config_write32,
 };
 
 static int dw_pcie_iatu_setup(struct dw_pcie_rp *pp)
@@ -652,6 +666,7 @@ static int dw_pcie_iatu_setup(struct dw_pcie_rp *pp)
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 	struct resource_entry *entry;
 	int i, ret;
+	resource_size_t res_start, res_size, window_size;
 
 	/* Note the very first outbound ATU is used for CFG IOs */
 	if (!pci->num_ob_windows) {
@@ -677,14 +692,25 @@ static int dw_pcie_iatu_setup(struct dw_pcie_rp *pp)
 		if (pci->num_ob_windows <= ++i)
 			break;
 
-		ret = dw_pcie_prog_outbound_atu(pci, i, PCIE_ATU_TYPE_MEM,
-						entry->res->start,
-						entry->res->start - entry->offset,
-						resource_size(entry->res));
-		if (ret) {
-			dev_err(pci->dev, "Failed to set MEM range %pr\n",
-				entry->res);
-			return ret;
+		res_start = entry->res->start;
+		res_size = resource_size(entry->res);
+
+		while (res_size > 0) {
+			window_size = res_size > (pci->region_limit + 1) ?
+					(pci->region_limit + 1) : res_size;
+
+			ret = dw_pcie_prog_outbound_atu(pci, ++i, PCIE_ATU_TYPE_MEM,
+							res_start,
+							res_start - entry->offset,
+							window_size);
+			if (ret) {
+				dev_err(pci->dev, "Failed to set MEM range %pr\n",
+					entry->res);
+				return ret;
+			}
+
+			res_start += window_size;
+			res_size -= window_size;
 		}
 	}
 

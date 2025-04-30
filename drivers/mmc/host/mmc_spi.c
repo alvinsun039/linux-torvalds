@@ -29,6 +29,7 @@
 
 #include <asm/unaligned.h>
 
+#define CONFIG_HAS_DMA 0
 
 /* NOTES:
  *
