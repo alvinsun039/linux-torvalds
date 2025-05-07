@@ -18,6 +18,9 @@ static bool disable_pcr_integrity;
 module_param(disable_pcr_integrity, bool, 0444);
 MODULE_PARM_DESC(disable_pcr_integrity, "Disable integrity protection of TPM2_PCR_Extend");
 
+/* Device type：tpm or tcm */
+int device_type = DEVICE_TYPE_TPM;
+
 static struct tpm2_hash tpm2_hash_map[] = {
 	{HASH_ALGO_SHA1, TPM_ALG_SHA1},
 	{HASH_ALGO_SHA256, TPM_ALG_SHA256},
@@ -720,6 +723,69 @@ out:
 	return rc;
 }
 EXPORT_SYMBOL_GPL(tpm2_get_cc_attrs_tbl);
+
+struct tpm2_alg_property {
+	__be16  alg_id;
+	__be32  algProperties;
+} __packed;
+
+int tpm2_check_dev_type(struct tpm_chip *chip, int *dev_type)
+{
+	struct tpm_buf buf;
+	struct tpm2_alg_property *algProperties;
+	u32 alg_count;
+	int i;
+	int rc;
+	u16 alg_id;
+	bool has_sha256 = false, has_sm3 = false;
+
+	rc = tpm_buf_init(&buf, TPM2_ST_NO_SESSIONS, TPM2_CC_GET_CAPABILITY);
+	if (rc)
+		goto out;
+
+	tpm_buf_append_u32(&buf, TPM2_CAP_ALGS);
+	tpm_buf_append_u32(&buf, 0);
+	tpm_buf_append_u32(&buf, TPM2_MAX_CAP_ALGS);
+
+	rc = tpm_transmit_cmd(chip, &buf, 9, "get tpm algorithm");
+	if (rc) {
+		tpm_buf_destroy(&buf);
+		goto out;
+	}
+
+	alg_count = be32_to_cpup(
+		(__be32 *)&buf.data[TPM_HEADER_SIZE + 5]);
+
+	for (i = 0; i < alg_count; i++) {
+		algProperties = (struct tpm2_alg_property *)&buf.data[TPM_HEADER_SIZE + 9 +
+			i * sizeof(struct tpm2_alg_property)];
+		alg_id = be16_to_cpu(algProperties->alg_id);
+
+		if (alg_id == TPM_ALG_SHA256)
+			has_sha256 = true;
+
+		if (alg_id == TPM_ALG_SM3_256)
+			has_sm3 = true;
+	}
+
+	if (has_sha256) {
+		dev_dbg(&chip->dev, "Detected device: TPM (supports SHA256)\n");
+		*dev_type = 0; // TPM
+	} else if (has_sm3) {
+		dev_dbg(&chip->dev, "Detected device: TCM (supports SM3-256, but not SHA256)\n");
+		*dev_type = 1; // TCM
+	} else {
+		dev_dbg(&chip->dev, "Neither SHA256 nor SM3-256 supported\n");
+		*dev_type = -1;
+	}
+
+	tpm_buf_destroy(&buf);
+
+out:
+	if (rc > 0)
+		rc = -ENODEV;
+	return rc;
+}
 
 /**
  * tpm2_startup - turn on the TPM

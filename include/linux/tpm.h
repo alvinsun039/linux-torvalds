@@ -56,6 +56,12 @@ enum tpm_algorithms {
 };
 
 /*
+ * maxinum number of algorithms a TPM can have.
+ * get from tpm2-tss tss2_tpm2_types.h
+ */
+#define TPM2_MAX_CAP_ALGS 169
+
+/*
  * maximum number of hashing algorithms a TPM can have.  This is
  * basically a count of every hash in tpm_algorithms above
  */
@@ -310,6 +316,7 @@ static inline enum tpm2_mso_type tpm2_handle_mso(u32 handle)
 }
 
 enum tpm2_capabilities {
+	TPM2_CAP_ALGS		= 0,
 	TPM2_CAP_HANDLES	= 1,
 	TPM2_CAP_COMMANDS	= 2,
 	TPM2_CAP_PCRS		= 5,

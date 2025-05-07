@@ -51,6 +51,13 @@ enum tpm_addr {
 	TPM_ADDR = 0x4E,
 };
 
+/* Device type */
+enum DEVICE_TYPE {
+	DEVICE_TYPE_TPM = 0,
+	DEVICE_TYPE_TCM = 1,
+	DEVICE_TYPE_MAX = 256,
+};
+
 #define TPM_WARN_RETRY          0x800
 #define TPM_WARN_DOING_SELFTEST 0x802
 #define TPM_ERR_DEACTIVATED     0x6
@@ -302,6 +309,7 @@ void tpm2_shutdown(struct tpm_chip *chip, u16 shutdown_type);
 unsigned long tpm2_calc_ordinal_duration(struct tpm_chip *chip, u32 ordinal);
 int tpm2_probe(struct tpm_chip *chip);
 int tpm2_get_cc_attrs_tbl(struct tpm_chip *chip);
+int tpm2_check_dev_type(struct tpm_chip *chip, int *dev_type);
 int tpm2_find_cc(struct tpm_chip *chip, u32 cc);
 int tpm2_init_space(struct tpm_space *space, unsigned int buf_size);
 void tpm2_del_space(struct tpm_chip *chip, struct tpm_space *space);
