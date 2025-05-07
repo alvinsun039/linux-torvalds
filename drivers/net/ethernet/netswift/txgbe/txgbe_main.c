@@ -5670,9 +5670,7 @@ int txgbe_add_mac_filter(struct txgbe_adapter *adapter, const u8 *addr, u16 pool
 		return -EINVAL;
 
 	for (i = 0; i < hw->mac.num_rar_entries; i++) {
-
-		if (adapter->mac_table[i].state & TXGBE_MAC_STATE_IN_USE)
-		{
+		if (adapter->mac_table[i].state & TXGBE_MAC_STATE_IN_USE) {
 			if (ether_addr_equal(addr, adapter->mac_table[i].addr)) {
 				if (adapter->mac_table[i].pools != (1ULL << pool)) {
 					adapter->mac_table[i].state |= TXGBE_MAC_STATE_MODIFIED;
@@ -5683,7 +5681,9 @@ int txgbe_add_mac_filter(struct txgbe_adapter *adapter, const u8 *addr, u16 pool
 				}
 			}
 		}
+	}
 
+	for (i = 0; i < hw->mac.num_rar_entries; i++) {
 		if (adapter->mac_table[i].state & TXGBE_MAC_STATE_IN_USE) {
 			continue;
 		}
