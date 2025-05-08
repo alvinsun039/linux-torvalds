@@ -583,8 +583,8 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_25g_sr_core1:
 		case txgbe_sfp_type_25g_lr_core0:
 		case txgbe_sfp_type_25g_lr_core1:
-		case txgbe_sfp_type_25g_fcpi4_lmt_core0:
-		case txgbe_sfp_type_25g_fcpi4_lmt_core1:
+		case txgbe_sfp_type_25g_aoc_core0:
+		case txgbe_sfp_type_25g_aoc_core1:
 		case txgbe_qsfp_type_40g_sr_core0:
 		case txgbe_qsfp_type_40g_sr_core1:
 		case txgbe_qsfp_type_40g_lr_core0:

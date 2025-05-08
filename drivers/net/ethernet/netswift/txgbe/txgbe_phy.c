@@ -656,17 +656,29 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					else
 						hw->phy.sfp_type =
 						txgbe_sfp_type_da_act_lmt_core1;
-				} else if (cable_spec & TXGBE_SFF_FCPI4_LIMITING) {
+				} else {
+					hw->phy.sfp_type = txgbe_sfp_type_unknown;
+				}
+
+				if (comp_codes_25g == TXGBE_SFF_25GAUI_C2M_AOC_BER_5 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_ACC_BER_5 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_AOC_BER_12 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_ACC_BER_12) {
 					if (hw->bus.lan_id == 0)
 						hw->phy.sfp_type =
-						txgbe_sfp_type_25g_fcpi4_lmt_core0;
+						txgbe_sfp_type_25g_aoc_core0;
 					else
 						hw->phy.sfp_type =
-						txgbe_sfp_type_25g_fcpi4_lmt_core1;
-				} else {
-					hw->phy.sfp_type =
-							txgbe_sfp_type_unknown;
+						txgbe_sfp_type_25g_aoc_core1;
 				}
+			} else if (comp_codes_25g == TXGBE_SFF_25GAUI_C2M_AOC_BER_5 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_ACC_BER_5 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_AOC_BER_12 ||
+					comp_codes_25g == TXGBE_SFF_25GAUI_C2M_ACC_BER_12) {
+				if (hw->bus.lan_id == 0)
+					hw->phy.sfp_type = txgbe_sfp_type_25g_aoc_core0;
+				else
+					hw->phy.sfp_type = txgbe_sfp_type_25g_aoc_core1;
 			} else if (comp_codes_25g == TXGBE_SFF_25GBASESR_CAPABLE ||
 					comp_codes_25g == TXGBE_SFF_25GBASEER_CAPABLE) {
 				if (hw->bus.lan_id == 0)
