@@ -333,10 +333,10 @@ F:	include/net/bluetooth/
 F:	net/bluetooth/
 
 BPF AND eBPF SUBSYSTEM
-M:	Xiao Linkui <xiaolinkui@kylinos.cn>
+M:	Lu Yun <luyun@kylinos.cn>
 M:	Chen Zhang <chenzhang@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
-M:	Lu Yun <luyun@kylinos.cn>
+M:	Xiao Linkui <xiaolinkui@kylinos.cn>
 M:	Zhang Duo <zhangduo@kylinos.cn>
 M:	Geliang Tang <tanggeliang@kylinos.cn>
 S:	Supported
