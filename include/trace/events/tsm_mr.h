@@ -22,8 +22,9 @@ TRACE_EVENT(tsm_mr_read,
 	),
 
 	TP_fast_assign(
-		__assign_str(mr);
-		__assign_str(hash);
+		__assign_str(mr, mr->mr_name);
+		__assign_str(hash, mr->mr_flags & TSM_MR_F_NOHASH ?
+			     "data" : hash_algo_name[mr->mr_hash]);
 		memcpy(__get_dynamic_array(d), mr->mr_value, __get_dynamic_array_len(d));
 	),
 
@@ -43,7 +44,7 @@ TRACE_EVENT(tsm_mr_refresh,
 	),
 
 	TP_fast_assign(
-		__assign_str(mr);
+		__assign_str(mr, mr->mr_name);
 		__entry->rc = rc;
 	),
 
@@ -65,8 +66,9 @@ TRACE_EVENT(tsm_mr_write,
 	),
 
 	TP_fast_assign(
-		__assign_str(mr);
-		__assign_str(hash);
+		__assign_str(mr, mr->mr_name);
+		__assign_str(hash, mr->mr_flags & TSM_MR_F_NOHASH ?
+			     "data" : hash_algo_name[mr->mr_hash]);
 		memcpy(__get_dynamic_array(d), data, __get_dynamic_array_len(d));
 	),
 
