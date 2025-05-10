@@ -441,7 +441,7 @@ static int vf_qm_get_match_data(struct hisi_acc_vf_core_device *hisi_acc_vdev,
 }
 
 static void vf_qm_xeqc_save(struct hisi_qm *qm,
-	struct hisi_acc_vf_migration_file *migf)
+			    struct hisi_acc_vf_migration_file *migf)
 {
 	struct acc_vf_data *vf_data = &migf->vf_data;
 	u16 eq_head, aeq_head;
@@ -563,7 +563,6 @@ static int vf_qm_state_save(struct hisi_acc_vf_core_device *hisi_acc_vdev,
 	}
 
 	migf->total_length = sizeof(struct acc_vf_data);
-
 	/* Save eqc and aeqc interrupt information */
 	vf_qm_xeqc_save(vf_qm, migf);
 
