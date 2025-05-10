@@ -122,7 +122,8 @@ static struct cpu_mode_desc phytium_cpu_platform[] = {
 	{ PHYTIUM_CPU_D2000_8_E8C2, "Phytium,D2000/8 E8C" },
 	{ PHYTIUM_CPU_D2000_8_M8C, "Phytium,D2000/8 M8C" },
 	{ PHYTIUM_CPU_D2000_8_EN8I, "Phytium,D2000/8 EN8I" },
-	{ PHYTIUM_CPU_S5000, "Phytium,S5000" },
+	{ PHYTIUM_CPU_S5000C_E, "Phytium,S5000C-E" },
+	{ PHYTIUM_CPU_S5000C, "Phytium,S5000C" },
 	{ PHYTIUM_CPU_E2000, "Phytium,FT-E2000" },
 	{ PHYTIUM_CPU_D3000, "Phytium,FT-D3000" },
 	{}

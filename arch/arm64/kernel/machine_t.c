@@ -135,7 +135,8 @@ static int __init detect_phytium_cpu_type(void)
 	case PHYTIUM_CPU_E2000:
 		static_branch_enable(&machine_t_cpu_fte2000_key);
 		return 0;
-	case PHYTIUM_CPU_S5000:
+	case PHYTIUM_CPU_S5000C_E:
+	case PHYTIUM_CPU_S5000C:
 		static_branch_enable(&machine_t_cpu_fts5000_key);
 		return 0;
 	default:
