@@ -1341,6 +1341,9 @@ got:
 		}
 	}
 
+	if (ext4_should_enable_large_folio(inode))
+		mapping_set_large_folios(inode->i_mapping);
+
 	if (ext4_handle_valid(handle)) {
 		ei->i_sync_tid = handle->h_transaction->t_tid;
 		ei->i_datasync_tid = handle->h_transaction->t_tid;
