@@ -556,6 +556,7 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 	case txgbe_phy_sfp_passive_tyco:
 	case txgbe_phy_sfp_passive_unknown:
 	case txgbe_phy_sfp_active_unknown:
+	case txgbe_phy_sfp_ftl_active:
 	case txgbe_phy_sfp_ftl:
 	case txgbe_phy_sfp_avago:
 	case txgbe_phy_sfp_intel:
@@ -579,6 +580,8 @@ static int txgbe_get_link_ksettings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_sx_core1:
 		case txgbe_sfp_type_1g_lx_core0:
 		case txgbe_sfp_type_1g_lx_core1:
+		case txgbe_sfp_type_da_act_lmt_core0:
+		case txgbe_sfp_type_da_act_lmt_core1:
 		case txgbe_sfp_type_25g_sr_core0:
 		case txgbe_sfp_type_25g_sr_core1:
 		case txgbe_sfp_type_25g_lr_core0:
@@ -843,6 +846,7 @@ int txgbe_get_settings(struct net_device *netdev,
 	case txgbe_phy_nl:
 	case txgbe_phy_sfp_passive_tyco:
 	case txgbe_phy_sfp_passive_unknown:
+	case txgbe_phy_sfp_ftl_active:
 	case txgbe_phy_sfp_ftl:
 	case txgbe_phy_sfp_avago:
 	case txgbe_phy_sfp_intel:
@@ -866,8 +870,14 @@ int txgbe_get_settings(struct net_device *netdev,
 		case txgbe_sfp_type_1g_sx_core1:
 		case txgbe_sfp_type_1g_lx_core0:
 		case txgbe_sfp_type_1g_lx_core1:
+		case txgbe_sfp_type_da_act_lmt_core0:
+		case txgbe_sfp_type_da_act_lmt_core1:
 		case txgbe_sfp_type_25g_sr_core0:
 		case txgbe_sfp_type_25g_sr_core1:
+		case txgbe_sfp_type_25g_lr_core0:
+		case txgbe_sfp_type_25g_lr_core1:
+		case txgbe_sfp_type_25g_aoc_core0:
+		case txgbe_sfp_type_25g_aoc_core1:
 		case txgbe_qsfp_type_40g_sr_core0:
 		case txgbe_qsfp_type_40g_sr_core1:
 		case txgbe_qsfp_type_40g_lr_core0:
