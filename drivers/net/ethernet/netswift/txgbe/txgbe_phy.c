@@ -633,6 +633,11 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->dac_sfp = true;
 				}
 
+				if (comp_copper_len == 0x1)
+					hw->bypassCtle = true;
+				else
+					hw->bypassCtle = false;
+
 				if (comp_codes_25g == TXGBE_SFF_25GBASECR_91FEC ||
 				    comp_codes_25g == TXGBE_SFF_25GBASECR_74FEC ||
 				    comp_codes_25g == TXGBE_SFF_25GBASECR_NOFEC) {
@@ -643,6 +648,13 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 					hw->phy.fiber_suppport_speed |=
 						TXGBE_LINK_SPEED_10GB_FULL;
 				}
+				if (!AUTO) {
+					if (hw->bus.lan_id == 0)
+						hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core0;
+					else
+						hw->phy.sfp_type = txgbe_sfp_type_25g_sr_core1;
+				}
+
 			} else if (cable_tech & TXGBE_SFF_DA_ACTIVE_CABLE) {
 				hw->dac_sfp = false;
 				TCALL(hw, phy.ops.read_i2c_eeprom,

@@ -2534,11 +2534,11 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 {
 	u32 bylinkmode = adapter->bp_link_mode;
 	struct txgbe_hw *hw = &adapter->hw;
+	u8 bypassCtle = hw->bypassCtle;
 	int status = 0, pTempData = 0;
 	u32 lane_num = 0, lane_idx = 0;
 	u32 pmd_ctrl = 0;
 	u32 txffe = 0;
-	u8 bypassCtle = 0;
 	int ret = 0;
 	u32 rdata;
 
@@ -2759,6 +2759,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	an_int = value;
 	if (value & TXGBE_E56_AN_INT_CMPLT) {
 		adapter->an_done = true;
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
 		field_set(&value, 0, 0, 0);
 		txgbe_wr32_epcs(hw, 0x78002, value);
 	}
@@ -2772,7 +2773,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		field_set(&value, 3, 3, 0);
 		txgbe_wr32_epcs(hw, 0x78002, value);
 		mutex_lock(&adapter->e56_lock);
-		txgbe_e56_set_phylinkmode(adapter, 10, 0);
+		txgbe_e56_set_phylinkmode(adapter, 10, hw->bypassCtle);
 		mutex_unlock(&adapter->e56_lock);
 		goto an_status;
 	}
@@ -2782,7 +2783,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 		ret = handle_e56_bkp_an73_flow(adapter);
 		if (ret & AN_TRAINNING_MODE) {
 			mutex_lock(&adapter->e56_lock);
-			txgbe_e56_set_phylinkmode(adapter, 10, 0);
+			txgbe_e56_set_phylinkmode(adapter, 10, hw->bypassCtle);
 			mutex_unlock(&adapter->e56_lock);
 		} else {
 			if (AN_TRAINNING_MODE)
@@ -2792,8 +2793,10 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 
 an_status:
 	an_int1 = txgbe_rd32_epcs(hw, 0x78002);
-	if (an_int1 & TXGBE_E56_AN_INT_CMPLT)
+	if (an_int1 & TXGBE_E56_AN_INT_CMPLT) {
 		adapter->an_done = true;
+		adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
+	}
 	rlu = txgbe_rd32_epcs(hw, 0x30001);
 	kr_dbg(KR_MODE,
 	       "RLU:%x MLU:%x INT:%x-%x CTL:%x fsm:%x pmd_cfg0:%x an_done:%d\n",

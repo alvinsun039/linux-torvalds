@@ -79,7 +79,7 @@ static s32 txgbe_setup_mac_link_aml40(struct txgbe_hw *hw,
 				goto out;
 		}
 		mutex_lock(&adapter->e56_lock);
-		txgbe_e56_set_phylinkmode(adapter, 40, 0);
+		txgbe_e56_set_phylinkmode(adapter, 40, hw->bypassCtle);
 		mutex_unlock(&adapter->e56_lock);
 		goto out;
 	}
