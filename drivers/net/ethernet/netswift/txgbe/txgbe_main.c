@@ -12096,7 +12096,7 @@ static int txgbe_vlan_rate_ioctl(struct net_device *netdev, struct ifreq *ifr, i
 		return -EINVAL;
 	}
 
-	if (!adapter->link_up ||
+	if (!netif_carrier_ok(netdev) ||
 	     adapter->link_speed < TXGBE_LINK_SPEED_1GB_FULL) {
 		e_dev_err("please set vlan rate limit when link up, speed 1G not support");
 		return -EINVAL;
