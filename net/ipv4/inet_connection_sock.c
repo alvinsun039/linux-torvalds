@@ -330,15 +330,18 @@ inet_csk_find_open_port(const struct sock *sk, struct inet_bind_bucket **tb_ret,
 			struct inet_bind_hashbucket **head2_ret, int *port_ret)
 {
 	struct inet_hashinfo *hinfo = tcp_or_dccp_get_hashinfo(sk);
-	int i, low, high, attempt_half, port, l3mdev;
+	int i, low, high, attempt_half, port, l3mdev, span_size;
 	struct inet_bind_hashbucket *head, *head2;
 	struct net *net = sock_net(sk);
 	struct inet_bind2_bucket *tb2;
 	struct inet_bind_bucket *tb;
 	u32 remaining, offset;
 	bool relax = false;
+	bool port_unified;
 
 	l3mdev = inet_sk_bound_l3mdev(sk);
+	port_unified = READ_ONCE(sysctl_bind_port_unified);
+	span_size = port_unified ? 1 : 2;
 ports_exhausted:
 	attempt_half = (sk->sk_reuse == SK_CAN_REUSE) ? 1 : 0;
 other_half_scan:
@@ -355,18 +358,19 @@ other_half_scan:
 			low = half;
 	}
 	remaining = high - low;
-	if (likely(remaining > 1))
+	if (!port_unified && likely(remaining > 1))
 		remaining &= ~1U;
 
 	offset = get_random_u32_below(remaining);
 	/* __inet_hash_connect() favors ports having @low parity
 	 * We do the opposite to not pollute connect() users.
 	 */
-	offset |= 1U;
+	if (!port_unified)
+		offset |= 1U;
 
 other_parity_scan:
 	port = low + offset;
-	for (i = 0; i < remaining; i += 2, port += 2) {
+	for (i = 0; i < remaining; i += span_size, port += span_size) {
 		if (unlikely(port >= high))
 			port -= remaining;
 		if (inet_is_local_reserved_port(net, port))
@@ -397,9 +401,11 @@ next_port:
 		cond_resched();
 	}
 
-	offset--;
-	if (!(offset & 1))
-		goto other_parity_scan;
+	if (!port_unified) {
+		offset--;
+		if (!(offset & 1))
+			goto other_parity_scan;
+	}
 
 	if (attempt_half == 1) {
 		/* OK we now try the upper half of the range */

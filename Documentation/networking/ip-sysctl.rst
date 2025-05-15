@@ -149,6 +149,22 @@ local_port_allocation - BOOLEAN
 	- 0 - Use even ports for connect()
 	- 1 - Use all odd and even ports for connect()
 
+bind_port_unified - BOOLEAN
+	Allow all odd and even ports to be used in sequence in bind(), 0 means
+	using odd ports first and then even ports. Otherwise, no priority is
+	given to odd ports, and ports will be allocated in sequence.
+
+	Please note that the odd/even property mentioned above are based on the
+	starting number of ip_local_port_range being even. If it is odd, the
+	situation will be reversed.
+
+	Default: 0
+
+	Possible values:
+
+	- 0 - Use odd ports first in bind().
+	- 1 - Use all ports in sequence in bind().
+
 ip_forward_update_priority - INTEGER
 	Whether to update SKB priority from "TOS" field in IPv4 header after it
 	is forwarded. The new SKB priority is mapped from TOS field value

@@ -582,6 +582,13 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dobool,
 	},
+	{
+		.procname       = "bind_port_unified",
+		.data           = &sysctl_bind_port_unified,
+		.maxlen         = sizeof(sysctl_bind_port_unified),
+		.mode           = 0644,
+		.proc_handler   = proc_dobool,
+	},
 };
 
 static struct ctl_table ipv4_net_table[] = {
