@@ -138,16 +138,21 @@ fib_sync_mem - UNSIGNED INTEGER
 	Default: 512kB   Minimum: 64kB   Maximum: 64MB
 
 local_port_allocation - BOOLEAN
-	Enable all odd and even ports to use for connect(), 0 means even and odd
-	port allocation strategy will be applied, otherwise sequential allocation
-	will be used.
+	Allow all even and odd ports to be used in sequence in connect(),
+	0 means using even ports first and then odd ports. Otherwise, no
+	priority is given to even ports, and ports will be allocated in
+	sequence.
+
+	Please note that the odd/even property mentioned above are based on the
+	starting number of ip_local_port_range being even. If it is odd, the
+	situation will be reversed.
 
 	Default: 0
 
 	Possible values:
 
-	- 0 - Use even ports for connect()
-	- 1 - Use all odd and even ports for connect()
+	- 0 - Use even ports first in connect().
+	- 1 - Use all ports in sequence in connect().
 
 bind_port_unified - BOOLEAN
 	Allow all odd and even ports to be used in sequence in bind(), 0 means
