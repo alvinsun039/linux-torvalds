@@ -2428,9 +2428,12 @@ static int txgbe_set_priv_flags(struct net_device *dev, u32 flags)
 			adapter->flags2 |= TXGBE_FLAG2_RX_LEGACY;
 		else
 			adapter->flags2 &= ~TXGBE_FLAG2_RX_LEGACY;
+
+		/* reset interface to repopulate queues */
+		if (netif_running(dev))
+			txgbe_reinit_locked(adapter);
 	}
 #endif
-
 
 	return status;
 }
