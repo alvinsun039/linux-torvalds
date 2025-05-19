@@ -9064,6 +9064,9 @@ static void txgbe_watchdog_update_link(struct txgbe_adapter *adapter)
 		TCALL(hw, mac.ops.check_link, &link_speed, &link_up, false);
 		msleep(10);
 	}
+#else
+	if (adapter->link_up == link_up && adapter->link_speed == link_speed)
+		return;
 #endif
 
 	adapter->link_up = link_up;
