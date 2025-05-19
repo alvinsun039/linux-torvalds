@@ -129,13 +129,6 @@ const unsigned char * const x86_nops[ASM_NOP_MAX+1] =
 
 #ifdef CONFIG_MITIGATION_ITS
 
-u8 *its_static_thunk(int reg)
-{
-	u8 *thunk = __x86_indirect_its_thunk_array[reg];
-
-	return thunk;
-}
-
 #ifdef CONFIG_MODULES
 static struct module *its_mod;
 static void *its_page;
@@ -736,7 +729,15 @@ static bool cpu_wants_indirect_its_thunk_at(unsigned long addr, int reg)
 	/* Lower-half of the cacheline? */
 	return !(addr & 0x20);
 }
-#endif
+
+u8 *its_static_thunk(int reg)
+{
+	u8 *thunk = __x86_indirect_its_thunk_array[reg];
+
+	return thunk;
+}
+
+#endif /* CONFIG_MITIGATION_ITS */
 
 /*
  * Rewrite the compiler generated retpoline thunk calls.
