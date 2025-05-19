@@ -1264,7 +1264,7 @@ static bool txgbe_alloc_mapped_page(struct txgbe_ring *rx_ring,
  * @rx_ring: ring to bump
  * @val: new head index
  **/
-void txgbe_release_rx_desc(struct txgbe_ring *rx_ring, u32 val)
+static void txgbe_release_rx_desc(struct txgbe_ring *rx_ring, u32 val)
 {
 	rx_ring->next_to_use = val;
 #ifndef CONFIG_TXGBE_DISABLE_PACKET_SPLIT

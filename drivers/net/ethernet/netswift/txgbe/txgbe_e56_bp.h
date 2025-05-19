@@ -11,20 +11,6 @@
 #define TXGBE_25G_BASE_FEC_REQ	BIT(13)
 #define TXGBE_25G_RS_FEC_REQ	BIT(12)
 
-/**
- * FIELD_GET_M() - extract a bitfield element
- * @_mask: shifted mask defining the field's length and position
- * @_reg:  value of entire bitfield
- *
- * FIELD_GET_M() extracts the field specified by @_mask from the
- * bitfield passed in as @_reg by masking and shifting it down.
- */
-#define FIELD_GET_M(_mask, _reg)						\
-	({								\
-		__BF_FIELD_CHECK(_mask, _reg, 0U, "FIELD_GET_M: ");	\
-		(typeof(_mask))(((_reg) & (_mask)) >> __bf_shf(_mask));	\
-	})
-
 typedef union {
 	struct {
 		u32 tx0_cursor_factor : 7;
