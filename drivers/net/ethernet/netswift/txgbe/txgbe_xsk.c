@@ -1180,6 +1180,7 @@ int txgbe_xsk_async_xmit(struct net_device *dev, u32 qid)
 
 void txgbe_xsk_clean_tx_ring(struct txgbe_ring *tx_ring)
 {
+	unsigned long size = sizeof(struct txgbe_tx_buffer) * tx_ring->count;
 	u16 ntc = tx_ring->next_to_clean, ntu = tx_ring->next_to_use;
 	struct txgbe_tx_buffer *tx_bi;
 	u32 xsk_frames = 0;
@@ -1201,5 +1202,10 @@ void txgbe_xsk_clean_tx_ring(struct txgbe_ring *tx_ring)
 
 	if (xsk_frames)
 		xsk_tx_completed(tx_ring->xsk_pool, xsk_frames);
+
+	memset(tx_ring->tx_buffer_info, 0, size);
+
+	/* Zero out the descriptor ring */
+	memset(tx_ring->desc, 0, tx_ring->size);
 }
 #endif /* HAVE_AF_XDP_ZC_SUPPORT */
