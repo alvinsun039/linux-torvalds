@@ -9693,7 +9693,7 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 		return;
 
 	/* someone else is in init, wait until next service event */
-	if (test_and_set_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
+	if (test_bit(__TXGBE_IN_SFP_INIT, &adapter->state))
 		return;
 
 	adapter->flags &= ~TXGBE_FLAG_NEED_LINK_CONFIG;
@@ -9704,7 +9704,6 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 		if (value & 0x400)
 			adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
 		if (!(value & 0x800)) {
-			clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 			return;
 		}
 	}
@@ -9735,7 +9734,6 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 			hw->mac.type == txgbe_mac_aml40) {
 		if (TCALL(hw, mac.ops.acquire_swfw_sync, gssr) != 0) {
 			adapter->flags |= TXGBE_FLAG_NEED_LINK_CONFIG;
-			clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 			e_warn(probe, "delay config ephy\n");
 			return;
 		}
@@ -9749,7 +9747,6 @@ static void txgbe_sfp_link_config_subtask(struct txgbe_adapter *adapter)
 
 	adapter->flags |= TXGBE_FLAG_NEED_LINK_UPDATE;
 	adapter->link_check_timeout = jiffies;
-	clear_bit(__TXGBE_IN_SFP_INIT, &adapter->state);
 }
 
 static void txgbe_sfp_reset_eth_phy_subtask(struct txgbe_adapter *adapter)
