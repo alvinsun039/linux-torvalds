@@ -1,24 +1,32 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_adapter.h"
 #include "vidsch.h"
 #include "vidschi.h"
 #include "vidsch_engine_e3k.h"
 #include "vidsch_debug_hang_e3k.h"
 #include "ring_buffer.h"
-#include "context.h"
 #include "perfevent.h"
 
 reg_debug_mode_e3k debug_mode_e3k = {0};
@@ -295,7 +303,6 @@ static int enginei_submit_to_gfx_high_e3k(engine_e3k_t *engine, task_dma_t *task
     unsigned int * pRB1 = NULL;
     Cmd_Blk_Cmd_Csp_Indicator_Dword1 trigger_Dw = {0};
     Csp_Opcodes_cmd         cmd                 = {0};
-    unsigned int dwRealRBSize;
     RINGBUFFER_COMMANDS_E3K *pRingBufferCommands = (RINGBUFFER_COMMANDS_E3K*)share->RingBufferCommands;
     RB_PREDEFINE_DMA        *pPredefine         = (RB_PREDEFINE_DMA*)share->begin_end_vma->virt_addr;
     CONTEXT_RESTORE_DMA_E3K *pRestoreDMA        = &(pPredefine->RestoreDMA);
@@ -510,14 +517,6 @@ static int enginei_submit_to_gfx_high_e3k(engine_e3k_t *engine, task_dma_t *task
 
     cmd.cmd_Tbr_Indicator.Indicator_Info = TBR_INDICATOR_INDICATOR_INFO_BEGIN;
     *pRB++ = cmd.uint;
-
-    dwRealRBSize = pRB - pRB0;
-
-//    dwAlignRBSize = (((dwRealRBSize) + 15) & ~15);
-//    if (dwAlignRBSize != dwRbSize)
-//    {
-//        *pRB++ = SEND_SKIP_E3K(dwRbSize - dwRealRBSize);
-//    }
 
     gf_memcpy(pRB1, pRB0, (dwRbSize<<2));
     //util_dump_memory(pRB1, dwRbSize<<2, "high dma in rb");

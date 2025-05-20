@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #ifndef __GF_DRIVER_H
 #define __GF_DRIVER_H
 
@@ -24,6 +33,9 @@
 
 #define __STR(x)    #x
 #define STR(x)      __STR(x)
+
+#define GF_S4_RESUME  0x01
+#define GF_SHUT_DOWN 0x02
 
 typedef struct gf_file gf_file_t;
 
@@ -66,7 +78,6 @@ typedef struct
     struct os_pages_memory *trace_buffer;
     gf_vm_area_t        *trace_buffer_vma;
 
-#define GF_S4_RESUME  0x01
     unsigned int flags;
     unsigned int fps_count;
     unsigned int rxa_blt_scn_cnt;
@@ -74,6 +85,7 @@ typedef struct
     unsigned long       allocation_trace_tags; // allocation trace tags, 0 to disable.
     unsigned int video_irq_info_all;
     int runtime_pm;
+    unsigned long long primary_addr[MAX_CORE_CRTCS];
 }gf_card_t;
 
 struct gf_file

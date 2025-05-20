@@ -1,26 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** chip functions implementation.
-**
-** NOTE:
-** The chip functions SHOULD NOT be called by other modules directly.
-** Please call the corresponding function defined in CBiosChipFunc.h.
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include "CBios_Arise.h"
 #include "../Register/BIU_SBI_registers.h"
@@ -1421,13 +1421,13 @@ CBIOS_STATUS cbCheckSurfaceOnDisplay_Arise(PCBIOS_EXTENSION_COMMON pcbe, PCBIOS_
     {
         if(pChkSurfacePara->pSrcWindow)
         {
-            cbDebugPrint((MAKE_LEVEL_EX(BACK,GENERIC,DEBUG), "Check %d: Addr=%x,Pitch=%d,FixedAddr=%x, OnDisp=%d.\n\n",
+            cbDebugPrint((MAKE_LEVEL(GENERIC,DEBUG), "Check %d: Addr=%x,Pitch=%d,FixedAddr=%x, OnDisp=%d.\n\n",
                                     StreamType, pChkSurfacePara->pSurfaceAttr->StartAddr, pChkSurfacePara->pSurfaceAttr->Pitch,
                                     PhyAddr, bOnDisplay));
         }
         else
         {
-            cbDebugPrint((MAKE_LEVEL_EX(BACK,GENERIC,DEBUG), "Check %d(disable): Addr=%x, OnDisp=%d.\n\n", StreamType,
+            cbDebugPrint((MAKE_LEVEL(GENERIC,DEBUG), "Check %d(disable): Addr=%x, OnDisp=%d.\n\n", StreamType,
                                     pChkSurfacePara->pSurfaceAttr->StartAddr, bOnDisplay));
         }
     }
@@ -2973,17 +2973,17 @@ CBIOS_STATUS cbCECEnableDisable_Arise(PCBIOS_VOID pvcbe, PCBIOS_CEC_ENABLE_DISAB
     if (pCECEnableDisablePara == CBIOS_NULL)
     {
         Status = CBIOS_ER_NULLPOINTER;
-        cbDebugPrint((DBG_LEVEL_ERROR_MSG, "CBiosCECEnableDisable_E3K: pCECEnableDisablePara is NULL!"));
+        cbDebugPrint((MAKE_LEVEL(HDMI, ERROR), "CBiosCECEnableDisable_E3K: pCECEnableDisablePara is NULL!"));
     }
     else if (!pcbe->ChipCaps.IsSupportCEC)
     {
         Status = CBIOS_ER_HARDWARE_LIMITATION;
-        cbDebugPrint((DBG_LEVEL_ERROR_MSG, "CBiosCECEnableDisable_E3K: Can't support CEC!"));
+        cbDebugPrint((MAKE_LEVEL(HDMI, ERROR), "CBiosCECEnableDisable_E3K: Can't support CEC!"));
     }
     else if (pCECEnableDisablePara->CECIndex >= CBIOS_CEC_INDEX_COUNT)
     {
         Status = CBIOS_ER_INVALID_PARAMETER;
-        cbDebugPrint((DBG_LEVEL_ERROR_MSG, "CBiosCECEnableDisable_E3K: invalid CEC index!"));
+        cbDebugPrint((MAKE_LEVEL(HDMI, ERROR), "CBiosCECEnableDisable_E3K: invalid CEC index!"));
     }
     else
     {

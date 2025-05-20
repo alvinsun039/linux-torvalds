@@ -1,23 +1,31 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_adapter.h"
 #include "vidsch.h"
 #include "vidschi.h"
 #include "vidsch_render.h"
 #include "vidmm.h"
-#include "context.h"
 #include "vidsch_submit.h"
 #include "perfevent.h"
 
@@ -28,16 +36,20 @@ static int vidschi_submit_dma(vidsch_mgr_t *sch_mgr, task_dma_t *task_dma)
     gpu_context_t           *context       = task_dma->desc.context;
     vidmm_allocation_t      *mm_allocation = NULL;
     vidsch_allocation_t     *sch_allocation = NULL;
-    unsigned long long      fence_id, last_send_fence_id;
+    unsigned long long      fence_id;
     int                      i, ret = S_OK;
 
     gf_down_read(schedule->rw_lock);
+
+    if (task_dma->desc.Flags.normal_recovery)
+        schedule->chip_func->boost(adapter, ENG_POWER_STATE_E0, ENG_POWER_MIN_HOLDING_TIME_MS * 10, FALSE);
+    else
+        schedule->chip_func->boost(adapter, sch_mgr->boost_level, ENG_POWER_MIN_HOLDING_TIME_MS, FALSE);
 
     gf_mutex_lock(sch_mgr->engine_lock);
 
     //gf_mutex_lock(adapter->hw_reset_lock);
 
-    last_send_fence_id = sch_mgr->last_send_fence_id;
     fence_id = vidschi_inc_send_fence_id(sch_mgr, task_dma->prepare_submit);
 
     task_dma->prepare_submit = FALSE;
@@ -70,7 +82,6 @@ static int vidschi_submit_dma(vidsch_mgr_t *sch_mgr, task_dma_t *task_dma)
 
             sch_allocation->segment_id = mm_allocation->segment_id;
             sch_allocation->phy_addr   = mm_allocation->phys_addr;
-
         }
     }
 
@@ -151,6 +162,8 @@ void vidsch_submit_paging_task(adapter_t *adapter, task_paging_t *paging_task)
         }
 
         gf_down_read(schedule->rw_lock);
+
+        schedule->chip_func->boost(adapter, sch_mgr->boost_level, ENG_POWER_MIN_HOLDING_TIME_MS, FALSE);
 
         /* lock engine */
         gf_mutex_lock(sch_mgr->engine_lock);

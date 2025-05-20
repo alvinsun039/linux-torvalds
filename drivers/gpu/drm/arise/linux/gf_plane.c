@@ -1,18 +1,28 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_plane.h"
+#include "gf_disp.h"
 #include "gf_drmfb.h"
 #include "gf_fence.h"
 #include "gf_modifies.h"
@@ -41,6 +51,8 @@ int gf_atomic_helper_update_plane(struct drm_plane *plane,
 {
     struct drm_plane_state*  plane_state = plane->state;
     const struct drm_plane_helper_funcs *funcs;
+    gf_card_t *gf_card = (gf_card_t *)plane->dev->dev_private;
+    disp_info_t *disp_info = (disp_info_t *)gf_card->disp_info;
 
     gf_assert(!!crtc == !!fb, GF_FUNC_NAME(__func__));
 
@@ -52,6 +64,8 @@ int gf_atomic_helper_update_plane(struct drm_plane *plane,
         return  drm_atomic_helper_update_plane(plane, crtc, fb, crtc_x, crtc_y, crtc_w, crtc_h, src_x, src_y, src_w, src_h);
 #endif
     }
+
+    gf_acquire_display(disp_info, DISP_CURSOR_REF);
 
     plane_state->crtc = crtc;
     if(crtc->state)
@@ -87,6 +101,8 @@ int gf_atomic_helper_update_plane(struct drm_plane *plane,
     }
 
     plane->old_fb = plane->fb;
+
+    gf_release_display(disp_info, DISP_CURSOR_REF);
 
     return 0;
 }
@@ -642,8 +658,9 @@ bool gf_plane_format_mod_supported(struct drm_plane *plane, uint32_t format,
     case DRM_FORMAT_MOD_GF_TILED_COMPRESS:
     case DRM_FORMAT_MOD_GF_LOCAL:
     case DRM_FORMAT_MOD_GF_PCIE:
+    case DRM_FORMAT_MOD_GF_RB_ALT:
     case DRM_FORMAT_MOD_GF_INVALID:
-        /* TODO: should do something? */
+        /* TODO: should do something after sync? */
         ret = true;
         goto check_done;
     default:

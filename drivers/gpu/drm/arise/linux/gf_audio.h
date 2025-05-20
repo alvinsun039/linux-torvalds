@@ -21,16 +21,11 @@
  * IN THE SOFTWARE.
  *
  */
+#ifndef __GF_AUDIO_H
+#define __GF_AUDIO_H
 
-#ifndef _CBIOS_DIU_HDTV_H_
-#define _CBIOS_DIU_HDTV_H_
+#include "gf_kms.h"
 
-#include "../../Display/CBiosDisplayManager.h"
-#include "../../Device/CBiosDeviceShare.h"
-
-#define HDTV_MODU_NUM 4
-
-CBIOS_VOID cbDIU_HDTV_ModuleOnOff(PCBIOS_VOID pvcbe, CBIOS_MODULE_INDEX HDTVModuleIndex, CBIOS_BOOL bTurnOn);
-CBIOS_VOID cbDIU_HDTV_LBBypass(PCBIOS_VOID pvcbe, CBIOS_MODULE_INDEX HDTVModuleIndex, CBIOS_BOOL isBypass);
-CBIOS_VOID cbDoHDTVFuncSetting_Arise(PCBIOS_VOID pvcbe, PCBIOS_DISP_MODE_PARAMS pModeParams, CBIOS_U32 IGAIndex, CBIOS_ACTIVE_TYPE ulDevices);
+#define GF_DEFAULT_CODECS    4
+void gf_audio_set_connect(gf_connector_t *gf_connector, int enable);
 #endif

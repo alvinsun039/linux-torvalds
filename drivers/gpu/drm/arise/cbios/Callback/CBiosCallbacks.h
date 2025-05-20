@@ -1,25 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** CBios hw independent callback function prototype.
-**
-** NOTE:
-** The hw dependent callback function SHOULD NOT be added to this file.
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #ifndef _CBIOS_CALLBACKS_H_
 #define _CBIOS_CALLBACKS_H_
@@ -29,21 +30,13 @@
 #define CBIOS_DBG_PRINT 1
 
 #if CBIOS_DBG_PRINT
-#ifdef __LINUX__
-#define cbDebugPrint1(DebugCtlFlag, DebugMessage, args...) \
-    do{ \
-        CBIOS_UCHAR* pDbgBuff = cbGetDebugBuffer(DebugCtlFlag); \
-        if(pDbgBuff != CBIOS_NULL && cbVsnprintf != CBIOS_NULL) \
-        { \
-            CBIOS_U32  preLen = cbAddPrefix(DebugCtlFlag, pDbgBuff); \
-            cbVsnprintf(pDbgBuff + preLen, CBIOSDEBUGMESSAGEMAXBYTES-preLen-1, DebugMessage, ##args); \
-            cbPrintWithDbgFlag(DebugCtlFlag, pDbgBuff);\
-        } \
-    }while(0)
-#define cbDebugPrint(arg) cbDebugPrint1 arg
-#else
-#define cbDebugPrint(arg) cbPrintMessage arg
-#endif
+#define cbDebugPrint(arg)  \
+do{ \
+    if(cbVDbgPrint != CBIOS_NULL)  \
+    { \
+        cbVDbgPrint arg;   \
+    }   \
+}while(0)
 #else /*else DBG*/
 #define cbDebugPrint(arg)
 #endif
@@ -84,21 +77,16 @@ typedef PCBIOS_VOID   (*CALLBACK_cbMemSet)(PCBIOS_VOID pBuf, CBIOS_S32 value, CB
 typedef PCBIOS_VOID   (*CALLBACK_cbMemCpy)(PCBIOS_VOID pBuf1, PCBIOS_VOID pBuf2, CBIOS_U32 length);
 typedef CBIOS_S32     (*CALLBACK_cbMemCmp)(PCBIOS_VOID pBuf1, PCBIOS_VOID pBuf2, CBIOS_U32 length);
 typedef CBIOS_U64     (*CALLBACK_cbDoDiv)(CBIOS_U64 a, CBIOS_U64 b);
-#ifdef  __LINUX__
-typedef CBIOS_S32   (*CALLBACK_cbVsprintf)(PCBIOS_UCHAR buf, PCBIOS_CHAR fmt, ...);
-typedef CBIOS_S32   (*CALLBACK_cbVsnprintf)(PCBIOS_UCHAR buf, CBIOS_U32 size, PCBIOS_CHAR fmt, ...);
-#else
-typedef CBIOS_S32     (*CALLBACK_cbVsprintf)(PCBIOS_UCHAR buf, PCBIOS_CHAR fmt, va_list  args);
-typedef CBIOS_S32     (*CALLBACK_cbVsnprintf)(PCBIOS_UCHAR buf, CBIOS_U32 size, PCBIOS_CHAR fmt, va_list args);
-#endif
+typedef CBIOS_VOID  (*CALLBACK_cbVDbgPrint)(CBIOS_BOOL  bEnablePrint, CBIOS_U32 PrintLevel, PCBIOS_UCHAR PrefixStr, PCBIOS_UCHAR DbgMsg, ...);
 
-extern CALLBACK_cbVsprintf                  cbVsprintf;
-extern CALLBACK_cbVsnprintf                 cbVsnprintf;
+extern CALLBACK_cbVDbgPrint              cbVDbgPrint;
+
+
 
 CBIOS_STATUS cbSetCallBackFunctions(PCBIOS_CALLBACK_FUNCTIONS pFnCallBack);
 
 //******** Debug Print functions *******************************
-CBIOS_VOID cb_DbgPrint(CBIOS_U32 DebugPrintLevel, PCBIOS_UCHAR DebugMessage);
+
 
 //******** time delay functions ********************************
 CBIOS_VOID cb_DelayMicroSeconds(CBIOS_U32 Microseconds);

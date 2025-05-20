@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_disp.h"
 #include "gf_vip.h"
 #include "gf_wb.h"
@@ -543,7 +552,6 @@ int disp_init_cbios(disp_info_t *disp_info)
 
     fnCallBack.Size = sizeof(CBIOS_CALLBACK_FUNCTIONS);
 
-    fnCallBack.pFnDbgPrint          = disp_dbg_print;
     fnCallBack.pFnDelayMicroSeconds = disp_delay_micro_seconds;
     fnCallBack.pFnReadUchar         = disp_read_uchar;
     fnCallBack.pFnReadUshort        = disp_read_ushort;
@@ -573,6 +581,7 @@ int disp_init_cbios(disp_info_t *disp_info)
     fnCallBack.pFnDodiv             = gf_do_div;
     fnCallBack.pFnVsprintf          = gf_vsprintf;
     fnCallBack.pFnVsnprintf         = gf_vsnprintf;
+    fnCallBack.pFnVDbgPrint         = gf_cb_vdbgprint;
 
     if(CBiosSetCallBackFunctions(&fnCallBack) != CBIOS_OK)
     {
@@ -842,6 +851,29 @@ int disp_cbios_get_adapter_modes(disp_info_t *disp_info, void* buffer, int buf_s
     real_num = real_size / sizeof(CBiosModeInfoExt);
 
     return  real_num;
+}
+
+CBiosModeInfoExt* disp_cbios_get_preferred_mode(CBiosModeInfoExt *dev_mode_list, unsigned int mode_num)
+{
+    CBiosModeInfoExt *pcbios_mode = NULL;
+    int i = 0;
+
+    for (i = 0; i < mode_num; i++)
+    {
+        pcbios_mode = dev_mode_list + i;
+
+        if (pcbios_mode->isPreferredMode)
+        {
+            break;
+        }
+    }
+
+    return pcbios_mode;
+}
+
+CBiosModeInfoExt* disp_cbios_get_maxium_mode(CBiosModeInfoExt *dev_mode_list)
+{
+    return &dev_mode_list[0];
 }
 
 int disp_cbios_merge_modes(CBiosModeInfoExt* merge_mode_list, CBiosModeInfoExt * adapter_mode_list, unsigned int const adapter_mode_num,
@@ -1484,6 +1516,17 @@ int disp_cbios_set_mode(disp_info_t *disp_info, int crtc, struct drm_display_mod
     return (cb_status == CBIOS_OK) ? DISP_OK : DISP_FAIL;
 }
 
+int disp_cbios_turn_onoff_iga(disp_info_t *disp_info, int iga, int bOn)
+{
+    void                        *pcbe = disp_info->cbios_ext;
+    int                         cb_status;
+
+    cb_status = CBiosSetIgaOnOffState(pcbe, bOn, iga);
+
+    return (cb_status == CBIOS_OK) ? DISP_OK : DISP_FAIL;
+
+}
+
 int disp_cbios_turn_onoff_screen(disp_info_t *disp_info, int iga, int bOn)
 {
     void *pcbe = disp_info->cbios_ext;
@@ -1924,6 +1967,8 @@ int disp_cbios_crtc_flip(disp_info_t *disp_info, gf_crtc_flip_t *arg)
     {
         disp_plane.FlipMode.FlipType = CBIOS_PLANE_FLIP_WITH_DISABLE;
     }
+
+    gf_card->primary_addr[arg->crtc] = gfb ? gfb->obj->info.gpu_virt_addr:0;
 
     if(fb)
     {
@@ -2542,64 +2587,34 @@ int disp_cbios_wb_ctl(disp_info_t *disp_info, gf_wb_set_t *wb_set)
 int disp_wait_idle(void *_disp_info)
 {
     disp_info_t *disp_info = _disp_info;
-
-    unsigned long timeout_j = jiffies + msecs_to_jiffies(50) + 1;
-    unsigned int  in_vblank;
-    int ret = DISP_OK;
-    gf_get_counter_t   get_cnt = {0};
+    void *pcbe = NULL;
     unsigned int i = 0;
+    int cb_status = CBIOS_OK;
 
-    if(!disp_info)
+    if (!disp_info)
     {
         gf_info("why disp_info is null, 0x%x  0x%x\n",disp_info,_disp_info);
-        return -1;
+        return -EINVAL;
     }
 
-    i = 0;
-    while(i < disp_info->num_crtc)
+    pcbe = disp_info->cbios_ext;
+
+    while (i < disp_info->num_crtc)
     {
-        if(disp_info->active_output[i])
+        if (disp_info->active_output[i])
         {
             break;
         }
         i++;
     }
 
-    //case1): has one active crtc, wait the crtc's vblank
-    //case2): no active crtc,  no need to wait.
-    if(i != disp_info->num_crtc)  //has active crtc
+    //only wait the first active crtc's vblank
+    if (i != disp_info->num_crtc)
     {
-        get_cnt.crtc_index = i;
-        get_cnt.in_vblk = &in_vblank;
-
-        disp_cbios_get_counter(disp_info, &get_cnt);
-
-        while(in_vblank == 1)
-        {
-            if(time_after(jiffies, timeout_j))
-            {
-                gf_error("wait in vblank tiemout \n");
-                ret = -ETIMEDOUT;
-                break;
-            }
-            disp_cbios_get_counter(disp_info, &get_cnt);
-        }
-
-        timeout_j = jiffies + msecs_to_jiffies(50) + 1;
-
-        while(in_vblank == 0)
-        {
-            if(time_after(jiffies, timeout_j))
-            {
-                gf_error("wait in active timeout\n");
-                ret = -ETIMEDOUT;
-                break;
-            }
-            disp_cbios_get_counter(disp_info, &get_cnt);
-        }
+        cb_status = CBiosWaitVBlank(pcbe, i);
     }
 
-    return ret;
+    return (cb_status == CBIOS_TRUE) ? DISP_OK : DISP_FAIL;
 }
 
 static unsigned int cal_bits(unsigned int v)

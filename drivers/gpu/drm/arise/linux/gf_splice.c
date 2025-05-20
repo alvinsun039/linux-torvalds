@@ -1,16 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf.h"
 #include "gf_disp.h"
 #include "gf_cbios.h"
@@ -575,12 +585,15 @@ static int gf_splice_update_plane(struct drm_plane *plane,
 
     struct drm_plane_state*  plane_state = plane->state;
     const struct drm_plane_helper_funcs *funcs;
+    gf_card_t *gf_card = (gf_card_t *)plane->dev->dev_private;
+    disp_info_t *disp_info = (disp_info_t *)gf_card->disp_info;
 
     if (to_gf_plane(plane)->is_cursor == 0)
     {
-        //TODO: iter the plane
         return  drm_atomic_helper_update_plane(plane, crtc, fb, crtc_x, crtc_y, crtc_w, crtc_h, src_x, src_y, src_w, src_h, ctx);
     }
+
+    gf_acquire_display(disp_info, DISP_CURSOR_REF);
 
     plane_state->crtc = crtc;
     if(crtc->state)
@@ -616,8 +629,9 @@ static int gf_splice_update_plane(struct drm_plane *plane,
 
     plane->old_fb = plane->fb;
 
-    return 0;
+    gf_release_display(disp_info, DISP_CURSOR_REF);
 
+    return 0;
 }
 
 static int gf_splice_disable_plane(struct drm_plane *plane, struct drm_modeset_acquire_ctx *ctx)
@@ -1144,9 +1158,7 @@ static int gf_splice_crtc_page_flip(struct drm_crtc *crtc,
 
 static struct drm_crtc_state* gf_splice_crtc_duplicate_state(struct drm_crtc *crtc)
 {
-    gf_crtc_state_t* crtc_state, *cur_crtc_state;
-
-    cur_crtc_state = to_gf_crtc_state(crtc->state);
+    gf_crtc_state_t* crtc_state;
 
     crtc_state = gf_calloc(sizeof(gf_crtc_state_t));
     if (!crtc_state)
@@ -1644,7 +1656,18 @@ static void gf_splice_crtc_dpms_onoff_helper(struct drm_crtc *crtc, int dpms_on)
             continue;
         }
 
-        disp_cbios_turn_onoff_screen(disp_info, gf_source_crtc->pipe, status);
+        if(!status)
+        {
+            //turn off
+            disp_cbios_turn_onoff_screen(disp_info, gf_source_crtc->pipe, 0);
+            disp_cbios_turn_onoff_iga(disp_info, gf_source_crtc->pipe, 0);
+        }
+        else if(status)
+        {
+            //turn on
+            disp_cbios_turn_onoff_iga(disp_info, gf_source_crtc->pipe, 1);
+            disp_cbios_turn_onoff_screen(disp_info, gf_source_crtc->pipe, 1);
+        }
     }
 
     gf_crtc->crtc_dpms = status;

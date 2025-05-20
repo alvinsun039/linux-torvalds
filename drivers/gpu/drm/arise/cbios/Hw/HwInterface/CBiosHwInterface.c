@@ -1,25 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** CBios hw layer interface function implementation.
-**
-** NOTE:
-** The sw layer CAN call the hw interface defined in this file to do some hw related operation.
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include "CBiosChipShare.h"
 #include "CBiosHwInterface.h"
@@ -176,7 +177,6 @@ CBIOS_STATUS cbHWUnload(PCBIOS_VOID pvcbe)
 
     cbDeInitDeviceArray(pcbe);
     cbDispMgrDeInit(pcbe);
-    cbReleaseDebugBuffer();
     return CBIOS_OK;
 }
 
@@ -242,6 +242,93 @@ CBIOS_STATUS cbHWSetIgaScreenOnOffState(PCBIOS_VOID pvcbe, CBIOS_BOOL status, CB
     return CBIOS_OK;
 }
 
+CBIOS_STATUS cbHWSetIgaOnOffState(PCBIOS_VOID pvcbe, CBIOS_BOOL status, CBIOS_U8 IGAIndex)
+{
+    PCBIOS_EXTENSION_COMMON pcbe = (PCBIOS_EXTENSION_COMMON)pvcbe;
+    REG_CRFC_B RegCRB_FCValue;
+    REG_CRFC_B RegCRB_FCMask;
+    REG_CRFD_B RegCRB_FDValue;
+    REG_CRFD_B RegCRB_FDMask;
+    REG_SR0B RegSR0BValue;
+    REG_SR0B RegSR0BMask;
+
+    cbTraceEnter(GENERIC);
+
+    if(status) //on
+    {
+        if (IGAIndex == IGA1)
+        {
+            RegCRB_FCValue.Value = 0;
+            RegCRB_FCValue.PLL_DCLK1_POWER_DOWN = 0;
+            RegCRB_FCMask.Value = 0xFF;
+            RegCRB_FCMask.PLL_DCLK1_POWER_DOWN = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FC, RegCRB_FCValue.Value, RegCRB_FCMask.Value);
+        }
+        else if(IGAIndex == IGA2)
+        {
+            RegSR0BValue.Value = 0;
+            RegSR0BValue.DCLK2_Power_Down = 0;
+            RegSR0BMask.Value = 0xFF;
+            RegSR0BMask.DCLK2_Power_Down = 0;
+            cbMMIOWriteReg(pcbe,SR_0B, RegSR0BValue.Value, RegSR0BMask.Value);
+        }
+        else if(IGAIndex == IGA3)
+        {
+            RegCRB_FCValue.Value = 0;
+            RegCRB_FCValue.PLL_DCLK3_Power_Down = 0;
+            RegCRB_FCMask.Value = 0xFF;
+            RegCRB_FCMask.PLL_DCLK3_Power_Down = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FC, RegCRB_FCValue.Value, RegCRB_FCMask.Value);
+        }
+        else if(IGAIndex == IGA4)
+        {
+            RegCRB_FDValue.Value = 0;
+            RegCRB_FDValue.DCLK4_PLL_PWDN = 0;
+            RegCRB_FDMask.Value = 0xFF;
+            RegCRB_FDMask.DCLK4_PLL_PWDN = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FD, RegCRB_FDValue.Value, RegCRB_FDMask.Value);
+        }
+    }
+    else //off
+    {
+        if (IGAIndex == IGA1)
+        {
+            RegCRB_FCValue.Value = 0;
+            RegCRB_FCValue.PLL_DCLK1_POWER_DOWN = 1;
+            RegCRB_FCMask.Value = 0xFF;
+            RegCRB_FCMask.PLL_DCLK1_POWER_DOWN = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FC, RegCRB_FCValue.Value, RegCRB_FCMask.Value);
+        }
+        else if(IGAIndex == IGA2)
+        {
+            RegSR0BValue.Value = 0;
+            RegSR0BValue.DCLK2_Power_Down = 1;
+            RegSR0BMask.Value = 0xFF;
+            RegSR0BMask.DCLK2_Power_Down = 0;
+            cbMMIOWriteReg(pcbe,SR_0B, RegSR0BValue.Value, RegSR0BMask.Value);
+        }
+        else if(IGAIndex == IGA3)
+        {
+            RegCRB_FCValue.Value = 0;
+            RegCRB_FCValue.PLL_DCLK3_Power_Down = 1;
+            RegCRB_FCMask.Value = 0xFF;
+            RegCRB_FCMask.PLL_DCLK3_Power_Down = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FC, RegCRB_FCValue.Value, RegCRB_FCMask.Value);
+        }
+        else if(IGAIndex == IGA4)
+        {
+            RegCRB_FDValue.Value = 0;
+            RegCRB_FDValue.DCLK4_PLL_PWDN = 1;
+            RegCRB_FDMask.Value = 0xFF;
+            RegCRB_FDMask.DCLK4_PLL_PWDN = 0;
+            cbMMIOWriteReg(pcbe,CR_B_FD, RegCRB_FDValue.Value, RegCRB_FDMask.Value);
+        }
+    }
+
+    cbTraceExit(GENERIC);
+
+    return CBIOS_OK;
+}
 
 CBIOS_STATUS cbHWResetBlock(PCBIOS_VOID pvcbe, CBIOS_HW_BLOCK HWBlock)
 {
@@ -603,7 +690,7 @@ CBIOS_STATUS  cbHwSyncDataWithVbios(PCBIOS_VOID  pvcbe, PCBIOS_VBIOS_DATA_PARAM 
     }
     else
     {
-        cbDebugPrint((0, "CBiosSyncDataWithVbios_dst: null pointer is transfered!\n"));
+        cbDebugPrint((MAKE_LEVEL(GENERIC, ERROR), "CBiosSyncDataWithVbios_dst: null pointer is transfered!\n"));
         return CBIOS_ER_NULLPOINTER;
     }
 }
@@ -1091,7 +1178,7 @@ CBIOS_STATUS cbHWCECTransmitMessage(PCBIOS_VOID pvcbe, PCBIOS_CEC_MESSAGE pCECMe
         }
         else
         {
-            cbDebugPrint((DBG_LEVEL_ERROR_MSG, "cbHWCECTransmitMessage: Message transmission fail!\n"));
+            cbDebugPrint((MAKE_LEVEL(HDMI, ERROR), "cbHWCECTransmitMessage: Message transmission fail!\n"));
             Status = CBIOS_ER_INTERNAL;
         }
 
@@ -1192,7 +1279,7 @@ CBIOS_STATUS cbHWCECReceiveMessage(PCBIOS_VOID pvcbe, PCBIOS_CEC_MESSAGE pCECMes
         }
         else
         {
-            cbDebugPrint((DBG_LEVEL_ERROR_MSG, "cbHWCECReceiveMessage: Message receive fail!\n"));
+            cbDebugPrint((MAKE_LEVEL(HDMI, ERROR), "cbHWCECReceiveMessage: Message receive fail!\n"));
             Status = CBIOS_ER_INTERNAL;
         }
 

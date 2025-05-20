@@ -1,31 +1,32 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** CBios path manager interface function implementation.
-** Generate display source path, DIU module index and devices combination.
-**
-** NOTE:
-**The hw dependent function or structure SHOULD NOT be added to this file.
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include "CBiosPathManager.h"
 #include "CBiosChipShare.h"
 #include "../Hw/HwBlock/CBiosDIU_HDCP.h"
 #include "../Hw/HwBlock/CBiosDIU_HDTV.h"
+#include "../Hw/HwBlock/CBiosDIU_DP.h"
 #include "../Hw/HwBlock/CBiosDIU_HDMI.h"
 
 
@@ -64,7 +65,7 @@ CBIOS_STATUS cbPathMgrGetDevComb(PCBIOS_VOID pvcbe, PCBIOS_GET_DEV_COMB pDevComb
     while(Devices)
     {
         bAssigned = CBIOS_FALSE;
-        
+
         //select a high priority device if more than one device
         TempDev = cbDevGetPrimaryDevice(Devices);
         Devices &= ~TempDev;
@@ -98,7 +99,7 @@ CBIOS_STATUS cbPathMgrGetDevComb(PCBIOS_VOID pvcbe, PCBIOS_GET_DEV_COMB pDevComb
         pDeviceComb->Iga3Dev = DevOnIga[IGA3];
         pDeviceComb->Iga4Dev = DevOnIga[IGA4];
         pDevComb->bSupported = CBIOS_TRUE;
-        
+
         return CBIOS_OK;
     }
     else
@@ -106,7 +107,7 @@ CBIOS_STATUS cbPathMgrGetDevComb(PCBIOS_VOID pvcbe, PCBIOS_GET_DEV_COMB pDevComb
         pDevComb->bSupported = CBIOS_FALSE;
         return CBIOS_ER_INVALID_PARAMETER;
     }
-    
+
 }
 
 CBIOS_STATUS cbPathMgrGetIgaMask(PCBIOS_VOID pvcbe, PCBIOS_GET_IGA_MASK pGetIgaMask)
@@ -356,12 +357,20 @@ CBIOS_MODULE_INDEX cbGetModuleIndex(PCBIOS_VOID pvcbe, CBIOS_ACTIVE_TYPE Device,
     {
     case CBIOS_MODULE_TYPE_DP:
         ModuleIndex = pSource->ModuleList.DPModule.Index;
+        if(ModuleIndex >= DP_MODU_NUM)
+        {
+            ModuleIndex = CBIOS_MODULE_INDEX_INVALID;
+        }
         break;
     case CBIOS_MODULE_TYPE_MHL:
         ModuleIndex = pSource->ModuleList.MHLModule.Index;
         break;
     case CBIOS_MODULE_TYPE_HDMI:
         ModuleIndex = pSource->ModuleList.HDMIModule.Index;
+        if(ModuleIndex >= HDMI_MODU_NUM)
+        {
+            ModuleIndex = CBIOS_MODULE_INDEX_INVALID;
+        }
         break;
     case CBIOS_MODULE_TYPE_HDTV:
         ModuleIndex = pSource->ModuleList.HDTVModule.Index;
@@ -374,6 +383,10 @@ CBIOS_MODULE_INDEX cbGetModuleIndex(PCBIOS_VOID pvcbe, CBIOS_ACTIVE_TYPE Device,
         break;
     case CBIOS_MODULE_TYPE_IGA:
         ModuleIndex = pSource->ModuleList.IGAModule.Index;
+        if((CBIOS_U32)ModuleIndex >= pcbe->DispMgr.IgaCount)
+        {
+            ModuleIndex = CBIOS_MODULE_INDEX_INVALID;
+        }
         break;
     default:
         cbDebugPrint((MAKE_LEVEL(GENERIC, ERROR), "%s: invalid module type: %d!\n", FUNCTION_NAME, ModuleType));
@@ -382,7 +395,7 @@ CBIOS_MODULE_INDEX cbGetModuleIndex(PCBIOS_VOID pvcbe, CBIOS_ACTIVE_TYPE Device,
 
     if (ModuleIndex == CBIOS_MODULE_INDEX_INVALID)
     {
-        cbDebugPrint((MAKE_LEVEL(GENERIC, WARNING), "%s: invalid module index of module: %d!\n", FUNCTION_NAME, ModuleType));
+        cbDebugPrint((MAKE_LEVEL(GENERIC, INFO), "%s: Invalid module %d for device 0x%x!\n", FUNCTION_NAME, ModuleType, Device));
     }
 
     return ModuleIndex;
