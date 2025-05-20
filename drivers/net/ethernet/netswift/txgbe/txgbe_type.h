@@ -3041,6 +3041,8 @@ enum txgbe_sfp_type {
 	txgbe_qsfp_type_40g_sr_core1 = 26,
 	txgbe_qsfp_type_40g_lr_core0 = 27,
 	txgbe_qsfp_type_40g_lr_core1 = 28,
+	txgbe_qsfp_type_40g_active_core0 = 29,
+	txgbe_qsfp_type_40g_active_core1 = 30,
 	txgbe_sfp_type_not_present = 0xFFFE,
 	txgbe_sfp_type_unknown = 0xFFFF
 };

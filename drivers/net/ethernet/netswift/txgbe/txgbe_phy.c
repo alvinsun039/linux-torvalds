@@ -966,6 +966,8 @@ s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw)
 
 	if (identifier == TXGBE_SFF_IDENTIFIER_QSFP ||
 	    identifier == TXGBE_SFF_IDENTIFIER_QSFP_PLUS) {
+		hw->phy.type = txgbe_phy_sfp_unknown;
+
 		status = hw->phy.ops.read_i2c_eeprom(hw,
 						     TXGBE_ETHERNET_COMP_OFFSET,
 						     &transceiver_type);
@@ -995,6 +997,14 @@ s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw)
 			else
 				hw->phy.sfp_type = txgbe_qsfp_type_40g_lr_core1;
 		}
+
+		if (transceiver_type & TXGBE_SFF_ETHERNET_40G_ACTIVE) {
+			if (hw->bus.lan_id == 0)
+				hw->phy.sfp_type = txgbe_qsfp_type_40g_active_core0;
+			else
+				hw->phy.sfp_type = txgbe_qsfp_type_40g_active_core1;
+		}
+
 	} else {
 		hw->phy.type = txgbe_phy_sfp_unsupported;
 		status = TXGBE_ERR_SFP_NOT_SUPPORTED;
