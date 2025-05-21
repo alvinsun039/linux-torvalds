@@ -7653,6 +7653,8 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	int j, bwg_pct;
 #endif /* CONFIG_DCB */
 	u32 fw_version;
+	u32 flash_header;
+	u32 flash_header_index;
 
 	/* PCI config space info */
 	hw->vendor_id = pdev->vendor;
@@ -7665,13 +7667,23 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 		goto out;
 	}
 
+	txgbe_flash_read_dword(hw, 0x0, &flash_header);
+	if ((flash_header & 0xffff) == TXGBE_FLASH_HEADER_FLAG)
+		flash_header_index = 0x0;
+	else
+		flash_header_index = 0x1;
+
 	hw->oem_svid = pdev->subsystem_vendor;
 	hw->oem_ssid = pdev->subsystem_device;
 	if (pdev->subsystem_vendor == 0x8088) {
 		hw->subsystem_vendor_id = pdev->subsystem_vendor;
 		hw->subsystem_device_id = pdev->subsystem_device;
 	} else {
-		txgbe_flash_read_dword(hw, 0xfffdc, &ssid);
+		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
+			txgbe_flash_read_dword(hw, (flash_header_index * 0x10000) + 0x202c, &ssid);
+		else
+			txgbe_flash_read_dword(hw, 0xfffdc, &ssid);
+
 		if (ssid == 0x1) {
 			e_err(probe, "read of internel subsystem device id failed\n");
 			err = -ENODEV;
@@ -7682,7 +7694,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 					  hw->subsystem_device_id << 8;
 	}
 
-	txgbe_flash_read_dword(hw, 0x13a, &fw_version);
+	txgbe_flash_read_dword(hw, (flash_header_index * 0x10000) + 0x13a, &fw_version);
 	snprintf(adapter->fl_version, sizeof(adapter->fw_version),
 			 "0x%08x", fw_version);
 	

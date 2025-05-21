@@ -136,6 +136,8 @@
 #define TXGBE_WOL_MASK                          0x4000
 #define TXGBE_DEV_MASK                          0xf0
 
+#define TXGBE_FLASH_HEADER_FLAG                 0x5aa5
+
 
 /* Combined interface*/
 #define TXGBE_ID_SFI_XAUI						0x50
