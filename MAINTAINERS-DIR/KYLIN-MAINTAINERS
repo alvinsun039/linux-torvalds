@@ -374,11 +374,11 @@ F:	net/can/
 FILESYSTEM DRIVER
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Hu Hai <huhai@kylinos.cn>
-M:	Shida Zhang <zhangshida@kylinos.cn>
-R:	liubaolin <liubaolin@kylinos.cn>
-R:	pengyu <pengyu@kylinos.cn>
-R:	Jiangshan Yi <yijiangshan@kylinos.cn>
-R:	pengcan <pengcan@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+M:	Youling Tang <tangyouling@kylinos.cn>
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
 S:	Supported
 F:	net/ceph/
 F:	include/linux/ceph/
@@ -391,10 +391,76 @@ F:	include/trace/events/fs_dax.h
 F:	include/uapi/linux/fuse.h
 F:	include/uapi/linux/gfs2_ondisk.h
 
+XFS FILESYSTEM
+M:	Zhang Shida <zhangshida@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+R:	Youling Tang <tangyouling@kylinos.cn>
+S:	Supported
+F:	Documentation/filesystems/xfs.txt
+F:	fs/xfs/
+
+EXT4 FILESYSTEM
+M:	liubaolin <liubaolin@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+S:	Supported
+F:	Documentation/filesystems/ext4/
+F:	fs/ext4/
+F:	fs/jbd2/
+
+NFS FILESYSTEM
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+R:	dingpenglong <dingpenglong@kylinos.cn>
+S:	Supported
+F:	fs/nfs/
+F:	fs/nfs_common/
+F:	fs/nfsd/
+
+SMB FILESYSTEM
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+R:	dingpenglong <dingpenglong@kylinos.cn>
+S:	Supported
+F:	fs/smb/
+
+BTRFS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+S:	Supported
+F:	fs/btrfs
+
+F2FS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+S:	Supported
+F:	fs/f2fs
+
+GFS2 FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+S:	Supported
+F:	fs/gfs2
+
+JFS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+S:	Supported
+F:	fs/jfs
+
+OCFS2 FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+S:	Supported
+F:	fs/ocfs2
+
+BCACHEFS FILESYSTEM
+M:	Youling Tang <tangyouling@kylinos.cn>
+R:	huhai <huhai@kylinos.cn>
+S:	Supported
+F:	fs/bcachefs
+
 CHAR and MISC DRIVERS
 M:	Liu Yun <liuyun01@kylinos.cn>
 M:	Xiong Xin <xiongxin@kylinos.cn>
-M:	Hu Hai <huhai@kylinos.cn>
 R:	Luo xueqin <luoxueqin@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 R:	i Chao <aichao@kylinos.cn>
@@ -1091,13 +1157,6 @@ F:	include/xen/
 F:	arch/x86/include/asm/xen/
 F:	arch/x86/pci/xen.c
 F:	arch/x86/xen/
-
-XFS FILESYSTEM
-M:	Zhang Shida <zhangshida@kylinos.cn>
-M:	Hu Hai <huhai@kylinos.cn>
-S:	Supported
-F:	Documentation/filesystems/xfs.txt
-F:	fs/xfs/
 
 BACKPORT TOOLS
 M:	Liu Yun <liuyun01@kylinos.cn>
