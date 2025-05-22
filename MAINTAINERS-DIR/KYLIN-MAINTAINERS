@@ -390,6 +390,20 @@ F:	include/linux/dax.h
 F:	include/trace/events/fs_dax.h
 F:	include/uapi/linux/fuse.h
 F:	include/uapi/linux/gfs2_ondisk.h
+X:	Documentation/filesystems/xfs.txt
+X:	fs/xfs/
+X:	fs/ext4/
+X:	fs/jbd2/
+X:	fs/nfs/
+X:	fs/nfs_common/
+X:	fs/nfsd/
+X:	fs/smb/
+X:	fs/btrfs
+X:	fs/f2fs
+X:	fs/gfs2
+X:	fs/jfs
+X:	fs/ocfs2
+X:	fs/bcachefs
 
 XFS FILESYSTEM
 M:	Zhang Shida <zhangshida@kylinos.cn>
