@@ -3727,12 +3727,11 @@ void txgbe_irq_enable(struct txgbe_adapter *adapter, bool queues, bool flush)
 
 	/* enable gpio interrupt */
 	if (hw->mac.type == txgbe_mac_aml40) {
-		mask |= TXGBE_GPIO_INTEN_4;
+		mask = TXGBE_GPIO_INTEN_4;
 	} else if (device_type != TXGBE_ID_MAC_XAUI &&
 	    device_type != TXGBE_ID_MAC_SGMII) {
-		mask |= TXGBE_GPIO_INTEN_2;
-		mask |= TXGBE_GPIO_INTEN_3;
-		mask |= TXGBE_GPIO_INTEN_6;
+		mask = TXGBE_GPIO_INTEN_2 | TXGBE_GPIO_INTEN_3 |
+			TXGBE_GPIO_INTEN_6;
 	}
 	wr32(&adapter->hw, TXGBE_GPIO_INTEN, mask);
 
