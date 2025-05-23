@@ -7017,6 +7017,7 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 	}
 
 	if (hw->mac.type == txgbe_mac_aml40) {
+		hw->mac.ops.clear_hw_cntrs(hw);
 		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
 			 if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_40G) {
@@ -7031,6 +7032,7 @@ static void txgbe_up_complete(struct txgbe_adapter *adapter)
 			 TXGBE_GPIO_DDR_0 | TXGBE_GPIO_DDR_1 | TXGBE_GPIO_DDR_3);
 		wr32(hw, TXGBE_GPIO_DR, TXGBE_GPIO_DR_1);
 	} else if (hw->mac.type == txgbe_mac_aml) {
+		hw->mac.ops.clear_hw_cntrs(hw);
 		links_reg = rd32(hw, TXGBE_CFG_PORT_ST);
 		if (links_reg & TXGBE_CFG_PORT_ST_LINK_UP) {
 			if (links_reg & TXGBE_CFG_PORT_ST_AML_LINK_25G) {
@@ -8443,15 +8445,6 @@ int txgbe_close(struct net_device *netdev)
 		sizeof(struct txgbe_5tuple_filter_info));
 
 	txgbe_release_hw_control(adapter);
-
-	if (hw->mac.type == txgbe_mac_aml ||
-			hw->mac.type == txgbe_mac_aml40) {
-		wr32m(hw, TXGBE_MAC_TX_CFG, TXGBE_MAC_TX_CFG_TE,
-							 ~TXGBE_MAC_TX_CFG_TE);
-		wr32m(hw, TXGBE_MAC_RX_CFG, TXGBE_MAC_RX_CFG_RE,
-							 ~TXGBE_MAC_RX_CFG_RE);
-		hw->mac.ops.clear_hw_cntrs(hw);
-	}
 
 	return 0;
 }

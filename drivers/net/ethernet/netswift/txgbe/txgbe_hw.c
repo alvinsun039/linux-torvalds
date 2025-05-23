@@ -3748,9 +3748,8 @@ void txgbe_enable_rx(struct txgbe_hw *hw)
 	u32 pfdtxgswc;
 
 	/* enable mac receiver */
-	if (hw->mac.type == txgbe_mac_sp)
-		wr32m(hw, TXGBE_MAC_RX_CFG,
-			TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
+	wr32m(hw, TXGBE_MAC_RX_CFG,
+		TXGBE_MAC_RX_CFG_RE, TXGBE_MAC_RX_CFG_RE);
 
 	wr32m(hw, TXGBE_RDB_PB_CTL,
 		TXGBE_RDB_PB_CTL_RXEN, TXGBE_RDB_PB_CTL_RXEN);
