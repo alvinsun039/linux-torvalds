@@ -7669,7 +7669,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 	}
 
 	txgbe_flash_read_dword(hw, 0x0, &flash_header);
-	if ((flash_header & 0xffff) == TXGBE_FLASH_HEADER_FLAG)
+	if (((flash_header >> 16) & 0xffff) == TXGBE_FLASH_HEADER_FLAG)
 		flash_header_index = 0x0;
 	else
 		flash_header_index = 0x1;
