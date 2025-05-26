@@ -7668,6 +7668,12 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 		goto out;
 	}
 
+	err = txgbe_init_shared_code(hw);
+	if (err) {
+		e_err(probe, "init_shared_code failed: %d\n", err);
+		goto out;
+	}
+
 	txgbe_flash_read_dword(hw, 0x0, &flash_header);
 	if (((flash_header >> 16) & 0xffff) == TXGBE_FLASH_HEADER_FLAG)
 		flash_header_index = 0x0;
@@ -7700,11 +7706,6 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 			 "0x%08x", fw_version);
 	
 
-	err = txgbe_init_shared_code(hw);
-	if (err) {
-		e_err(probe, "init_shared_code failed: %d\n", err);
-		goto out;
-	}
 	adapter->mac_table = kzalloc(sizeof(struct txgbe_mac_addr) *
 				     hw->mac.num_rar_entries,
 				     GFP_ATOMIC);
