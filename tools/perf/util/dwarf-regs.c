@@ -58,7 +58,7 @@ const char *get_dwarf_regstr(unsigned int n, unsigned int machine)
 	case EM_SPARC:
 	case EM_SPARCV9:
 		return __get_dwarf_regstr(sparc_regstr_tbl, n);
-	case EM_SW_64:
+	case EM_SW64:
 		return __get_dwarf_regstr(sw_64_regstr_tbl, n);
 	case EM_XTENSA:
 		return __get_dwarf_regstr(xtensa_regstr_tbl, n);
