@@ -1351,6 +1351,8 @@ bool txgbe_alloc_rx_buffers(struct txgbe_ring *rx_ring, u16 cleaned_count)
 	return false;
 
 no_buffers:
+	i += rx_ring->count;
+
 	if (rx_ring->next_to_use != i)
 		txgbe_release_rx_desc(rx_ring, i);
 
