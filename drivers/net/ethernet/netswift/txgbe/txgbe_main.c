@@ -7689,7 +7689,7 @@ static int __devinit txgbe_sw_init(struct txgbe_adapter *adapter)
 		hw->subsystem_device_id = pdev->subsystem_device;
 	} else {
 		if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
-			txgbe_flash_read_dword(hw, (flash_header_index * 0x10000) + 0x202c, &ssid);
+			txgbe_flash_read_dword(hw, (flash_header_index * 0x10000) + 0x302c, &ssid);
 		else
 			txgbe_flash_read_dword(hw, 0xfffdc, &ssid);
 
