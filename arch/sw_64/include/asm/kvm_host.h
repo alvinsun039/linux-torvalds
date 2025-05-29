@@ -127,13 +127,6 @@ struct kvm_vm_stat {
 	struct kvm_vm_stat_generic generic;
 };
 
-struct kvm_stats_debugfs_item {
-	const char *name;
-	int offset;
-	enum kvm_stat_kind kind;
-	int mode;
-};
-
 struct kvm_vcpu_stat {
 	struct kvm_vcpu_stat_generic generic;
 	u64 pid;
@@ -162,27 +155,6 @@ struct kvm_vcpu_stat {
 	u64 stime;
 	u64 gtime;
 };
-
-enum dfx_sw64_stat_kind {
-	DFX_SW64_STAT_U64,
-	DFX_SW64_STAT_CPUTIME,
-};
-
-/* Detail For vcpu stat EXtension debugfs item */
-struct dfx_sw64_kvm_stats_debugfs_item {
-	const char *name;
-	int offset;
-	enum dfx_sw64_stat_kind dfx_kind;
-	struct dentry *dentry;
-};
-extern struct dfx_sw64_kvm_stats_debugfs_item dfx_sw64_debugfs_entries[];
-
-#define VM_STAT(n, x, ...) 							\
-	{ n, offsetof(struct kvm, stat.x), KVM_STAT_VM, ## __VA_ARGS__ }
-#define VCPU_STAT(n, x, ...)							\
-	{ n, offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU, ## __VA_ARGS__ }
-
-extern struct kvm_stats_debugfs_item debugfs_entries[];
 
 #ifdef CONFIG_SUBARCH_C4
 #define KVM_ARCH_WANT_MMU_NOTIFIER

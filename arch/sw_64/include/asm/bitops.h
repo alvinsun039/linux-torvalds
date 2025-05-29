@@ -8,27 +8,7 @@
 
 #include <asm/compiler.h>
 #include <asm/barrier.h>
-
-static inline bool xor_unlock_is_negative_byte(unsigned long mask,
-		volatile unsigned long *p)
-{
-	unsigned long temp, old;
-
-	__asm__ __volatile__(
-	"1:     ldl_u %0,%4\n"
-	"       mov %0,%2\n"
-	"       xor %0,%3,%0\n"
-	"       stl %0,%1\n"
-	"       beq %0,2f\n"
-	".subsection 2\n"
-	"2:     br 1b\n"
-	".previous"
-	:"=&r" (temp), "=m" (*p), "=&r" (old)
-	:"Ir" (mask), "m" (*p));
-
-	return (old & BIT(7)) != 0;
-}
-
+#include <linux/atomic.h>
 
 #ifdef CONFIG_SUBARCH_C3B
 /*
