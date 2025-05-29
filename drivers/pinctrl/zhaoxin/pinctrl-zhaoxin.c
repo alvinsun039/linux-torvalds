@@ -26,24 +26,6 @@
 #include "../core.h"
 #include "pinctrl-zhaoxin.h"
 
-/* debug option */
-static bool debug;
-module_param(debug, bool, 0444);
-MODULE_PARM_DESC(debug, "print debug information");
-
-static int pin_to_hwgpio(struct pinctrl_gpio_range *range, unsigned int pin)
-{
-	int offset = 0;
-
-	if (range->pins) {
-		for (offset = 0; offset < range->npins; offset++)
-			if (pin == range->pins[offset])
-				break;
-		return range->base + offset - range->gc->base;
-	} else
-		return pin - range->pin_base + range->base - range->gc->base;
-}
-
 static u16 zx_pad_read16(struct zhaoxin_pinctrl *pctrl, u8 index)
 {
 	outb(index, pctrl->pmio_rx90 + pctrl->pmio_base);
@@ -83,7 +65,6 @@ static int zhaoxin_get_group_pins(struct pinctrl_dev *pctldev, unsigned int grou
 
 static void zhaoxin_pin_dbg_show(struct pinctrl_dev *pctldev, struct seq_file *s, unsigned int pin)
 {
-	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
 }
 
 static const struct pinctrl_ops zhaoxin_pinctrl_ops = {
@@ -121,8 +102,6 @@ static int zhaoxin_get_function_groups(struct pinctrl_dev *pctldev, unsigned int
 static int zhaoxin_pinmux_set_mux(struct pinctrl_dev *pctldev, unsigned int function,
 				  unsigned int group)
 {
-	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-
 	return 0;
 }
 
@@ -194,16 +173,12 @@ static const struct pinmux_ops zhaoxin_pinmux_ops = {
 
 static int zhaoxin_config_get(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *config)
 {
-	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-
 	return 0;
 }
 
 static int zhaoxin_config_set(struct pinctrl_dev *pctldev, unsigned int pin, unsigned long *configs,
 			      unsigned int nconfigs)
 {
-	struct zhaoxin_pinctrl *pctrl = pinctrl_dev_get_drvdata(pctldev);
-
 	return 0;
 }
 
