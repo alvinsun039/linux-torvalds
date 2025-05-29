@@ -198,6 +198,8 @@ static int move_ptes(struct vm_area_struct *vma, pmd_t *old_pmd,
 
 	for (; old_addr < old_end; old_pte++, old_addr += PAGE_SIZE,
 				   new_pte++, new_addr += PAGE_SIZE) {
+		VM_WARN_ON_ONCE(!pte_none(*new_pte));
+
 		if (pte_none(ptep_get(old_pte)))
 			continue;
 
