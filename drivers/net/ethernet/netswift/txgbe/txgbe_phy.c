@@ -1422,8 +1422,7 @@ STATIC s32 txgbe_write_i2c_byte_int(struct txgbe_hw *hw, u8 byte_offset,
 	if (status != 0)
 		goto out;
 
-	wr32(hw, TXGBE_I2C_DATA_CMD,
-			byte_offset | TXGBE_I2C_DATA_CMD_STOP);
+	wr32(hw, TXGBE_I2C_DATA_CMD, byte_offset);
 	wr32(hw, TXGBE_I2C_DATA_CMD,
 			data | TXGBE_I2C_DATA_CMD_WRITE);
 
