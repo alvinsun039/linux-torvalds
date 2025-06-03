@@ -145,7 +145,7 @@ static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
 		 (0x09090909 & GENMASK(8 * lane_num - 1, 0))),
 		100, 200000, false, hw, E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	if (status)
-		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts 1 = %x : %d, Wait rx_sts %s.\n",
 		       rdata, status, status ? "FAILED" : "SUCCESS");
 
 	for (lane_id = 0; lane_id < lane_num; lane_id++) {
@@ -172,7 +172,7 @@ static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
 		 (0x21212121 & GENMASK(8 * lane_num - 1, 0))),
 		100, 200000, false, hw, E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	if (status)
-		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts 2 = %x : %d, Wait rx_sts %s.\n",
 		       rdata, status, status ? "FAILED" : "SUCCESS");
 	rdata = rd32_ephy(hw, 0x15ec);
 	txgbe_wr32_ephy(hw, 0x15ec, rdata);
@@ -207,7 +207,7 @@ static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
 		 (0x09090909 & GENMASK(8 * lane_num - 1, 0))),
 		100, 200000, false, hw, E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	if (status)
-		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts 3 = %x : %d, Wait rx_sts %s.\n",
 		       rdata, status, status ? "FAILED" : "SUCCESS");
 
 	for (lane_id = 0; lane_id < lane_num; lane_id++) {
@@ -246,7 +246,7 @@ static int E56phyRxsOscInitForTempTrackRange(struct txgbe_adapter *adapter,
 		 (0x21212121 & GENMASK(8 * lane_num - 1, 0))),
 		100, 200000, false, hw, E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 	if (status)
-		kr_dbg(KR_MODE, "Wait fsm_rx_sts = %x : %d, Wait rx_sts %s.\n",
+		kr_dbg(KR_MODE, "Wait fsm_rx_sts 4 = %x : %d, Wait rx_sts %s.\n",
 		       rdata, status, status ? "FAILED" : "SUCCESS");
 	rdata = rd32_ephy(hw, 0x15ec);
 	txgbe_wr32_ephy(hw, 0x15ec, rdata);
@@ -537,7 +537,6 @@ static int E56phyRxsAdcAdaptSeq(struct txgbe_adapter *adapter, u32 bypassCtle)
 		kr_dbg(KR_MODE, "%s %d :Invalid speed\n", __func__, __LINE__);
 		break;
 	}
-
 	for (lane_idx = 0; lane_idx < lane_num; lane_idx++) {
 		addr = 0x1544 + (E56PHY_PMD_RX_OFFSET * lane_idx);
 		/* Wait RXS0-3_OVRDVAL[1]::rxs0-3_rx0_cdr_rdy_o = 1 */
@@ -676,7 +675,7 @@ static int E56phyRxsAdcAdaptSeq(struct txgbe_adapter *adapter, u32 bypassCtle)
 		/* set ovrd_en_rxs0_rx0_adc_intl_adapt_en_i=0*/
 		addr = 0x1538 + (E56PHY_PMD_RX_OFFSET * lane_idx);
 		rdata = rd32_ephy(hw, addr);
-		field_set(&rdata, 31, 31, 0x1);
+		field_set(&rdata, 6, 6, 0);
 		txgbe_wr32_ephy(hw, addr, rdata);
 
 		/* 8. Now re-enable VGA and CTLE trainings, so that it continues
@@ -2003,10 +2002,26 @@ static int setphylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 	/* 1. Initiate the vendor-specific software reset by programming
 	 * the VR_RST field (bit [15]) of the VR_PCS_DIG_CTRL1 register to 1.
 	 */
+	rdata = txgbe_rd32_epcs(hw, 0x038000);
+	txgbe_wr32_epcs(hw, 0x038000, rdata | BIT(15));
 
 	/* 2. Wait for the hardware to clear the value for the VR_RST
 	 * field (bit [15]) of the VR_PCS_DIG_CTRL1 register.
 	 */
+	kr_dbg(KR_MODE, "Wait for the bit [15] (VR_RST) to get cleared.\n");
+	status = read_poll_timeout(txgbe_rd32_epcs, rdata,
+				   FIELD_GET_M(BIT(15), rdata) == 0, 100,
+				   200000, false, hw,
+				   0x038000);
+	kr_dbg(KR_MODE, "Wait PHY VR_RST = %x, Wait VR_RST %s.\n",
+	       rdata, status ? "FAILED" : "SUCCESS");
+
+	/* wait rx/tx/cm powerdn_st  according pmd 50   2.0.5 */
+	status = read_poll_timeout(rd32_ephy, rdata,
+				   (rdata & GENMASK(3, 0)) == 0x9, 100,
+				   200000, false, hw, 0x14d4);
+	kr_dbg(KR_MODE, "wait ctrl_fsm_cm_st = %x, %s.\n",
+	       rdata, status ? "FAILED" : "SUCCESS");
 
 	/* 3. Write 4'b0011 to bits [5:2] of the SR_PCS_CTRL1 register.
 	 * 10G: 0 25G: 5 40G: 3
@@ -2191,6 +2206,7 @@ int txgbe_e56_set_phylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 		break;
 	}
 
+	adapter->an_done = false;
 	if (adapter->curbp_link_mode == 10)
 		return 0;
 	kr_dbg(KR_MODE, "Setup to backplane mode ==========\n");
@@ -2274,27 +2290,6 @@ int txgbe_e56_set_phylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 		txgbe_wr32_epcs(hw, 0x078006, 25);
 		txgbe_wr32_epcs(hw, 0x078000, 0x0008 | BIT(2));
 
-		rdata = txgbe_rd32_epcs(hw, 0x038000);
-		txgbe_wr32_epcs(hw, 0x038000, rdata | BIT(15));
-
-		kr_dbg(KR_MODE, "1.1 Wait PHY init ....\n");
-		status = read_poll_timeout(txgbe_rd32_epcs, rdata,
-					   FIELD_GET_M(BIT(15), rdata) == 0, 100,
-					   200000, false, hw, 0x038000);
-		if (status) {
-			kr_dbg(KR_MODE,
-			       "Wait PHY VR_RST = %x, Wait VR_RST %s.\n", rdata,
-			       status ? "FAILED" : "SUCCESS");
-			return status;
-		}
-
-		/* wait rx/tx/cm powerdn_st  according pmd 50   2.0.5 */
-		status = read_poll_timeout(rd32_ephy, rdata,
-					   (rdata & GENMASK(3, 0)) == 0x9, 100,
-					   200000, false, hw, 0x14d4);
-		kr_dbg(KR_MODE, "wait ctrl_fsm_cm_st = %x, %s.\n", rdata,
-		       status ? "FAILED" : "SUCCESS");
-
 		kr_dbg(KR_MODE, "1.2 Wait 10G KR phy/pcs mode init ....\n");
 		status = setphylinkmode(adapter, 10, bypassCtle);
 		if (status)
@@ -2325,6 +2320,10 @@ int txgbe_e56_set_phylinkmode(struct txgbe_adapter *adapter, u8 bplinkmode,
 					   E56PHY_CTRL_FSM_RX_STAT_0_ADDR);
 		kr_dbg(KR_MODE, "Wait 10g fsm_rx_sts = %x, Wait rx_sts %s.\n",
 		       rdata, status ? "FAILED" : "SUCCESS");
+
+		rdata = txgbe_rd32_epcs(hw, 0x070000);
+		field_set(&rdata, 12, 12, 0x1);
+		txgbe_wr32_epcs(hw, 0x070000, rdata);
 		kr_dbg(KR_MODE, "Setup the backplane mode========end ==\n");
 	} else {
 		if ((hw->phy.fiber_suppport_speed &
@@ -2585,6 +2584,7 @@ static int txgbe_e56_cl72_trainning(struct txgbe_adapter *adapter)
 	/* 16. enable CMS and its internal PLL */
 	rdata = rd32_ephy(hw, 0x1400);
 	field_set(&rdata, 21, 20, pll_en_cfg);
+	field_set(&rdata, 19, 12, 0); /* tx/rx off */
 	field_set(&rdata, 8, 8, pmd_mode);
 	field_set(&rdata, 1, 1, 0x1); /* pmd en */
 	txgbe_wr32_ephy(hw, 0x1400, rdata);
@@ -2738,7 +2738,7 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	struct net_device *netdev = adapter->netdev;
 	u32 rlu = 0, an_int = 0, an_int1 = 0;
 	struct txgbe_hw *hw = &adapter->hw;
-	u32 value = 0;
+	u32 value = 0, fsm = 0;
 	int ret = 0;
 
 	if (!(hw->phy.sfp_type == txgbe_sfp_type_da_cu_core0 ||
@@ -2781,13 +2781,27 @@ void txgbe_e56_bp_watchdog_event(struct txgbe_adapter *adapter)
 	if (value & TXGBE_E56_AN_PG_RCV) {
 		kr_dbg(KR_MODE, "Enter training\n");
 		ret = handle_e56_bkp_an73_flow(adapter);
-		if (ret & AN_TRAINNING_MODE) {
-			mutex_lock(&adapter->e56_lock);
-			txgbe_e56_set_phylinkmode(adapter, 10, hw->bypassCtle);
-			mutex_unlock(&adapter->e56_lock);
+		if (!AN_TRAINNING_MODE) {
+			fsm = txgbe_rd32_epcs(hw, 0x78010);
+			if (fsm & 0x8)
+				goto an_status;
+			if (ret) {
+				kr_dbg(KR_MODE, "Training FAILED, do reset\n");
+				mutex_lock(&adapter->e56_lock);
+				txgbe_e56_set_phylinkmode(adapter, 10, hw->bypassCtle);
+				mutex_unlock(&adapter->e56_lock);
+			} else {
+				kr_dbg(KR_MODE, "ALL SUCCESSED\n");
+			}
 		} else {
-			if (AN_TRAINNING_MODE)
+			if (ret) {
+				kr_dbg(KR_MODE, "Training FAILED, do reset\n");
+				mutex_lock(&adapter->e56_lock);
+				txgbe_e56_set_phylinkmode(adapter, 10, hw->bypassCtle);
+				mutex_unlock(&adapter->e56_lock);
+			} else {
 				adapter->an_done = true;
+			}
 		}
 	}
 
@@ -2799,8 +2813,8 @@ an_status:
 	}
 	rlu = txgbe_rd32_epcs(hw, 0x30001);
 	kr_dbg(KR_MODE,
-	       "RLU:%x MLU:%x INT:%x-%x CTL:%x fsm:%x pmd_cfg0:%x an_done:%d\n",
+	       "RLU:%x MLU:%x INT:%x-%x CTL:%x fsm:%x pmd_cfg0:%x an_done:%d by:%d\n",
 	       txgbe_rd32_epcs(hw, 0x30001), rd32(hw, 0x14404), an_int, an_int1,
 	       txgbe_rd32_epcs(hw, 0x70000), txgbe_rd32_epcs(hw, 0x78010),
-	       rd32_ephy(hw, 0x1400), adapter->an_done);
+	       rd32_ephy(hw, 0x1400), adapter->an_done, hw->bypassCtle);
 }

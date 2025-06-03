@@ -982,6 +982,13 @@ s32 txgbe_identify_qsfp_module(struct txgbe_hw *hw)
 			hw->phy.fiber_suppport_speed =
 						TXGBE_LINK_SPEED_40GB_FULL |
 						TXGBE_LINK_SPEED_10GB_FULL;
+
+			if (!AUTO) {
+				if (hw->bus.lan_id == 0)
+					hw->phy.sfp_type = txgbe_qsfp_type_40g_sr_core0;
+				else
+					hw->phy.sfp_type = txgbe_qsfp_type_40g_sr_core1;
+			}
 		}
 
 		if (transceiver_type & TXGBE_SFF_ETHERNET_40G_SR4) {
