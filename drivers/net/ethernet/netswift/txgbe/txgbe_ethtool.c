@@ -5467,6 +5467,11 @@ static int txgbe_get_module_eeprom(struct net_device *dev,
 		if (value & TXGBE_SFP1_MOD_PRST_LS) {
 			return -EIO;
 		}
+
+		if (!netif_carrier_ok(dev)) {
+			e_err(drv, "\"Ethool -m\" is supported only when link is up for 40G.\n");
+			return -EIO;
+		}
 	}
 
 	if (hw->mac.type == txgbe_mac_aml) {
