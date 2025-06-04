@@ -281,7 +281,7 @@ config SUNXI_NMI_INTC
 	bool
 	select GENERIC_IRQ_CHIP
 
-config SW64_INTC_V2
+config SW64_PINTC
 	bool "SW64 Interrupt Controller V2"
 	depends on UNCORE_XUELANG
 	default y
