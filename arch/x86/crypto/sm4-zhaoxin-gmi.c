@@ -351,7 +351,7 @@ static int sm4_cipher_ofb(struct skcipher_request *req, struct sm4_cipher_data *
 	struct skcipher_walk walk;
 	unsigned int blocks, nbytes;
 	int err;
-	u8 *iv = NULL, *dst, *src;
+	u8 *dst, *src;
 
 	err = skcipher_walk_virt(&walk, req, true);
 
