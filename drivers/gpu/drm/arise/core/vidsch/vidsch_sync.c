@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_adapter.h"
 #include "vidsch.h"
 #include "vidschi.h"
@@ -519,7 +528,7 @@ static int vidschi_wait_fence_sync_object_signaled(task_wait_t *task, vidsch_wai
     adapter_t                  *adapter   = context->device->adapter;
     vidsch_mgr_t               *sch_mgr   = adapter->sch_mgr[context->engine_index];
     condition_func_t           condition  = (condition_func_t)&vidschi_is_fence_sync_object_signaled;
-    unsigned int               msec       = gf_do_div(instance->timeout, 1000);
+    unsigned int               msec       = gf_do_div(instance->timeout, 1000 * 1000);
     unsigned int               e_status   = 0, status = 0;
 
     vidsch_wait_fence_signaled_arg_t argu = {0};
@@ -568,7 +577,7 @@ static int vidschi_client_wait_instance_signaled(task_wait_t *task, vidsch_wait_
     adapter_t *adapter = task->desc.context->device->adapter;
     vidsch_sync_object_t *sync_obj = instance->sync_obj;
 
-    int status = GF_SYNC_OBJ_CONDITION_SATISFIED;
+    int ret = 0, status = GF_SYNC_OBJ_CONDITION_SATISFIED;
 
     switch (sync_obj->type)
     {
@@ -592,7 +601,13 @@ static int vidschi_client_wait_instance_signaled(task_wait_t *task, vidsch_wait_
 
     case GF_SYNC_OBJ_TYPE_DMAFENCE:
 
-        status = adapter->drm_cb->fence.dma_sync_object_wait(adapter->drm_cb_argu, sync_obj->dma.dma_sync_obj, 1000);
+        ret = adapter->drm_cb->fence.dma_sync_object_wait(adapter->drm_cb_argu, sync_obj->dma.dma_sync_obj, 1000);
+        if (ret > 0)
+            status = GF_SYNC_OBJ_ALREAD_SIGNALED;
+        else if (!ret)
+            status = GF_SYNC_OBJ_TIMEOUT_EXPIRED;
+        else
+            status = GF_SYNC_OBJ_ERROR;
 
         break;
 

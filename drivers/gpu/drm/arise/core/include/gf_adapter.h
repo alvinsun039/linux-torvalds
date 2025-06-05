@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #ifndef __GF_ADAPTER_H__
 #define __GF_ADAPTER_H__
 
@@ -220,17 +229,34 @@ typedef struct ctl_flags
     unsigned int  vesa_tempbuffer_enable :1;
     unsigned int  hwq_event_enable       :1;
     unsigned int  run_on_qemu_device     :1;
-    unsigned int  reserved               :14;
+    unsigned int  boost                  :1;
+    unsigned int  reserved               :13;
 }ctl_flags_t;
 
 #define PATCH_E2UMA_FENCE_ID_LOST   (1 << 0)
 #define PATCH_FENCE_INTERRUPT_LOST  (1 << 1)
 #define PATCH_E2UMA_HW66 (1<<2)
 
+#define ENG_POWER_MIN_HOLDING_TIME_MS 300
+
+enum engine_power_state
+{
+    ENG_POWER_STATE_E0 = 0,        // ECLK Default(650Mhz)
+    ENG_POWER_STATE_E1,            // ECLK 250Mhz
+    ENG_POWER_STATE_E2,            // ECLK 250Mhz + VCLK OFF
+    ENG_POWER_STATE_E3,            // ECLK 150Mhz + VCLK OFF
+    ENG_POWER_STATE_E4,            // ECLK 150Mhz + VCLK OFF + VCORE + LOW VCC (short idle)
+    ENG_POWER_STATE_E5,            // ECLK 50Mhz + VCLK OFF + VCORE + LOW VCC (long idle)
+    ENG_POWER_STATE_HOLD,
+    ENG_POWER_STATE_AUTO,
+    ENG_POWER_STATE_NONE
+};
+
 typedef struct
 {
     int EnableClockGating;
     int EnablePowerGating;
+    int EnablePowerSwitch;
     int DonotInitPowerSet;
 }pwm_level_t;
 
@@ -382,6 +408,10 @@ typedef struct
     unsigned long long          hw_hang_max_timeout_ns;
     unsigned long long          hw_hang_fast_timeout_ns;
     unsigned long long          sync_max_server_wait_time_ns;
+    unsigned int                power_state;
+    unsigned int                disp_state;
+    unsigned long long          power_holding_time;
+    unsigned int                power_state_hold;
 } adapter_t;
 
 #endif

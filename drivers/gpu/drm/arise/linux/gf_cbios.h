@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #ifndef __GF_CBIOS_H__
 #define __GF_CBIOS_H__
 #include "CBios.h"
@@ -114,6 +123,8 @@ int         disp_cbios_get_adapter_modes_size(disp_info_t *disp_info);
 int         disp_cbios_get_adapter_modes(disp_info_t *disp_info, void* buffer, int buf_size);
 int         disp_cbios_merge_modes(CBiosModeInfoExt* merge_mode_list, CBiosModeInfoExt * adapter_mode_list, unsigned int const adapter_mode_num,
     CBiosModeInfoExt const * dev_mode_list, unsigned int const dev_mode_num);
+CBiosModeInfoExt* disp_cbios_get_preferred_mode(CBiosModeInfoExt *dev_mode_list, unsigned int mode_num);
+CBiosModeInfoExt* disp_cbios_get_maxium_mode(CBiosModeInfoExt *dev_mode_list);
 int         disp_cbios_cbmode_to_drmmode(disp_info_t *disp_info, int output, void* cbmode, int i, struct drm_display_mode *drm_mode);
 int         disp_cbios_3dmode_to_drmmode(disp_info_t *disp_info, int output, void* mode, int i, struct drm_display_mode *drm_mode);
 int         disp_cbios_get_3dmode_size(disp_info_t* disp_info, int output);
@@ -126,6 +137,7 @@ int         disp_cbios_update_output_active(disp_info_t *disp_info, int* outputs
 int         disp_cbios_set_mode(disp_info_t *disp_info, int crtc, struct drm_display_mode* mode, struct drm_display_mode* adjusted_mode, int  update_flag);
 int         disp_cbios_set_hdac_connect_status(disp_info_t *disp_info, int device , int bPresent, int bEldValid);
 int         disp_cbios_turn_onoff_screen(disp_info_t *disp_info, int iga, int on);
+int         disp_cbios_turn_onoff_iga(disp_info_t *disp_info, int iga, int on);
 int         disp_cbios_detect_connected_output(disp_info_t *disp_info, int to_detect, int full_detect);
 int         disp_cbios_set_dpms(disp_info_t *disp_info, int device, int dpms_mode);
 int         disp_cbios_sync_vbios(disp_info_t *disp_info);

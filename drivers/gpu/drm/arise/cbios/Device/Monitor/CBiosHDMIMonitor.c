@@ -1,26 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** HDMI monitor interface function implementation.
-**
-** NOTE:
-** HDMI monitor related function SHOULD be added to this file,
-** no matter the monitor is on DP port or MHL port.
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include "CBiosChipShare.h"
 #include "../../Hw/HwBlock/CBiosDIU_HDMI.h"
@@ -197,7 +197,7 @@ static CBIOS_VOID cbHDMIMonitor_GenerateAVIInfoFrameData(PCBIOS_EXTENSION_COMMON
 
     if(bIsCEAMode && VICCode > 1)
     {
-        if((pAVIInfoFrameData->ColorFormat == 0))//RGB
+        if(pAVIInfoFrameData->ColorFormat == 0)//RGB
         {
             if((pModeParams->IsAdobe) && pModeParams->ColorimetryCaps.IsSupportAdobeRGB)
             {
@@ -1110,7 +1110,7 @@ CBIOS_BOOL cbHDMIMonitor_SCDC_Handler(CBIOS_VOID* pvcbe, PCBIOS_DEVICE_COMMON pD
     CBIOS_SCDC_UPDATE_FLAGS UpdateFlags;
     CBIOS_BOOL bRet = CBIOS_FALSE;
 
-    if(pDevCommon->EdidStruct.Attribute.HFVSDBData.IsSCDCPresent)
+    if(pDevCommon->EdidStruct.Attribute.HFSCDSData.IsSCDCPresent)
     {
         cb_memset(&UpdateFlags, 0, sizeof(UpdateFlags));
         bRet = cbHDMIMonitor_SCDC_ReadUpdateFlags(pcbe, pDevCommon, &UpdateFlags);
@@ -1287,6 +1287,7 @@ CBIOS_BOOL cbHDMIMonitor_Detect(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT p
 #else
         cb_memcpy(pDevCommon->EdidData, FPGAHDMIEdid, sizeof(FPGAHDMIEdid));
 #endif
+        pDevCommon->TotalBlockNum = cbEDIDModule_GetExtBlockNum(pDevCommon->EdidData) + 1;
         IsDevChanged = CBIOS_TRUE;
         bConnected = CBIOS_TRUE;
     }
@@ -1326,7 +1327,7 @@ CBIOS_BOOL cbHDMIMonitor_Detect(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT p
             }
             cbDIU_HDMI_ConfigScrambling(pcbe, HDMIModuleIndex, pHDMIMonitorContext->ScramblingEnable);
 
-            if(pDevCommon->EdidStruct.Attribute.HFVSDBData.IsSCDCPresent)
+            if(pDevCommon->EdidStruct.Attribute.HFSCDSData.IsSCDCPresent)
             {
                 SCDCStatusFlags.ScramblerStatus = 0;
                 if(cbHDMIMonitor_SCDC_ReadData(pcbe, pDevCommon, &(SCDCStatusFlags.ScramblerStatus), 0x21, 0x1))
@@ -1449,7 +1450,7 @@ CBIOS_VOID cbHDMIMonitor_SetMode(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT 
     if (bHDMIDevice)
     {
         // avoid HBlank being too small to not transmit any packet(32 bytes).
-        if (pModeParams->TargetTiming.HorBEnd - pModeParams->TargetTiming.HorBStart < 
+        if (pModeParams->TargetTiming.HorBEnd - pModeParams->TargetTiming.HorBStart <
             HDMI_DELAY_FOR_HDCP + HDMI_LEADING_GUARD_BAND_PERIOD + HDMI_MIN_CTL_PERIOD + HDMI_TRAILING_GUARD_BAND_PERIOD + 32)
         {
             bHDCPCapable = CBIOS_FALSE;
@@ -1483,7 +1484,7 @@ CBIOS_VOID cbHDMIMonitor_OnOff(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT pH
     CBIOS_MODULE_INDEX      IGAIndex        = cbGetModuleIndex(pcbe, pDevCommon->DeviceType, CBIOS_MODULE_TYPE_IGA);
     PCBIOS_DISP_MODE_PARAMS pModeParams     = CBIOS_NULL;
     CBIOS_BOOL              bHDMIDevice     = pDevCommon->EdidStruct.Attribute.IsCEA861HDMI;
-    CBIOS_BOOL              bSCDCPresent    = pDevCommon->EdidStruct.Attribute.HFVSDBData.IsSCDCPresent;
+    CBIOS_BOOL              bSCDCPresent    = pDevCommon->EdidStruct.Attribute.HFSCDSData.IsSCDCPresent;
     PCBIOS_CEA_EXTENED_BLOCK pCEAExtData    = &pDevCommon->EdidStruct.Attribute.ExtDataBlock[VIDEO_CAPABILITY_DATA_BLOCK_TAG];
     CBIOS_BOOL              bQS             = pCEAExtData->VideoCapabilityData.bRGBQuantRange;
     CBIOS_CSC_ADJUST_PARA   CSCAdjustPara   = {0};
@@ -1571,9 +1572,6 @@ CBIOS_VOID cbHDMIMonitor_OnOff(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT pH
     }
     else
     {
-        //Wait vblank before turning off device to avoid flashing white lines
-        cbWaitVBlank(pcbe, IGAIndex);
-
         cbDIU_HDMI_DisableVideoAudio(pcbe, HDMIModuleIndex);
 
         if(pcbe->ChipCaps.bSupportScrambling)
@@ -1585,9 +1583,7 @@ CBIOS_VOID cbHDMIMonitor_OnOff(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT pH
         {
             cbDIU_HDMI_EnableReadRequest(pcbe, HDMIModuleIndex, CBIOS_FALSE);
         }
-
     }
-
 }
 
 CBIOS_VOID cbHDMIMonitor_QueryAttribute(PCBIOS_VOID pvcbe, PCBIOS_HDMI_MONITOR_CONTEXT pHDMIMonitorContext, PCBiosMonitorAttribute pMonitorAttribute)

@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_crtc.h"
 #include "gf_fence.h"
 #include "gf_drmfb.h"
@@ -34,12 +43,26 @@ void gf_crtc_dpms_onoff_helper(struct drm_crtc *crtc, int dpms_on)
     gf_crtc_t *gf_crtc = to_gf_crtc(crtc);
     int status = dpms_on? 1 : 0;
 
-    if (gf_crtc->crtc_dpms != status)
+    if(gf_crtc->crtc_dpms && !status)
     {
+        //turn off crtc
         if (!(is_crtc_work_in_splice_mode(crtc) &&
             is_splice_target_active_in_drm(drm_dev)))
         {
-            disp_cbios_turn_onoff_screen(disp_info, gf_crtc->pipe, status);
+            disp_cbios_turn_onoff_screen(disp_info, gf_crtc->pipe, 0);
+            disp_cbios_turn_onoff_iga(disp_info, gf_crtc->pipe, 0);
+        }
+
+        gf_crtc->crtc_dpms = status;
+    }
+    else if(!gf_crtc->crtc_dpms && status)
+    {
+        //turn on crtc
+        if (!(is_crtc_work_in_splice_mode(crtc) &&
+            is_splice_target_active_in_drm(drm_dev)))
+        {
+            disp_cbios_turn_onoff_iga(disp_info, gf_crtc->pipe, 1);
+            disp_cbios_turn_onoff_screen(disp_info, gf_crtc->pipe, 1);
         }
 
         gf_crtc->crtc_dpms = status;
@@ -97,13 +120,18 @@ void  gf_crtc_helper_set_mode(struct drm_crtc *crtc)
     struct drm_display_mode* mode = &crtc->state->mode;
     struct drm_display_mode* adj_mode = &crtc_state->adjusted_mode;
     int flag = 0;
-
+    struct task_struct *cur_task = current;
      //in atomic set phase, atomic state is updated to state of crtc/encoder/connector,
     //so we can't roll back mode setting, that means all parameter check should be placed in
     //atomic check function, and now all para is correct, we only need flush them to HW register
     //but we still add para check code here tempararily, it will be removed after code stable.
 
     DRM_DEBUG_KMS("crtc=%d\n", crtc->index);
+
+    if(cur_task)
+    {
+        gf_info("Task [%s] set mode to crtc %d.\n", cur_task->comm, crtc->index);
+    }
 
     gf_update_active_connector(crtc);
 
@@ -235,7 +263,11 @@ void gf_crtc_update_lut(struct drm_crtc_state *crtc_state)
         gamma[i] = ((b >> 6) & 0x3FF) + ((g << 4) & 0xFFC00) + ((r << 14) & 0x3FF00000);
     }
 
+    gf_mutex_lock(disp_info->gamma_lock);
+
     disp_cbios_set_gamma(disp_info, gf_crtc->pipe, gamma);
+
+    gf_mutex_unlock(disp_info->gamma_lock);
 
     gf_free(gamma);
 }
@@ -256,10 +288,10 @@ void gf_crtc_atomic_begin(struct drm_crtc *crtc, struct drm_crtc_state *old_crtc
     //do some prepare on specified crtc before update planes
     //for intel chip, it will wait until scan line is not in (vblank-100us) ~ vblank
     //will implement it later
-    if(crtc_state->color_mgmt_changed ||
+    if (crtc_state->color_mgmt_changed ||
        drm_atomic_crtc_needs_modeset(crtc_state))
     {
-        if(crtc_state->gamma_lut)
+        if (crtc_state->gamma_lut)
         {
             gf_crtc_update_lut(crtc_state);
         }
@@ -490,7 +522,12 @@ void gf_crtc_gamma_set(struct drm_crtc *crtc, u16 *red, u16 *green,
         gf_crtc->lut_entry[i] = (blue[i] >> 6) | ((green[i] << 4) & 0xFFC00) | ((red[i] << 14) & 0x3FF00000);
     }
 
+    gf_mutex_lock(disp_info->gamma_lock);
+
     disp_cbios_set_gamma(disp_info, gf_crtc->pipe, gf_crtc->lut_entry);
+
+    gf_mutex_unlock(disp_info->gamma_lock);
+
 #ifdef PHYTIUM_2000
      return 0;
 #endif

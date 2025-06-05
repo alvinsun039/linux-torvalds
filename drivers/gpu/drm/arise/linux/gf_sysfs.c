@@ -1,16 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf.h"
 #include "gf_disp.h"
 #include "gf_cbios.h"
@@ -62,20 +72,22 @@ static ssize_t gf_enable_usage_store(struct device *dev,struct device_attribute 
     struct pci_dev*     pdev        = container_of(dev,struct pci_dev,dev);
     struct drm_device* drm_dev      = pci_get_drvdata(pdev);
     gf_card_t*         gf_card      = drm_dev->dev_private;
-
+    unsigned int power_state;
     unsigned long value = 0;
-    ret = kstrtoul(buf, 0, &value);
-    if(ret < 0)
-    {
-        return ret;
-    }
 
-    value = (value==0)? 0:1;
-    gf_core_interface->ctl_flags_set(gf_card->adapter,1,(1UL<<16),(value<<16)); //First Int Bit16 hwq_event_enable
-    if(value)
-    {
-        gf_core_interface->ctl_flags_set(gf_card->adapter,1,(1UL<<9),(value<<9)); //First Int Bit11, perf_event_enable
-    }
+    ret = gf_core_interface->get_power_state(gf_card->adapter, &power_state);
+    if (ret == 0)
+        return -EPERM;
+
+    ret = kstrtoul(buf, 0, &value);
+    if (ret < 0)
+        return ret;
+
+    value = (value == 0) ? 0 : 1;
+    gf_core_interface->ctl_flags_set(gf_card->adapter, 1, (1UL << 16), (value << 16)); //First Int Bit16 hwq_event_enable
+    if (value)
+        gf_core_interface->ctl_flags_set(gf_card->adapter, 1, (1UL << 9), (value << 9)); //First Int Bit11, perf_event_enable
+
     return len;
 }
 
@@ -85,20 +97,22 @@ static ssize_t gf_enable_perf_store(struct device *dev,struct device_attribute *
     struct pci_dev*     pdev        = container_of(dev,struct pci_dev,dev);
     struct drm_device* drm_dev      = pci_get_drvdata(pdev);
     gf_card_t*         gf_card      = drm_dev->dev_private;
-
+    unsigned int power_state;
     unsigned long value = 0;
-    ret = kstrtoul(buf, 0, &value);
-    if(ret < 0)
-    {
-        return ret;
-    }
 
-    value = (value==0)? 0:1;
-    gf_core_interface->ctl_flags_set(gf_card->adapter,1,(1UL<<9),(value<<9)); //First Int Bit11 perf_event_enable
-    if(value==0)
-    {
-        gf_core_interface->ctl_flags_set(gf_card->adapter,1,(1UL<<16),(value<<16)); //First Int Bit16 hwq_event_enable
-    }
+    ret = gf_core_interface->get_power_state(gf_card->adapter, &power_state);
+    if (ret == 0)
+        return -EPERM;
+
+    ret = kstrtoul(buf, 0, &value);
+    if (ret < 0)
+        return ret;
+
+    value = (value == 0) ? 0 : 1;
+    gf_core_interface->ctl_flags_set(gf_card->adapter, 1, (1UL << 9), (value << 9)); //First Int Bit11 perf_event_enable
+    if (value == 0)
+        gf_core_interface->ctl_flags_set(gf_card->adapter, 1, (1UL << 16), (value << 16)); //First Int Bit16 hwq_event_enable
+
     return len;
 }
 
@@ -613,6 +627,42 @@ static ssize_t gf_task_timeout_store(struct device *dev, struct device_attribute
     return len;
 }
 
+static ssize_t gf_power_state_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+    struct pci_dev*     pdev        = container_of(dev,struct pci_dev,dev);
+    struct drm_device* drm_dev      = pci_get_drvdata(pdev);
+    gf_card_t*         gf_card      = drm_dev->dev_private;
+    unsigned int level = 0;
+    int ret;
+
+    ret = gf_core_interface->get_power_state(gf_card->adapter, &level);
+    if (ret)
+        return -EPERM;
+
+    return sprintf(buf, "E%u\n", level);
+}
+
+static ssize_t gf_power_state_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t len)
+{
+    struct pci_dev*     pdev        = container_of(dev,struct pci_dev,dev);
+    struct drm_device* drm_dev      = pci_get_drvdata(pdev);
+    gf_card_t*         gf_card      = drm_dev->dev_private;
+    unsigned int level = 0;
+    int ret;
+
+    ret = sscanf(buf, "%u", &level);
+    if (ret <= 0)
+        return -EINVAL;
+
+    ret = gf_core_interface->set_power_state(gf_card->adapter, level, 300, TRUE, TRUE, TRUE);
+    if (ret)
+        return -EPERM;
+
+    gf_debug("trying to fix power state.\n");
+
+    return len;
+}
+
 static ssize_t gf_firmware_version_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
     struct pci_dev*     pdev        = container_of(dev,struct pci_dev,dev);
@@ -652,6 +702,7 @@ GF_DEVICE_ATTR_RW(misc_ctl_flag);
 GF_DEVICE_ATTR_RO(segment_info);
 GF_DEVICE_ATTR_RW(task_timeout);
 GF_DEVICE_ATTR_RO(firmware_version);
+GF_DEVICE_ATTR_RW(power_state);
 
 static struct attribute *gf_info_attributes[] = {
     &dev_attr_string.attr,
@@ -682,6 +733,7 @@ static struct attribute *gf_info_attributes[] = {
     &dev_attr_segment_info.attr,
     &dev_attr_task_timeout.attr,
     &dev_attr_firmware_version.attr,
+    &dev_attr_power_state.attr,
     NULL
 };
 
@@ -781,9 +833,15 @@ static const struct vm_operations_struct gf_sysfs_trace_vmops = {
 
 extern unsigned char gf_validate_page_cache(struct os_pages_memory *memory, int start_page, int end_page, unsigned char request_cache_type);
 
+#if DRM_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
 static int gf_sysfs_trace_mmap(struct file *filp, struct kobject *kobj,
                                    struct bin_attribute *attr,
                                    struct vm_area_struct *vma)
+#else
+static int gf_sysfs_trace_mmap(struct file *filp, struct kobject *kobj,
+                                   const struct bin_attribute *attr,
+                                   struct vm_area_struct *vma)
+#endif
 {
     struct pci_dev*    pdev    = to_pci_dev(container_of(kobj,struct device,kobj));
     struct drm_device* drm_dev = pci_get_drvdata(pdev);

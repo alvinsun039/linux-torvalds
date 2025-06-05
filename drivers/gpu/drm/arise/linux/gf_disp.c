@@ -1,21 +1,31 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "gf_disp.h"
 #include "gf_cbios.h"
 #include "gf_atomic.h"
 #include "gf_crtc.h"
+#include "gf_modifies.h"
 #include "gf_plane.h"
 #include "gf_drmfb.h"
 #include "gf_irq.h"
@@ -31,7 +41,9 @@ static const struct drm_mode_config_funcs  gf_kms_mode_funcs = {
 #if DRM_VERSION_CODE < KERNEL_VERSION(4, 19, 0)
     .output_poll_changed = gf_fbdev_poll_changed,
 #else
+#if DRM_VERSION_CODE < KERNEL_VERSION(6, 12, 0)
     .output_poll_changed = drm_fb_helper_output_poll_changed,
+#endif
 #endif
 
 #if DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
@@ -82,6 +94,20 @@ static const unsigned int vsync_int_tbl[] = {
 #define VSYNC_INT_TABLE_LEN (sizeof(vsync_int_tbl)/sizeof(vsync_int_tbl[0]))
 
 static char*  cursor_name = "cursor";
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
+static const uint64_t chx_cursor_modifiers[] = {
+    DRM_FORMAT_MOD_GF_LINEAR,
+    DRM_FORMAT_MOD_GF_INVALID
+};
+
+static const uint64_t chx_plane_modifiers[] = {
+    DRM_FORMAT_MOD_GF_DISPLAY,
+    DRM_FORMAT_MOD_GF_LINEAR,
+    DRM_FORMAT_MOD_GF_INVALID
+};
+
+#endif
 
 #if  DRM_VERSION_CODE >= KERNEL_VERSION(4, 8, 0)
 
@@ -195,6 +221,7 @@ static  void  disp_info_pre_init(disp_info_t*  disp_info)
     disp_info->hpd_lock = gf_create_spinlock(0);
     disp_info->hda_lock = gf_create_spinlock(0);
     disp_info->hdcp_lock = gf_create_spinlock(0);
+    disp_info->gamma_lock = gf_create_mutex();
 
     disp_info->cbios_inner_spin_lock = gf_create_spinlock(0);
     disp_info->cbios_aux_mutex = gf_create_mutex();
@@ -230,6 +257,9 @@ static  void  disp_info_deinit(disp_info_t*  disp_info)
 
     gf_destroy_spinlock(disp_info->hdcp_lock);
     disp_info->hdcp_lock = NULL;
+
+    gf_destroy_mutex(disp_info->gamma_lock);
+    disp_info->gamma_lock = NULL;
 
 #if 0
     int i = 0;
@@ -434,6 +464,7 @@ void disp_create_plane_property(struct drm_device* dev, gf_plane_t* gf_plane)
     drm_plane_create_zpos_immutable_property(&gf_plane->base_plane, zpos); //we do not support dynamic plane order
 }
 
+
 static gf_plane_t*  disp_gene_plane_create(disp_info_t* disp_info,  int  index, GF_PLANE_TYPE  type, int is_cursor)
 {
     gf_card_t*  gf_card = disp_info->gf_card;
@@ -441,7 +472,8 @@ static gf_plane_t*  disp_gene_plane_create(disp_info_t* disp_info,  int  index, 
     gf_plane_t*  gf_plane = NULL;
     gf_plane_state_t*  gf_pstate = NULL;
     int  ret = 0;
-    const int*  formats = 0;
+    const int*  formats = NULL;
+    const uint64_t *modifiers = NULL;
     int  fmt_count = 0;
     int  drm_ptype;
     char* name;
@@ -480,6 +512,9 @@ static gf_plane_t*  disp_gene_plane_create(disp_info_t* disp_info,  int  index, 
     {
         formats = chx_cursor_formats;
         fmt_count = sizeof(chx_cursor_formats)/sizeof(chx_cursor_formats[0]);
+    #if  DRM_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
+        modifiers = chx_cursor_modifiers;
+    #endif
         name = cursor_name;
         drm_ptype = DRM_PLANE_TYPE_CURSOR;
     }
@@ -487,6 +522,9 @@ static gf_plane_t*  disp_gene_plane_create(disp_info_t* disp_info,  int  index, 
     {
         formats = chx_plane_formats;
         fmt_count = sizeof(chx_plane_formats)/sizeof(chx_plane_formats[0]);
+    #if  DRM_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)
+        modifiers = chx_plane_modifiers;
+    #endif
         name = plane_name[type];
         drm_ptype = (type == GF_PLANE_PS)? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
     }
@@ -500,7 +538,7 @@ static gf_plane_t*  disp_gene_plane_create(disp_info_t* disp_info,  int  index, 
 #else
     ret = drm_universal_plane_init(drm, &gf_plane->base_plane,
                                     (1 << index), &gf_plane_funcs,
-                                    formats, fmt_count, NULL,
+                                    formats, fmt_count, modifiers,
                                     drm_ptype,
                                     "IGA%d-%s", (index+1), name);
 #endif
@@ -1068,15 +1106,6 @@ void disp_post_resume(struct drm_device *dev)
 
     if (!ret && state)
     {
-#if DRM_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
-        for_each_crtc_in_state(state, crtc, crtc_state, i)
-#else
-        for_each_new_crtc_in_state(state, crtc, crtc_state, i)
-#endif
-        {
-            crtc_state->mode_changed = true;
-        }
-
         if (gf->flags & GF_S4_RESUME)
         {
 #if DRM_VERSION_CODE < KERNEL_VERSION(4, 15, 0)
@@ -1095,7 +1124,7 @@ void disp_post_resume(struct drm_device *dev)
             gf->flags &= ~GF_S4_RESUME;
         }
 
-#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 13, 0)
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 12, 0)
         ret = drm_atomic_helper_commit_duplicated_state(state, &ctx);
 #else
         ret = drm_atomic_commit(state);
@@ -1141,16 +1170,13 @@ static int disp_mode_config_init(disp_info_t* disp_info)
 
     drm->mode_config.max_width = 3840*4;   // 4*4k
     drm->mode_config.max_height = 2160*4;
-    drm->mode_config.cursor_width = 64;
-    drm->mode_config.cursor_height = 64;
+    drm->mode_config.cursor_width = 128;
+    drm->mode_config.cursor_height = 128;
 
     drm->mode_config.preferred_depth = 24;
     drm->mode_config.prefer_shadow = 1;
 
-
-#if  DRM_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-    drm->mode_config.fb_modifiers_not_supported = TRUE;
-#elif  DRM_VERSION_CODE < KERNEL_VERSION(5, 14, 0)
+#if  DRM_VERSION_CODE < KERNEL_VERSION(5, 14, 0)
     drm->mode_config.allow_fb_modifiers = TRUE;
 #endif
 
@@ -1188,6 +1214,7 @@ static void  disp_turn_off_crtc_output(disp_info_t* disp_info)
     for(index = 0; index < disp_info->num_crtc; index++)
     {
         disp_cbios_turn_onoff_screen(disp_info, index, 0);
+        disp_cbios_turn_onoff_iga(disp_info, index, 0);
     }
 }
 
@@ -1314,6 +1341,98 @@ static int disp_modeset_create_properties(disp_info_t *disp_info)
     return 0;
 }
 
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+void gf_disp_state_timer_fn(struct timer_list *t)
+#else
+void gf_disp_state_timer_fn(unsigned long data)
+#endif
+{
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+    disp_state_info_t *pstate_info = from_timer(pstate_info, t, state_timer);
+#else
+    disp_state_info_t *pstate_info  = (disp_state_info_t  *)data;
+#endif
+    disp_info_t *disp_info = (disp_info_t *)pstate_info->disp_info;
+    gf_card_t *gf_card  = (gf_card_t *)disp_info->gf_card;
+    struct  drm_device *drm_dev = gf_card->drm_dev;
+    struct drm_crtc *crtc = NULL;
+    bool all_crtcs_off = true;
+
+    list_for_each_entry(crtc, &(drm_dev->mode_config.crtc_list), head)
+    {
+        if (to_gf_crtc(crtc)->enabled)
+        {
+            all_crtcs_off = false;
+            break;
+        }
+
+    }
+
+    if (all_crtcs_off)
+    {
+        gf_core_interface->disp_state_update(gf_card->adapter, DISP_LONGIDLE_STATE);
+
+    }
+    else
+    {
+        gf_core_interface->disp_state_update(gf_card->adapter, DISP_SHORTIDLE_STATE);
+    }
+
+    if (all_crtcs_off)
+    {
+        atomic_set(&pstate_info->curr_state, DISP_LONGIDLE_STATE);
+    }
+    else
+    {
+        atomic_set(&pstate_info->curr_state, DISP_SHORTIDLE_STATE);
+    }
+}
+
+int disp_init_state_info(disp_info_t *disp_info)
+{
+    disp_state_info_t *pstate_info = NULL;
+
+    pstate_info = gf_calloc(sizeof(disp_state_info_t));
+
+    if (!pstate_info)
+    {
+        return -1;
+    }
+
+    disp_info->state_info = pstate_info;
+    pstate_info->disp_info = disp_info;
+
+    pstate_info->ref_lock = gf_create_spinlock(0);
+
+    atomic_set(&pstate_info->curr_state, DISP_INIT_STATE);
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)
+    timer_setup(&pstate_info->state_timer, gf_disp_state_timer_fn, 0);
+#else
+    setup_timer(&pstate_info->state_timer, gf_disp_state_timer_fn, (unsigned long)pstate_info);
+#endif
+
+    return 0;
+}
+
+void disp_deinit_state_info(disp_info_t* disp_info)
+{
+    disp_state_info_t* pstate_info = disp_info->state_info;
+
+#if DRM_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
+    timer_delete_sync(&pstate_info->state_timer);
+#else
+    del_timer_sync(&pstate_info->state_timer);
+#endif
+
+    gf_destroy_spinlock(pstate_info->ref_lock);
+    pstate_info->ref_lock = NULL;
+
+    gf_free(pstate_info);
+
+    disp_info->state_info = NULL;
+}
+
 int  gf_init_modeset(struct drm_device *dev)
 {
     gf_card_t*  gf_card = dev->dev_private;
@@ -1400,6 +1519,8 @@ int  gf_init_modeset(struct drm_device *dev)
 
     disp_capture_init(disp_info);
 
+    disp_init_state_info(disp_info);
+
     disp_info_print(disp_info);
 
     return  ret;
@@ -1452,6 +1573,8 @@ void  gf_deinit_modeset(struct drm_device *dev)
     drm_mode_config_cleanup(dev);
 
     disp_cbios_cleanup(disp_info);
+
+    disp_deinit_state_info(disp_info);
 
     disp_info_deinit(disp_info);
 
@@ -1684,12 +1807,12 @@ int gf_get_chip_fanspeed(void* dispi, int index)
 
 int gf_get_chip_fanspeed_legacy(void* dispi, int index)
 {
-    static int fanspeed = 0,pwm = 0;
+    static int fanspeed = 0;
     disp_info_t*  disp_info = (disp_info_t*)dispi;
     adapter_info_t*  adp_info = disp_info->adp_info;
     int ctrl_reg_8x000, ctrl_reg_8x008, ctrl_reg_8x014, out_8x01c;
-    unsigned int *pRegAddr_8x000, *pRegAddr_8x004, *pRegAddr_8x008, *pRegAddr_8x00c, *pRegAddr_8x014, *pRegAddr_8x01c, *pRegAddr_d00xc;
-    int temp = 0, fanbase = 0, pwmoffset = 0;
+    unsigned int *pRegAddr_8x000, *pRegAddr_8x004, *pRegAddr_8x008, *pRegAddr_8x014, *pRegAddr_8x01c;
+    int temp = 0, fanbase = 0;
 
     if(adp_info->mmio_size < 0x8F024)
     {
@@ -1704,12 +1827,10 @@ int gf_get_chip_fanspeed_legacy(void* dispi, int index)
             return fanspeed;
 
         fanbase = 0x8c000;
-        pwmoffset = 0x10;
     }
     else if(index == 0)
     {
         fanbase = 0x8d000;
-        pwmoffset = 0x0;
     }
     else
     {
@@ -1719,10 +1840,8 @@ int gf_get_chip_fanspeed_legacy(void* dispi, int index)
     pRegAddr_8x000   = (unsigned int*)(adp_info->mmio  + fanbase + 0x000);
     pRegAddr_8x004   = (unsigned int*)(adp_info->mmio  + fanbase + 0x004);
     pRegAddr_8x008   = (unsigned int*)(adp_info->mmio  + fanbase + 0x008);
-    pRegAddr_8x00c   = (unsigned int*)(adp_info->mmio  + fanbase + 0x00c);
     pRegAddr_8x014   = (unsigned int*)(adp_info->mmio  + fanbase + 0x014);
     pRegAddr_8x01c   = (unsigned int*)(adp_info->mmio  + fanbase + 0x01c);
-    pRegAddr_d00xc   = (unsigned int*)(adp_info->mmio  + pwmoffset + 0xd0000 + 0x0c);
 
     if((gf_read32(pRegAddr_8x004) & 0x2) != 0)
     {
@@ -1745,8 +1864,6 @@ int gf_get_chip_fanspeed_legacy(void* dispi, int index)
 
         fanspeed = -1;
     }
-
-    pwm = gf_read32(pRegAddr_d00xc) & 0xfff;
 
     ctrl_reg_8x014 = 0x7D00;
     gf_write32(pRegAddr_8x014, ctrl_reg_8x014);
@@ -1914,5 +2031,68 @@ int gf_debugfs_displayinfo_dump(struct seq_file* file, struct drm_device* dev)
     seq_printf(file, "Temper: %d degree\n", gf_get_chip_temp(gf_card->disp_info));
 
     return 0;
+}
+
+void gf_acquire_display(disp_info_t *disp_info, unsigned int ref_type)
+{
+    gf_card_t *gf_card = disp_info->gf_card;
+    disp_state_info_t *pstate_info = disp_info->state_info;
+    unsigned long flags = 0;
+    bool request = false;
+
+    flags = gf_spin_lock_irqsave(pstate_info->ref_lock);
+
+    if (!pstate_info->ref_count)
+    {
+        request = true;
+    }
+
+    pstate_info->ref_count |= (1 << ref_type);
+
+    gf_spin_unlock_irqrestore(pstate_info->ref_lock, flags);
+
+    if (request)
+    {
+    #if DRM_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
+        timer_delete_sync(&pstate_info->state_timer);
+    #else
+        del_timer_sync(&pstate_info->state_timer);
+    #endif
+
+        if (atomic_read(&pstate_info->curr_state) != DISP_BUSY_STATE)
+        {
+            gf_core_interface->disp_state_update(gf_card->adapter, DISP_BUSY_STATE);
+            atomic_set(&pstate_info->curr_state, DISP_BUSY_STATE);
+        }
+    }
+
+}
+
+void gf_release_display(disp_info_t *disp_info, unsigned int ref_type)
+{
+    disp_state_info_t *pstate_info = disp_info->state_info;
+    unsigned long flags = 0;
+    bool notify = false;
+
+    if (ref_type >= DISP_MAX_REF)
+    {
+        return;
+    }
+
+    flags = gf_spin_lock_irqsave(pstate_info->ref_lock);
+
+    if (pstate_info->ref_count == (1 << ref_type))
+    {
+        notify = true;
+    }
+
+    pstate_info->ref_count &= ~(1 << ref_type);
+
+    gf_spin_unlock_irqrestore(pstate_info->ref_lock, flags);
+
+    if (notify)
+    {
+        mod_timer(&pstate_info->state_timer, jiffies+HZ);
+    }
 }
 

@@ -47,6 +47,7 @@ linux-objs:= \
 	gf_i2c.o \
 	gf_sink.o \
 	gf_splice.o \
+	gf_audio.o \
 	e3k/gf_irq_e3k.o
 
 ifeq ($(HW_NULL), 1)

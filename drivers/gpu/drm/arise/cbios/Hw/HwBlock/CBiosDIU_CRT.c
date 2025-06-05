@@ -1,25 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
-
-/*****************************************************************************
-** DESCRIPTION:
-** CRT hw block interface function implementation.
-**
-** NOTE:
-**
-******************************************************************************/
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 
 #include "CBiosDIU_CRT.h"
 #include "CBiosChipShare.h"
@@ -33,7 +34,7 @@ static CBREGISTER NewCRTDetectEnv[] = {
     {SR,(CBIOS_U8)~0x01,0x0B, 0x00 },       //Turn on DCLK2
     {SR,(CBIOS_U8)~0x20,0x18, 0x20 },       //Turn on CRT Dac1
     {SR,(CBIOS_U8)~0x02,0x21, 0x02 },       //Turn on CRT Dac1 Sense power
-    {SR,(CBIOS_U8)~0x02,0x20, 0x00 },       //CRT DAC not off in Standby mode 
+    {SR,(CBIOS_U8)~0x02,0x20, 0x00 },       //CRT DAC not off in Standby mode
     {SR,(CBIOS_U8)~0x4C,0x31, 0x44 },       //DAC1 Sense Data Source Select
     {SR, 0x00,0x4B, 0x94 },        // R sense data
     {SR, 0x00,0x4C, 0x94 },        // G sense data
@@ -56,6 +57,7 @@ CBIOS_VOID cbDIU_CRT_SetHVSync(PCBIOS_VOID pvcbe, CBIOS_U8 HVPolarity, CBIOS_U8 
     PCBIOS_EXTENSION_COMMON pcbe = (PCBIOS_EXTENSION_COMMON)pvcbe;
     CBIOS_ACTIVE_TYPE DevicePort = 0;
     CBIOS_U8 byTemp = 0;
+    GPIO_REGISTER Gpio21Value;
 
     DevicePort = pcbe->DispMgr.ActiveDevices[IGAIndex];
 
@@ -90,6 +92,23 @@ CBIOS_VOID cbDIU_CRT_SetHVSync(PCBIOS_VOID pvcbe, CBIOS_U8 HVPolarity, CBIOS_U8 
         {
             cbMMIOWriteReg(pcbe, CR_55, (byTemp >> 6), 0xFC);
         }
+
+        if (pcbe->ChipID == CHIPID_ARISE2030)
+        {
+            // Set GPIO21 for Blue pin
+            Gpio21Value.Value = 0;
+            Gpio21Value.GPIO_OE = 1;
+            if (HVPolarity & VerNEGATIVE)
+            {
+                Gpio21Value.GPIO_OUT = 1; // if VerNEGATIVE, output = 1
+            }
+            else
+            {
+                Gpio21Value.GPIO_OUT = 0; // if VerPOSITIVE, output = 0
+            }
+            cb_WriteU16(pcbe->pAdapterContext, 0xA005C, Gpio21Value.Value); // GPIO21 = 0xA0058, swap 58 --> 5C
+        }
+
     }
 }
 
@@ -251,6 +270,61 @@ static CBIOS_BOOL  cbIsNeedDacSense(PCBIOS_EXTENSION_COMMON pcbe, CBIOS_DAC_SENS
     return bNeedSense;
 }
 
+CBIOS_BOOL cbArise2030_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon)
+{
+    PCBIOS_EXTENSION_COMMON pcbe = (PCBIOS_EXTENSION_COMMON)pvcbe;
+    CBIOS_U32               IGAIndex = pDevCommon->DispSource.ModuleList.IGAModule.Index;
+    CBIOS_BOOL              bStatus = CBIOS_FALSE;
+    GPIO_REGISTER           Gpio21Value, Gpio22Value;
+
+    if(pDevCommon->PowerState != CBIOS_PM_ON)
+    {
+        // Set GPIO21
+        Gpio21Value.Value = 0;
+        Gpio21Value.GPIO_OE = 1;
+        Gpio21Value.GPIO_OUT = 0;
+        cb_WriteU16(pcbe->pAdapterContext, 0xA005C, Gpio21Value.Value); // GPIO21 = 0xA0058, swap 58 --> 5C
+        cb_DelayMicroSeconds(200);//delay 200us
+        Gpio21Value.Value = 0;
+        Gpio21Value.GPIO_OE = 1;
+        Gpio21Value.GPIO_OUT = 1;
+        cb_WriteU16(pcbe->pAdapterContext, 0xA005C, Gpio21Value.Value);  //swap 58 --> 5C
+        cb_DelayMicroSeconds(200);//delay 200us
+        Gpio21Value.Value = 0;
+        Gpio21Value.GPIO_OE = 1;
+        Gpio21Value.GPIO_OUT = 0;
+        cb_WriteU16(pcbe->pAdapterContext, 0xA005C, Gpio21Value.Value);  //swap 58 --> 5C
+
+        // Set GPIO22 Input Enable
+        Gpio22Value.Value = 0;
+        Gpio22Value.GPIO_IE = 1;
+        cb_WriteU16(pcbe->pAdapterContext, 0xA0058, Gpio22Value.Value); // GPIO22 = 0xA005C, swap 5C --> 58
+        cb_DelayMicroSeconds(200);//delay 200us
+
+        // Read GPIO22 Input Value
+        Gpio22Value.Value = cb_ReadU16(pcbe->pAdapterContext, 0xA0058); // GPIO22 = 0xA005C, swap 5C --> 58
+        if(Gpio22Value.GPIO_Data_In == 0) // 0: connect; 1: not connect
+        {
+            bStatus = CBIOS_TRUE;
+        }
+    }
+    else
+    {
+        // Set GPIO22 Input Enable
+        Gpio22Value.Value = 0;
+        Gpio22Value.GPIO_IE = 1;
+        cb_WriteU16(pcbe->pAdapterContext, 0xA0058, Gpio22Value.Value); // GPIO22 = 0xA005C, swap 5C --> 58
+        cbWaitVSync(pcbe, (CBIOS_U8)IGAIndex);
+
+        // Read GPIO22 Input Value
+        Gpio22Value.Value = cb_ReadU16(pcbe->pAdapterContext, 0xA0058); // GPIO22 = 0xA005C, swap 5C --> 58
+        if(Gpio22Value.GPIO_Data_In == 0) // 0: connect; 1: not connect
+        {
+            bStatus = CBIOS_TRUE;
+        }
+    }
+    return bStatus;
+}
 CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon, CBIOS_BOOL  bPrevEdidValid)
 {
     PCBIOS_EXTENSION_COMMON pcbe       = (PCBIOS_EXTENSION_COMMON)pvcbe;
@@ -263,6 +337,11 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon
     REG_CR71_Pair           RegCR71Value, RegCR71Mask;
     CBIOS_DAC_SENSE_PARA  DacSensePara = {0};
 
+    if (pcbe->ChipID == CHIPID_ARISE2030)
+    {
+        return cbArise2030_DACSense(pcbe, pDevCommon);
+    }
+
     DacSensePara.PowerState = pDevCommon->PowerState;
     DacSensePara.PrevEdidValid = (bPrevEdidValid)? 1 : 0;
 
@@ -270,9 +349,9 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon
     {
         return  (DacSensePara.Connected)? CBIOS_TRUE : CBIOS_FALSE;
     }
-    
+
     if(DacSensePara.UseNewSense)
-    {        
+    {
         //Use new DAC1 sense logic when CRT is on.
         RegSR21Value.Value = 0;
         RegSR21Value.DAC1_SENSE_Power_Down_Enable = 0;
@@ -301,11 +380,11 @@ CBIOS_BOOL cbDIU_CRT_DACSense(PCBIOS_VOID pvcbe, PCBIOS_DEVICE_COMMON pDevCommon
         RegCR71Mask.SENSEL = 0;
         RegCR71Mask.SENWIDTH = 0;
         cbMMIOWriteReg(pcbe,CR_71, RegCR71Value.Value, RegCR71Mask.Value);
-        
+
         cbMMIOWriteReg(pcbe,SR_4B, 0x7A, 0x00);   //R sense
         cbMMIOWriteReg(pcbe,SR_4C, 0x7A, 0x00);   // G sense
         cbMMIOWriteReg(pcbe,SR_4D, 0x7A, 0x00);  // B sense
-        
+
         RegSR3FValue.Value = 0;
         RegSR3FValue.B_Sense_1to0 = 3;
         RegSR3FValue.G_Sense_1to0 = 3;

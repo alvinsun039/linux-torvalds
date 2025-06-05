@@ -1,17 +1,26 @@
-//*****************************************************************************
-//  Copyright (c) 2021 Glenfly Tech Co., Ltd..
-//  All Rights Reserved.
-//
-//  This is UNPUBLISHED PROPRIETARY SOURCE CODE of Glenfly Tech Co., Ltd..;
-//  the contents of this file may not be disclosed to third parties, copied or
-//  duplicated in any form, in whole or in part, without the prior written
-//  permission of Glenfly Tech Co., Ltd..
-//
-//  The copyright of the source code is protected by the copyright laws of the People's
-//  Republic of China and the related laws promulgated by the People's Republic of China
-//  and the international covenant(s) ratified by the People's Republic of China.
-//*****************************************************************************
-
+/*
+ * Copyright © 2021 Glenfly Tech Co., Ltd.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
 #include "os_interface.h"
 #include "gf_driver.h"
 #include "gf_ioctl.h"
@@ -100,12 +109,12 @@ int gf_map_system_ram(struct vm_area_struct* vma, gf_map_argu_t *map)
     int start_page  = _ALIGN_DOWN(map->offset, PAGE_SIZE) / PAGE_SIZE;
     int end_page    = start_page + PAGE_ALIGN(map->size) / PAGE_SIZE;
 
-#if LINUX_VERSION_CODE <= 0x02040e
+#if DRM_VERSION_CODE <= 0x02040e
     vma->vm_flags |= VM_LOCKED;
-#elif LINUX_VERSION_CODE < 0x030700
+#elif DRM_VERSION_CODE < 0x030700
     vma->vm_flags |= VM_RESERVED;
 #else
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,3,0)
+#if DRM_VERSION_CODE < KERNEL_VERSION(6,3,0)
     vma->vm_flags |= VM_DONTEXPAND | VM_DONTDUMP;
 #else
     vm_flags_set(vma, VM_DONTEXPAND | VM_DONTDUMP);
@@ -445,7 +454,6 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
 
     int ret = 0;
     size_t len = 0;
-    static int print_flag = 1;
     char *buffer = NULL, *memory_type = "DDR4", *pmp_version = NULL, *product_name = NULL, *type_dp = "\0";
     char *output_type_vga_hdmi = "VGA, HDMI", *output_type_full = "VGA, HDMI, DP", *hdmi_resolution = "3840 x 2160", *vga_resolution = "1920 x 1080", *output_type = output_type_vga_hdmi;
     unsigned int mclk, coreclk, eclk, free_mem, mem_usage, usage_3d, usage_vcp, usage_vpp;
@@ -456,7 +464,7 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
     unsigned char *fwname = NULL;
     int fw_version = 0;
 
-    if (!print_flag)
+    if (!offp || *offp)
         goto exit;
 
     buffer = gf_calloc(1024);
@@ -596,6 +604,15 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
         type_dp = "/DP";
         break;
 
+    case 0x3d0e:
+        hdmi_fps = 60;
+        subsystemid = 0x10D0;
+        technology = 28;
+        pixel_fillrate = 96 * eclk;
+        texture_fillrate = pixel_fillrate *2;
+        product_name = "Arise10D0";
+        break;
+
     default:
         hdmi_fps = 60;
         subsystemid = 0;
@@ -657,7 +674,8 @@ static ssize_t gf_gpuinfo_proc_read(struct file *filp, char *buf, size_t count, 
     if (ret)
         goto exit_err;
 
-    print_flag = 0;
+    *offp += len;
+
     return len;
 
 exit_err:
@@ -667,7 +685,6 @@ exit_nomem:
     return -ENOMEM;
 
 exit:
-    print_flag = 1;
     return 0;
 }
 
@@ -1010,6 +1027,7 @@ int gf_card_init(gf_card_t *gf, void *pdev)
     gf->allocation_trace_tags = 0;
     gf->video_irq_info_all = 0;
     gf->runtime_pm = gf_modparams.gf_runtime_pm;
+    gf->flags = 0;
 
     return ret;
 }
