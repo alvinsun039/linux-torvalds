@@ -9922,7 +9922,7 @@ static void txgbe_amlit_temp_subtask(struct txgbe_adapter *adapter)
 	    hw->mac.type != txgbe_mac_aml40)
 		return;
 
-	if (netif_running(adapter->netdev))
+	if (!netif_carrier_ok(adapter->netdev))
 		return;
 
 	status = txgbe_e56_get_temp(hw, &temp);
