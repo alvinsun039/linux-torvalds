@@ -47,7 +47,8 @@
 #define SPI_CMD_CFG1_ADDR            0x10118  // Flash command configuration register 1
 #define MISC_RST_REG_ADDR            0x1000c  // Misc reset register address
 #define MGR_FLASH_RELOAD_REG_ADDR    0x101a0  // MGR reload flash read
-#define PRB_CTL                      0X10200  // used to check whether has been upgraded
+#define PRB_CTL                      0x10200  // used to check whether has been upgraded
+#define PRB_SCRATCH                  0x10230  // used to check whether has been upgraded
 
 #define MAC_ADDR0_WORD0_OFFSET_1G    0x006000c  // MAC Address for LAN0, stored in external FLASH
 #define MAC_ADDR0_WORD1_OFFSET_1G    0x0060014

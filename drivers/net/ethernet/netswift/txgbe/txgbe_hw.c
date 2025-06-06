@@ -3233,11 +3233,29 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	u8 id_str_len, pn_str_len, sn_str_len, rv_str_len;
 	u32 mac_addr0_dword0_addr, mac_addr0_dword1_addr;
 	u32 mac_addr1_dword0_addr, mac_addr1_dword1_addr;
+	u16 subsystem_device_id;
+	u16 device_id;
 	u16 vpd_ro_len;
 	u32 chksum = 0;
+	u32 upgrade_check = 0x0;
 	int err = 0;
 
-	read_data = rd32(hw, PRB_CTL);
+	if (hw->mac.type == txgbe_mac_sp) {
+		upgrade_check = PRB_CTL;
+		subsystem_device_id = data[0xfffdc] << 8  | data[0xfffdd];
+		device_id = data[0xfffde] << 8 | data[0xfffdf];
+	} else {
+		upgrade_check = PRB_SCRATCH;
+		if (data[0x3000] == 0x25 && data[0x3001] == 0x20) {
+			subsystem_device_id = data[0x302c] << 8  | data[0x302d];
+			device_id = data[0x302e] << 8 | data[0x302f];
+		} else {
+			subsystem_device_id = data[0xfffdc] << 8  | data[0xfffdd];
+			device_id = data[0xfffde] << 8 | data[0xfffdf];
+		}
+	}
+
+	read_data = rd32(hw, upgrade_check);
 	if (read_data & 0x80000000) {
 		e_info(drv, "The flash has been successfully upgraded once, please reboot to make it work.\n");
 		return -EOPNOTSUPP;
@@ -3246,11 +3264,11 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	/*check sub_id*/;
 	e_info(drv, "Checking sub_id .......\n");
 	e_info(drv, "The card's sub_id : %04x\n", hw->subsystem_device_id);
-	e_info(drv, "The image's sub_id : %04x\n", data[0xfffdc] << 8  | data[0xfffdd]);
-	if ((hw->subsystem_device_id & 0xfff) == 
-		((data[0xfffdc] << 8  | data[0xfffdd]) & 0xfff)){
+	e_info(drv, "The image's sub_id : %04x\n", subsystem_device_id);
+
+	if ((hw->subsystem_device_id & 0xfff) == (subsystem_device_id & 0xfff)) {
 		e_info(drv, "It is a right image\n");
-	} else if (hw->subsystem_device_id == 0xffff){
+	} else if (hw->subsystem_device_id == 0xffff) {
 		e_info(drv, "update anyway\n");
 	} else {
 		e_err(drv, "====The Gigabit image is not match the Gigabit card====\n");
@@ -3260,9 +3278,9 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	
 	/*check dev_id*/
 	e_info(drv, "Checking dev_id .......\n");
-	e_info(drv, "The image's dev_id : %04x\n", data[0xfffde] << 8  | data[0xfffdf]);
+	e_info(drv, "The image's dev_id : %04x\n", device_id);
 	e_info(drv, "The card's dev_id : %04x\n", hw->device_id);
-	if (!((hw->device_id & 0xfff0) == ((data[0xfffde] << 8 | data[0xfffdf]) & 0xfff0)) &&
+	if (!((hw->device_id & 0xfff0) == (device_id & 0xfff0)) &&
 	    !(hw->device_id == 0xffff))
 	{
 		e_err(drv, "====The Gigabit image is not match the Gigabit card====\n");
@@ -3471,7 +3489,7 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		txgbe_flash_write_dword(hw, PRODUCT_SERIAL_NUM_OFFSET_1G + 8, serial_num_dword2_t);
 	}
 
-	wr32(hw, PRB_CTL, rd32(hw, PRB_CTL) | 0x80000000);
+	wr32(hw, upgrade_check, rd32(hw, upgrade_check) | 0x80000000);
 
 err_exit:
 	kfree(vpd_tend);
