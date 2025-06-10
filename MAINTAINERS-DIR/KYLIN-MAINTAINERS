@@ -678,7 +678,7 @@ M:	Xie Ming <xieming@kylinos.cn>
 M:	Sun Liming <sunliming@kylinos.cn>
 R:	Li Weishi <liweishi@kylinos.cn>
 R:	Xia Jidong <xiajidong@kylinos.cn>
-R:	Liu Cong <liucong2@kylinos.cn>
+R:	Feng Jiang <jiangfeng@kylinos.cn>
 R:	Yu Jun <yujun@kylinos.cn>
 R:	Zhang Hao <zhanghao1@kylinos.cn>
 R:	Tang Longjun <tanglongjun@kylinos.cn>
@@ -1020,7 +1020,6 @@ F:	kylin/gpu/
 VIRTIO AND VHOST VSOCK DRIVER
 M:	Jiang Feng <jiangfeng@kylinos.cn>
 M:	Xie Ming <xieming@kylinos.cn>
-R:	Liu Cong <liucong2@kylinos.cn>
 R:	Yu Jun <yujun@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
 R:	He Minhong <heminhong@kylinos.cn>
@@ -1062,6 +1061,18 @@ F:	include/uapi/linux/vhost.h
 F:	drivers/virtio/virtio_input.c
 F:	include/uapi/linux/virtio_input.h
 F:	virt/lib/
+
+VIRTUAL GPU DRIVER
+M:	Feng Jiang <jiangfeng@kylinos.cn>
+M:	Weishi Li <liweishi@kylinos.cn>
+R:	Qiang Liu <liuqiang@kylinos.cn>
+S:	Supported
+F:	drivers/gpu/drm/qxl/
+F:	include/uapi/drm/qxl_drm.h
+F:	drivers/gpu/drm/vmwgfx/
+F:	include/uapi/drm/vmwgfx_drm.h
+F:	drivers/gpu/drm/vboxvideo/
+F:	include/uapi/linux/vbox*.h
 
 WATCHDOG
 M:	Xiong Xin <xiongxin@kylinos.cn>
