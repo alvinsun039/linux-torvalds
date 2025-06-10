@@ -13,6 +13,7 @@
 #include <linux/version.h>
 
 #include <linux/../../mm/cma.h>
+#include <linux/memblock.h>
 
 extern int dma_declare_coherent_memory(struct device *dev,
 		phys_addr_t phys_addr, dma_addr_t device_addr, size_t size);
