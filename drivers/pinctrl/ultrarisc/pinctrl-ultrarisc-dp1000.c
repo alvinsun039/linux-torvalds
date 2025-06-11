@@ -111,6 +111,7 @@ static const struct of_device_id ur_pinctrl_of_match[] = {
 	},
 	{ }
 };
+MODULE_DEVICE_TABLE(of, ur_pinctrl_of_match);
 
 static struct platform_driver ur_pinctrl_driver = {
 	.driver = {
