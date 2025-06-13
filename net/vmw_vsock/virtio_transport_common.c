@@ -1317,7 +1317,7 @@ virtio_transport_recv_listen(struct sock *sk, struct sk_buff *skb,
 	 * Subsequent enqueues would lead to a memory leak.
 	 */
 	if (sk->sk_shutdown == SHUTDOWN_MASK) {
-		virtio_transport_reset_no_sock(t, pkt);
+		virtio_transport_reset_no_sock(t, skb);
 		return -ESHUTDOWN;
 	}
 
