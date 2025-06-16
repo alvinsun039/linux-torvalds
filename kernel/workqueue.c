@@ -3765,7 +3765,7 @@ void free_workqueue_attrs(struct workqueue_attrs *attrs)
  *
  * Return: The allocated new workqueue_attr on success. %NULL on failure.
  */
-struct workqueue_attrs *alloc_workqueue_attrs(void)
+struct workqueue_attrs *alloc_workqueue_attrs_noprof(void)
 {
 	struct workqueue_attrs *attrs;
 
@@ -4699,9 +4699,9 @@ static int init_rescuer(struct workqueue_struct *wq)
 }
 
 __printf(1, 4)
-struct workqueue_struct *alloc_workqueue(const char *fmt,
-					 unsigned int flags,
-					 int max_active, ...)
+struct workqueue_struct *alloc_workqueue_noprof(const char *fmt,
+						unsigned int flags,
+						int max_active, ...)
 {
 	va_list args;
 	struct workqueue_struct *wq;
@@ -4721,12 +4721,12 @@ struct workqueue_struct *alloc_workqueue(const char *fmt,
 		flags |= WQ_UNBOUND;
 
 	/* allocate wq and format name */
-	wq = kzalloc(sizeof(*wq), GFP_KERNEL);
+	wq = kzalloc_noprof(sizeof(*wq), GFP_KERNEL);
 	if (!wq)
 		return NULL;
 
 	if (flags & WQ_UNBOUND) {
-		wq->unbound_attrs = alloc_workqueue_attrs();
+		wq->unbound_attrs = alloc_workqueue_attrs_noprof();
 		if (!wq->unbound_attrs)
 			goto err_free_wq;
 	}
@@ -4789,7 +4789,7 @@ err_destroy:
 	destroy_workqueue(wq);
 	return NULL;
 }
-EXPORT_SYMBOL_GPL(alloc_workqueue);
+EXPORT_SYMBOL_GPL(alloc_workqueue_noprof);
 
 static bool pwq_busy(struct pool_workqueue *pwq)
 {

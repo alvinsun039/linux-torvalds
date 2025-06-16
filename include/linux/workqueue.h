@@ -6,6 +6,7 @@
 #ifndef _LINUX_WORKQUEUE_H
 #define _LINUX_WORKQUEUE_H
 
+#include <linux/alloc_tag.h>
 #include <linux/timer.h>
 #include <linux/linkage.h>
 #include <linux/bitops.h>
@@ -444,7 +445,8 @@ extern struct workqueue_struct *system_freezable_power_efficient_wq;
  * Pointer to the allocated workqueue on success, %NULL on failure.
  */
 __printf(1, 4) struct workqueue_struct *
-alloc_workqueue(const char *fmt, unsigned int flags, int max_active, ...);
+alloc_workqueue_noprof(const char *fmt, unsigned int flags, int max_active, ...);
+#define alloc_workqueue(...)	alloc_hooks(alloc_workqueue_noprof(__VA_ARGS__))
 
 /**
  * alloc_ordered_workqueue - allocate an ordered workqueue
@@ -473,7 +475,9 @@ alloc_workqueue(const char *fmt, unsigned int flags, int max_active, ...);
 
 extern void destroy_workqueue(struct workqueue_struct *wq);
 
-struct workqueue_attrs *alloc_workqueue_attrs(void);
+struct workqueue_attrs *alloc_workqueue_attrs_noprof(void);
+#define alloc_workqueue_attrs(...)	alloc_hooks(alloc_workqueue_attrs_noprof(__VA_ARGS__))
+
 void free_workqueue_attrs(struct workqueue_attrs *attrs);
 int apply_workqueue_attrs(struct workqueue_struct *wq,
 			  const struct workqueue_attrs *attrs);
