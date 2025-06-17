@@ -536,13 +536,11 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 		xhci->quirks |= XHCI_ZHAOXIN_HOST;
 		xhci->quirks |= XHCI_LPM_SUPPORT;
 
-		if (pdev->device == 0x9202) {
+		if (pdev->device == 0x9202 ||
+		    pdev->device == 0x9203) {
 			xhci->quirks |= XHCI_RESET_ON_RESUME;
 			xhci->quirks |= XHCI_TRB_OVERFETCH;
 		}
-
-		if (pdev->device == 0x9203)
-			xhci->quirks |= XHCI_TRB_OVERFETCH;
 	}
 
 	if (pdev->vendor == PCI_DEVICE_ID_CADENCE &&
