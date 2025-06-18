@@ -794,6 +794,12 @@ static int nouveau_drm_probe(struct pci_dev *pdev,
 	if (ret)
 		return ret;
 
+	if (device->card_type > NV_E0) {
+		DRM_DEBUG_DRIVER("Please use NVIDIA closed-source drivers. \n");
+		nvkm_device_del(&device);
+		return -1;
+	}
+
 	nvkm_device_del(&device);
 
 	/* Remove conflicting drivers (vesafb, efifb etc). */
