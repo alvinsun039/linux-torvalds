@@ -124,7 +124,9 @@ static int linlondp_crtc_prepare(struct linlondp_crtc *kcrtc)
 	struct linlondp_dev *mdev = kcrtc->base.dev->dev_private;
 	struct linlondp_pipeline *master = kcrtc->master;
 	struct linlondp_crtc_state *kcrtc_st = to_kcrtc_st(kcrtc->base.state);
+#if !IS_ENABLED(CONFIG_DRM_LINLONDP_CLOCK_FIXED)
 	struct drm_display_mode *mode = &kcrtc_st->base.adjusted_mode;
+#endif
 	u32 new_mode;
 	int err;
 
@@ -544,7 +546,9 @@ static bool linlondp_crtc_mode_fixup(struct drm_crtc *crtc,
 				     struct drm_display_mode *adjusted_mode)
 {
 	struct linlondp_crtc *kcrtc = to_kcrtc(crtc);
+#if !IS_ENABLED(CONFIG_DRM_LINLONDP_CLOCK_FIXED)
 	unsigned long clk_rate;
+#endif
 	u16 hor_divisor = 1;
 
 	drm_mode_set_crtcinfo(adjusted_mode, 0);
