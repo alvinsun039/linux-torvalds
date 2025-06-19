@@ -1,0 +1,3 @@
+gpio-y += \
+	mcu_peripherals/gpio/pinctrl-gb02-mcu.o \
+

@@ -1,0 +1,12 @@
+ipcfg-y += \
+	ip/gb_edma.o \
+	ip/gb_dp.o \
+	ip/gb_dp_dbg.o \
+	ip/gb_dp_core.o \
+	ip/gb_dp_link.o \
+	ip/gb_dp_avgen.o \
+	ip/gb_dp_aux.o \
+	ip/gb_dp_intr.o \
+	ip/gb_hdmac.o \
+	ip/gb_hdmac_mmu.o \
+	ip/gb_v2vdma.o \

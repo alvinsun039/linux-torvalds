@@ -1,0 +1,14 @@
+gpu-y := \
+	gpu/gb_mmu_mode_config.o \
+	gpu/gb_pages_alloc.o \
+	gpu/gb_drv.o \
+	gpu/gb_device.o \
+	gpu/gb_gem.o \
+	gpu/gb_gpu.o \
+	gpu/gb_stage.o \
+	gpu/gb_mmu.o \
+	gpu/gb_gpu_irq.o \
+	gpu/gb_ttm.o \
+	gpu/gb_firmware_upgrade.o \
+	gpu/gb_debugfs.o \
+	gpu/gb_osl.o \

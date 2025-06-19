@@ -1,0 +1,7 @@
+dev_kms-y += \
+	kms/device/gbdc_ops.o \
+	kms/device/gbdc_device.o \
+	kms/device/gbdc_edid.o \
+	kms/device/gb_ip.o \
+	kms/device/gb_hdmi_ddc.o \
+	kms/device/gb_device_ctrl.o

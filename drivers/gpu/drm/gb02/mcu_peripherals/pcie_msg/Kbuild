@@ -1,0 +1,2 @@
+pcie_msg-y += \
+	mcu_peripherals/pcie_msg/gb02_pcie_msg.o \

@@ -1,0 +1,14 @@
+glmark2 -b desktop:nframes=10
+
+glmark2 -b refract:nframes=10
+
+
+glmark2 -b shadow:nframes=10
+
+
+glmark2 -b terrain:nframes=10
+
+
+glmark2 -b texture:texture-filter=mipmap:nframes=10
+
+

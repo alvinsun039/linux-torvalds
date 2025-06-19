@@ -1,0 +1,15 @@
+dc_kms-y += \
+	kms/gbdc_hdmi_ddc.o \
+	kms/gbdc_vga_bridge.o \
+	kms/gbdc_backlight.o \
+	kms/gbdc_connector.o \
+	kms/gbdc_crtc.o \
+	kms/gbdc_display.o \
+	kms/gbdc_encoder.o \
+	kms/gbdc_fbdev.o \
+	kms/gbdc_mm.o \
+	kms/gbdc_planes.o \
+	kms/gb_kms.o \
+	kms/gbdc_drv.o \
+	kms/gbdc_irq.o \
+	kms/gbdc_infinity.o

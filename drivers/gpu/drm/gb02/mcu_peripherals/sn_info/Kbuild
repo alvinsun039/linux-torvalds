@@ -1,0 +1,5 @@
+sn_info-y += \
+	mcu_peripherals/sn_info/param_def.o  \
+	mcu_peripherals/sn_info/gb_sn_info.o  \
+
+

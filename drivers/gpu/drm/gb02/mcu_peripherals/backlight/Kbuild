@@ -1,0 +1,2 @@
+backlight-y += \
+	mcu_peripherals/backlight/gb_backlight.o \

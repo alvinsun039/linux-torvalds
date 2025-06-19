@@ -1,0 +1,18 @@
+#  load GenBu Driver Modules by check genbu pcie card
+
+[Unit]
+Description=Load GenBu Modules
+Documentation=man:systemd-modules-load.service(8) man:modules-load.d(5)
+DefaultDependencies=no
+Conflicts=shutdown.target
+Before=sysinit.target shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+ExecStart=/usr/local/bin/genbu_load.sh
+TimeoutSec=10s
+
+[Install]
+Alias=genbu.service
+WantedBy=sysinit.target

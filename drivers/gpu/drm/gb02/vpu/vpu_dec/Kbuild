@@ -1,0 +1,7 @@
+vpu_dec-y += \
+	vpu/vpu_dec/vpu_dec.o \
+	vpu/vpu_dec/vpu_dec_irq.o \
+	vpu/vpu_dec/vpu_subsys.o \
+	vpu/vpu_dec/vpu_vcmd.o \
+
+

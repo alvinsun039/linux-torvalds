@@ -1,0 +1,2 @@
+spi-y += \
+	mcu_peripherals/spi/spi-gb02-mcu.o \

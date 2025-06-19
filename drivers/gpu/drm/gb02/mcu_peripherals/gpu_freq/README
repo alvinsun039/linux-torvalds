@@ -1,0 +1,11 @@
+gpu_freq.c
+gpu动态调频驱动。
+结合gpu资源占用率和pvt sensor监控的温度(thermal framework)，综合对gpu进行动态调频。
+
+debug方法：
+节点路径：/sys/class/hwmon/hwmonX/device/  X根据系统不同，值可能不同，比如hwmon2；
+获取当前gpu频率： cat gb02_freq
+配置gpu频率：需要root权限，echo 400 > gb02_freq; 该模式为用户模式，第一优先级，如果需要取消该模式，echo 0 > gb02_freq，即可关闭。
+value 400 600 800
+freq 400M 600M 800M
+使能动态调频：需要root权限，echo 1 > auto_freq;  该模式根据gpu占用率动态调整频率，默认关闭。
