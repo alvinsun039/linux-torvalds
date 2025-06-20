@@ -2,7 +2,7 @@
 /* UltraRisc pinctrl driver
  *
  * Copyright(C) 2025 UltraRisc Technology Co., Ltd.
- * 
+ *
  *  Author:  wangjia <wangjia@ultrarisc.com>
  */
 
@@ -60,9 +60,9 @@ struct ur_pinctrl {
 	struct pinctrl_dev *pctl_dev;
 	struct pinctrl_desc *pctl_desc;
 	void __iomem *base;
-	unsigned ngroups;
+	unsigned int ngroups;
 	const char **grp_names;
-	unsigned nbanks;
+	unsigned int nbanks;
 	const struct ur_pinctrl_match_data *match_data;
 	struct regmap		*regmap;
 	raw_spinlock_t lock;
