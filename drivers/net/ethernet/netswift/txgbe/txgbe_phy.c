@@ -870,49 +870,51 @@ s32 txgbe_identify_sfp_module(struct txgbe_hw *hw)
 			goto out;
 		}
 	}
-	/*record eeprom info*/
-	status = TCALL(hw, phy.ops.read_i2c_eeprom,
-		       TXGBE_SFF_SFF_8472_COMP,
-		       &sff8472_rev);
-	if (status != 0)
-		goto err_read_i2c_eeprom;
-
-	/* addressing mode is not supported */
-	status = TCALL(hw, phy.ops.read_i2c_eeprom,
-					     TXGBE_SFF_SFF_8472_SWAP,
-					     &addr_mode);
-	if (status != 0)
-		goto err_read_i2c_eeprom;
-
-	if (addr_mode & TXGBE_SFF_ADDRESSING_MODE) {
-		e_err(drv, "Address change required to access page 0xA2, "
-		      "but not supported. Please report the module type to the "
-		      "driver maintainers.\n");
-		page_swap = true;
-	}
-
-	if (sff8472_rev == TXGBE_SFF_SFF_8472_UNSUP || page_swap ||
-		!(addr_mode & TXGBE_SFF_DDM_IMPLEMENTED)) {
-		/* We have a SFP, but it does not support SFF-8472 */
-		adapter->eeprom_type = ETH_MODULE_SFF_8079;
-		adapter->eeprom_len = ETH_MODULE_SFF_8079_LEN;
-	} else {
-		/* We have a SFP which supports a revision of SFF-8472. */
-		adapter->eeprom_type = ETH_MODULE_SFF_8472;
-		adapter->eeprom_len = ETH_MODULE_SFF_8472_LEN;
-	}
-	for (i = 0; i < adapter->eeprom_len; i++) {
-		if (i < ETH_MODULE_SFF_8079_LEN)
-			status = TCALL(hw, phy.ops.read_i2c_eeprom, i,
-				       &databyte);
-		else
-			status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
-				       &databyte);
-
+	if (hw->mac.type == txgbe_mac_sp) {
+		/*record eeprom info*/
+		status = TCALL(hw, phy.ops.read_i2c_eeprom,
+			TXGBE_SFF_SFF_8472_COMP,
+			&sff8472_rev);
 		if (status != 0)
 			goto err_read_i2c_eeprom;
 
-		adapter->i2c_eeprom[i] = databyte;
+		/* addressing mode is not supported */
+		status = TCALL(hw, phy.ops.read_i2c_eeprom,
+						TXGBE_SFF_SFF_8472_SWAP,
+						&addr_mode);
+		if (status != 0)
+			goto err_read_i2c_eeprom;
+
+		if (addr_mode & TXGBE_SFF_ADDRESSING_MODE) {
+			e_err(drv, "Address change required to access page 0xA2, "
+			"but not supported. Please report the module type to the "
+			"driver maintainers.\n");
+			page_swap = true;
+		}
+
+		if (sff8472_rev == TXGBE_SFF_SFF_8472_UNSUP || page_swap ||
+			!(addr_mode & TXGBE_SFF_DDM_IMPLEMENTED)) {
+			/* We have a SFP, but it does not support SFF-8472 */
+			adapter->eeprom_type = ETH_MODULE_SFF_8079;
+			adapter->eeprom_len = ETH_MODULE_SFF_8079_LEN;
+		} else {
+			/* We have a SFP which supports a revision of SFF-8472. */
+			adapter->eeprom_type = ETH_MODULE_SFF_8472;
+			adapter->eeprom_len = ETH_MODULE_SFF_8472_LEN;
+		}
+		for (i = 0; i < adapter->eeprom_len; i++) {
+			if (i < ETH_MODULE_SFF_8079_LEN)
+				status = TCALL(hw, phy.ops.read_i2c_eeprom, i,
+					&databyte);
+			else
+				status = TCALL(hw, phy.ops.read_i2c_sff8472, i,
+					&databyte);
+
+			if (status != 0)
+				goto err_read_i2c_eeprom;
+
+			adapter->i2c_eeprom[i] = databyte;
+		}
 	}
 
 out:

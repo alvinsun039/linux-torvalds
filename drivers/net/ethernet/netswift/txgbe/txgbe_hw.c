@@ -3475,6 +3475,20 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 		}
 	}
 
+	chksum = 0;
+	for (i = 0; i < 0x1000; i += 2) {
+		if (i >= TXGBE_VPD_OFFSET && i < TXGBE_VPD_END) {
+			chksum += (vpd_tend[i - TXGBE_VPD_OFFSET + 1] << 8 | vpd_tend[i - TXGBE_VPD_OFFSET]);
+		} else if (i == 0x15e) {
+			continue;
+		} else {
+			chksum += (data[i + 1] << 8 | data[i]);
+		}
+	}
+	chksum = 0xbaba - chksum;
+	chksum &= 0xffff;
+
+	status = txgbe_flash_write_dword(hw, 0x15e, 0xffff0000 | chksum);
 	txgbe_flash_write_dword(hw, mac_addr0_dword0_addr, mac_addr0_dword0_t);
 	txgbe_flash_write_dword(hw, mac_addr0_dword1_addr, (mac_addr0_dword1_t | 0x80000000));//lan0
 	txgbe_flash_write_dword(hw, mac_addr1_dword0_addr, mac_addr1_dword0_t);
@@ -3492,7 +3506,8 @@ int txgbe_upgrade_flash(struct txgbe_hw *hw, u32 region,
 	wr32(hw, upgrade_check, rd32(hw, upgrade_check) | 0x80000000);
 
 err_exit:
-	kfree(vpd_tend);
+	if (vpd_tend)
+		kfree(vpd_tend);
 	return err;
 }
 
@@ -6241,10 +6256,6 @@ s32 txgbe_reset_hw(struct txgbe_hw *hw)
 	if (status != 0)
 		goto reset_hw_out;
 
-	status = txgbe_reset_misc(hw);
-	if (status != 0)
-		goto reset_hw_out;
-
 	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40) {
 		wr32(hw, TXGBE_LINKUP_FILTER, TXGBE_LINKUP_FILTER_TIME);
 		wr32m(hw, TXGBE_MAC_MISC_CTL, TXGBE_MAC_MISC_LINK_STS_MOD,
@@ -7575,8 +7586,9 @@ static s32 txgbe_write_ee_hostif_data(struct txgbe_hw *hw, u16 offset,
 	buffer.hdr.req.cmd = FW_WRITE_SHADOW_RAM_CMD;
 	buffer.hdr.req.buf_lenh = 0;
 	buffer.hdr.req.buf_lenl = FW_WRITE_SHADOW_RAM_LEN;
-	if (hw->mac.type == txgbe_mac_sp)
+#ifndef TXGBE_SWFW_MBOX_AML
 		buffer.hdr.req.cksum_or_index.checksum = FW_DEFAULT_CHECKSUM;
+#endif
 
 	/* one word */
 	buffer.length = TXGBE_CPU_TO_BE16(sizeof(u16));
