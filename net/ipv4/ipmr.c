@@ -2294,7 +2294,8 @@ int ip_mr_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	struct mr_table *mrt;
 	int vif;
 
-	WARN_ON_ONCE(!rcu_read_lock_held());
+	guard(rcu)();
+
 	dev = rt->dst.dev;
 
 	if (IPCB(skb)->flags & IPSKB_FORWARDED)
@@ -2308,7 +2309,6 @@ int ip_mr_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (IS_ERR(mrt))
 		goto mc_output;
 
-	/* already under rcu_read_lock() */
 	cache = ipmr_cache_find(mrt, ip_hdr(skb)->saddr, ip_hdr(skb)->daddr);
 	if (!cache) {
 		vif = ipmr_find_vif(mrt, dev);
