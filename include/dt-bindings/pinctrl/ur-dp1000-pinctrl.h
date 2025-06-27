@@ -2,7 +2,7 @@
 /* UltraRisc DP1000 pinctrl header
  *
  * Copyright(C) 2025 UltraRisc Technology Co., Ltd.
- * 
+ *
  *  Author:  wangjia <wangjia@ultrarisc.com>
  */
 
@@ -15,7 +15,7 @@
 #define UR_DP1000_IOMUX_D		0x3
 #define UR_DP1000_IOMUX_LPC		0x4
 
-#define UR_FUNC_DEF			0
+#define UR_FUNC_DEF				0
 #define UR_FUNC0			1
 #define UR_FUNC1			0x10000
 
@@ -25,12 +25,12 @@
  * pin:
  *     PA: 0 - 15
  *     PB-PD: 0 - 7
- * func: 
+ * func:
  *     UR_FUNC_DEF: default
  *     UR_FUNC0: func0
  *     UR_FUNC1: func1
  */
-#define UR_DP1000_IOPAD(port, pin, func)		(port) (pin) (func)
+#define UR_DP1000_IOPAD(port, pin, func)	(port) (pin) (func)
 
 /**
  * Configure pull up/down resistor of the IO pin
@@ -55,6 +55,6 @@
 #define UR_DRIVE_2		2
 #define UR_DRIVE_3		3
 
-#define UR_DP1000_BIAS(port, pin, pull, drive)			(port) (pin) (((pull)<<2) + (drive))
+#define UR_DP1000_BIAS(port, pin, pull, drive)		(port) (pin) (((pull)<<2) + (drive))
 
 #endif
