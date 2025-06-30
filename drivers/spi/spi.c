@@ -35,6 +35,8 @@
 #include <linux/spi/spi-mem.h>
 #include <uapi/linux/sched/types.h>
 
+#define CONFIG_HAS_DMA 0
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/spi.h>
 EXPORT_TRACEPOINT_SYMBOL(spi_transfer_start);

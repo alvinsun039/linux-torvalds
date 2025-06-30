@@ -2,7 +2,7 @@
 /* UltraRisc pinctrl driver
  *
  * Copyright(C) 2025 UltraRisc Technology Co., Ltd.
- *
+ * 
  *  Author:  wangjia <wangjia@ultrarisc.com>
  */
 
@@ -38,7 +38,7 @@ static int ur_pin_to_desc(struct pinctrl_dev *pctldev, struct ur_pin_val *pin_va
 }
 
 static int ur_subnode_to_pin(struct pinctrl_dev *pctldev,
-			const char *name,
+			const char *name, 
 			enum pinctrl_map_type type,
 			struct device_node *np,
 			int **pins,
@@ -77,7 +77,6 @@ static int ur_subnode_to_pin(struct pinctrl_dev *pctldev,
 
 	for (int i = 0; i < rows; i++) {
 		struct of_phandle_args pin_args;
-
 		ret = pinctrl_parse_index_with_args(np, name, i, &pin_args);
 		if (ret) {
 			dev_err(pctldev->dev, "parse args of %s index %d failed\n", name, i);
@@ -145,7 +144,7 @@ static int ur_pinmux_to_map(struct pinctrl_dev *pctldev,
 
 	ret = ur_subnode_to_pin(pctldev, PINMUX_PROP_NAME, PIN_MAP_TYPE_MUX_GROUP,
 				np, &pins, &pin_vals, &pin_num);
-	if (ret) {
+	if (ret){
 		dev_err(pctldev->dev, "get pinmux data %s failed\n", np->name);
 		return ret;
 	}
@@ -156,7 +155,7 @@ static int ur_pinmux_to_map(struct pinctrl_dev *pctldev,
 
 	dev_dbg(pctldev->dev, "type=%d, mux.group=%s, mux.function=%s\n",
 		map->type, map->data.mux.group, map->data.mux.function);
-
+	
 	return 0;
 }
 
@@ -175,7 +174,7 @@ static int ur_pinconf_to_map(struct pinctrl_dev *pctldev,
 		dev_err(pctldev->dev, "get pinconf data %s failed\n", np->name);
 		return ret;
 	}
-
+	
 	dev_dbg(pctldev->dev, "get an pinconf of %s\n", np->name);
 	map->type = PIN_MAP_TYPE_CONFIGS_GROUP;
 	map->data.configs.group_or_pin = np->name;
@@ -191,12 +190,12 @@ static int ur_pinconf_to_map(struct pinctrl_dev *pctldev,
 static int ur_dt_node_to_map(struct pinctrl_dev *pctldev,
 			struct device_node *np,
 			struct pinctrl_map **map,
-			unsigned int *num_maps)
+			unsigned *num_maps)
 {
 	int ret;
 	bool mux_present = false, conf_present = false;
 	struct pinctrl_map *new_map;
-	unsigned int map_num = 0, prop_count = 0;
+	unsigned map_num = 0, prop_count = 0;
 
 	//device_get_named_child_node(pctldev->dev, np->name);
 	if (of_property_present(np, PINMUX_PROP_NAME)) {
@@ -227,8 +226,9 @@ static int ur_dt_node_to_map(struct pinctrl_dev *pctldev,
 	}
 	if (conf_present) {
 		ret = ur_pinconf_to_map(pctldev, np, new_map);
-		if (!ret)
+		if (!ret) {
 			map_num++;
+		}
 	}
 
 	if (!map_num) {
@@ -245,14 +245,14 @@ free_map:
 }
 
 static void ur_dt_free_map(struct pinctrl_dev *pctldev,
-			struct pinctrl_map *map, unsigned int num_maps)
+			struct pinctrl_map *map, unsigned num_maps)
 {
 	if (map)
 		devm_kfree(pctldev->dev, map);
 }
 
 static void ur_pin_dbg_show(struct pinctrl_dev *pctldev,
-			struct seq_file *s, unsigned int offset)
+			struct seq_file *s, unsigned offset)
 {
 	seq_printf(s, "%s", dev_name(pctldev->dev));
 }
@@ -266,7 +266,7 @@ static const struct pinctrl_ops ur_pinctrl_ops = {
 	.pin_dbg_show = ur_pin_dbg_show,
 };
 
-static int ur_set_pin_mux(struct ur_pinctrl *pin_ctrl, struct ur_pin_val *pin_vals)
+static int ur_set_pin_mux(struct ur_pinctrl *pin_ctrl,struct ur_pin_val *pin_vals)
 {
 	unsigned long flag;
 	//bool clear_mode = false;
@@ -288,15 +288,14 @@ static int ur_set_pin_mux(struct ur_pinctrl *pin_ctrl, struct ur_pin_val *pin_va
 	return 0;
 }
 
-static int ur_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector,
-		unsigned int group_selector)
+static int ur_set_mux(struct pinctrl_dev *pctldev, unsigned func_selector,
+		unsigned group_selector)
 {
 	struct ur_pinctrl *ur_pinctrl = pinctrl_dev_get_drvdata(pctldev);
 	struct group_desc *ur_group;
 	struct ur_pin_val *pin_vals;
-
-	dev_dbg(pctldev->dev, "set mux: func_selector=%d, group_selector=%d\n",
-		func_selector, group_selector);
+	
+	dev_dbg(pctldev->dev, "set mux: func_selector=%d, gourp_selector=%d\n", func_selector, group_selector);
 	ur_group = pinctrl_generic_get_group(pctldev, group_selector);
 	if (!ur_group) {
 		dev_err(pctldev->dev, "get group %d failed\n", group_selector);
@@ -310,9 +309,9 @@ static int ur_set_mux(struct pinctrl_dev *pctldev, unsigned int func_selector,
 		return -EINVAL;
 	}
 
-	for (int i = 0; i < ur_group->num_pins; i++)
+	for (int i = 0; i < ur_group->num_pins; i++) {
 		ur_set_pin_mux(ur_pinctrl, &pin_vals[i]);
-
+	}
 	return 0;
 }
 
@@ -354,7 +353,7 @@ static int ur_set_pin_conf(struct ur_pinctrl *pin_ctrl, struct ur_pin_val *pin_v
 }
 
 static int ur_pin_config_get(struct pinctrl_dev *pctldev,
-			unsigned int pin,
+			unsigned pin,
 			unsigned long *config)
 {
 	dev_dbg(pctldev->dev, "%s(%d): pin=%d\n", __func__, __LINE__, pin);
@@ -363,15 +362,14 @@ static int ur_pin_config_get(struct pinctrl_dev *pctldev,
 }
 
 static int ur_pin_config_set(struct pinctrl_dev *pctldev,
-			unsigned int pin,
+			unsigned pin,
 			unsigned long *configs,
-			unsigned int num_configs)
+			unsigned num_configs)
 {
 	struct ur_pin_val *pin_conf;
 	struct ur_pinctrl *ur_pinctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	dev_dbg(pctldev->dev, "%s(%d): pin=%d, num_configs=%d\n",
-		__func__, __LINE__, pin, num_configs);
+	dev_dbg(pctldev->dev, "%s(%d): pin=%d, num_configs=%d\n", __func__, __LINE__, pin, num_configs);
 	pin_conf = (struct ur_pin_val *)configs;
 	for (int i = 0; i < num_configs; i++) {
 		dev_dbg(pctldev->dev, "pinconf[%d], port=%d, pin=%d, conf=0x%x\n",
@@ -385,22 +383,20 @@ static int ur_pin_config_group_get(struct pinctrl_dev *pctldev,
 				unsigned selector,
 				unsigned long *config)
 {
-	dev_dbg(pctldev->dev, "%s(%d): selector=%d, config=0x%lx\n",
-		__func__, __LINE__, selector, *config);
-	return -EOPNOTSUPP;
+	dev_dbg(pctldev->dev, "%s(%d): selector=%d, config=0x%lx\n", __func__, __LINE__, selector, *config);
+	return -ENOTSUPP;
 }
 
 int ur_pin_config_group_set(struct pinctrl_dev *pctldev,
-			unsigned int selector,
+			unsigned selector,
 			unsigned long *configs,
-			unsigned int num_configs)
+			unsigned num_configs)
 {
 	struct group_desc *ur_group;
 	struct ur_pin_val *pin_conf;
 	struct ur_pinctrl *ur_pinctrl = pinctrl_dev_get_drvdata(pctldev);
 
-	dev_dbg(pctldev->dev, "%s(%d): selector=%d, num_configs=%d\n",
-		__func__, __LINE__, selector, num_configs);
+	dev_dbg(pctldev->dev, "%s(%d): selector=%d, num_configs=%d\n", __func__, __LINE__, selector, num_configs);
 	ur_group = pinctrl_generic_get_group(pctldev, selector);
 	if (!ur_group) {
 		dev_err(pctldev->dev, "Cannot get group by selector %d\n", selector);
@@ -435,8 +431,9 @@ int ur_pinctrl_probe(struct platform_device *pdev)
 	int ret;
 
 	pins_data = of_device_get_match_data(&pdev->dev);
-	if (!pins_data)
+	if (!pins_data) {
 		return -ENODEV;
+	}
 
 	ur_pinctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*ur_pinctrl_desc), GFP_KERNEL);
 	if (!ur_pinctrl_desc) {
@@ -451,16 +448,15 @@ int ur_pinctrl_probe(struct platform_device *pdev)
 		goto free_pinctrl_desc;
 	}
 	struct resource *res;
-
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dev_dbg(&pdev->dev, "iomem start=0x%llx\n", res->start);
 	ur_pinctrl->base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(ur_pinctrl->base)) {
-		dev_err(&pdev->dev, "get ioremap resource failed\n");
+		dev_err(&pdev->dev, "get ioremap resource falied\n");
 		ret = -EINVAL;
 		goto free_pinctrl_desc;
 	}
-	dev_dbg(&pdev->dev, "pinctrl base=0x%p\n", ur_pinctrl->base);
+	dev_dbg(&pdev->dev, "pinctr base=0x%px\n", ur_pinctrl->base);
 	ur_pinctrl_desc->name = dev_name(&pdev->dev);
 	ur_pinctrl_desc->owner = THIS_MODULE;
 	ur_pinctrl_desc->pins = pins_data->pins;
@@ -475,13 +471,12 @@ int ur_pinctrl_probe(struct platform_device *pdev)
 	raw_spin_lock_init(&ur_pinctrl->lock);
 	mutex_init(&ur_pinctrl->mutex);
 	
-	ret = devm_pinctrl_register_and_init(&pdev->dev, ur_pinctrl_desc,
-			ur_pinctrl, &ur_pinctrl->pctl_dev);
+	ret = devm_pinctrl_register_and_init(&pdev->dev, ur_pinctrl_desc, ur_pinctrl, &ur_pinctrl->pctl_dev);
 	if (ret) {
 		dev_err(&pdev->dev, "pinctrl register failed\n");
 		goto free_pinctrl;
 	}
-
+	
 	platform_set_drvdata(pdev, ur_pinctrl);
 
 	return pinctrl_enable(ur_pinctrl->pctl_dev);
