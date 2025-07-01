@@ -2,7 +2,7 @@
 /* UltraRisc DP1000 pinctrl driver
  *
  * Copyright(C) 2025 UltraRisc Technology Co., Ltd.
- * 
+ *
  *  Author:  wangjia <wangjia@ultrarisc.com>
  */
 
@@ -105,12 +105,10 @@ enum ur_dp1000_port_list {
 
 
 static const struct of_device_id ur_pinctrl_of_match[] = {
-	{
-		.compatible = "ultrarisc,dp1000-pinctrl",
-		.data = &ur_dp1000_match_data,
-	},
+	{ .compatible = "ultrarisc,dp1000-pinctrl", .data = &ur_dp1000_match_data, },
 	{ }
 };
+MODULE_DEVICE_TABLE(of, ur_pinctrl_of_match);
 
 static struct platform_driver ur_pinctrl_driver = {
 	.driver = {
