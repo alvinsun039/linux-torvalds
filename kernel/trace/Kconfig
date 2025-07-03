@@ -249,7 +249,7 @@ config FUNCTION_GRAPH_RETVAL
 	  See Documentation/trace/ftrace.rst
 
 config DYNAMIC_FTRACE
-	bool "enable/disable function tracing dynamically"
+	bool
 	depends on FUNCTION_TRACER
 	depends on HAVE_DYNAMIC_FTRACE
 	default y
