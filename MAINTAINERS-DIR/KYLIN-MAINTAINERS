@@ -1020,6 +1020,7 @@ F:	kylin/gpu/
 VIRTIO AND VHOST VSOCK DRIVER
 M:	Jiang Feng <jiangfeng@kylinos.cn>
 M:	Xie Ming <xieming@kylinos.cn>
+M:	Li Weishi <liweishi@kylinos.cn>
 R:	Yu Jun <yujun@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
 R:	He Minhong <heminhong@kylinos.cn>
