@@ -455,16 +455,17 @@
 #define X86_FEATURE_AUTOIBRS		(20*32+ 8) /* "" Automatic IBRS */
 #define X86_FEATURE_NO_SMM_CTL_MSR	(20*32+ 9) /* "" SMM_CTL MSR is not present */
 
+/* Zhaoxin/Centaur-defined CPU features, CPUID level 0xC0000006, word 22 */
+#define X86_FEATURE_ZXPAUSE             (22*32+ 0) /* ZHAOXIN ZXPAUSE */
+#define X86_FEATURE_PAUSEOPT            (22*32+ 0) /* ZHAOXIN PAUSEOPT */
+
+/* HYGON-defined CPU features, CPUID level 0x8c860000:0 (EDX), word 23 */
+#define X86_FEATURE_SM3			(23*32+ 1) /* SM3 instructions */
+#define X86_FEATURE_SM4			(23*32+ 2) /* SM4 instructions */
+
 #define X86_FEATURE_SBPB		(20*32+27) /* "" Selective Branch Prediction Barrier */
 #define X86_FEATURE_IBPB_BRTYPE		(20*32+28) /* "" MSR_PRED_CMD[IBPB] flushes all branch type predictions */
 #define X86_FEATURE_SRSO_NO		(20*32+29) /* "" CPU is not affected by SRSO */
-
-/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000006, word 22 */
-#define X86_FEATURE_ZXPAUSE		(22*32 + 0) /* ZHAOXIN ZXPAUSE */
-
-/* HYGON-defined CPU features, CPUID level 0x8c860000:0 (EDX), word 23 */
-#define X86_FEATURE_SM3				(23*32 + 1) /* SM3 instructions */
-#define X86_FEATURE_SM4				(23*32 + 2) /* SM4 instructions */
 
 /*
  * Extended auxiliary flags: Linux defined - for features scattered in various
