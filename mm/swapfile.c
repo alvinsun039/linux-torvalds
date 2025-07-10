@@ -1344,17 +1344,55 @@ static void swap_entry_free(struct swap_info_struct *p, swp_entry_t entry)
 	swap_range_free(p, offset, 1);
 }
 
+static void cluster_swap_free_nr(struct swap_info_struct *sis,
+		unsigned long offset, int nr_pages)
+{
+	struct swap_cluster_info *ci;
+	DECLARE_BITMAP(to_free, BITS_PER_LONG) = { 0 };
+	int i, nr;
+
+	ci = lock_cluster_or_swap_info(sis, offset);
+	while (nr_pages) {
+		nr = min(BITS_PER_LONG, nr_pages);
+		for (i = 0; i < nr; i++) {
+			if (!__swap_entry_free_locked(sis, offset + i, 1))
+				bitmap_set(to_free, i, 1);
+		}
+		if (!bitmap_empty(to_free, BITS_PER_LONG)) {
+			unlock_cluster_or_swap_info(sis, ci);
+			for_each_set_bit(i, to_free, BITS_PER_LONG)
+				free_swap_slot(swp_entry(sis->type, offset + i));
+			if (nr == nr_pages)
+				return;
+			bitmap_clear(to_free, 0, BITS_PER_LONG);
+			ci = lock_cluster_or_swap_info(sis, offset);
+		}
+		offset += nr;
+		nr_pages -= nr;
+	}
+	unlock_cluster_or_swap_info(sis, ci);
+}
+
 /*
  * Caller has made sure that the swap device corresponding to entry
  * is still around or has not been recycled.
  */
-void swap_free(swp_entry_t entry)
+void swap_free_nr(swp_entry_t entry, int nr_pages)
 {
-	struct swap_info_struct *p;
+	int nr;
+	struct swap_info_struct *sis;
+	unsigned long offset = swp_offset(entry);
 
-	p = _swap_info_get(entry);
-	if (p)
-		__swap_entry_free(p, entry);
+	sis = _swap_info_get(entry);
+	if (!sis)
+		return;
+
+	while (nr_pages) {
+		nr = min_t(int, nr_pages, SWAPFILE_CLUSTER - offset % SWAPFILE_CLUSTER);
+		cluster_swap_free_nr(sis, offset, nr);
+		offset += nr;
+		nr_pages -= nr;
+	}
 }
 
 /*
@@ -1871,10 +1909,20 @@ static int unuse_pte(struct vm_area_struct *vma, pmd_t *pmd,
 		VM_BUG_ON_FOLIO(folio_test_writeback(folio), folio);
 		if (pte_swp_exclusive(old_pte))
 			rmap_flags |= RMAP_EXCLUSIVE;
-
-		folio_add_anon_rmap_pte(folio, page, vma, addr, rmap_flags);
+		/*
+		 * We currently only expect small !anon folios, which are either
+		 * fully exclusive or fully shared. If we ever get large folios
+		 * here, we have to be careful.
+		 */
+		if (!folio_test_anon(folio)) {
+			VM_WARN_ON_ONCE(folio_test_large(folio));
+			VM_WARN_ON_FOLIO(!folio_test_locked(folio), folio);
+			folio_add_new_anon_rmap(folio, vma, addr, rmap_flags);
+		} else {
+			folio_add_anon_rmap_pte(folio, page, vma, addr, rmap_flags);
+		}
 	} else { /* ksm created a completely new copy */
-		folio_add_new_anon_rmap(folio, vma, addr);
+		folio_add_new_anon_rmap(folio, vma, addr, RMAP_EXCLUSIVE);
 		folio_add_lru_vma(folio, vma);
 	}
 	new_pte = pte_mkold(mk_pte(page, vma->vm_page_prot));

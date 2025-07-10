@@ -517,11 +517,12 @@ static int __bpf_strtoll(const char *buf, size_t buf_len, u64 flags,
 }
 
 BPF_CALL_4(bpf_strtol, const char *, buf, size_t, buf_len, u64, flags,
-	   long *, res)
+	   s64 *, res)
 {
 	long long _res;
 	int err;
 
+	*res = 0;
 	err = __bpf_strtoll(buf, buf_len, flags, &_res);
 	if (err < 0)
 		return err;
@@ -538,16 +539,18 @@ const struct bpf_func_proto bpf_strtol_proto = {
 	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
 	.arg2_type	= ARG_CONST_SIZE,
 	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_LONG,
+	.arg4_type	= ARG_PTR_TO_FIXED_SIZE_MEM | MEM_UNINIT | MEM_ALIGNED,
+	.arg4_size	= sizeof(s64),
 };
 
 BPF_CALL_4(bpf_strtoul, const char *, buf, size_t, buf_len, u64, flags,
-	   unsigned long *, res)
+	   u64 *, res)
 {
 	unsigned long long _res;
 	bool is_negative;
 	int err;
 
+	*res = 0;
 	err = __bpf_strtoull(buf, buf_len, flags, &_res, &is_negative);
 	if (err < 0)
 		return err;
@@ -566,7 +569,8 @@ const struct bpf_func_proto bpf_strtoul_proto = {
 	.arg1_type	= ARG_PTR_TO_MEM | MEM_RDONLY,
 	.arg2_type	= ARG_CONST_SIZE,
 	.arg3_type	= ARG_ANYTHING,
-	.arg4_type	= ARG_PTR_TO_LONG,
+	.arg4_type	= ARG_PTR_TO_FIXED_SIZE_MEM | MEM_UNINIT | MEM_ALIGNED,
+	.arg4_size	= sizeof(u64),
 };
 
 BPF_CALL_3(bpf_strncmp, const char *, s1, u32, s1_sz, const char *, s2)
@@ -1929,8 +1933,6 @@ bpf_base_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 	}
 }
 
-void __bpf_obj_drop_impl(void *p, const struct btf_record *rec);
-
 void bpf_list_head_free(const struct btf_field *field, void *list_head,
 			struct bpf_spin_lock *spin_lock)
 {
@@ -1962,7 +1964,7 @@ unlock:
 		 * bpf_list_head which needs to be freed.
 		 */
 		migrate_disable();
-		__bpf_obj_drop_impl(obj, field->graph_root.value_rec);
+		__bpf_obj_drop_impl(obj, field->graph_root.value_rec, false);
 		migrate_enable();
 	}
 }
@@ -2001,7 +2003,7 @@ void bpf_rb_root_free(const struct btf_field *field, void *rb_root,
 
 
 		migrate_disable();
-		__bpf_obj_drop_impl(obj, field->graph_root.value_rec);
+		__bpf_obj_drop_impl(obj, field->graph_root.value_rec, false);
 		migrate_enable();
 	}
 }
@@ -2031,8 +2033,10 @@ __bpf_kfunc void *bpf_percpu_obj_new_impl(u64 local_type_id__k, void *meta__ign)
 }
 
 /* Must be called under migrate_disable(), as required by bpf_mem_free */
-void __bpf_obj_drop_impl(void *p, const struct btf_record *rec)
+void __bpf_obj_drop_impl(void *p, const struct btf_record *rec, bool percpu)
 {
+	struct bpf_mem_alloc *ma;
+
 	if (rec && rec->refcount_off >= 0 &&
 	    !refcount_dec_and_test((refcount_t *)(p + rec->refcount_off))) {
 		/* Object is refcounted and refcount_dec didn't result in 0
@@ -2044,10 +2048,14 @@ void __bpf_obj_drop_impl(void *p, const struct btf_record *rec)
 	if (rec)
 		bpf_obj_free_fields(rec, p);
 
-	if (rec && rec->refcount_off >= 0)
-		bpf_mem_free_rcu(&bpf_global_ma, p);
+	if (percpu)
+		ma = &bpf_global_percpu_ma;
 	else
-		bpf_mem_free(&bpf_global_ma, p);
+		ma = &bpf_global_ma;
+	if (rec && rec->refcount_off >= 0)
+		bpf_mem_free_rcu(ma, p);
+	else
+		bpf_mem_free(ma, p);
 }
 
 __bpf_kfunc void bpf_obj_drop_impl(void *p__alloc, void *meta__ign)
@@ -2055,7 +2063,7 @@ __bpf_kfunc void bpf_obj_drop_impl(void *p__alloc, void *meta__ign)
 	struct btf_struct_meta *meta = meta__ign;
 	void *p = p__alloc;
 
-	__bpf_obj_drop_impl(p, meta ? meta->record : NULL);
+	__bpf_obj_drop_impl(p, meta ? meta->record : NULL, false);
 }
 
 __bpf_kfunc void bpf_percpu_obj_drop_impl(void *p__alloc, void *meta__ign)
@@ -2099,7 +2107,7 @@ static int __bpf_list_add(struct bpf_list_node_kern *node,
 	 */
 	if (cmpxchg(&node->owner, NULL, BPF_PTR_POISON)) {
 		/* Only called from BPF prog, no need to migrate_disable */
-		__bpf_obj_drop_impl((void *)n - off, rec);
+		__bpf_obj_drop_impl((void *)n - off, rec, false);
 		return -EINVAL;
 	}
 
@@ -2198,7 +2206,7 @@ static int __bpf_rbtree_add(struct bpf_rb_root *root,
 	 */
 	if (cmpxchg(&node->owner, NULL, BPF_PTR_POISON)) {
 		/* Only called from BPF prog, no need to migrate_disable */
-		__bpf_obj_drop_impl((void *)n - off, rec);
+		__bpf_obj_drop_impl((void *)n - off, rec, false);
 		return -EINVAL;
 	}
 
