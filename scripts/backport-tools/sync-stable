@@ -165,7 +165,7 @@ AUTHOR=$(git log --pretty="%an <%ae>" -1 $COMMIT_ID)
 [ ! -z $SEVERITY_LEVEL_FORCE ] && SEVERITY_LEVEL=$SEVERITY_LEVEL_FORCE
 
 # Need cc stable-tree?
-[ ! -z $NEED_CC_STABLE ] && CC_STABLE="%nCc: kernel-stable-team #SP0+"
+[ ! -z $NEED_CC_STABLE ] && CC_STABLE="%nCc: kernel-stable-team #2503+"
 
 AUTHOR_DATE=$(git log -1 $COMMIT_ID --pretty="%ad")
 
