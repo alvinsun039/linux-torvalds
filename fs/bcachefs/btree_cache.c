@@ -159,6 +159,16 @@ struct btree *__bch2_btree_node_mem_alloc(struct bch_fs *c)
 	return b;
 }
 
+void bch2_btree_node_to_freelist(struct bch_fs *c, struct btree *b)
+{
+	mutex_lock(&c->btree_cache.lock);
+	list_move(&b->list, &c->btree_cache.freeable);
+	mutex_unlock(&c->btree_cache.lock);
+
+	six_unlock_write(&b->c.lock);
+	six_unlock_intent(&b->c.lock);
+}
+
 /* Btree in memory cache - hash table */
 
 void bch2_btree_node_hash_remove(struct btree_cache *bc, struct btree *b)
@@ -737,6 +747,13 @@ out:
 			       start_time);
 
 	memalloc_nofs_restore(flags);
+
+	int ret = bch2_trans_relock(trans);
+	if (unlikely(ret)) {
+		bch2_btree_node_to_freelist(c, b);
+		return ERR_PTR(ret);
+	}
+
 	return b;
 err:
 	mutex_lock(&bc->lock);
@@ -857,6 +874,10 @@ static noinline struct btree *bch2_btree_node_fill(struct btree_trans *trans,
 
 		bch2_btree_node_read(trans, b, sync);
 
+		int ret = bch2_trans_relock(trans);
+		if (ret)
+			return ERR_PTR(ret);
+
 		if (!sync)
 			return NULL;
 
@@ -974,6 +995,10 @@ retry:
 		need_relock = true;
 
 		bch2_btree_node_wait_on_read(b);
+
+		ret = bch2_trans_relock(trans);
+		if (ret)
+			return ERR_PTR(ret);
 
 		/*
 		 * should_be_locked is not set on this path yet, so we need to

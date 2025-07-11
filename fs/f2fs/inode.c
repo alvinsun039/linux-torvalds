@@ -35,6 +35,11 @@ void f2fs_mark_inode_dirty_sync(struct inode *inode, bool sync)
 	if (f2fs_inode_dirtied(inode, sync))
 		return;
 
+	if (f2fs_is_atomic_file(inode)) {
+		set_inode_flag(inode, FI_ATOMIC_DIRTIED);
+		return;
+	}
+
 	mark_inode_dirty_sync(inode);
 }
 
@@ -377,9 +382,9 @@ static void init_idisk_time(struct inode *inode)
 {
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 
-	fi->i_disk_time[0] = inode->i_atime;
+	fi->i_disk_time[0] = inode_get_atime(inode);
 	fi->i_disk_time[1] = inode_get_ctime(inode);
-	fi->i_disk_time[2] = inode->i_mtime;
+	fi->i_disk_time[2] = inode_get_mtime(inode);
 }
 
 static int do_read_inode(struct inode *inode)
@@ -407,18 +412,17 @@ static int do_read_inode(struct inode *inode)
 	inode->i_size = le64_to_cpu(ri->i_size);
 	inode->i_blocks = SECTOR_FROM_BLOCK(le64_to_cpu(ri->i_blocks) - 1);
 
-	inode->i_atime.tv_sec = le64_to_cpu(ri->i_atime);
+	inode_set_atime(inode, le64_to_cpu(ri->i_atime),
+			le32_to_cpu(ri->i_atime_nsec));
 	inode_set_ctime(inode, le64_to_cpu(ri->i_ctime),
 			le32_to_cpu(ri->i_ctime_nsec));
-	inode->i_mtime.tv_sec = le64_to_cpu(ri->i_mtime);
-	inode->i_atime.tv_nsec = le32_to_cpu(ri->i_atime_nsec);
-	inode->i_mtime.tv_nsec = le32_to_cpu(ri->i_mtime_nsec);
+	inode_set_mtime(inode, le64_to_cpu(ri->i_mtime),
+			le32_to_cpu(ri->i_mtime_nsec));
 	inode->i_generation = le32_to_cpu(ri->i_generation);
 	if (S_ISDIR(inode->i_mode))
 		fi->i_current_depth = le32_to_cpu(ri->i_current_depth);
 	else if (S_ISREG(inode->i_mode))
-		fi->i_gc_failures[GC_FAILURE_PIN] =
-					le16_to_cpu(ri->i_gc_failures);
+		fi->i_gc_failures = le16_to_cpu(ri->i_gc_failures);
 	fi->i_xattr_nid = le32_to_cpu(ri->i_xattr_nid);
 	fi->i_flags = le32_to_cpu(ri->i_flags);
 	if (S_ISREG(inode->i_mode))
@@ -640,8 +644,9 @@ retry:
 
 void f2fs_update_inode(struct inode *inode, struct page *node_page)
 {
+	struct f2fs_inode_info *fi = F2FS_I(inode);
 	struct f2fs_inode *ri;
-	struct extent_tree *et = F2FS_I(inode)->extent_tree[EX_READ];
+	struct extent_tree *et = fi->extent_tree[EX_READ];
 
 	f2fs_wait_on_page_writeback(node_page, NODE, true, true);
 	set_page_dirty(node_page);
@@ -651,7 +656,7 @@ void f2fs_update_inode(struct inode *inode, struct page *node_page)
 	ri = F2FS_INODE(node_page);
 
 	ri->i_mode = cpu_to_le16(inode->i_mode);
-	ri->i_advise = F2FS_I(inode)->i_advise;
+	ri->i_advise = fi->i_advise;
 	ri->i_uid = cpu_to_le32(i_uid_read(inode));
 	ri->i_gid = cpu_to_le32(i_gid_read(inode));
 	ri->i_links = cpu_to_le32(inode->i_nlink);
@@ -670,66 +675,56 @@ void f2fs_update_inode(struct inode *inode, struct page *node_page)
 	}
 	set_raw_inline(inode, ri);
 
-	ri->i_atime = cpu_to_le64(inode->i_atime.tv_sec);
-	ri->i_ctime = cpu_to_le64(inode_get_ctime(inode).tv_sec);
-	ri->i_mtime = cpu_to_le64(inode->i_mtime.tv_sec);
-	ri->i_atime_nsec = cpu_to_le32(inode->i_atime.tv_nsec);
-	ri->i_ctime_nsec = cpu_to_le32(inode_get_ctime(inode).tv_nsec);
-	ri->i_mtime_nsec = cpu_to_le32(inode->i_mtime.tv_nsec);
+	ri->i_atime = cpu_to_le64(inode_get_atime_sec(inode));
+	ri->i_ctime = cpu_to_le64(inode_get_ctime_sec(inode));
+	ri->i_mtime = cpu_to_le64(inode_get_mtime_sec(inode));
+	ri->i_atime_nsec = cpu_to_le32(inode_get_atime_nsec(inode));
+	ri->i_ctime_nsec = cpu_to_le32(inode_get_ctime_nsec(inode));
+	ri->i_mtime_nsec = cpu_to_le32(inode_get_mtime_nsec(inode));
 	if (S_ISDIR(inode->i_mode))
-		ri->i_current_depth =
-			cpu_to_le32(F2FS_I(inode)->i_current_depth);
+		ri->i_current_depth = cpu_to_le32(fi->i_current_depth);
 	else if (S_ISREG(inode->i_mode))
-		ri->i_gc_failures =
-			cpu_to_le16(F2FS_I(inode)->i_gc_failures[GC_FAILURE_PIN]);
-	ri->i_xattr_nid = cpu_to_le32(F2FS_I(inode)->i_xattr_nid);
-	ri->i_flags = cpu_to_le32(F2FS_I(inode)->i_flags);
-	ri->i_pino = cpu_to_le32(F2FS_I(inode)->i_pino);
+		ri->i_gc_failures = cpu_to_le16(fi->i_gc_failures);
+	ri->i_xattr_nid = cpu_to_le32(fi->i_xattr_nid);
+	ri->i_flags = cpu_to_le32(fi->i_flags);
+	ri->i_pino = cpu_to_le32(fi->i_pino);
 	ri->i_generation = cpu_to_le32(inode->i_generation);
-	ri->i_dir_level = F2FS_I(inode)->i_dir_level;
+	ri->i_dir_level = fi->i_dir_level;
 
 	if (f2fs_has_extra_attr(inode)) {
-		ri->i_extra_isize = cpu_to_le16(F2FS_I(inode)->i_extra_isize);
+		ri->i_extra_isize = cpu_to_le16(fi->i_extra_isize);
 
 		if (f2fs_sb_has_flexible_inline_xattr(F2FS_I_SB(inode)))
 			ri->i_inline_xattr_size =
-				cpu_to_le16(F2FS_I(inode)->i_inline_xattr_size);
+				cpu_to_le16(fi->i_inline_xattr_size);
 
 		if (f2fs_sb_has_project_quota(F2FS_I_SB(inode)) &&
-			F2FS_FITS_IN_INODE(ri, F2FS_I(inode)->i_extra_isize,
-								i_projid)) {
+			F2FS_FITS_IN_INODE(ri, fi->i_extra_isize, i_projid)) {
 			projid_t i_projid;
 
-			i_projid = from_kprojid(&init_user_ns,
-						F2FS_I(inode)->i_projid);
+			i_projid = from_kprojid(&init_user_ns, fi->i_projid);
 			ri->i_projid = cpu_to_le32(i_projid);
 		}
 
 		if (f2fs_sb_has_inode_crtime(F2FS_I_SB(inode)) &&
-			F2FS_FITS_IN_INODE(ri, F2FS_I(inode)->i_extra_isize,
-								i_crtime)) {
-			ri->i_crtime =
-				cpu_to_le64(F2FS_I(inode)->i_crtime.tv_sec);
-			ri->i_crtime_nsec =
-				cpu_to_le32(F2FS_I(inode)->i_crtime.tv_nsec);
+			F2FS_FITS_IN_INODE(ri, fi->i_extra_isize, i_crtime)) {
+			ri->i_crtime = cpu_to_le64(fi->i_crtime.tv_sec);
+			ri->i_crtime_nsec = cpu_to_le32(fi->i_crtime.tv_nsec);
 		}
 
 		if (f2fs_sb_has_compression(F2FS_I_SB(inode)) &&
-			F2FS_FITS_IN_INODE(ri, F2FS_I(inode)->i_extra_isize,
+			F2FS_FITS_IN_INODE(ri, fi->i_extra_isize,
 							i_compress_flag)) {
 			unsigned short compress_flag;
 
-			ri->i_compr_blocks =
-				cpu_to_le64(atomic_read(
-					&F2FS_I(inode)->i_compr_blocks));
-			ri->i_compress_algorithm =
-				F2FS_I(inode)->i_compress_algorithm;
-			compress_flag = F2FS_I(inode)->i_compress_flag |
-				F2FS_I(inode)->i_compress_level <<
+			ri->i_compr_blocks = cpu_to_le64(
+					atomic_read(&fi->i_compr_blocks));
+			ri->i_compress_algorithm = fi->i_compress_algorithm;
+			compress_flag = fi->i_compress_flag |
+						fi->i_compress_level <<
 						COMPRESS_LEVEL_OFFSET;
 			ri->i_compress_flag = cpu_to_le16(compress_flag);
-			ri->i_log_cluster_size =
-				F2FS_I(inode)->i_log_cluster_size;
+			ri->i_log_cluster_size = fi->i_log_cluster_size;
 		}
 	}
 

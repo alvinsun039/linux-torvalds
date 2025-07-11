@@ -15,3 +15,6 @@ config PINCTRL_ULTRARISC_DP1000
 	tristate "Pinctrl driver of UltraRisc DP1000"
 	select PINCTRL_ULTRARISC
 	depends on OF && HAS_IOMEM
+	help
+	  This driver configures the UltraRisc DP1000 SoC's pinctrl
+	  subsystem.

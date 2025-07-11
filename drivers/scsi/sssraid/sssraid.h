@@ -6,8 +6,8 @@
 #ifndef __SSSRAID_H_
 #define __SSSRAID_H_
 
-#define SSSRAID_DRIVER_VERSION	"1.0.0.0"
-#define SSSRAID_DRIVER_RELDATE	"12-December-2022"
+#define SSSRAID_DRIVER_VERSION	"1.0.6.6"
+#define SSSRAID_DRIVER_RELDATE	"08-July-2024"
 
 #define SSSRAID_DRIVER_NAME	"sssraid"
 

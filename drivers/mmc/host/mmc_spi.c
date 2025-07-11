@@ -29,8 +29,6 @@
 
 #include <asm/unaligned.h>
 
-#define CONFIG_HAS_DMA 0
-
 /* NOTES:
  *
  * - For now, we won't try to interoperate with a real mmc/sd/sdio

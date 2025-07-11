@@ -7,7 +7,9 @@
  * Author: Paul E. McKenney <paulmck@linux.ibm.com>
  */
 
+#include <linux/console.h>
 #include <linux/kvm_para.h>
+#include <linux/rcu_notifier.h>
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -541,16 +543,16 @@ static void rcu_check_gp_kthread_starvation(void)
 		       data_race(READ_ONCE(rcu_state.gp_state)),
 		       gpk ? data_race(READ_ONCE(gpk->__state)) : ~0, cpu);
 		if (gpk) {
+			struct rcu_data *rdp = per_cpu_ptr(&rcu_data, cpu);
+
 			pr_err("\tUnless %s kthread gets sufficient CPU time, OOM is now expected behavior.\n", rcu_state.name);
 			pr_err("RCU grace-period kthread stack dump:\n");
 			sched_show_task(gpk);
-			if (cpu >= 0) {
-				if (cpu_is_offline(cpu)) {
-					pr_err("RCU GP kthread last ran on offline CPU %d.\n", cpu);
-				} else  {
-					pr_err("Stack dump where RCU GP kthread last ran:\n");
-					dump_cpu_task(cpu);
-				}
+			if (cpu_is_offline(cpu)) {
+				pr_err("RCU GP kthread last ran on offline CPU %d.\n", cpu);
+			} else if (!(data_race(READ_ONCE(rdp->mynode->qsmask)) & rdp->grpmask)) {
+				pr_err("Stack dump where RCU GP kthread last ran:\n");
+				dump_cpu_task(cpu);
 			}
 			wake_up_process(gpk);
 		}
@@ -604,6 +606,8 @@ static void print_other_cpu_stall(unsigned long gp_seq, unsigned long gps)
 	if (rcu_stall_is_suppressed())
 		return;
 
+	nbcon_cpu_emergency_enter();
+
 	/*
 	 * OK, time to rat on our buddy...
 	 * See Documentation/RCU/stallwarn.rst for info on how to debug
@@ -655,6 +659,8 @@ static void print_other_cpu_stall(unsigned long gp_seq, unsigned long gps)
 	rcu_check_gp_kthread_expired_fqs_timer();
 	rcu_check_gp_kthread_starvation();
 
+	nbcon_cpu_emergency_exit();
+
 	panic_on_rcu_stall();
 
 	rcu_force_quiescent_state();  /* Kick them all. */
@@ -674,6 +680,8 @@ static void print_cpu_stall(unsigned long gps)
 	rcu_stall_kick_kthreads();
 	if (rcu_stall_is_suppressed())
 		return;
+
+	nbcon_cpu_emergency_enter();
 
 	/*
 	 * OK, time to rat on ourselves...
@@ -703,6 +711,8 @@ static void print_cpu_stall(unsigned long gps)
 			   jiffies + 3 * rcu_jiffies_till_stall_check() + 3);
 	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
 
+	nbcon_cpu_emergency_exit();
+
 	panic_on_rcu_stall();
 
 	/*
@@ -718,7 +728,7 @@ static void print_cpu_stall(unsigned long gps)
 
 static void check_cpu_stall(struct rcu_data *rdp)
 {
-	bool didstall = false;
+	bool self_detected;
 	unsigned long gs1;
 	unsigned long gs2;
 	unsigned long gps;
@@ -775,10 +785,10 @@ static void check_cpu_stall(struct rcu_data *rdp)
 		return; /* No stall or GP completed since entering function. */
 	rnp = rdp->mynode;
 	jn = jiffies + ULONG_MAX / 2;
+	self_detected = READ_ONCE(rnp->qsmask) & rdp->grpmask;
 	if (rcu_gp_in_progress() &&
-	    (READ_ONCE(rnp->qsmask) & rdp->grpmask) &&
+	    (self_detected || ULONG_CMP_GE(j, js + RCU_STALL_RAT_DELAY)) &&
 	    cmpxchg(&rcu_state.jiffies_stall, js, jn) == js) {
-
 		/*
 		 * If a virtual machine is stopped by the host it can look to
 		 * the watchdog like an RCU stall. Check to see if the host
@@ -787,39 +797,28 @@ static void check_cpu_stall(struct rcu_data *rdp)
 		if (kvm_check_and_clear_guest_paused())
 			return;
 
-		/* We haven't checked in, so go dump stack. */
-		print_cpu_stall(gps);
+		rcu_stall_notifier_call_chain(RCU_STALL_NOTIFY_NORM, (void *)j - gps);
+		if (self_detected) {
+			/* We haven't checked in, so go dump stack. */
+			print_cpu_stall(gps);
+		} else {
+			/* They had a few time units to dump stack, so complain. */
+			print_other_cpu_stall(gs2, gps);
+		}
+
 		if (READ_ONCE(rcu_cpu_stall_ftrace_dump))
 			rcu_ftrace_dump(DUMP_ALL);
-		didstall = true;
 
-	} else if (rcu_gp_in_progress() &&
-		   ULONG_CMP_GE(j, js + RCU_STALL_RAT_DELAY) &&
-		   cmpxchg(&rcu_state.jiffies_stall, js, jn) == js) {
-
-		/*
-		 * If a virtual machine is stopped by the host it can look to
-		 * the watchdog like an RCU stall. Check to see if the host
-		 * stopped the vm.
-		 */
-		if (kvm_check_and_clear_guest_paused())
-			return;
-
-		/* They had a few time units to dump stack, so complain. */
-		print_other_cpu_stall(gs2, gps);
-		if (READ_ONCE(rcu_cpu_stall_ftrace_dump))
-			rcu_ftrace_dump(DUMP_ALL);
-		didstall = true;
-	}
-	if (didstall && READ_ONCE(rcu_state.jiffies_stall) == jn) {
-		jn = jiffies + 3 * rcu_jiffies_till_stall_check() + 3;
-		WRITE_ONCE(rcu_state.jiffies_stall, jn);
+		if (READ_ONCE(rcu_state.jiffies_stall) == jn) {
+			jn = jiffies + 3 * rcu_jiffies_till_stall_check() + 3;
+			WRITE_ONCE(rcu_state.jiffies_stall, jn);
+		}
 	}
 }
 
 //////////////////////////////////////////////////////////////////////////////
 //
-// RCU forward-progress mechanisms, including of callback invocation.
+// RCU forward-progress mechanisms, including for callback invocation.
 
 
 /*
@@ -1071,3 +1070,67 @@ static int __init rcu_sysrq_init(void)
 	return 0;
 }
 early_initcall(rcu_sysrq_init);
+
+#ifdef CONFIG_RCU_CPU_STALL_NOTIFIER
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// RCU CPU stall-warning notifiers
+
+static ATOMIC_NOTIFIER_HEAD(rcu_cpu_stall_notifier_list);
+
+/**
+ * rcu_stall_chain_notifier_register - Add an RCU CPU stall notifier
+ * @n: Entry to add.
+ *
+ * Adds an RCU CPU stall notifier to an atomic notifier chain.
+ * The @action passed to a notifier will be @RCU_STALL_NOTIFY_NORM or
+ * friends.  The @data will be the duration of the stalled grace period,
+ * in jiffies, coerced to a void* pointer.
+ *
+ * Returns 0 on success, %-EEXIST on error.
+ */
+int rcu_stall_chain_notifier_register(struct notifier_block *n)
+{
+	int rcsn = rcu_cpu_stall_notifiers;
+
+	WARN(1, "Adding %pS() to RCU stall notifier list (%s).\n", n->notifier_call,
+	     rcsn ? "possibly suppressing RCU CPU stall warnings" : "failed, so all is well");
+	if (rcsn)
+		return atomic_notifier_chain_register(&rcu_cpu_stall_notifier_list, n);
+	return -EEXIST;
+}
+EXPORT_SYMBOL_GPL(rcu_stall_chain_notifier_register);
+
+/**
+ * rcu_stall_chain_notifier_unregister - Remove an RCU CPU stall notifier
+ * @n: Entry to add.
+ *
+ * Removes an RCU CPU stall notifier from an atomic notifier chain.
+ *
+ * Returns zero on success, %-ENOENT on failure.
+ */
+int rcu_stall_chain_notifier_unregister(struct notifier_block *n)
+{
+	return atomic_notifier_chain_unregister(&rcu_cpu_stall_notifier_list, n);
+}
+EXPORT_SYMBOL_GPL(rcu_stall_chain_notifier_unregister);
+
+/*
+ * rcu_stall_notifier_call_chain - Call functions in an RCU CPU stall notifier chain
+ * @val: Value passed unmodified to notifier function
+ * @v: Pointer passed unmodified to notifier function
+ *
+ * Calls each function in the RCU CPU stall notifier chain in turn, which
+ * is an atomic call chain.  See atomic_notifier_call_chain() for more
+ * information.
+ *
+ * This is for use within RCU, hence the omission of the extra asterisk
+ * to indicate a non-kerneldoc format header comment.
+ */
+int rcu_stall_notifier_call_chain(unsigned long val, void *v)
+{
+	return atomic_notifier_call_chain(&rcu_cpu_stall_notifier_list, val, v);
+}
+
+#endif // #ifdef CONFIG_RCU_CPU_STALL_NOTIFIER

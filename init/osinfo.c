@@ -17,6 +17,7 @@
 #include <linux/cpumask.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/utsname.h>
 
 static void get_uptime_format_string(char *buf)
 {
@@ -72,13 +73,13 @@ static int osinfo_proc_show(struct seq_file *m, void *v)
 	get_uptime_format_string(uptime_buf);
 	totalram = i.totalram << (PAGE_SHIFT - 10);
 
-	seq_printf(m, "Kernel Version:\t\t%s\n", UTS_RELEASE);
+	seq_printf(m, "Kernel Version:\t\t%s\n", utsname()->release);
 	seq_printf(m, "Source Version:\t\t%s\n", SOURCE_VERSION);
 	seq_printf(m, "Upstream Version:\t%d.%d.%d\n", LINUX_VERSION_MAJOR,
 		   LINUX_VERSION_PATCHLEVEL,
 		   LINUX_VERSION_SUBLEVEL);
-	seq_printf(m, "Build Time:\t\t%s\n", UTS_VERSION);
-	seq_printf(m, "Architecture:\t\t%s\n", UTS_MACHINE);
+	seq_printf(m, "Build Time:\t\t%s\n", utsname()->version);
+	seq_printf(m, "Architecture:\t\t%s\n", utsname()->machine);
 	seq_printf(m, "Online CPUs:\t\t%d\n", num_online_cpus());
 	seq_printf(m, "MemTotal:\t\t%llu.%02llu GB\nPageSize:\t\t%ld KB\n",
 		   totalram >> 20, ((totalram & 0xFFFFF) * 100) >> 20,

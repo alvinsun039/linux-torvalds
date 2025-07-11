@@ -11,6 +11,7 @@
 #include <linux/jump_label.h>
 #include <linux/suspend.h>
 #include <linux/ftrace.h>
+#include <linux/static_call.h>
 #include <linux/slab.h>
 
 #include <trace/events/sched.h>
@@ -172,6 +173,7 @@ DEFINE_STATIC_KEY_FALSE(kill_ftrace_graph);
 int ftrace_graph_active;
 
 static struct fgraph_ops *fgraph_array[FGRAPH_ARRAY_SIZE];
+static unsigned long fgraph_array_bitmask;
 
 /* LRU index table for fgraph_array */
 static int fgraph_lru_table[FGRAPH_ARRAY_SIZE];
@@ -196,6 +198,8 @@ static int fgraph_lru_release_index(int idx)
 
 	fgraph_lru_table[fgraph_lru_last] = idx;
 	fgraph_lru_last = (fgraph_lru_last + 1) % FGRAPH_ARRAY_SIZE;
+
+	clear_bit(idx, &fgraph_array_bitmask);
 	return 0;
 }
 
@@ -210,6 +214,8 @@ static int fgraph_lru_alloc_index(void)
 
 	fgraph_lru_table[fgraph_lru_next] = -1;
 	fgraph_lru_next = (fgraph_lru_next + 1) % FGRAPH_ARRAY_SIZE;
+
+	set_bit(idx, &fgraph_array_bitmask);
 	return idx;
 }
 
@@ -506,6 +512,11 @@ static struct fgraph_ops fgraph_stub = {
 	.retfunc = ftrace_graph_ret_stub,
 };
 
+static struct fgraph_ops *fgraph_direct_gops = &fgraph_stub;
+DEFINE_STATIC_CALL(fgraph_func, ftrace_graph_entry_stub);
+DEFINE_STATIC_CALL(fgraph_retfunc, ftrace_graph_ret_stub);
+static DEFINE_STATIC_KEY_TRUE(fgraph_do_direct);
+
 /**
  * ftrace_graph_stop - set to permanently disable function graph tracing
  *
@@ -642,20 +653,34 @@ int function_graph_enter(unsigned long ret, unsigned long func,
 	if (offset < 0)
 		goto out;
 
-	for (i = 0; i < FGRAPH_ARRAY_SIZE; i++) {
-		struct fgraph_ops *gops = fgraph_array[i];
-		int save_curr_ret_stack;
+#ifdef CONFIG_HAVE_STATIC_CALL
+	if (static_branch_likely(&fgraph_do_direct)) {
+		int save_curr_ret_stack = current->curr_ret_stack;
 
-		if (gops == &fgraph_stub)
-			continue;
-
-		save_curr_ret_stack = current->curr_ret_stack;
-		if (ftrace_ops_test(&gops->ops, func, NULL) &&
-		    gops->entryfunc(&trace, gops))
-			bitmap |= BIT(i);
+		if (static_call(fgraph_func)(&trace, fgraph_direct_gops))
+			bitmap |= BIT(fgraph_direct_gops->idx);
 		else
 			/* Clear out any saved storage */
 			current->curr_ret_stack = save_curr_ret_stack;
+	} else
+#endif
+	{
+		for_each_set_bit(i, &fgraph_array_bitmask,
+					 sizeof(fgraph_array_bitmask) * BITS_PER_BYTE) {
+			struct fgraph_ops *gops = READ_ONCE(fgraph_array[i]);
+			int save_curr_ret_stack;
+
+			if (gops == &fgraph_stub)
+				continue;
+
+			save_curr_ret_stack = current->curr_ret_stack;
+			if (ftrace_ops_test(&gops->ops, func, NULL) &&
+			    gops->entryfunc(&trace, gops))
+				bitmap |= BIT(i);
+			else
+				/* Clear out any saved storage */
+				current->curr_ret_stack = save_curr_ret_stack;
+		}
 	}
 
 	if (!bitmap)
@@ -794,15 +819,22 @@ static unsigned long __ftrace_return_to_handler(struct fgraph_ret_regs *ret_regs
 #endif
 
 	bitmap = get_bitmap_bits(current, offset);
-	for (i = 0; i < FGRAPH_ARRAY_SIZE; i++) {
-		struct fgraph_ops *gops = fgraph_array[i];
 
-		if (!(bitmap & BIT(i)))
-			continue;
-		if (gops == &fgraph_stub)
-			continue;
+#ifdef CONFIG_HAVE_STATIC_CALL
+	if (static_branch_likely(&fgraph_do_direct)) {
+		if (test_bit(fgraph_direct_gops->idx, &bitmap))
+			static_call(fgraph_retfunc)(&trace, fgraph_direct_gops);
+	} else
+#endif
+	{
+		for_each_set_bit(i, &bitmap, sizeof(bitmap) * BITS_PER_BYTE) {
+			struct fgraph_ops *gops = fgraph_array[i];
 
-		gops->retfunc(&trace, gops);
+			if (gops == &fgraph_stub)
+				continue;
+
+			gops->retfunc(&trace, gops);
+		}
 	}
 
 	/*
@@ -862,18 +894,24 @@ ftrace_graph_get_ret_stack(struct task_struct *task, int idx)
 }
 
 /**
- * ftrace_graph_ret_addr - convert a potentially modified stack return address
- *			   to its original value
+ * ftrace_graph_ret_addr - return the original value of the return address
+ * @task: The task the unwinder is being executed on
+ * @idx: An initialized pointer to the next stack index to use
+ * @ret: The current return address (likely pointing to return_handler)
+ * @retp: The address on the stack of the current return location
  *
  * This function can be called by stack unwinding code to convert a found stack
- * return address ('ret') to its original value, in case the function graph
+ * return address (@ret) to its original value, in case the function graph
  * tracer has modified it to be 'return_to_handler'.  If the address hasn't
- * been modified, the unchanged value of 'ret' is returned.
+ * been modified, the unchanged value of @ret is returned.
  *
- * 'idx' is a state variable which should be initialized by the caller to zero
- * before the first call.
+ * @idx holds the last index used to know where to start from. It should be
+ * initialized to zero for the first iteration as that will mean to start
+ * at the top of the shadow stack. If the location is found, this pointer
+ * will be assigned that location so that if called again, it will continue
+ * where it left off.
  *
- * 'retp' is a pointer to the return address on the stack.  It's ignored if
+ * @retp is a pointer to the return address on the stack.  It's ignored if
  * the arch doesn't have HAVE_FUNCTION_GRAPH_RET_ADDR_PTR defined.
  */
 #ifdef HAVE_FUNCTION_GRAPH_RET_ADDR_PTR
@@ -887,8 +925,12 @@ unsigned long ftrace_graph_ret_addr(struct task_struct *task, int *idx,
 	if (ret != return_handler)
 		return ret;
 
+	if (!idx)
+		return ret;
+
+	i = *idx ? : task->curr_ret_stack;
 	while (i > 0) {
-		ret_stack = get_ret_stack(current, i, &i);
+		ret_stack = get_ret_stack(task, i, &i);
 		if (!ret_stack)
 			break;
 		/*
@@ -900,8 +942,10 @@ unsigned long ftrace_graph_ret_addr(struct task_struct *task, int *idx,
 		 * Thus we will continue to find real return address.
 		 */
 		if (ret_stack->retp == retp &&
-		    ret_stack->ret != return_handler)
+		    ret_stack->ret != return_handler) {
+			*idx = i;
 			return ret_stack->ret;
+		}
 	}
 
 	return ret;
@@ -1156,13 +1200,17 @@ void fgraph_update_pid_func(void)
 	if (!(graph_ops.flags & FTRACE_OPS_FL_INITIALIZED))
 		return;
 
+#ifdef CONFIG_DYNAMIC_FTRACE
 	list_for_each_entry(op, &graph_ops.subop_list, list) {
 		if (op->flags & FTRACE_OPS_FL_PID) {
 			gops = container_of(op, struct fgraph_ops, ops);
 			gops->entryfunc = ftrace_pids_enabled(op) ?
 				fgraph_pid_func : gops->saved_func;
+			if (ftrace_graph_active == 1)
+				static_call_update(fgraph_func, gops->entryfunc);
 		}
 	}
+#endif
 }
 
 /* Allocate a return stack for each task */
@@ -1215,6 +1263,42 @@ static void init_task_vars(int idx)
 	read_unlock(&tasklist_lock);
 }
 
+static void ftrace_graph_enable_direct(bool enable_branch, struct fgraph_ops *gops)
+{
+	trace_func_graph_ent_t func = NULL;
+	trace_func_graph_ret_t retfunc = NULL;
+	int i;
+
+	if (gops) {
+		func = gops->entryfunc;
+		retfunc = gops->retfunc;
+		fgraph_direct_gops = gops;
+	} else {
+		for_each_set_bit(i, &fgraph_array_bitmask,
+				 sizeof(fgraph_array_bitmask) * BITS_PER_BYTE) {
+			func = fgraph_array[i]->entryfunc;
+			retfunc = fgraph_array[i]->retfunc;
+			fgraph_direct_gops = fgraph_array[i];
+		}
+	}
+	if (WARN_ON_ONCE(!func))
+		return;
+
+	static_call_update(fgraph_func, func);
+	static_call_update(fgraph_retfunc, retfunc);
+	if (enable_branch)
+		static_branch_disable(&fgraph_do_direct);
+}
+
+static void ftrace_graph_disable_direct(bool disable_branch)
+{
+	if (disable_branch)
+		static_branch_disable(&fgraph_do_direct);
+	static_call_update(fgraph_func, ftrace_graph_entry_stub);
+	static_call_update(fgraph_retfunc, ftrace_graph_ret_stub);
+	fgraph_direct_gops = &fgraph_stub;
+}
+
 int register_ftrace_graph(struct fgraph_ops *gops)
 {
 	int command = 0;
@@ -1235,13 +1319,15 @@ int register_ftrace_graph(struct fgraph_ops *gops)
 		ret = -ENOSPC;
 		goto out;
 	}
-
-	fgraph_array[i] = gops;
 	gops->idx = i;
 
 	ftrace_graph_active++;
 
+	if (ftrace_graph_active == 2)
+		ftrace_graph_disable_direct(true);
+
 	if (ftrace_graph_active == 1) {
+		ftrace_graph_enable_direct(false, gops);
 		register_pm_notifier(&ftrace_suspend_notifier);
 		ret = start_graph_tracing();
 		if (ret)
@@ -1256,14 +1342,15 @@ int register_ftrace_graph(struct fgraph_ops *gops)
 	} else {
 		init_task_vars(gops->idx);
 	}
-
 	/* Always save the function, and reset at unregistering */
 	gops->saved_func = gops->entryfunc;
 
 	ret = ftrace_startup_subops(&graph_ops, &gops->ops, command);
+	if (!ret)
+		fgraph_array[i] = gops;
+
 error:
 	if (ret) {
-		fgraph_array[i] = &fgraph_stub;
 		ftrace_graph_active--;
 		gops->saved_func = NULL;
 		fgraph_lru_release_index(i);
@@ -1297,6 +1384,11 @@ void unregister_ftrace_graph(struct fgraph_ops *gops)
 		command = FTRACE_STOP_FUNC_RET;
 
 	ftrace_shutdown_subops(&graph_ops, &gops->ops, command);
+
+	if (ftrace_graph_active == 1)
+		ftrace_graph_enable_direct(true, NULL);
+	else if (!ftrace_graph_active)
+		ftrace_graph_disable_direct(false);
 
 	if (!ftrace_graph_active) {
 		ftrace_graph_return = ftrace_stub_graph;

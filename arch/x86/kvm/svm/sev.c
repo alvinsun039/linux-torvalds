@@ -63,7 +63,7 @@ module_param_named(sev_es, sev_es_enabled, bool, 0444);
 static bool sev_es_debug_swap_enabled = false;
 module_param_named(debug_swap, sev_es_debug_swap_enabled, bool, 0444);
 #else
-#define sev_enabled false
+static bool sev_enabled = false;
 #define sev_es_enabled false
 #define sev_es_debug_swap_enabled false
 #endif /* CONFIG_KVM_AMD_SEV */
