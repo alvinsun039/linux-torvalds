@@ -751,8 +751,6 @@ F:	tools/testing/selftests/livepatch/
 MEDIA INPUT INFRASTRUCTURE (V4L/DVB)
 M:	Wang Yongjun <wangyongjun@kylinos.cn>
 M:	Zhou Lei <zhoulei@kylinos.cn>
-M:	Liu Yihu <liuyihu@kylinos.cn>
-M:	Li Zhenneng <lizhenneng@kylinos.cn>
 R:	lihongtao <lihongtao@kylinos.cn>
 S:	Supported
 F:	drivers/media/
@@ -1003,11 +1001,11 @@ F:	samples/vfio-mdev/
 VIDEO DRIVERS
 M:	Wang Yongjun <wangyongjun@kylinos.cn>
 M:	Zhou Lei <zhoulei@kylinos.cn>
-M:	Liu Yihu <liuyihu@kylinos.cn>
-M:	Li Zhenneng <lizhenneng@kylinos.cn>
-R:	Yang Deyi <yangdeyi@kylinos.cn>
-R:	pengfuyuan <pengfuyuan@kylinos.cn >
 R:	lihongtao <lihongtao@kylinos.cn>
+R:	yangdacheng <yangdacheng@kylinos.cn>
+R:	yaolu <yaolu@kylinos.cn>
+R:	lihaojie <lihaojie@kylinos.cn>
+R:	JiangWang <jiangwang@kylinos.cn>
 R:	oushixiong <oushixiong@kylinos.cn>
 R:	xurui <xurui@kylinos.cn>
 R:	sunzhigang <sunzhigang1@kylinos.cn>
