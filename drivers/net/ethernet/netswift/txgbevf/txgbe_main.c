@@ -3015,7 +3015,6 @@ void txgbe_up_complete(struct txgbe_adapter *adapter)
 	txgbe_save_reset_stats(adapter);
 	txgbe_init_last_counter_stats(adapter);
 
-	adapter->link_status_flag = false;
 	hw->mac.get_link_status = 1;
 	mod_timer(&adapter->service_timer, jiffies);
 }
@@ -6047,13 +6046,8 @@ static void txgbe_set_features(struct txgbe_adapter *adapter, u8 fea_flags)
 		netdev->features |= netdev->gso_partial_features |
 					NETIF_F_GSO_PARTIAL;
 #endif /* NETIF_F_GSO_PARTIAL */
-#ifdef NETIF_F_HW_VLAN_STAG_TX
-	netdev->features |= NETIF_F_HW_VLAN_STAG_TX |
-			    NETIF_F_HW_VLAN_STAG_RX;
-				/*|NETIF_F_HW_VLAN_STAG_FILTER*/
-#endif
 
-#ifdef NETIF_F_HW_VLAN_CTAG_TX
+#if 0
 	netdev->features |= NETIF_F_HW_VLAN_CTAG_TX |
 			    NETIF_F_HW_VLAN_CTAG_RX;
 				/*|NETIF_F_HW_VLAN_CTAG_FILTER*/
@@ -6091,6 +6085,11 @@ static void txgbe_set_features(struct txgbe_adapter *adapter, u8 fea_flags)
 #endif
 	
 		/* set this bit last since it cannot be part of vlan_features */
+#ifdef NETIF_F_HW_VLAN_STAG_TX
+	netdev->features |= NETIF_F_HW_VLAN_STAG_TX |
+				NETIF_F_HW_VLAN_STAG_RX |
+				NETIF_F_HW_VLAN_STAG_FILTER;
+#endif
 #ifdef NETIF_F_HW_VLAN_CTAG_TX
 		netdev->features |= NETIF_F_HW_VLAN_CTAG_TX |
 					NETIF_F_HW_VLAN_CTAG_RX |
