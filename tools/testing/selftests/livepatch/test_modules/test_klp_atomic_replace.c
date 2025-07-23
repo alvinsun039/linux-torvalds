@@ -42,7 +42,11 @@ static struct klp_patch patch = {
 static int test_klp_atomic_replace_init(void)
 {
 	patch.replace = replace;
+#ifdef CONFIG_LIVEPATCH_WO_FTRACE
+	return klp_register_patch(&patch);
+#else
 	return klp_enable_patch(&patch);
+#endif
 }
 
 static void test_klp_atomic_replace_exit(void)

@@ -98,7 +98,11 @@ static int livepatch_init(void)
 	 */
 	npids = npids_pending;
 
+#ifdef CONFIG_LIVEPATCH_WO_FTRACE
+	return klp_register_patch(&patch);
+#else
 	return klp_enable_patch(&patch);
+#endif
 }
 
 static void livepatch_exit(void)
