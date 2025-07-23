@@ -44,6 +44,7 @@
 #include <linux/fs_parser.h>
 #include <linux/watch_queue.h>
 #include <linux/io_uring.h>
+#include <uapi/linux/lsm.h>
 #ifdef CONFIG_KEYP
 #include <asm/iee-key.h>
 #endif

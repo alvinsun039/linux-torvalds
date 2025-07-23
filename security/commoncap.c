@@ -25,6 +25,7 @@
 #include <linux/binfmts.h>
 #include <linux/personality.h>
 #include <linux/mnt_idmapping.h>
+#include <uapi/linux/lsm.h>
 #ifdef CONFIG_CREDP
 #include <asm/iee-cred.h>
 #endif
