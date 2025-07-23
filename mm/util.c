@@ -26,6 +26,8 @@
 
 #include <linux/uaccess.h>
 
+#include <kunit/visibility.h>
+
 #include "internal.h"
 #include "swap.h"
 
@@ -465,6 +467,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm, struct rlimit *rlim_stack)
 	mm->get_unmapped_area = arch_get_unmapped_area;
 }
 #endif
+EXPORT_SYMBOL_IF_KUNIT(arch_pick_mmap_layout);
 
 /**
  * __account_locked_vm - account locked pages to an mm's locked_vm

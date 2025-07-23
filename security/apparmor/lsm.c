@@ -24,6 +24,7 @@
 #include <linux/zstd.h>
 #include <net/sock.h>
 #include <uapi/linux/mount.h>
+#include <uapi/linux/lsm.h>
 
 #include "include/apparmor.h"
 #include "include/apparmorfs.h"
@@ -661,13 +662,12 @@ static int apparmor_sb_pivotroot(const struct path *old_path,
 }
 
 static int apparmor_getselfattr(unsigned int attr, struct lsm_ctx __user *lx,
-				size_t *size, u32 flags)
+				u32 *size, u32 flags)
 {
 	int error = -ENOENT;
 	struct aa_task_ctx *ctx = task_ctx(current);
 	struct aa_label *label = NULL;
-	size_t total_len = 0;
-	char *value;
+	char *value = NULL;
 
 	switch (attr) {
 	case LSM_ATTR_CURRENT:
@@ -688,22 +688,14 @@ static int apparmor_getselfattr(unsigned int attr, struct lsm_ctx __user *lx,
 
 	if (label) {
 		error = aa_getprocattr(label, &value, false);
-		if (error > 0) {
-			total_len = ALIGN(struct_size(lx, ctx, error), 8);
-			if (total_len > *size)
-				error = -E2BIG;
-			else if (lx)
-				error = lsm_fill_user_ctx(lx, value, error,
-							  LSM_ID_APPARMOR, 0);
-			else
-				error = 1;
-		}
+		if (error > 0)
+			error = lsm_fill_user_ctx(lx, size, value, error,
+						  LSM_ID_APPARMOR, 0);
 		kfree(value);
 	}
 
 	aa_put_label(label);
 
-	*size = total_len;
 	if (error < 0)
 		return error;
 	return 1;
@@ -815,7 +807,7 @@ fail:
 }
 
 static int apparmor_setselfattr(unsigned int attr, struct lsm_ctx *ctx,
-				size_t size, u32 flags)
+				u32 size, u32 flags)
 {
 	int rc;
 
@@ -1330,6 +1322,11 @@ struct lsm_blob_sizes apparmor_blob_sizes __ro_after_init = {
 	.lbs_cred = sizeof(struct aa_label *),
 	.lbs_file = sizeof(struct aa_file_ctx),
 	.lbs_task = sizeof(struct aa_task_ctx),
+};
+
+static const struct lsm_id apparmor_lsmid = {
+	.name = "apparmor",
+	.id = LSM_ID_APPARMOR,
 };
 
 static struct security_hook_list apparmor_hooks[] __ro_after_init = {
@@ -2024,7 +2021,7 @@ static int __init apparmor_init(void)
 		goto buffers_out;
 	}
 	security_add_hooks(apparmor_hooks, ARRAY_SIZE(apparmor_hooks),
-				"apparmor");
+				&apparmor_lsmid);
 
 	/* Report that AppArmor successfully initialized */
 	apparmor_initialized = 1;

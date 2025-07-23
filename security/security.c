@@ -29,6 +29,7 @@
 #include <linux/backing-dev.h>
 #include <linux/string.h>
 #include <linux/msg.h>
+#include <linux/overflow.h>
 #include <net/flow.h>
 #ifdef CONFIG_CREDP
 #include <asm/iee-cred.h>
@@ -540,12 +541,12 @@ static int lsm_append(const char *new, char **result)
  * security_add_hooks - Add a modules hooks to the hook lists.
  * @hooks: the hooks to add
  * @count: the number of hooks to add
- * @lsm: the name of the security module
+ * @lsmid: the identification information for the security module
  *
  * Each LSM has to register its hooks with the infrastructure.
  */
 void __init security_add_hooks(struct security_hook_list *hooks, int count,
-			       const char *lsm)
+			       const struct lsm_id *lsmid)
 {
 	int i;
 
@@ -562,7 +563,7 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 	}
 
 	for (i = 0; i < count; i++) {
-		hooks[i].lsm = lsm;
+		hooks[i].lsmid = lsmid;
 		hlist_add_tail_rcu(&hooks[i].list, hooks[i].head);
 	}
 
@@ -571,7 +572,7 @@ void __init security_add_hooks(struct security_hook_list *hooks, int count,
 	 * and fix this up afterwards.
 	 */
 	if (slab_is_available()) {
-		if (lsm_append(lsm, &lsm_names) < 0)
+		if (lsm_append(lsmid->name, &lsm_names) < 0)
 			panic("%s - Cannot get early memory.\n", __func__);
 	}
 }
@@ -779,6 +780,60 @@ static int lsm_superblock_alloc(struct super_block *sb)
 	if (sb->s_security == NULL)
 		return -ENOMEM;
 	return 0;
+}
+
+/**
+ * lsm_fill_user_ctx - Fill a user space lsm_ctx structure
+ * @uctx: a userspace LSM context to be filled
+ * @uctx_len: available uctx size (input), used uctx size (output)
+ * @val: the new LSM context value
+ * @val_len: the size of the new LSM context value
+ * @id: LSM id
+ * @flags: LSM defined flags
+ *
+ * Fill all of the fields in a userspace lsm_ctx structure.  If @uctx is NULL
+ * simply calculate the required size to output via @utc_len and return
+ * success.
+ *
+ * Returns 0 on success, -E2BIG if userspace buffer is not large enough,
+ * -EFAULT on a copyout error, -ENOMEM if memory can't be allocated.
+ */
+int lsm_fill_user_ctx(struct lsm_ctx __user *uctx, u32 *uctx_len,
+		      void *val, size_t val_len,
+		      u64 id, u64 flags)
+{
+	struct lsm_ctx *nctx = NULL;
+	size_t nctx_len;
+	int rc = 0;
+
+	nctx_len = ALIGN(struct_size(nctx, ctx, val_len), sizeof(void *));
+	if (nctx_len > *uctx_len) {
+		rc = -E2BIG;
+		goto out;
+	}
+
+	/* no buffer - return success/0 and set @uctx_len to the req size */
+	if (!uctx)
+		goto out;
+
+	nctx = kzalloc(nctx_len, GFP_KERNEL);
+	if (nctx == NULL) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	nctx->id = id;
+	nctx->flags = flags;
+	nctx->len = nctx_len;
+	nctx->ctx_len = val_len;
+	memcpy(nctx->ctx, val, val_len);
+
+	if (copy_to_user(uctx, nctx, nctx_len))
+		rc = -EFAULT;
+
+out:
+	kfree(nctx);
+	*uctx_len = nctx_len;
+	return rc;
 }
 
 /*
@@ -3869,10 +3924,160 @@ void security_d_instantiate(struct dentry *dentry, struct inode *inode)
 }
 EXPORT_SYMBOL(security_d_instantiate);
 
+/*
+ * Please keep this in sync with it's counterpart in security/lsm_syscalls.c
+ */
+
+/**
+ * security_getselfattr - Read an LSM attribute of the current process.
+ * @attr: which attribute to return
+ * @uctx: the user-space destination for the information, or NULL
+ * @size: pointer to the size of space available to receive the data
+ * @flags: special handling options. LSM_FLAG_SINGLE indicates that only
+ * attributes associated with the LSM identified in the passed @ctx be
+ * reported.
+ *
+ * A NULL value for @uctx can be used to get both the number of attributes
+ * and the size of the data.
+ *
+ * Returns the number of attributes found on success, negative value
+ * on error. @size is reset to the total size of the data.
+ * If @size is insufficient to contain the data -E2BIG is returned.
+ */
+int security_getselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
+			 u32 __user *size, u32 flags)
+{
+	struct security_hook_list *hp;
+	struct lsm_ctx lctx = { .id = LSM_ID_UNDEF, };
+	u8 __user *base = (u8 __user *)uctx;
+	u32 entrysize;
+	u32 total = 0;
+	u32 left;
+	bool toobig = false;
+	bool single = false;
+	int count = 0;
+	int rc;
+
+	if (attr == LSM_ATTR_UNDEF)
+		return -EINVAL;
+	if (size == NULL)
+		return -EINVAL;
+	if (get_user(left, size))
+		return -EFAULT;
+
+	if (flags) {
+		/*
+		 * Only flag supported is LSM_FLAG_SINGLE
+		 */
+		if (flags != LSM_FLAG_SINGLE || !uctx)
+			return -EINVAL;
+		if (copy_from_user(&lctx, uctx, sizeof(lctx)))
+			return -EFAULT;
+		/*
+		 * If the LSM ID isn't specified it is an error.
+		 */
+		if (lctx.id == LSM_ID_UNDEF)
+			return -EINVAL;
+		single = true;
+	}
+
+	/*
+	 * In the usual case gather all the data from the LSMs.
+	 * In the single case only get the data from the LSM specified.
+	 */
+	hlist_for_each_entry(hp, &security_hook_heads.getselfattr, list) {
+		if (single && lctx.id != hp->lsmid->id)
+			continue;
+		entrysize = left;
+		if (base)
+			uctx = (struct lsm_ctx __user *)(base + total);
+		rc = hp->hook.getselfattr(attr, uctx, &entrysize, flags);
+		if (rc == -EOPNOTSUPP) {
+			rc = 0;
+			continue;
+		}
+		if (rc == -E2BIG) {
+			rc = 0;
+			left = 0;
+			toobig = true;
+		} else if (rc < 0)
+			return rc;
+		else
+			left -= entrysize;
+
+		total += entrysize;
+		count += rc;
+		if (single)
+			break;
+	}
+	if (put_user(total, size))
+		return -EFAULT;
+	if (toobig)
+		return -E2BIG;
+	if (count == 0)
+		return LSM_RET_DEFAULT(getselfattr);
+	return count;
+}
+
+/*
+ * Please keep this in sync with it's counterpart in security/lsm_syscalls.c
+ */
+
+/**
+ * security_setselfattr - Set an LSM attribute on the current process.
+ * @attr: which attribute to set
+ * @uctx: the user-space source for the information
+ * @size: the size of the data
+ * @flags: reserved for future use, must be 0
+ *
+ * Set an LSM attribute for the current process. The LSM, attribute
+ * and new value are included in @uctx.
+ *
+ * Returns 0 on success, -EINVAL if the input is inconsistent, -EFAULT
+ * if the user buffer is inaccessible, E2BIG if size is too big, or an
+ * LSM specific failure.
+ */
+int security_setselfattr(unsigned int attr, struct lsm_ctx __user *uctx,
+			 u32 size, u32 flags)
+{
+	struct security_hook_list *hp;
+	struct lsm_ctx *lctx;
+	int rc = LSM_RET_DEFAULT(setselfattr);
+	u64 required_len;
+
+	if (flags)
+		return -EINVAL;
+	if (size < sizeof(*lctx))
+		return -EINVAL;
+	if (size > PAGE_SIZE)
+		return -E2BIG;
+
+	lctx = memdup_user(uctx, size);
+	if (IS_ERR(lctx))
+		return PTR_ERR(lctx);
+
+	if (size < lctx->len ||
+	    check_add_overflow(sizeof(*lctx), lctx->ctx_len, &required_len) ||
+	    lctx->len < required_len) {
+		rc = -EINVAL;
+		goto free_out;
+	}
+
+	hlist_for_each_entry(hp, &security_hook_heads.setselfattr, list)
+		if ((hp->lsmid->id) == lctx->id) {
+			rc = hp->hook.setselfattr(attr, lctx, size, flags);
+			break;
+		}
+
+free_out:
+	kfree(lctx);
+	return rc;
+}
+
 /**
  * security_getprocattr() - Read an attribute for a task
  * @p: the task
- * @lsm: LSM name
+ * @lsmid: LSM identification
  * @name: attribute name
  * @value: attribute value
  *
@@ -3880,13 +4085,13 @@ EXPORT_SYMBOL(security_d_instantiate);
  *
  * Return: Returns the length of @value on success, a negative value otherwise.
  */
-int security_getprocattr(struct task_struct *p, const char *lsm,
-			 const char *name, char **value)
+int security_getprocattr(struct task_struct *p, int lsmid, const char *name,
+			 char **value)
 {
 	struct security_hook_list *hp;
 
 	hlist_for_each_entry(hp, &security_hook_heads.getprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
+		if (lsmid != 0 && lsmid != hp->lsmid->id)
 			continue;
 		return hp->hook.getprocattr(p, name, value);
 	}
@@ -3895,7 +4100,7 @@ int security_getprocattr(struct task_struct *p, const char *lsm,
 
 /**
  * security_setprocattr() - Set an attribute for a task
- * @lsm: LSM name
+ * @lsmid: LSM identification
  * @name: attribute name
  * @value: attribute value
  * @size: attribute value size
@@ -3905,13 +4110,12 @@ int security_getprocattr(struct task_struct *p, const char *lsm,
  *
  * Return: Returns bytes written on success, a negative value otherwise.
  */
-int security_setprocattr(const char *lsm, const char *name, void *value,
-			 size_t size)
+int security_setprocattr(int lsmid, const char *name, void *value, size_t size)
 {
 	struct security_hook_list *hp;
 
 	hlist_for_each_entry(hp, &security_hook_heads.setprocattr, list) {
-		if (lsm != NULL && strcmp(lsm, hp->lsm))
+		if (lsmid != 0 && lsmid != hp->lsmid->id)
 			continue;
 		return hp->hook.setprocattr(name, value, size);
 	}
@@ -5308,6 +5512,55 @@ int security_bpf_prog_load(struct bpf_prog *prog, union bpf_attr *attr,
 }
 
 /**
+ * security_bpf_token_create() - Check if creating of BPF token is allowed
+ * @token: BPF token object
+ * @attr: BPF syscall attributes used to create BPF token
+ * @path: path pointing to BPF FS mount point from which BPF token is created
+ *
+ * Do a check when the kernel instantiates a new BPF token object from BPF FS
+ * instance. This is also the point where LSM blob can be allocated for LSMs.
+ *
+ * Return: Returns 0 on success, error on failure.
+ */
+int security_bpf_token_create(struct bpf_token *token, union bpf_attr *attr,
+			      struct path *path)
+{
+	return call_int_hook(bpf_token_create, 0, token, attr, path);
+}
+
+/**
+ * security_bpf_token_cmd() - Check if BPF token is allowed to delegate
+ * requested BPF syscall command
+ * @token: BPF token object
+ * @cmd: BPF syscall command requested to be delegated by BPF token
+ *
+ * Do a check when the kernel decides whether provided BPF token should allow
+ * delegation of requested BPF syscall command.
+ *
+ * Return: Returns 0 on success, error on failure.
+ */
+int security_bpf_token_cmd(const struct bpf_token *token, enum bpf_cmd cmd)
+{
+	return call_int_hook(bpf_token_cmd, 0, token, cmd);
+}
+
+/**
+ * security_bpf_token_capable() - Check if BPF token is allowed to delegate
+ * requested BPF-related capability
+ * @token: BPF token object
+ * @cap: capabilities requested to be delegated by BPF token
+ *
+ * Do a check when the kernel decides whether provided BPF token should allow
+ * delegation of requested BPF-related capabilities.
+ *
+ * Return: Returns 0 on success, error on failure.
+ */
+int security_bpf_token_capable(const struct bpf_token *token, int cap)
+{
+	return call_int_hook(bpf_token_capable, 0, token, cap);
+}
+
+/**
  * security_bpf_map_free() - Free a bpf map's LSM blob
  * @map: bpf map
  *
@@ -5327,6 +5580,17 @@ void security_bpf_map_free(struct bpf_map *map)
 void security_bpf_prog_free(struct bpf_prog *prog)
 {
 	call_void_hook(bpf_prog_free, prog);
+}
+
+/**
+ * security_bpf_token_free() - Free a BPF token's LSM blob
+ * @token: BPF token struct
+ *
+ * Clean up the security information stored inside BPF token.
+ */
+void security_bpf_token_free(struct bpf_token *token)
+{
+	call_void_hook(bpf_token_free, token);
 }
 #endif /* CONFIG_BPF_SYSCALL */
 
