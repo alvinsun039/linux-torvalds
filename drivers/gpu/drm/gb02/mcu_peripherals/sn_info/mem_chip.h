@@ -1,0 +1,41 @@
+/*
+ * mem_chip_def.h
+ *
+ *  Created on: 2023年12月19日
+ *      Author: gxich
+ */
+#include "enum_macro.h"
+
+#define CHIP_VENDOR_ENUM(XX)  	\
+	XX(MEM_VENDOR_MICRON,=0) 	\
+	XX(MEM_VENDOR_SUMSUNG,=1) 	\
+	XX(MEM_VENDOR_CXMT,=2)
+
+#define CHIP_BIT_WIDTH_ENUM(XX)  	\
+	XX(CHIP_BIT_WIDTH_X4, = 4) 		\
+	XX(CHIP_BIT_WIDTH_X8, = 8) 		\
+	XX(CHIP_BIT_WIDTH_X16, = 16) 	\
+	XX(CHIP_BIT_WIDTH_X32, = 32)
+
+#define CHIP_CHNL_ENUM(XX)  \
+	XX(CHIP_CHNL_1, = 1) 	\
+	XX(CHIP_CHNL_2, = 2) 	\
+	XX(CHIP_CHNL_4, = 4)
+
+#define CHIP_DENSITY_ENUM(XX) 		\
+	XX(CHIP_DENSITY_256M, = 8) 		\
+	XX(CHIP_DENSITY__512M, = 9) 	\
+	XX(CHIP_DENSITY_1024M, = 10) 	\
+	XX(CHIP_DENSITY_2048M, = 11) 	\
+	XX(CHIP_DENSITY_4096M, = 12)
+
+#define CHIP_DIES_ENUM(XX) 	\
+	XX(CHIP_DIES_1 ,= 1) 	\
+	XX(CHIP_DIES_2 ,= 2) 	\
+	XX(CHIP_DIES_4 ,= 4)
+
+DECL_ENUM(MemChipVendor,CHIP_VENDOR_ENUM)
+DECL_ENUM(MemChipBitWidth,CHIP_BIT_WIDTH_ENUM)
+DECL_ENUM(MemChipChnl,CHIP_CHNL_ENUM)
+DECL_ENUM(MemChipDensity,CHIP_DENSITY_ENUM)
+DECL_ENUM(MemChipDies,CHIP_DIES_ENUM)

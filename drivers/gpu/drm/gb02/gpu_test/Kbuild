@@ -1,0 +1,3 @@
+gpu_debug-y := \
+	gpu_test/gb_easy_shell.o \
+	gpu_test/gb_mem_tool.o \

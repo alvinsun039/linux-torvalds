@@ -1,0 +1,5 @@
+i2c-y += \
+	mcu_peripherals/i2c/i2c-gb02-mcu.o \
+	mcu_peripherals/i2c/ina2xx.o \
+	mcu_peripherals/i2c/ads1015.o \
+

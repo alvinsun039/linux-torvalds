@@ -1,0 +1,5 @@
+vpu_comm-y += \
+	vpu/vpu_mm/gb_vpu_gem.o \
+	vpu/vpu_mm/gb_vpu_ttm.o \
+	vpu/vpu_mm/gb_vpu_object.o \
+

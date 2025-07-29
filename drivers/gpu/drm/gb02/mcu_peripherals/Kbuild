@@ -1,0 +1,2 @@
+gb_peri_common-y += \
+	mcu_peripherals/gb_peripherals_common.o 

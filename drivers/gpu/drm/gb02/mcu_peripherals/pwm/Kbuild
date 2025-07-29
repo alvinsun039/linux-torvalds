@@ -1,0 +1,11 @@
+pwm-y += \
+	mcu_peripherals/pwm/gb02_mcu_pwm.o \
+	mcu_peripherals/pwm/gb_pwm.o \
+	mcu_peripherals/pwm/backlight/gb02-pwm-bl.o \
+	mcu_peripherals/pwm/fan/gb02-pwm-fan.o \
+
+gpio-pwm-y += \
+	mcu_peripherals/pwm/gpio-pwm.o \
+	mcu_peripherals/pwm/gb_pwm.o \
+	mcu_peripherals/pwm/backlight/gb02-pwm-bl.o \
+	mcu_peripherals/pwm/fan/gb02-pwm-fan.o \

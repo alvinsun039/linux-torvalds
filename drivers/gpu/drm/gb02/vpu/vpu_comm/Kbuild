@@ -1,0 +1,7 @@
+vpu_comm-y += \
+	vpu/vpu_comm/vpu_afe.o \
+	vpu/vpu_comm/vpu_io.o \
+	vpu/vpu_comm/vpu_list.o \
+	vpu/vpu_comm/vpu_vcmd_comm.o \
+	vpu/vpu_comm/vpu_vcmd_registers.o \
+

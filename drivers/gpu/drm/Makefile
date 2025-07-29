@@ -203,3 +203,4 @@ obj-$(CONFIG_DRM_LOONGSON) += loongson/
 obj-$(CONFIG_DRM_ARISE) += arise/
 obj-$(CONFIG_DRM_PHYTIUM) += phytium/
 obj-$(CONFIG_DRM_CIX)	+= cix/
+obj-$(CONFIG_DRM_GB02) += gb02/

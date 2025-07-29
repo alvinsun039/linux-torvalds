@@ -1,0 +1,77 @@
+gb_peripherals_common.c
+该文件是内核驱动MCU资源公共层，包含了各IP合外设的配置和初始化，休眠等公共逻辑。
+
+关键结构体及说明
+mcu ip资源结构体：
+struct gb02_mcu_peripherals_info {
+	unsigned char mcu_peripherals_device_name[PERIPHERALS_DEVICE_NAME_LEN]; //mcu ip name
+	unsigned int mcu_peripherals_device_id; //mcu ip 编号，如I2C0 则编号为0
+	unsigned int peri_offset_address; //基地址偏移
+	int gpio_num; //GPIO pwm专用
+	int (*gb02_peri_ip_drv_init)(struct gb_device *, struct gb02_mcu_peripherals_info *); //ip驱动初始化回调
+	void (*gb02_peri_ip_drv_exit)(struct gb02_mcu_peripherals_info *); //ip驱动卸载回调
+	int (*gb02_peri_ip_drv_suspend)(struct gb02_mcu_peripherals_info *); //ip驱动休眠回调
+	int (*gb02_peri_ip_drv_resume)(struct gb02_mcu_peripherals_info *); //ip驱动唤醒回调
+	void *priv; //ip驱动私有数据指针
+};
+
+i2c外设资源结构体
+struct gb02_i2c_device {
+	struct i2c_board_info board_info; //i2c board info
+	u8 bus_id; //i2c 总线编号，这里对应的是mcu i2c 资源编号
+	int (*i2c_driver_init)(struct i2c_client *); //i2c 外设驱动初始化回调
+	void (*i2c_driver_exit)(struct i2c_client *); //i2c 外设驱动卸载回调
+	struct i2c_client * client; //i2c 外设申请的内核i2c_clinet资源
+};
+
+struct gb02_pwm_device {
+	int device_id; //pwm控制器资源编号
+	bool gpio_pwm; //是否使用gpio pwm资源
+	unsigned char *name; //pwm外设name
+	int (*pwm_driver_init)(struct gb_device *, struct gb02_mcu_peripherals_info *); //pwm 外设驱动初始化回调
+	void (*pwm_driver_exit)(struct gb02_mcu_peripherals_info *); //pwm 外设驱动卸载回调
+	int (*pwm_driver_suspend)(struct gb02_mcu_peripherals_info *); //pwm 外设驱动休眠回调
+	int (*pwm_driver_resume)(struct gb_device *gbdev, struct gb02_mcu_peripherals_info *); //pwm 外设驱动唤醒回调
+};
+
+
+新增IP和外设适配方式
+新增ip：
+填充mcu_periph_info数组
+static struct gb02_mcu_peripherals_info mcu_periph_info[] = {
+	/*UART*/
+	{
+		.mcu_peripherals_device_name = PLATFORM_UART_DEVICE_NAME,
+		.mcu_peripherals_device_id = DEVICE_ID0,
+		.peri_offset_address = MCU_UART0_PERI_ADDR_BASE,
+		.gb02_peri_ip_drv_init = gb02_mcu_uart_drv_init,
+		.gb02_peri_ip_drv_exit = gb02_mcu_uart_drv_exit,
+	},
+}
+
+新增i2c外设：
+填充mcu_i2c_device数组
+static struct gb02_i2c_device mcu_i2c_device[] = {
+	{
+		.board_info = {I2C_BOARD_INFO(INA219_DEVICE_NAME, INA219_ADDR),},
+		.bus_id = INA219_BUS_ID,
+		.i2c_driver_init = ina2xx_driver_init,
+		.i2c_driver_exit = ina2xx_remove,
+	},
+}
+
+新增pwm外设：
+填充mcu_pwm_device数组
+static struct gb02_pwm_device mcu_pwm_device[] = {
+	{
+		.device_id = FAN_PWM_CTRL_NO,
+		.name = GB02_PWM_FAN_DEV_NAME,
+		.gpio_pwm = true, //for gpio pwm
+		.pwm_driver_init = gb02_pwm_fan_init,
+		.pwm_driver_exit = gb02_pwm_fan_exit,
+		.pwm_driver_resume = pwm_fan_resume,
+	},
+}
+
+使能及编译
+使能方式有三种，1. 通过适配的方式进行控制，不配置则不使能，主要针对外设部分； 2. 通过修改驱动根目录下的makefile配置选项，针对ip部分（推荐）；3. 配置对应资源结构体中的enable变量进行控制（todo）

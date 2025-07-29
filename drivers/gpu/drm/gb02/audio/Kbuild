@@ -1,0 +1,7 @@
+audio-y += \
+        audio/dwc-i2s.o \
+        audio/i2s_platform.o \
+        audio/gb02_fpga_v2vdma.o \
+        audio/gb_snd_codec.o \
+        audio/gb_audio_procfs.o
+

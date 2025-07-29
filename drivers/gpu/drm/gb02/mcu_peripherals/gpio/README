@@ -1,0 +1,26 @@
+pinctrl-gb02-mcu.c
+mcu gpio驱动，该驱动对外提供gpio操作的公共接口及debug节点。
+
+通用接口：
+int gb02_gpio_request(unsigned int gpio) //申请gpio资源
+void gb02_gpio_free(unsigned int gpio) //释放gpio资源，将gpio还原至default配置
+int gb02_gpio_set_direction(unsigned int gpio, bool direction) //配置gpio输入or输出
+int gb02_gpio_get_direction(unsigned int gpio) //获取gpio输入or输出状态，0为输入，1为输出
+int gb02_gpio_get(unsigned int gpio) //获取gpio引脚电平状态
+int gb02_gpio_set(unsigned int gpio, int value) //配置gpio引脚电平状态，该操作会默认将gpio配置为输出
+void gb02_gpio_irq_enable(unsigned int gpio); //使能对应gpio的中断功能，目前仅支持40-43
+
+debug：
+当使能该驱动后，会自动生成/sys/class/gb02_gpio路径供进行调试。
+进入路径后，有两个测试节点：export和unexport
+例如：
+测试gpio40
+echo 40 > export
+路径下自动生成gpio40路径
+进入gpio40路径，有两个测试节点：direction和value
+echo out > direction //输出
+echo in > direction //输入
+echo 1 or 0 > value //配置gpio电平状态，默认会配置为输出
+cat value //获取gpio电平状态
+
+echo 40 > unexport //撤销gpio40测试

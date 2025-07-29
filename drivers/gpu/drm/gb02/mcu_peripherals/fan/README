@@ -1,0 +1,14 @@
+gb02_fan.c
+pwm风扇驱动，风扇设备作为thermal框架中的cooling device，该驱动联动pvt，实现风扇转速动态调节功能。
+
+1.风扇转速控制：
+联动pvt下发的状态，定时将风扇转速状态通过共享寄存器的方式传递至mcu侧，由mcu侧进行转速调节；
+2.风扇转速读取：
+用户侧可通过节点按需获取风扇转速，风扇转速采集逻辑在mcu侧，定时将风扇转速通过共享寄存器的方式传递至内核侧；
+
+debug方式：
+节点路径：/sys/class/hwmon/hwmonX/   X根据系统不同，值可能不同，比如hwmon2；
+获取风扇转速： cat fan1_input
+调整风扇转速： echo 5 > fan1_level
+Level 1 2 3 4 5
+Duty cycle 20% 40% 60% 80% 100%

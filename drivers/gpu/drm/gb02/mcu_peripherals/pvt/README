@@ -1,0 +1,11 @@
+gb02-pvt.c
+pvt sensor驱动
+
+pvt sensor主要功能是获取gpu温度，该驱动结合内核原生thermal框架，注册了一个thermal_zone, 绑定gpu-freq和pwm-fan两个 cooling device，使用step-wise的调度策略，根据获取的gpu温度动态调整gpu频率和风扇转速。另外当过温发生时，也会触发主动关机流程。
+
+debug方式
+节点路径：/sys/class/thermal/thermal_zone0/
+获取当前温度：cat temp
+
+模拟温度节点：/sys/class/thermal/thermal_zone0/emul_temp
+echo 90000 > emul_temp //90摄氏度

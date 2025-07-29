@@ -1,0 +1,8 @@
+gpu_freq-y += \
+	mcu_peripherals/gpu_freq/gb_devfreq.o \
+	mcu_peripherals/gpu_freq/gb_governor_performance.o \
+	mcu_peripherals/gpu_freq/gb_governor_powersave.o \
+	mcu_peripherals/gpu_freq/gb_governor_simpleondemand.o \
+	mcu_peripherals/gpu_freq/gb_governor_userspace.o \
+	mcu_peripherals/gpu_freq/gpu_freq.o \
+

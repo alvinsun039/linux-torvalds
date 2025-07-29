@@ -1,0 +1,2 @@
+fan-y += \
+	mcu_peripherals/fan/gb02_fan.o \

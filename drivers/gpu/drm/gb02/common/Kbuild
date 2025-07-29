@@ -1,0 +1,7 @@
+gb_common-y += \
+	common/gb_procfs.o \
+	common/gb_pcie_info.o \
+	common/gb_gpuinfo.o \
+	common/gb_irq.o \
+	common/gb02_debugfs.o \
+	common/gb02_pcie_resizebar.o

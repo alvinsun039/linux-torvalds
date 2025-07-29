@@ -1,0 +1,5 @@
+vpu_enc-y += \
+	vpu/vpu_enc/vpu_vc8000E_irq.o \
+	vpu/vpu_enc/vpu_vc8000E_vcmd.o
+
+

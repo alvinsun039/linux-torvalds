@@ -1,0 +1,79 @@
+config DRM_GB02
+	tristate "GB02 chip"
+	depends on DRM && SND_PCM
+	select DRM_KMS_HELPER
+	select DRM_VRAM_HELPER
+	select DRM_TTM
+	select DRM_SCHED
+	select FB_IOMEM_HELPERS if DRM_FBDEV_EMULATION
+	select DRM_GEM_SHMEM_HELPER
+	select DRM_DEVFREQ
+	select DRM_TTM_HELPER
+	help
+	  Choose this option if you have a sietium graphics card. 
+          If M is selected, the module will be called gb02 (C21).
+          
+if DRM_GB02
+config MCU_PERI
+    bool "Enable MCU Peripheral Control"
+    default y
+
+config MCU_I2C
+    bool "MCU I2C Interface"
+    default n
+    depends on MCU_PERI
+
+config MCU_UART
+    bool "MCU UART Interface"
+    default n
+    depends on MCU_PERI
+
+config MCU_GPIO
+    bool "MCU GPIO Control"
+    default y
+    depends on MCU_PERI
+
+config MCU_PWM
+    bool "MCU PWM Output"
+    default n
+    depends on MCU_PERI
+    
+config MCU_SPI
+    bool "MCU SPI Output"
+    default n
+    depends on MCU_PERI    
+
+config GPIO_PWM
+    bool "GPIO-based PWM"
+    default n
+    depends on MCU_PERI
+
+config MCU_PVT
+    bool "MCU PVT Sensor"
+    default y
+    depends on MCU_PERI
+    
+config MCU_FREQ
+    bool "MCU FREQ Sensor"
+    default y
+    depends on MCU_PERI
+    
+config MCU_FAN
+    bool "MCU FAN Sensor"
+    default y
+    depends on MCU_PERI
+
+config SN_INFO
+    bool
+    default y if DRM_GB02
+
+config PCIE_MSG
+    bool
+    default y if DRM_GB02
+
+config GB_BACKLIGHT
+    bool "GB02 Backlight Control"
+    default y
+    depends on DRM_GB02
+
+endif  # DRM_GB02

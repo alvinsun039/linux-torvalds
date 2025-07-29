@@ -1,0 +1,6 @@
+SUBSYSTEM!="sound", GOTO="pulseaudio_end"
+ACTION!="change", GOTO="pulseaudio_end"
+KERNEL!="card*", GOTO="pulseaudio_end"
+
+SUBSYSTEMS=="pci", ATTRS{vendor}=="0x8510", ATTRS{device}=="0x0201", ENV{PULSE_PROFILE_SET}="gb_audio.conf"
+LABEL="pulseaudio_end"
