@@ -2,8 +2,23 @@
 
 . $(dirname $0)/init-functions
 
-## for patchs
+## for patches
 DIRECTORY=""
+
+# Cleanup function
+cleanup() {
+	local exit_code=$?
+	# Clean up temporary files
+	[ -f "$patchlisttmpfile" ] && rm -f "$patchlisttmpfile"
+	[ -f "$_patchlisttmpfile" ] && rm -f "$_patchlisttmpfile"
+	[ -f "$sortresultfile" ] && rm -f "$sortresultfile"
+	# Clean up any remaining .dups files
+	rm -f /tmp/*.dups 2>/dev/null
+	exit $exit_code
+}
+
+# Set up trap for cleanup
+trap cleanup EXIT INT TERM
 
 function usage () {
 	echo "This script will automatically get a list of all patches that"
@@ -16,38 +31,61 @@ function usage () {
 	echo "-h|--help: show this help"
 }
 
-[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1
-[ $? -ne 0 ] && echo "This directory is not a git repository." && exit 1
+# Verify we're in a git repository
+if ! git rev-parse --git-dir > /dev/null 2>&1; then
+	echo "Error: This directory is not a git repository." >&2
+	exit 1
+fi
 
-current_branch=$(git rev-parse --abbrev-ref HEAD) || ret=$?
-[ -z $current_branch ] && echo "I'm not in branch." && exit $ret
+# Get current branch
+current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+if [ -z "$current_branch" ]; then
+	echo "Error: Unable to determine current branch." >&2
+	exit 1
+fi
 
-commits=$(git log --pretty=oneline HEAD...origin/$current_branch --reverse | awk '{print $1}') || ret=$?
-[ -z "$commits" ] && echo "You are don't have un-merged commits" && exit $ret
+# Get unmerged commits
+commits=$(git log --pretty=oneline "HEAD...origin/$current_branch" --reverse 2>/dev/null | awk '{print $1}')
+if [ -z "$commits" ]; then
+	echo "No unmerged commits found." >&2
+	exit 1
+fi
 
-ARGS=$(getopt -o ho: -a --long help,output -- "$@") || ret=$?
-[ -z "$ARGS" ] && echo "Terminating..." && usage && exit $?
+# Parse command line arguments
+if ! ARGS=$(getopt -o ho: -a --long help,output: -- "$@"); then
+	echo "Error: Invalid arguments." >&2
+	usage
+	exit 1
+fi
 
-eval set -- "${ARGS}"
+eval set -- "$ARGS"
 
-while true
-do
+while true; do
 	case $1 in
 		-h|--help)
-			usage && exit 0;;
+			usage
+			exit 0
+			;;
 		-o|--output)
-			DIRECTORY=$2
-			shift 2;;
+			DIRECTORY="$2"
+			shift 2
+			;;
 		--)
 			shift
-			break;;
+			break
+			;;
+		*)
+			echo "Error: Unknown option $1" >&2
+			usage
+			exit 1
+			;;
 	esac
 done
 
-if [ ! -z $DIRECTORY ]; then
-	# make sure the directory specified exists.
-	if ! mkdir -p "$DIRECTORY" ; then
-		echo "Directory $DIRECTORY not created."
+# Create output directory if specified
+if [ -n "$DIRECTORY" ]; then
+	if ! mkdir -p "$DIRECTORY"; then
+		echo "Error: Failed to create directory '$DIRECTORY'." >&2
 		exit 1
 	fi
 fi
@@ -55,121 +93,168 @@ fi
 patchlisttmpfile=$(mktemp)
 
 function sort_commit_file_by_authordate() {
-	filen=$1
-	# file contains "commitdate commitid authordate"
+	local filen="$1"
+
+	if [ ! -f "$filen" ]; then
+		echo "Warning: File '$filen' not found." >&2
+		return 1
+	fi
+
+	# file contains "commitdate commitid authordate downstreamid"
 	sort -k3 -n "$filen" -o "$filen"
-	awk ' { print $1" "$4 } ' "$filen" >> "$sortresultfile"
-	# delete the prev_commitdate.dups file
+	awk '{print $1" "$4}' "$filen" >> "$sortresultfile"
+	# delete the temp file
 	rm -f "$filen"
 }
 
 function sort_commit_list() {
+	if [ ! -f "$_patchlisttmpfile" ]; then
+		echo "Error: Patch list file not found." >&2
+		return 1
+	fi
+
 	sort -k1 -n "$_patchlisttmpfile" -o "$_patchlisttmpfile"
 
 	sortresultfile=$(mktemp)
-	prev_cdatefile=/tmp/1.dups
-	# go through the file line by line
-	while read -r LINE
-	do
-		local _cdate
-		_cdate=$(echo "$LINE" | awk ' { print $1 } ')
-		local _cid
-		_cid=$(echo "$LINE" | awk ' { print $2 } ')
-		local _adate
-		_adate=$(git log --pretty=%at -1 "$_cid")
-		local _downid
-		_downid=$(echo "$LINE" | awk ' { print $3 } ')
+	local prev_cdatefile="/tmp/1.dups"
 
-		# Does _cdate.dups exist?
-		cdatefile=/tmp/${_cdate}.dups
+	# Process each line in the patch list
+	while IFS=' ' read -r _cdate _cid _downid; do
+		[ -z "$_cdate" ] && continue
+
+		# Get author date for the commit
+		local _adate
+		_adate=$(git log --pretty=%at -1 "$_cid" 2>/dev/null)
+		if [ -z "$_adate" ]; then
+			echo "Warning: Unable to get author date for commit $_cid" >&2
+			continue
+		fi
+
+		# Group commits by commit date
+		local cdatefile="/tmp/${_cdate}.dups"
 		if [ -e "$cdatefile" ]; then
-			# Yes, add this data to it
+			# Add to existing group
 			echo "$_cdate $_cid $_adate $_downid" >> "$cdatefile"
 		else
-			# No, create a new _cdate.dups file and echo this data into it
+			# Create new group and process previous one
 			echo "$_cdate $_cid $_adate $_downid" > "$cdatefile"
-			# does prev_cate.dups file exist?
-			if [ -e $prev_cdatefile ]; then
-				sort_commit_file_by_authordate $prev_cdatefile
+			if [ -e "$prev_cdatefile" ]; then
+				sort_commit_file_by_authordate "$prev_cdatefile"
 			fi
 		fi
-		prev_cdatefile=$cdatefile
+		prev_cdatefile="$cdatefile"
 	done < "$_patchlisttmpfile"
 
-	# finish the last one
-	last_cdate=$(tail -1 "$_patchlisttmpfile" | awk ' { print $1 } ')
-	sort_commit_file_by_authordate "/tmp/${last_cdate}.dups"
+	# Process the last group
+	if [ -f "$_patchlisttmpfile" ] && [ -s "$_patchlisttmpfile" ]; then
+		local last_cdate
+		last_cdate=$(tail -1 "$_patchlisttmpfile" | awk '{print $1}')
+		if [ -n "$last_cdate" ] && [ -f "/tmp/${last_cdate}.dups" ]; then
+			sort_commit_file_by_authordate "/tmp/${last_cdate}.dups"
+		fi
+	fi
 
-	mv -f "$sortresultfile" "$_patchlisttmpfile"
+	# Replace original file with sorted result
+	if [ -f "$sortresultfile" ]; then
+		mv "$sortresultfile" "$_patchlisttmpfile"
+	fi
 }
 
-# temp file for sorting
+# Create temporary files for processing
+echo "Processing commits..." >&2
 _patchlisttmpfile=$(mktemp)
-# re-sort the patches by date
-for downstream_commit in $commits
-do
-	upstream_commit=$(git show $downstream_commit | grep Mainline: | head -n 1 | awk '{print $2}')
-	if [[ x$upstream_commit == x"" ]]; then
-		echo "$downstream_commit don't have upstream commmit, please re-check." >&2
-		echo $downstream_commit >> "$patchlisttmpfile"
+
+# Process each downstream commit to find upstream mapping
+for downstream_commit in $commits; do
+	upstream_commit=$(git show "$downstream_commit" | grep Mainline: | head -n 1 | awk '{print $2}')
+	if [[ x"$upstream_commit" == x"" ]]; then
+		echo "Warning: $downstream_commit doesn't have upstream commit, please re-check." >&2
+		echo "$downstream_commit" >> "$patchlisttmpfile"
 		continue
 	fi
 
-	# verify upstream_commit
-	if ! git show "$upstream_commit" >& /dev/null ; then
-		echo "$downstream_commit with $upstream_commit is not upstream-commit, please re-check." >&2
-		echo $downstream_commit >> "$patchlisttmpfile"
-		continue;
+	# Verify upstream_commit exists
+	if ! git show "$upstream_commit" >/dev/null 2>&1; then
+		echo "Warning: $downstream_commit with $upstream_commit is not valid upstream-commit, please re-check." >&2
+		echo "$downstream_commit" >> "$patchlisttmpfile"
+		continue
 	fi
 
-	_UP_HASH_SHORT=$(git log -1 --pretty=%h "$upstream_commit" 2> /dev/null)
+	# Get short hashes for better readability
+	_UP_HASH_SHORT=$(git log -1 --pretty=%h "$upstream_commit" 2>/dev/null)
 	[ -n "$_UP_HASH_SHORT" ] && upstream_commit="$_UP_HASH_SHORT"
-	_DOWN_HASH_SHORT=$(git log -1 --pretty=%h "$downstream_commit" 2> /dev/null)
+	_DOWN_HASH_SHORT=$(git log -1 --pretty=%h "$downstream_commit" 2>/dev/null)
 	[ -n "$_DOWN_HASH_SHORT" ] && downstream_commit="$_DOWN_HASH_SHORT"
-	_UP_CTIME=$(git log $upstream_commit -1 --pretty="%ct" | awk '{print $1}')
+
+	# Get upstream commit time for sorting
+	_UP_CTIME=$(git log "$upstream_commit" -1 --pretty="%ct" | awk '{print $1}')
 	echo "$_UP_CTIME" "$_UP_HASH_SHORT" "$_DOWN_HASH_SHORT" >> "$_patchlisttmpfile"
 done
 
+# Sort commits by date and author date
+echo "Sorting commits by date..." >&2
 sort_commit_list
-awk -F " " ' { print $2 }' < "$_patchlisttmpfile" >> "$patchlisttmpfile"
-rm "$_patchlisttmpfile"
+awk -F " " '{print $2}' < "$_patchlisttmpfile" >> "$patchlisttmpfile"
+rm -f "$_patchlisttmpfile"
 
-test -s "$patchlisttmpfile" || { usage && exit 1; }
+# Check if we have any commits to process
+if [ ! -s "$patchlisttmpfile" ]; then
+	echo "Error: No valid commits found to process." >&2
+	usage
+	exit 1
+fi
 
-# print the patches to files $DIRECTORY/xxxx.patch
+# Process and output patches
+echo "Processing patches..." >&2
 count=0
-while read -r LINE
-do
-	commitid=$(echo "$LINE" | awk -F " " '{print $1}')
-	# sanitize commitid to upstream short length
-	commitid=$(git log --pretty=%h -1 $commitid)
-	# get the patch title
-	titlename="$(git log -1 --pretty=%s "$commitid" 2> /dev/null)"
+processed_count=0
 
-	#sanity check commitid
-	if test -z "$titlename"
-	then
-		echo -e "${YELLOW}Skipping: Bad commit ID: ${commitid}${NC}"
+while read -r LINE; do
+	commitid=$(echo "$LINE" | awk -F " " '{print $1}')
+
+	# Sanitize commitid to ensure it's valid
+	commitid=$(git log --pretty=%h -1 "$commitid" 2>/dev/null)
+	if [ -z "$commitid" ]; then
+		echo "Warning: Invalid commit ID in line: $LINE" >&2
 		continue
 	fi
 
-	echo $commitid
+	# Get the patch title
+	titlename="$(git log -1 --pretty=%s "$commitid" 2>/dev/null)"
 
-	if [ -z $DIRECTORY ]; then
+	# Sanity check commitid
+	if [ -z "$titlename" ]; then
+		echo "Warning: Skipping bad commit ID: $commitid" >&2
 		continue
+	fi
+
+	# Output commit ID
+	echo "$commitid"
+	processed_count=$((processed_count + 1))
+
+	# Generate patch file if directory specified
+	if [ -z "$DIRECTORY" ]; then
+		continue;
 	fi
 
 	((count++))
-	# number the files as xxxx.patch.  This allows for vim & emacs
-	# to use their config files for diff & patch
+	# Create numbered patch files for better organization
 	tfile_name="$(printf "%04d-%s-%s" "$count" "$commitid" "$titlename")"
-	tfile_name=$(echo $tfile_name | sed -e 's@[ /]@-@g' -e 's/[":\@|~{}()<>*]//g' -e "s/'//g")
+	# Sanitize filename
+	tfile_name=$(echo "$tfile_name" | sed -e 's@[ /]@-@g' -e 's/[":\@|~{}()<>*]//g' -e "s/'//g")
 	tfile_name=${tfile_name:0:80}
 	tfile_name+=".patch"
 	tfile="$DIRECTORY/$tfile_name"
-	# now put the actual patch into the diff file
-	git format-patch -1 --stdout "$commitid"  >> "$tfile"
+
+	# Generate the patch file
+	if git format-patch -1 --stdout "$commitid" > "$tfile" 2>/dev/null; then
+		echo "  -> Generated: $tfile_name"
+	else
+		echo "Warning: Failed to generate patch for commit $commitid" >&2
+	fi
 done < "$patchlisttmpfile"
 
-# clean
-[ -e "$patchlisttmpfile" ] && rm -f "$patchlisttmpfile"
+echo "Processed $processed_count commits." >&2
+if [ -n "$DIRECTORY" ] && [ $count -gt 0 ]; then
+	echo "Generated $count patch files in: $DIRECTORY" >&2
+fi
