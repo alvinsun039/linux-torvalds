@@ -2,37 +2,194 @@
 
 . $(dirname $0)/init-functions
 
-function usage()
-{
-	echo -e "Usage: `basename $0` upstream-comit-id"
+function usage() {
+	cat << EOF
+Usage: $(basename $0) [OPTIONS] <upstream-commit-id>
+
+Convert upstream commit ID to corresponding LTS branch commit.
+
+OPTIONS:
+	-h, --help      Show this help message
+	-v, --verbose   Enable verbose output
+	-q, --quiet     Suppress non-essential output
+	-b, --branch    Specify stable branch version (e.g., 4.19, 5.4, 6.6)
+
+EXAMPLES:
+	$(basename $0) abc123def456
+	$(basename $0) -v HEAD~1
+	$(basename $0) -b 5.4 abc123def456
+	$(basename $0) --branch 6.6 --verbose HEAD~1
+EOF
 }
 
-[ $# -lt 1 ] && usage && exit -1
+function log_info() {
+	[[ "$QUIET" != "1" ]] && echo -e "${GREEN}[INFO]${NC} $1" >&2
+}
 
-# LTS 4.4 is gone, fixup to 4.9
-if [ "$STABLE_MAJ_VER.$STABLE_MIN_VER" = "4.4" ]; then
-	STABLE_MIN_VER="9"
+function log_warn() {
+	echo -e "${YELLOW}[WARN]${NC} $1" >&2
+}
+
+function log_error() {
+	echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+function log_debug() {
+	[[ "$VERBOSE" == "1" ]] && echo -e "${BLUE}[DEBUG]${NC} $1" >&2
+}
+
+function validate_commit() {
+	local commit="$1"
+
+	if [[ -z "$commit" ]]; then
+		log_error "Commit ID cannot be empty"
+		return 1
+	fi
+
+	# Check if commit exists and is valid
+	if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
+		log_error "Invalid commit ID: $commit"
+		return 1
+	fi
+	return 0
+}
+
+# Parse command line arguments
+VERBOSE=0
+QUIET=0
+commit_id=""
+USER_BRANCH=""
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		-h|--help)
+			usage
+			exit 0
+			;;
+		-v|--verbose)
+			VERBOSE=1
+			shift
+			;;
+		-q|--quiet)
+			QUIET=1
+			shift
+			;;
+		-b|--branch)
+			if [[ -z "$2" || "$2" == -* ]]; then
+				log_error "Option -b/--branch requires a value"
+				exit 1
+			fi
+			USER_BRANCH="$2"
+			shift 2
+			;;
+		-*)
+			log_error "Unknown option: $1"
+			usage
+			exit 1
+			;;
+		*)
+			if [[ -z "$commit_id" ]]; then
+				commit_id="$1"
+			else
+				log_error "Multiple commit IDs provided"
+				usage
+				exit 1
+			fi
+			shift
+			;;
+	esac
+done
+
+# Check if commit ID is provided
+if [[ -z "$commit_id" ]]; then
+	log_error "No commit ID provided"
+	usage
+	exit 1
 fi
 
-latest_branch_tag=$(git tag --list "v$STABLE_MAJ_VER.$STABLE_MIN_VER.*" --sort="-taggerdate" | head -n 1)
+# Validate the commit
+if ! validate_commit "$commit_id"; then
+	exit 1
+fi
+
+# Normalize commit ID to full hash
+commit_id=$(git rev-parse "$commit_id")
+log_debug "Normalized commit ID: $commit_id"
+
+# Get stable version
+if [[ -n "$USER_BRANCH" ]]; then
+	# Validate user-specified branch format
+	if [[ ! "$USER_BRANCH" =~ ^[0-9]+\.[0-9]+$ ]]; then
+		log_error "Invalid branch format: $USER_BRANCH. Expected format: X.Y (e.g., 4.19, 5.4, 6.6)"
+		exit 1
+	fi
+	STABLE_MAJ_VER="${USER_BRANCH%.*}"
+	STABLE_MIN_VER="${USER_BRANCH#*.}"
+	log_info "Using user-specified stable version: $STABLE_MAJ_VER.$STABLE_MIN_VER"
+else
+	# LTS 4.4 is gone, fixup to 5.4
+	if [[ "$STABLE_MAJ_VER.$STABLE_MIN_VER" == "4.4" ]]; then
+		log_warn "LTS 4.4 is deprecated, using 5.4 instead"
+		STABLE_MAJ_VER="5"
+		STABLE_MIN_VER="4"
+	fi
+	log_info "Using auto-detected stable version: $STABLE_MAJ_VER.$STABLE_MIN_VER"
+fi
+
+latest_branch_tag=$(git tag --list "v$STABLE_MAJ_VER.$STABLE_MIN_VER.*" --sort="-version:refname" | head -n 1)
+
+if [[ -z "$latest_branch_tag" ]]; then
+	log_error "No tags found for version $STABLE_MAJ_VER.$STABLE_MIN_VER"
+	exit 1
+fi
+
+log_info "Latest tag: $latest_branch_tag"
 
 # Grab the subject, since commit sha1 is different between branches we
 # have to look it up based on subject.
-subj=$(git log -1 --pretty="%s" $1)
-if [ $? -gt 0 ]; then
-        exit 0
+subj=$(git log -1 --pretty="%s" "$commit_id" 2>/dev/null)
+if [[ $? -ne 0 || -z "$subj" ]]; then
+	log_error "Failed to extract subject from commit $commit_id"
+	exit 1
 fi
 
-# Try and find if there's a commit with given subject the hard way
-for i in $(git log --pretty="%H" -F --grep "$subj" v$STABLE_MAJ_VER.$STABLE_MIN_VER..$latest_branch_tag);
-do
-	cursubj=$(git log -1 --format="%s" $i)
-	if [ "$cursubj" = "$subj" ]; then
-		tags=$(gdct $i)
-		echo -e "$tags -> $i"
-		echo -e "${GREEN}Successed.${NC}"
-		exit 0;
-	fi
-done
+log_debug "Extracted subject: $subj"
+log_info "Searching for commit with subject: $subj"
 
-echo -e "${YELLOW}Not found${NC}"
+# Try and find if there's a commit with given subject the hard way
+commit_count=0
+found_commit=""
+
+log_debug "Searching commits from v$STABLE_MAJ_VER.$STABLE_MIN_VER to $latest_branch_tag"
+
+while IFS= read -r commit_hash; do
+	((commit_count++))
+
+	cursubj=$(git log -1 --format="%s" "$commit_hash" 2>/dev/null)
+
+	if [[ "$cursubj" == "$subj" ]]; then
+		found_commit="$commit_hash"
+		log_debug "Found matching commit: $commit_hash"
+		break
+	fi
+
+	# Show progress for verbose mode
+	if [[ $((commit_count % 100)) -eq 0 ]]; then
+		log_debug "Searched $commit_count commits..."
+	fi
+done < <(git log --pretty="%H" -F --grep="$subj" "v$STABLE_MAJ_VER.$STABLE_MIN_VER..$latest_branch_tag" 2>/dev/null)
+
+log_debug "Total commits searched: $commit_count"
+
+if [[ -n "$found_commit" ]]; then
+	tags=$(gdct "$found_commit" 2>/dev/null)
+	if [[ -n "$tags" ]]; then
+		echo "$tags -> $found_commit"
+	else
+		echo "$found_commit"
+	fi
+	log_info "Successfully found corresponding commit"
+else
+	log_warn "No matching commit found in LTS (${STABLE_MAJ_VER}.${STABLE_MIN_VER}) branch"
+	exit 1
+fi
