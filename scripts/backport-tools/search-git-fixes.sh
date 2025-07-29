@@ -1,145 +1,233 @@
 #!/bin/bash
 
-VER=2023-04-18
+VER=2025-07-29
 
-. $(dirname $0)/init-functions
+. "$(dirname $0)/init-functions"
 
 _temp_fixes_=$(mktemp)
 _all_log_fixes=$(mktemp)
+progress_pid=""
+interrupted=0
 
-# cleanup jobs
-trap '[ -n "$(jobs -pr)" ] && kill $(jobs -pr)' INT QUIT TERM EXIT
+# cleanup function
+cleanup() {
+	[ -f "${_temp_fixes_}" ] && rm -f "${_temp_fixes_}"
+	[ -f "${_all_log_fixes}" ] && rm -f "${_all_log_fixes}"
+	# stop progress indicator if running
+	if [[ -n "$progress_pid" ]] && kill -0 "$progress_pid" 2>/dev/null; then
+		kill "$progress_pid" 2>/dev/null
+		wait "$progress_pid" 2>/dev/null
+		printf "\r%*s\r" 20 ""  # clear progress line
+	fi
+	# kill any remaining background jobs
+	[ -n "$(jobs -pr)" ] && kill $(jobs -pr) 2>/dev/null
+	# set interrupted flag for signal handling
+	if [[ $? -eq 130 ]] || [[ $interrupted -eq 1 ]]; then
+		exit 130
+	fi
+}
+
+# signal handler for interruption
+handle_interrupt() {
+	interrupted=1
+	cleanup
+	exit 130
+}
+
+# cleanup jobs and temp files
+trap handle_interrupt INT QUIT TERM
+trap cleanup EXIT
 
 # check git install
-function check_git_is_installed()
-{
-	command -v git &> /dev/null
-	[ $? -ne 0 ] && echo -e "${RED}please install git first${RC}" && exit 1;
+check_git_is_installed() {
+	if ! command -v git &>/dev/null; then
+		echo -e "${RED}Please install git first${RC}" >&2
+		exit 1
+	fi
 }
 
 # check git-repo
-function is_git_repository()
-{
-	[ -d .git ] || git rev-parse --git-dir > /dev/null 2>&1
-	[ $? -ne 0 ] && echo -e "${RED}This directory is not a git repository.${RC}" && exit 1
+is_git_repository() {
+	if ! { [ -d .git ] || git rev-parse --git-dir >/dev/null 2>&1; }; then
+		echo -e "${RED}This directory is not a git repository.${RC}" >&2
+		exit 1
+	fi
 }
 
 # search fixes-message
-function search_fixes()
-{
-	origial=$1
-	commit_12=${origial:0:12}
-	gitData=`git show -s --date=format:'%d-%m-%Y' --format=%cd $commit_12`
-	commit=${origial:0:10}
-	git --no-pager log --after $gitData --grep "^Fixes:\s.*${commit}" --pretty="%h" origin/master >> ${_temp_fixes_}
-}
+search_fixes() {
+	local original="$1"
+	local commit_12="${original:0:12}"
+	local git_data
+	local commit="${original:0:10}"
 
-function single_local_patch()
-{
-	downstream_commit=$1
-
-	upstream_commit=$(git show $downstream_commit | grep Mainline: | head -n 1 | awk '{print $2}')
-	if [[ x$upstream_commit == x"" ]]; then
-		upstream_commit=$1
+	if ! git_data=$(git show -s --date=format:'%d-%m-%Y' --format=%cd "$commit_12" 2>/dev/null); then
+		echo "Warning: Failed to get commit date for $commit_12" >&2
+		return 1
 	fi
 
-	if [[ x$upstream_commit == x"KYLIN-only" ]]; then
-		return
+	git --no-pager log --after "$git_data" --grep "^Fixes:\s.*${commit}" --pretty="%h" origin/master >> "${_temp_fixes_}"
+}
+
+single_local_patch() {
+	local downstream_commit="$1"
+	local upstream_commit
+	local commit
+
+	upstream_commit=$(git show "$downstream_commit" 2>/dev/null | grep "Mainline:" | head -n 1 | awk '{print $2}')
+	if [[ -z "$upstream_commit" ]]; then
+		upstream_commit="$1"
+	fi
+
+	if [[ "$upstream_commit" == "KYLIN-only" ]]; then
+		return 0
 	fi
 
 	# verify upstream_commit
-	if ! git show "$upstream_commit" >& /dev/null ; then
+	if ! git show "$upstream_commit" >/dev/null 2>&1; then
 		echo "$downstream_commit with $upstream_commit is not upstream-commit, please re-check." >&2
-		return
+		return 1
 	fi
 
-	search_fixes $upstream_commit
+	if ! search_fixes "$upstream_commit"; then
+		return 1
+	fi
 
-	for commit in `cat ${_temp_fixes_}`
-	do
-		$(dirname $0)/test-commit-in-tree -q $commit
-		[ $? == 0 ] && continue
+	if [[ ! -s "${_temp_fixes_}" ]]; then
+		return 0
+	fi
 
-		git --no-pager log -1 --pretty="${downstream_commit:0:12} <- %h %s" $commit >> ${_all_log_fixes}
-	done
-	rm -rf ${_temp_fixes_}
+	while IFS= read -r commit; do
+		[[ -z "$commit" ]] && continue
+
+		if "$(dirname "$0")/test-commit-in-tree" -q "$commit"; then
+			continue
+		fi
+
+		git --no-pager log -1 --pretty="${downstream_commit:0:12} <- %h %s" "$commit" >> "${_all_log_fixes}"
+	done < "${_temp_fixes_}"
+
+	> "${_temp_fixes_}"  # clear temp file for next use
 }
 
-function all_local_patchs()
-{
-	current_branch=$(git rev-parse --abbrev-ref HEAD)
-	[ -z $current_branch ] && echo "I'm not in branch." && exit 1
+all_local_patches() {
+	local current_branch
+	local commit_start
+	local commits
+	local commit
+
+	current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+	if [[ -z "$current_branch" ]]; then
+		echo "Error: Not on any branch." >&2
+		exit 1
+	fi
 
 	commit_start="origin/$current_branch"
-	[ ! -z $base_commit ] && commit_start=$base_commit
+	if [[ -n "$base_commit" ]]; then
+		commit_start="$base_commit"
+	fi
 
-	commits=$(git log --pretty=oneline HEAD...${commit_start} --reverse | awk '{print $1}')
-	[ -z "$commits" ] && echo -e "${RED}You are don't have un-merged commits${RC}" && exit 1
+	commits=$(git log --pretty=oneline "HEAD...${commit_start}" --reverse 2>/dev/null | awk '{print $1}')
+	if [[ -z "$commits" ]]; then
+		echo -e "${RED}You don't have any un-merged commits${RC}" >&2
+		exit 1
+	fi
 
-	for commit in $commits
-	do
-		single_local_patch $commit
+	while IFS= read -r commit; do
+		[[ -z "$commit" ]] && continue
+		single_local_patch "$commit"
+	done <<< "$commits"
+}
+
+all_commits_patches() {
+	local commit_file="$1"
+	local commit
+
+	if [[ ! -f "$commit_file" ]]; then
+		echo "Error: $commit_file is not found, please check." >&2
+		exit 1
+	fi
+
+	while IFS= read -r commit; do
+		[[ -z "$commit" ]] && continue
+		single_local_patch "$commit"
+	done < "$commit_file"
+}
+
+usage() {
+	cat << EOF
+Usage: $0 [OPTIONS]
+
+OPTIONS:
+	-h			Show this help message
+	-v			Show version information
+	-c <commit-id>		Process a single commit
+	-f <commit-list>	Process commits from file
+	-b <start-commit-id>	Set base commit for comparison
+
+EOF
+	exit 0
+}
+
+show_version() {
+	echo "search-git-fixes version: $VER"
+	exit 0
+}
+
+show_progress() {
+	local spinner="|/-\\"
+	local i=0
+
+	# handle termination signals gracefully
+	trap 'exit 0' TERM INT
+
+	while true; do
+		printf "Searching... %c\r" "${spinner:$((i % 4)):1}"
+		sleep 0.3 2>/dev/null || exit 0
+		((i++))
 	done
 }
 
-function all_commits_patchs()
-{
-	[ ! -f $1 ] && echo "$1 is not found, please check." && exit 1
-
-	for commit in `cat $1`
-	do
-		single_local_patch $commit
-	done
-}
-
-function usage()
-{
-	echo "Usage:"
-	echo -e "$0"
-	echo -e "\t[-h] [-v <version>]"
-	echo -e "\t[-c <commit-id>] [-f <commit-list>]"
-	echo -e "\t[-b <start-commit-id>]"
-	exit 1
-}
-
-function showVersion()
-{
-	echo "version: $VER"
-	exit 1
-}
-
-function processing()
-{
-	while [ 1 ];
-	do
-		string="\|/-"
-		for ((i = 0; i < ${#string}; i++))
-		do
-			printf "Searching... %-s \r" "${string:$i:1}"
-			sleep 0.3
-		done
-	done
-}
-
-function main()
-{
+main() {
 	check_git_is_installed
 	is_git_repository
 
-	processing &
+	show_progress &
+	progress_pid=$!
 
-	if [ ! -z $commit_id ]; then
-		single_local_patch $commit_id
-	elif [ ! -z $commit_file ]; then
-		all_commits_patchs $commit_file
+	if [[ -n "$commit_id" ]]; then
+		single_local_patch "$commit_id"
+	elif [[ -n "$commit_file" ]]; then
+		all_commits_patches "$commit_file"
 	else
-		all_local_patchs
+		all_local_patches
 	fi
+
+	# stop progress indicator
+	kill $progress_pid 2>/dev/null
+	wait $progress_pid 2>/dev/null
+	printf "\r%*s\r" 20 ""  # clear progress line
+
+	# process results
+	local ret=0
+	if [[ -f "${_all_log_fixes}" ]]; then
+		if [[ ! -s "${_all_log_fixes}" ]]; then
+			echo -e "${BLUE}Not Found.${RC}"
+			ret=1
+		else
+			cat "${_all_log_fixes}"
+			ret=0
+		fi
+	else
+		echo "Error: Results file not found." >&2
+		ret=1
+	fi
+	exit $ret
 }
 
-while getopts "hf:d:c:vb:" opt;do
+while getopts "hf:d:c:vb:" opt; do
 	case "$opt" in
-		v) showVersion ;;
+		v) show_version ;;
 		c) commit_id="${OPTARG}" ;;
 		f) commit_file="${OPTARG}" ;;
 		h) usage ;;
@@ -149,16 +237,3 @@ while getopts "hf:d:c:vb:" opt;do
 done
 
 main
-
-if [ -f ${_all_log_fixes} ]; then
-	if [ `cat ${_all_log_fixes} | wc -l ` -eq 0 ]; then
-		printf "                     \r"
-		echo -e "${BLUE}Not Found.${RC}"
-		ret=1
-	else
-		cat ${_all_log_fixes}
-		ret=0
-	fi
-	rm -rf ${_all_log_fixes}
-	exit $ret
-fi
