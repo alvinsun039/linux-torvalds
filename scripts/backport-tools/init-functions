@@ -53,3 +53,60 @@ function trim()
 	var="$(echo -e "$var" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 	echo "$var"
 }
+
+# Logging functions
+function log_info()
+{
+	[[ "$QUIET" != "1" ]] && echo -e "${GREEN}[INFO]${NC} $1" >&2
+}
+
+function log_warn()
+{
+	echo -e "${YELLOW}[WARN]${NC} $1" >&2
+}
+
+function log_error()
+{
+	echo -e "${RED}[ERROR]${NC} $1" >&2
+}
+
+function log_debug()
+{
+	[[ "$VERBOSE" == "1" ]] && echo -e "${BLUE}[DEBUG]${NC} $1" >&2
+}
+
+# Git utility functions
+function check_git_is_installed()
+{
+	if ! command -v git &>/dev/null; then
+		echo -e "${RED}Please install git first${NC}" >&2
+		exit 1
+	fi
+}
+
+function is_git_repository()
+{
+	if ! { [ -d .git ] || git rev-parse --git-dir >/dev/null 2>&1; }; then
+		echo -e "${RED}This directory is not a git repository.${NC}" >&2
+		exit 1
+	fi
+}
+
+# Commit validation function
+function validate_commit()
+{
+	local commit="$1"
+
+	if [[ -z "$commit" ]]; then
+		log_error "Commit ID cannot be empty"
+		return 1
+	fi
+
+	# Check if commit exists and is valid
+	if ! git rev-parse --verify "$commit" >/dev/null 2>&1; then
+		log_error "Invalid commit ID: $commit"
+		return 1
+	fi
+	return 0
+}
+

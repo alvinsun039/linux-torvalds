@@ -38,23 +38,6 @@ handle_interrupt() {
 trap handle_interrupt INT QUIT TERM
 trap cleanup EXIT
 
-# check git install
-check_git_is_installed() {
-	if ! command -v git &>/dev/null; then
-		echo -e "${RED}Please install git first${RC}" >&2
-		exit 1
-	fi
-}
-
-# check git-repo
-is_git_repository() {
-	if ! { [ -d .git ] || git rev-parse --git-dir >/dev/null 2>&1; }; then
-		echo -e "${RED}This directory is not a git repository.${RC}" >&2
-		exit 1
-	fi
-}
-
-# search fixes-message
 search_fixes() {
 	local original="$1"
 	local commit_12="${original:0:12}"
@@ -129,7 +112,7 @@ all_local_patches() {
 
 	commits=$(git log --pretty=oneline "HEAD...${commit_start}" --reverse 2>/dev/null | awk '{print $1}')
 	if [[ -z "$commits" ]]; then
-		echo -e "${RED}You don't have any un-merged commits${RC}" >&2
+		echo -e "${RED}You don't have any un-merged commits${NC}" >&2
 		exit 1
 	fi
 
