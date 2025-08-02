@@ -29,6 +29,7 @@
 #ifdef CONFIG_CREDP
 #include <asm/iee-cred.h>
 #endif
+#include <uapi/linux/lsm.h>
 
 /*
  * If a non-root user executes a setuid-root binary in

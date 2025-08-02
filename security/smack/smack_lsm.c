@@ -48,6 +48,7 @@
 #ifdef CONFIG_KEYP
 #include <asm/iee-key.h>
 #endif
+#include <uapi/linux/lsm.h>
 #include "smack.h"
 
 #define TRANS_TRUE	"TRUE"
