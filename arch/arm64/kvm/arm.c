@@ -57,7 +57,6 @@ DECLARE_KVM_NVHE_PER_CPU(struct kvm_cpu_context, kvm_hyp_ctxt);
 static bool vgic_present, kvm_arm_initialised;
 
 static DEFINE_PER_CPU(unsigned char, kvm_hyp_initialized);
-DEFINE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
 
 bool is_kvm_arm_initialised(void)
 {
@@ -378,7 +377,6 @@ int kvm_arch_vcpu_create(struct kvm_vcpu *vcpu)
 
 	/* Force users to call KVM_ARM_VCPU_INIT */
 	vcpu_clear_flag(vcpu, VCPU_INITIALIZED);
-	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
 
 	vcpu->arch.mmu_page_cache.gfp_zero = __GFP_ZERO;
 
@@ -414,9 +412,6 @@ void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
 
 void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 {
-	if (vcpu_has_run_once(vcpu) && unlikely(!irqchip_in_kernel(vcpu->kvm)))
-		static_branch_dec(&userspace_irqchip_in_use);
-
 	kvm_mmu_free_memory_cache(&vcpu->arch.mmu_page_cache);
 	kvm_timer_vcpu_terminate(vcpu);
 	kvm_pmu_vcpu_destroy(vcpu);
@@ -632,6 +627,12 @@ int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
 			return ret;
 	}
 
+	if (vcpu_has_nv(vcpu)) {
+		ret = kvm_init_nv_sysregs(vcpu->kvm);
+		if (ret)
+			return ret;
+	}
+
 	ret = kvm_timer_enable(vcpu);
 	if (ret)
 		return ret;
@@ -644,14 +645,6 @@ int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
 		ret = pkvm_create_hyp_vm(kvm);
 		if (ret)
 			return ret;
-	}
-
-	if (!irqchip_in_kernel(kvm)) {
-		/*
-		 * Tell the rest of the code that there are userspace irqchip
-		 * VMs in the wild.
-		 */
-		static_branch_inc(&userspace_irqchip_in_use);
 	}
 
 	/*
@@ -875,7 +868,7 @@ static bool kvm_vcpu_exit_request(struct kvm_vcpu *vcpu, int *ret)
 	 * state gets updated in kvm_timer_update_run and
 	 * kvm_pmu_update_run below).
 	 */
-	if (static_branch_unlikely(&userspace_irqchip_in_use)) {
+	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
 		if (kvm_timer_should_notify_user(vcpu) ||
 		    kvm_pmu_should_notify_user(vcpu)) {
 			*ret = -EINTR;
@@ -931,7 +924,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 
 	if (run->exit_reason == KVM_EXIT_MMIO) {
 		ret = kvm_handle_mmio_return(vcpu);
-		if (ret)
+		if (ret <= 0)
 			return ret;
 	}
 
@@ -994,7 +987,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 			vcpu->mode = OUTSIDE_GUEST_MODE;
 			isb(); /* Ensure work in x_flush_hwstate is committed */
 			kvm_pmu_sync_hwstate(vcpu);
-			if (static_branch_unlikely(&userspace_irqchip_in_use))
+			if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
 				kvm_timer_sync_user(vcpu);
 			kvm_vgic_sync_hwstate(vcpu);
 			local_irq_enable();
@@ -1042,7 +1035,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu)
 		 * we don't want vtimer interrupts to race with syncing the
 		 * timer virtual interrupt state.
 		 */
-		if (static_branch_unlikely(&userspace_irqchip_in_use))
+		if (unlikely(!irqchip_in_kernel(vcpu->kvm)))
 			kvm_timer_sync_user(vcpu);
 
 		kvm_arch_vcpu_ctxsync_fp(vcpu);
@@ -1214,6 +1207,30 @@ int kvm_vm_ioctl_irq_line(struct kvm *kvm, struct kvm_irq_level *irq_level,
 	return -EINVAL;
 }
 
+static unsigned long system_supported_vcpu_features(void)
+{
+	unsigned long features = KVM_VCPU_VALID_FEATURES;
+
+	if (!cpus_have_final_cap(ARM64_HAS_32BIT_EL1))
+		clear_bit(KVM_ARM_VCPU_EL1_32BIT, &features);
+
+	if (!kvm_arm_support_pmu_v3())
+		clear_bit(KVM_ARM_VCPU_PMU_V3, &features);
+
+	if (!system_supports_sve())
+		clear_bit(KVM_ARM_VCPU_SVE, &features);
+
+	if (!system_has_full_ptr_auth()) {
+		clear_bit(KVM_ARM_VCPU_PTRAUTH_ADDRESS, &features);
+		clear_bit(KVM_ARM_VCPU_PTRAUTH_GENERIC, &features);
+	}
+
+	if (!cpus_have_final_cap(ARM64_HAS_NESTED_VIRT))
+		clear_bit(KVM_ARM_VCPU_HAS_EL2, &features);
+
+	return features;
+}
+
 static int kvm_vcpu_init_check_features(struct kvm_vcpu *vcpu,
 					const struct kvm_vcpu_init *init)
 {
@@ -1228,11 +1245,24 @@ static int kvm_vcpu_init_check_features(struct kvm_vcpu *vcpu,
 			return -ENOENT;
 	}
 
+	if (features & ~system_supported_vcpu_features())
+		return -EINVAL;
+
+	/*
+	 * For now make sure that both address/generic pointer authentication
+	 * features are requested by the userspace together.
+	 */
+	if (test_bit(KVM_ARM_VCPU_PTRAUTH_ADDRESS, &features) !=
+	    test_bit(KVM_ARM_VCPU_PTRAUTH_GENERIC, &features))
+		return -EINVAL;
+
+	/* Disallow NV+SVE for the time being */
+	if (test_bit(KVM_ARM_VCPU_HAS_EL2, &features) &&
+	    test_bit(KVM_ARM_VCPU_SVE, &features))
+		return -EINVAL;
+
 	if (!test_bit(KVM_ARM_VCPU_EL1_32BIT, &features))
 		return 0;
-
-	if (!cpus_have_final_cap(ARM64_HAS_32BIT_EL1))
-		return -EINVAL;
 
 	/* MTE is incompatible with AArch32 */
 	if (kvm_has_mte(vcpu->kvm))
@@ -1250,7 +1280,8 @@ static bool kvm_vcpu_init_changed(struct kvm_vcpu *vcpu,
 {
 	unsigned long features = init->features[0];
 
-	return !bitmap_equal(vcpu->arch.features, &features, KVM_VCPU_MAX_FEATURES);
+	return !bitmap_equal(vcpu->kvm->arch.vcpu_features, &features,
+			     KVM_VCPU_MAX_FEATURES);
 }
 
 static int __kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
@@ -1263,21 +1294,17 @@ static int __kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
 	mutex_lock(&kvm->arch.config_lock);
 
 	if (test_bit(KVM_ARCH_FLAG_VCPU_FEATURES_CONFIGURED, &kvm->arch.flags) &&
-	    !bitmap_equal(kvm->arch.vcpu_features, &features, KVM_VCPU_MAX_FEATURES))
+	    kvm_vcpu_init_changed(vcpu, init))
 		goto out_unlock;
-
-	bitmap_copy(vcpu->arch.features, &features, KVM_VCPU_MAX_FEATURES);
-
-	/* Now we know what it is, we can reset it. */
-	ret = kvm_reset_vcpu(vcpu);
-	if (ret) {
-		bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
-		goto out_unlock;
-	}
 
 	bitmap_copy(kvm->arch.vcpu_features, &features, KVM_VCPU_MAX_FEATURES);
+
+	/* Now we know what it is, we can reset it. */
+	kvm_reset_vcpu(vcpu);
+
 	set_bit(KVM_ARCH_FLAG_VCPU_FEATURES_CONFIGURED, &kvm->arch.flags);
 	vcpu_set_flag(vcpu, VCPU_INITIALIZED);
+	ret = 0;
 out_unlock:
 	mutex_unlock(&kvm->arch.config_lock);
 	return ret;
@@ -1302,7 +1329,8 @@ static int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
 	if (kvm_vcpu_init_changed(vcpu, init))
 		return -EINVAL;
 
-	return kvm_reset_vcpu(vcpu);
+	kvm_reset_vcpu(vcpu);
+	return 0;
 }
 
 static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,

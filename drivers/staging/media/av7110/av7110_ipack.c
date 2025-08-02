@@ -4,7 +4,6 @@
 #include <linux/string.h>	/* for memcpy() */
 #include <linux/vmalloc.h>
 
-
 void av7110_ipack_reset(struct ipack *p)
 {
 	p->found = 0;
@@ -20,11 +19,11 @@ void av7110_ipack_reset(struct ipack *p)
 	p->count = 0;
 }
 
-
 int av7110_ipack_init(struct ipack *p, int size,
 		      void (*func)(u8 *buf, int size, void *priv))
 {
-	if (!(p->buf = vmalloc(size))) {
+	p->buf = vmalloc(size);
+	if (!p->buf) {
 		printk(KERN_WARNING "Couldn't allocate memory for ipack\n");
 		return -ENOMEM;
 	}
@@ -35,12 +34,10 @@ int av7110_ipack_init(struct ipack *p, int size,
 	return 0;
 }
 
-
 void av7110_ipack_free(struct ipack *p)
 {
 	vfree(p->buf);
 }
-
 
 static void send_ipack(struct ipack *p)
 {
@@ -63,7 +60,7 @@ static void send_ipack(struct ipack *p)
 			streamid = p->buf[off];
 			if ((streamid & 0xf8) == 0x80) {
 				ai.off = 0;
-				ac3_off = ((p->buf[off + 2] << 8)|
+				ac3_off = ((p->buf[off + 2] << 8) |
 					   p->buf[off + 3]);
 				if (ac3_off < p->count)
 					f = dvb_filter_get_ac3info(p->buf + off + 3 + ac3_off,
@@ -84,8 +81,8 @@ static void send_ipack(struct ipack *p)
 		p->buf[7] = 0x00;
 		p->buf[8] = 0x00;
 		p->count = 9;
-		if (p->repack_subids && p->cid == PRIVATE_STREAM1
-		    && (streamid & 0xf8) == 0x80) {
+		if (p->repack_subids && p->cid == PRIVATE_STREAM1 &&
+		    (streamid & 0xf8) == 0x80) {
 			p->count += 4;
 			p->buf[9] = streamid;
 			p->buf[10] = (ac3_off >> 8) & 0xff;
@@ -108,7 +105,6 @@ static void send_ipack(struct ipack *p)
 	}
 }
 
-
 void av7110_ipack_flush(struct ipack *p)
 {
 	if (p->plength != MMAX_PLENGTH - 6 || p->found <= 6)
@@ -119,7 +115,6 @@ void av7110_ipack_flush(struct ipack *p)
 	av7110_ipack_reset(p);
 }
 
-
 static void write_ipack(struct ipack *p, const u8 *data, int count)
 {
 	u8 headr[3] = { 0x00, 0x00, 0x01 };
@@ -129,12 +124,13 @@ static void write_ipack(struct ipack *p, const u8 *data, int count)
 		p->count = 6;
 	}
 
-	if (p->count + count < p->size){
-		memcpy(p->buf+p->count, data, count);
+	if (p->count + count < p->size) {
+		memcpy(p->buf + p->count, data, count);
 		p->count += count;
 	} else {
 		int rest = p->size - p->count;
-		memcpy(p->buf+p->count, data, rest);
+
+		memcpy(p->buf + p->count, data, rest);
 		p->count += rest;
 		send_ipack(p);
 		if (count - rest > 0)
@@ -142,16 +138,15 @@ static void write_ipack(struct ipack *p, const u8 *data, int count)
 	}
 }
 
-
-int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
+int av7110_ipack_instant_repack(const u8 *buf, int count, struct ipack *p)
 {
 	int l;
 	int c = 0;
 
 	while (c < count && (p->mpeg == 0 ||
 			     (p->mpeg == 1 && p->found < 7) ||
-			     (p->mpeg == 2 && p->found < 9))
-	       &&  (p->found < 5 || !p->done)) {
+			     (p->mpeg == 2 && p->found < 9)) &&
+			     (p->found < 5 || !p->done)) {
 		switch (p->found) {
 		case 0:
 		case 1:
@@ -176,10 +171,10 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 			case PROG_STREAM_MAP:
 			case PRIVATE_STREAM2:
 			case PROG_STREAM_DIR:
-			case ECM_STREAM     :
-			case EMM_STREAM     :
-			case PADDING_STREAM :
-			case DSM_CC_STREAM  :
+			case ECM_STREAM:
+			case EMM_STREAM:
+			case PADDING_STREAM:
+			case DSM_CC_STREAM:
 			case ISO13522_STREAM:
 				p->done = 1;
 				fallthrough;
@@ -197,7 +192,7 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 			break;
 
 		case 4:
-			if (count-c > 1) {
+			if (count - c > 1) {
 				p->plen[0] = buf[c];
 				c++;
 				p->plen[1] = buf[c];
@@ -221,9 +216,9 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 				p->flag1 = buf[c];
 				c++;
 				p->found++;
-				if ((p->flag1 & 0xc0) == 0x80)
+				if ((p->flag1 & 0xc0) == 0x80) {
 					p->mpeg = 2;
-				else {
+				} else {
 					p->hlength = 0;
 					p->which = 0;
 					p->mpeg = 1;
@@ -284,7 +279,6 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 			}
 
 			if (p->mpeg == 1 && p->which < 2000) {
-
 				if (p->found == 7) {
 					p->check = p->flag1;
 					p->hlength = 1;
@@ -341,7 +335,7 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 
 				if (c == count)
 					return count;
-				if (p->which > 2){
+				if (p->which > 2) {
 					if ((p->flag2 & PTS_DTS_FLAGS) == PTS_ONLY) {
 						while (c < count && p->which < 7) {
 							p->pts[p->which - 2] = buf[c];
@@ -368,7 +362,6 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 					}
 					p->which = 2000;
 				}
-
 			}
 
 			while (c < count && p->found < p->plength + 6) {
@@ -381,7 +374,6 @@ int av7110_ipack_instant_repack (const u8 *buf, int count, struct ipack *p)
 			}
 			break;
 		}
-
 
 		if (p->done) {
 			if (p->found + count - c < p->plength + 6) {

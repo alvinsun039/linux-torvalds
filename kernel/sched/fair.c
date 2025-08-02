@@ -3167,7 +3167,7 @@ static bool vma_is_accessed(struct mm_struct *mm, struct vm_area_struct *vma)
 	 * This is also done to avoid any side effect of task scanning
 	 * amplifying the unfairness of disjoint set of VMAs' access.
 	 */
-	if (READ_ONCE(current->mm->numa_scan_seq) < 2)
+	if ((READ_ONCE(current->mm->numa_scan_seq) - vma->numab_state->start_scan_seq) < 2)
 		return true;
 
 	pids = vma->numab_state->pids_active[0] | vma->numab_state->pids_active[1];
@@ -3284,7 +3284,7 @@ retry_pids:
 		vma = vma_next(&vmi);
 	}
 
-	do {
+	for (; vma; vma = vma_next(&vmi)) {
 		if (!vma_migratable(vma) || !vma_policy_mof(vma) ||
 			is_vm_hugetlb_page(vma) || (vma->vm_flags & VM_MIXEDMAP)) {
 			trace_sched_skip_vma_numa(mm, vma, NUMAB_SKIP_UNSUITABLE);
@@ -3314,10 +3314,18 @@ retry_pids:
 
 		/* Initialise new per-VMA NUMAB state. */
 		if (!vma->numab_state) {
-			vma->numab_state = kzalloc(sizeof(struct vma_numab_state),
-				GFP_KERNEL);
-			if (!vma->numab_state)
+			struct vma_numab_state *ptr;
+
+			ptr = kzalloc(sizeof(*ptr), GFP_KERNEL);
+			if (!ptr)
 				continue;
+
+			if (cmpxchg(&vma->numab_state, NULL, ptr)) {
+				kfree(ptr);
+				continue;
+			}
+
+			vma->numab_state->start_scan_seq = mm->numa_scan_seq;
 
 			vma->numab_state->next_scan = now +
 				msecs_to_jiffies(sysctl_numa_balancing_scan_delay);
@@ -3404,7 +3412,7 @@ retry_pids:
 		 */
 		if (vma_pids_forced)
 			break;
-	} for_each_vma(vmi, vma);
+	}
 
 	/*
 	 * If no VMAs are remaining and VMAs were skipped due to the PID
@@ -5432,7 +5440,7 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
  * 4) do not run the "skip" process, if something else is available
  */
 static struct sched_entity *
-pick_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *curr)
+pick_next_entity(struct cfs_rq *cfs_rq)
 {
 	/*
 	 * Enabling NEXT_BUDDY will affect latency but not fairness.
@@ -6800,7 +6808,7 @@ static void set_next_buddy(struct sched_entity *se);
  * decreased. We remove the task from the rbtree and
  * update the fair scheduling stats:
  */
-static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
+static bool dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 {
 	struct cfs_rq *cfs_rq;
 	struct sched_entity *se = &p->se;
@@ -6868,6 +6876,8 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 dequeue_throttle:
 	util_est_update(&rq->cfs, p, task_sleep);
 	hrtick_update(rq);
+
+	return true;
 }
 
 #ifdef CONFIG_SMP
@@ -8384,7 +8394,6 @@ preempt:
 	resched_curr(rq);
 }
 
-#ifdef CONFIG_SMP
 static struct task_struct *pick_task_fair(struct rq *rq)
 {
 	struct sched_entity *se;
@@ -8396,42 +8405,41 @@ again:
 		return NULL;
 
 	do {
-		struct sched_entity *curr = cfs_rq->curr;
+		/* Might not have done put_prev_entity() */
+		if (cfs_rq->curr && cfs_rq->curr->on_rq)
+			update_curr(cfs_rq);
 
-		/* When we pick for a remote RQ, we'll not have done put_prev_entity() */
-		if (curr) {
-			if (curr->on_rq)
-				update_curr(cfs_rq);
-			else
-				curr = NULL;
+		if (unlikely(check_cfs_rq_runtime(cfs_rq)))
+			goto again;
 
-			if (unlikely(check_cfs_rq_runtime(cfs_rq)))
-				goto again;
-		}
-
-		se = pick_next_entity(cfs_rq, curr);
+		se = pick_next_entity(cfs_rq);
 		cfs_rq = group_cfs_rq(se);
 	} while (cfs_rq);
 
 	return task_of(se);
 }
-#endif
+
+static void __set_next_task_fair(struct rq *rq, struct task_struct *p, bool first);
+static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first);
 
 struct task_struct *
 pick_next_task_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
-	struct cfs_rq *cfs_rq = &rq->cfs;
 	struct sched_entity *se;
 	struct task_struct *p;
 	int new_tasks;
 
 again:
-	if (!sched_fair_runnable(rq))
+	p = pick_task_fair(rq);
+	if (!p)
 		goto idle;
+	se = &p->se;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
-	if (!prev || prev->sched_class != &fair_sched_class)
+	if (prev->sched_class != &fair_sched_class)
 		goto simple;
+
+	__put_prev_set_next_dl_server(rq, prev, p);
 
 	/*
 	 * Because of the set_next_buddy() in dequeue_task_fair() it is rather
@@ -8439,52 +8447,14 @@ again:
 	 *
 	 * Therefore attempt to avoid putting and setting the entire cgroup
 	 * hierarchy, only change the part that actually changes.
-	 */
-
-	do {
-		struct sched_entity *curr = cfs_rq->curr;
-
-		/*
-		 * Since we got here without doing put_prev_entity() we also
-		 * have to consider cfs_rq->curr. If it is still a runnable
-		 * entity, update_curr() will update its vruntime, otherwise
-		 * forget we've ever seen it.
-		 */
-		if (curr) {
-			if (curr->on_rq)
-				update_curr(cfs_rq);
-			else
-				curr = NULL;
-
-			/*
-			 * This call to check_cfs_rq_runtime() will do the
-			 * throttle and dequeue its entity in the parent(s).
-			 * Therefore the nr_running test will indeed
-			 * be correct.
-			 */
-			if (unlikely(check_cfs_rq_runtime(cfs_rq))) {
-				cfs_rq = &rq->cfs;
-
-				if (!cfs_rq->nr_running)
-					goto idle;
-
-				goto simple;
-			}
-		}
-
-		se = pick_next_entity(cfs_rq, curr);
-		cfs_rq = group_cfs_rq(se);
-	} while (cfs_rq);
-
-	p = task_of(se);
-
-	/*
+	 *
 	 * Since we haven't yet done put_prev_entity and if the selected task
 	 * is a different task than we started out with, try and touch the
 	 * least amount of cfs_rqs.
 	 */
 	if (prev != p) {
 		struct sched_entity *pse = &prev->se;
+		struct cfs_rq *cfs_rq;
 
 		while (!(cfs_rq = is_same_group(se, pse))) {
 			int se_depth = se->depth;
@@ -8502,38 +8472,15 @@ again:
 
 		put_prev_entity(cfs_rq, pse);
 		set_next_entity(cfs_rq, se);
+
+		__set_next_task_fair(rq, p, true);
 	}
 
-	goto done;
+	return p;
+
 simple:
 #endif
-	if (prev)
-		put_prev_task(rq, prev);
-
-	do {
-		se = pick_next_entity(cfs_rq, NULL);
-		set_next_entity(cfs_rq, se);
-		cfs_rq = group_cfs_rq(se);
-	} while (cfs_rq);
-
-	p = task_of(se);
-
-done: __maybe_unused;
-#ifdef CONFIG_SMP
-	/*
-	 * Move the next running task to the front of
-	 * the list, so our cfs_tasks list becomes MRU
-	 * one.
-	 */
-	list_move(&p->se.group_node, &rq->cfs_tasks);
-#endif
-
-	if (hrtick_enabled_fair(rq))
-		hrtick_start_fair(rq, p);
-
-	update_misfit_status(p, rq);
-	sched_fair_update_stop_tick(rq, p);
-
+	put_prev_set_next_task(rq, prev, p);
 	return p;
 
 idle:
@@ -8562,15 +8509,15 @@ idle:
 	return NULL;
 }
 
-static struct task_struct *__pick_next_task_fair(struct rq *rq)
+static struct task_struct *__pick_next_task_fair(struct rq *rq, struct task_struct *prev)
 {
-	return pick_next_task_fair(rq, NULL, NULL);
+	return pick_next_task_fair(rq, prev, NULL);
 }
 
 /*
  * Account for a descheduled task:
  */
-static void put_prev_task_fair(struct rq *rq, struct task_struct *prev)
+static void put_prev_task_fair(struct rq *rq, struct task_struct *prev, struct task_struct *next)
 {
 	struct sched_entity *se = &prev->se;
 	struct cfs_rq *cfs_rq;
@@ -12156,7 +12103,7 @@ static void _nohz_idle_balance(struct rq *this_rq, unsigned int flags)
 		 * work being done for other CPUs. Next load
 		 * balancing owner will pick it up.
 		 */
-		if (need_resched()) {
+		if (!idle_cpu(this_cpu) && need_resched()) {
 			if (flags & NOHZ_STATS_KICK)
 				has_blocked_load = true;
 			if (flags & NOHZ_NEXT_KICK)
@@ -12786,12 +12733,7 @@ static void switched_to_fair(struct rq *rq, struct task_struct *p)
 	}
 }
 
-/* Account for a task changing its policy or group.
- *
- * This routine is mostly called to set cfs_rq->curr field when a task
- * migrates between groups/classes.
- */
-static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
+static void __set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
 {
 	struct sched_entity *se = &p->se;
 
@@ -12805,6 +12747,23 @@ static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
 	}
 #endif
 
+	if (hrtick_enabled_fair(rq))
+		hrtick_start_fair(rq, p);
+
+	update_misfit_status(p, rq);
+	sched_fair_update_stop_tick(rq, p);
+}
+
+/*
+ * Account for a task changing its policy or group.
+ *
+ * This routine is mostly called to set cfs_rq->curr field when a task
+ * migrates between groups/classes.
+ */
+static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
+{
+	struct sched_entity *se = &p->se;
+
 	for_each_sched_entity(se) {
 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
 
@@ -12812,6 +12771,8 @@ static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
 		/* ensure bandwidth has been allocated on our new cfs_rq */
 		account_cfs_rq_runtime(cfs_rq, 0);
 	}
+
+	__set_next_task_fair(rq, p, first);
 }
 
 void init_cfs_rq(struct cfs_rq *cfs_rq)
@@ -13130,13 +13091,13 @@ DEFINE_SCHED_CLASS(fair) = {
 
 	.wakeup_preempt		= check_preempt_wakeup_fair,
 
+	.pick_task		= pick_task_fair,
 	.pick_next_task		= __pick_next_task_fair,
 	.put_prev_task		= put_prev_task_fair,
 	.set_next_task          = set_next_task_fair,
 
 #ifdef CONFIG_SMP
 	.balance		= balance_fair,
-	.pick_task		= pick_task_fair,
 	.select_task_rq		= select_task_rq_fair,
 	.migrate_task_rq	= migrate_task_rq_fair,
 

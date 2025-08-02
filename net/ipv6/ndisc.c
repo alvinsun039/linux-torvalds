@@ -1239,6 +1239,7 @@ static enum skb_drop_reason ndisc_router_discovery(struct sk_buff *skb)
 	struct ndisc_options ndopts;
 	struct fib6_info *rt = NULL;
 	struct inet6_dev *in6_dev;
+	struct fib6_table *table;
 	u32 defrtr_usr_metric;
 	unsigned int pref = 0;
 	__u32 old_if_flags;
@@ -1411,8 +1412,15 @@ static enum skb_drop_reason ndisc_router_discovery(struct sk_buff *skb)
 		inet6_rt_notify(RTM_NEWROUTE, rt, &nlinfo, NLM_F_REPLACE);
 	}
 
-	if (rt)
+	if (rt) {
+		table = rt->fib6_table;
+		spin_lock_bh(&table->tb6_lock);
+
 		fib6_set_expires(rt, jiffies + (HZ * lifetime));
+		fib6_add_gc_list(rt);
+
+		spin_unlock_bh(&table->tb6_lock);
+	}
 	if (in6_dev->cnf.accept_ra_min_hop_limit < 256 &&
 	    ra_msg->icmph.icmp6_hop_limit) {
 		if (in6_dev->cnf.accept_ra_min_hop_limit <= ra_msg->icmph.icmp6_hop_limit) {
@@ -1710,7 +1718,7 @@ void ndisc_send_redirect(struct sk_buff *skb, const struct in6_addr *target)
 	if (IS_ERR(dst))
 		return;
 
-	rt = (struct rt6_info *) dst;
+	rt = dst_rt6_info(dst);
 
 	if (rt->rt6i_flags & RTF_GATEWAY) {
 		ND_PRINTK(2, warn,

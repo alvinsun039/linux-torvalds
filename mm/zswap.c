@@ -146,6 +146,11 @@ static bool zswap_shrinker_enabled = IS_ENABLED(
 		CONFIG_ZSWAP_SHRINKER_DEFAULT_ON);
 module_param_named(shrinker_enabled, zswap_shrinker_enabled, bool, 0644);
 
+bool is_zswap_enabled(void)
+{
+	return zswap_enabled;
+}
+
 /*********************************
 * data structures
 **********************************/
@@ -1163,7 +1168,8 @@ static unsigned long zswap_shrinker_scan(struct shrinker *shrinker,
 	unsigned long shrink_ret, nr_protected, lru_size;
 	bool encountered_page_in_swapcache = false;
 
-	if (!zswap_shrinker_enabled) {
+	if (!zswap_shrinker_enabled ||
+			!mem_cgroup_zswap_writeback_enabled(sc->memcg)) {
 		sc->nr_scanned = 0;
 		return SHRINK_STOP;
 	}
@@ -1203,7 +1209,7 @@ static unsigned long zswap_shrinker_count(struct shrinker *shrinker,
 	struct lruvec *lruvec = mem_cgroup_lruvec(memcg, NODE_DATA(sc->nid));
 	unsigned long nr_backing, nr_stored, nr_freeable, nr_protected;
 
-	if (!zswap_shrinker_enabled)
+	if (!zswap_shrinker_enabled || !mem_cgroup_zswap_writeback_enabled(memcg))
 		return 0;
 
 	/*
@@ -1271,6 +1277,9 @@ static struct shrinker *zswap_alloc_shrinker(void)
 static int shrink_memcg(struct mem_cgroup *memcg)
 {
 	int nid, shrunk = 0;
+
+	if (!mem_cgroup_zswap_writeback_enabled(memcg))
+		return -EINVAL;
 
 	/*
 	 * Skip zombies because their LRUs are reparented and we would be

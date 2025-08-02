@@ -61,6 +61,7 @@ struct scx_dispatch_q {
 	struct list_head	list;	/* tasks in dispatch order */
 	struct rb_root		priq;	/* used to order by p->scx.dsq_vtime */
 	u32			nr;
+	u32			seq;	/* used by BPF iter */
 	u64			id;
 	struct rhash_head	hash_node;
 	struct llist_node	free_node;
@@ -70,7 +71,6 @@ struct scx_dispatch_q {
 /* scx_entity.flags */
 enum scx_ent_flags {
 	SCX_TASK_QUEUED		= 1 << 0, /* on ext runqueue */
-	SCX_TASK_BAL_KEEP	= 1 << 1, /* balance decided to keep current */
 	SCX_TASK_RESET_RUNNABLE_AT = 1 << 2, /* runnable_at should be reset */
 	SCX_TASK_DEQD_FOR_SLEEP	= 1 << 3, /* last dequeue was for SLEEP */
 
@@ -105,26 +105,31 @@ enum scx_ent_dsq_flags {
  * mechanism. See scx_kf_allow().
  */
 enum scx_kf_mask {
-	SCX_KF_UNLOCKED		= 0,	  /* not sleepable, not rq locked */
-	/* all non-sleepables may be nested inside SLEEPABLE */
-	SCX_KF_SLEEPABLE	= 1 << 0, /* sleepable init operations */
+	SCX_KF_UNLOCKED		= 0,	  /* sleepable and not rq locked */
 	/* ENQUEUE and DISPATCH may be nested inside CPU_RELEASE */
-	SCX_KF_CPU_RELEASE	= 1 << 1, /* ops.cpu_release() */
+	SCX_KF_CPU_RELEASE	= 1 << 0, /* ops.cpu_release() */
 	/* ops.dequeue (in REST) may be nested inside DISPATCH */
-	SCX_KF_DISPATCH		= 1 << 2, /* ops.dispatch() */
-	SCX_KF_ENQUEUE		= 1 << 3, /* ops.enqueue() and ops.select_cpu() */
-	SCX_KF_SELECT_CPU	= 1 << 4, /* ops.select_cpu() */
-	SCX_KF_REST		= 1 << 5, /* other rq-locked operations */
+	SCX_KF_DISPATCH		= 1 << 1, /* ops.dispatch() */
+	SCX_KF_ENQUEUE		= 1 << 2, /* ops.enqueue() and ops.select_cpu() */
+	SCX_KF_SELECT_CPU	= 1 << 3, /* ops.select_cpu() */
+	SCX_KF_REST		= 1 << 4, /* other rq-locked operations */
 
 	__SCX_KF_RQ_LOCKED	= SCX_KF_CPU_RELEASE | SCX_KF_DISPATCH |
 				  SCX_KF_ENQUEUE | SCX_KF_SELECT_CPU | SCX_KF_REST,
 	__SCX_KF_TERMINAL	= SCX_KF_ENQUEUE | SCX_KF_SELECT_CPU | SCX_KF_REST,
 };
 
-struct scx_dsq_node {
-	struct list_head	list;		/* dispatch order */
-	struct rb_node		priq;		/* p->scx.dsq_vtime order */
-	u32			flags;		/* SCX_TASK_DSQ_* flags */
+enum scx_dsq_lnode_flags {
+	SCX_DSQ_LNODE_ITER_CURSOR = 1 << 0,
+
+	/* high 16 bits can be for iter cursor flags */
+	__SCX_DSQ_LNODE_PRIV_SHIFT = 16,
+};
+
+struct scx_dsq_list_node {
+	struct list_head	node;
+	u32			flags;
+	u32			priv;		/* can be used by iter cursor */
 };
 
 /*
@@ -133,7 +138,10 @@ struct scx_dsq_node {
  */
 struct sched_ext_entity {
 	struct scx_dispatch_q	*dsq;
-	struct scx_dsq_node	dsq_node;	/* protected by dsq lock */
+	struct scx_dsq_list_node dsq_list;	/* dispatch order */
+	struct rb_node		dsq_priq;	/* p->scx.dsq_vtime order */
+	u32			dsq_seq;
+	u32			dsq_flags;	/* protected by DSQ lock */
 	u32			flags;		/* protected by rq lock */
 	u32			weight;
 	s32			sticky_cpu;
@@ -178,15 +186,19 @@ struct sched_ext_entity {
 	 * If set, reject future sched_setscheduler(2) calls updating the policy
 	 * to %SCHED_EXT with -%EACCES.
 	 *
-	 * If set from ops.init_task() and the task's policy is already
-	 * %SCHED_EXT, which can happen while the BPF scheduler is being loaded
-	 * or by inhering the parent's policy during fork, the task's policy is
-	 * rejected and forcefully reverted to %SCHED_NORMAL. The number of
-	 * such events are reported through /sys/kernel/debug/sched_ext::nr_rejected.
+	 * Can be set from ops.init_task() while the BPF scheduler is being
+	 * loaded (!scx_init_task_args->fork). If set and the task's policy is
+	 * already %SCHED_EXT, the task's policy is rejected and forcefully
+	 * reverted to %SCHED_NORMAL. The number of such events are reported
+	 * through /sys/kernel/debug/sched_ext::nr_rejected. Setting this flag
+	 * during fork is not allowed.
 	 */
 	bool			disallow;	/* reject switching into SCX */
 
 	/* cold fields */
+#ifdef CONFIG_EXT_GROUP_SCHED
+	struct cgroup		*cgrp_moving_from;
+#endif
 	/* must be the last field, see init_scx_entity() */
 	struct list_head	tasks_node;
 };

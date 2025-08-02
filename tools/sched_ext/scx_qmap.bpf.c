@@ -27,6 +27,8 @@
 enum consts {
 	ONE_SEC_IN_NS		= 1000000000,
 	SHARED_DSQ		= 0,
+	HIGHPRI_DSQ		= 1,
+	HIGHPRI_WEIGHT		= 8668,		/* this is what -20 maps to */
 };
 
 char _license[] SEC("license") = "GPL";
@@ -36,9 +38,12 @@ const volatile u32 stall_user_nth;
 const volatile u32 stall_kernel_nth;
 const volatile u32 dsp_inf_loop_after;
 const volatile u32 dsp_batch;
+const volatile bool highpri_boosting;
+const volatile bool print_shared_dsq;
 const volatile s32 disallow_tgid;
 const volatile bool suppress_dump;
 
+u64 nr_highpri_queued;
 u32 test_error_cnt;
 
 UEI_DEFINE(uei);
@@ -69,6 +74,18 @@ struct {
 };
 
 /*
+ * If enabled, CPU performance target is set according to the queue index
+ * according to the following table.
+ */
+static const u32 qidx_to_cpuperf_target[] = {
+	[0] = SCX_CPUPERF_ONE * 0 / 4,
+	[1] = SCX_CPUPERF_ONE * 1 / 4,
+	[2] = SCX_CPUPERF_ONE * 2 / 4,
+	[3] = SCX_CPUPERF_ONE * 3 / 4,
+	[4] = SCX_CPUPERF_ONE * 4 / 4,
+};
+
+/*
  * Per-queue sequence numbers to implement core-sched ordering.
  *
  * Tail seq is assigned to each queued task and incremented. Head seq tracks the
@@ -82,6 +99,7 @@ static u64 core_sched_tail_seqs[5];
 /* Per-task scheduling context */
 struct task_ctx {
 	bool	force_local;	/* Dispatch directly to local_dsq */
+	bool	highpri;
 	u64	core_sched_seq;
 };
 
@@ -95,6 +113,8 @@ struct {
 struct cpu_ctx {
 	u64	dsp_idx;	/* dispatch index */
 	u64	dsp_cnt;	/* remaining count */
+	u32	avg_weight;
+	u32	cpuperf_target;
 };
 
 struct {
@@ -105,8 +125,37 @@ struct {
 } cpu_ctx_stor SEC(".maps");
 
 /* Statistics */
-u64 nr_enqueued, nr_dispatched, nr_reenqueued, nr_dequeued;
+u64 nr_enqueued, nr_dispatched, nr_reenqueued, nr_dequeued, nr_ddsp_from_enq;
 u64 nr_core_sched_execed;
+u64 nr_expedited_local, nr_expedited_remote, nr_expedited_lost, nr_expedited_from_timer;
+u32 cpuperf_min, cpuperf_avg, cpuperf_max;
+u32 cpuperf_target_min, cpuperf_target_avg, cpuperf_target_max;
+
+static s32 pick_direct_dispatch_cpu(struct task_struct *p, s32 prev_cpu)
+{
+	s32 cpu;
+
+	if (p->nr_cpus_allowed == 1 ||
+	    scx_bpf_test_and_clear_cpu_idle(prev_cpu))
+		return prev_cpu;
+
+	cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);
+	if (cpu >= 0)
+		return cpu;
+
+	return -1;
+}
+
+static struct task_ctx *lookup_task_ctx(struct task_struct *p)
+{
+	struct task_ctx *tctx;
+
+	if (!(tctx = bpf_task_storage_get(&task_ctx_stor, p, 0, 0))) {
+		scx_bpf_error("task_ctx lookup failed");
+		return NULL;
+	}
+	return tctx;
+}
 
 s32 BPF_STRUCT_OPS(qmap_select_cpu, struct task_struct *p,
 		   s32 prev_cpu, u64 wake_flags)
@@ -114,23 +163,17 @@ s32 BPF_STRUCT_OPS(qmap_select_cpu, struct task_struct *p,
 	struct task_ctx *tctx;
 	s32 cpu;
 
-	tctx = bpf_task_storage_get(&task_ctx_stor, p, 0, 0);
-	if (!tctx) {
-		scx_bpf_error("task_ctx lookup failed");
+	if (!(tctx = lookup_task_ctx(p)))
 		return -ESRCH;
-	}
 
-	if (p->nr_cpus_allowed == 1 ||
-	    scx_bpf_test_and_clear_cpu_idle(prev_cpu)) {
+	cpu = pick_direct_dispatch_cpu(p, prev_cpu);
+
+	if (cpu >= 0) {
 		tctx->force_local = true;
+		return cpu;
+	} else {
 		return prev_cpu;
 	}
-
-	cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);
-	if (cpu >= 0)
-		return cpu;
-
-	return prev_cpu;
 }
 
 static int weight_to_idx(u32 weight)
@@ -155,6 +198,7 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	u32 pid = p->pid;
 	int idx = weight_to_idx(p->scx.weight);
 	void *ring;
+	s32 cpu;
 
 	if (p->flags & PF_KTHREAD) {
 		if (stall_kernel_nth && !(++kernel_cnt % stall_kernel_nth))
@@ -167,16 +211,12 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	if (test_error_cnt && !--test_error_cnt)
 		scx_bpf_error("test triggering error");
 
-	tctx = bpf_task_storage_get(&task_ctx_stor, p, 0, 0);
-	if (!tctx) {
-		scx_bpf_error("task_ctx lookup failed");
+	if (!(tctx = lookup_task_ctx(p)))
 		return;
-	}
 
 	/*
 	 * All enqueued tasks must have their core_sched_seq updated for correct
-	 * core-sched ordering, which is why %SCX_OPS_ENQ_LAST is specified in
-	 * qmap_ops.flags.
+	 * core-sched ordering. Also, take a look at the end of qmap_dispatch().
 	 */
 	tctx->core_sched_seq = core_sched_tail_seqs[idx]++;
 
@@ -184,9 +224,17 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	 * If qmap_select_cpu() is telling us to or this is the last runnable
 	 * task on the CPU, enqueue locally.
 	 */
-	if (tctx->force_local || (enq_flags & SCX_ENQ_LAST)) {
+	if (tctx->force_local) {
 		tctx->force_local = false;
 		scx_bpf_dispatch(p, SCX_DSQ_LOCAL, slice_ns, enq_flags);
+		return;
+	}
+
+	/* if select_cpu() wasn't called, try direct dispatch */
+	if (!(enq_flags & SCX_ENQ_CPU_SELECTED) &&
+	    (cpu = pick_direct_dispatch_cpu(p, scx_bpf_task_cpu(p))) >= 0) {
+		__sync_fetch_and_add(&nr_ddsp_from_enq, 1);
+		scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu, slice_ns, enq_flags);
 		return;
 	}
 
@@ -218,6 +266,10 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 		return;
 	}
 
+	if (highpri_boosting && p->scx.weight >= HIGHPRI_WEIGHT) {
+		tctx->highpri = true;
+		__sync_fetch_and_add(&nr_highpri_queued, 1);
+	}
 	__sync_fetch_and_add(&nr_enqueued, 1);
 }
 
@@ -234,24 +286,95 @@ void BPF_STRUCT_OPS(qmap_dequeue, struct task_struct *p, u64 deq_flags)
 
 static void update_core_sched_head_seq(struct task_struct *p)
 {
-	struct task_ctx *tctx = bpf_task_storage_get(&task_ctx_stor, p, 0, 0);
 	int idx = weight_to_idx(p->scx.weight);
+	struct task_ctx *tctx;
 
-	if (tctx)
+	if ((tctx = lookup_task_ctx(p)))
 		core_sched_head_seqs[idx] = tctx->core_sched_seq;
-	else
-		scx_bpf_error("task_ctx lookup failed");
+}
+
+/*
+ * To demonstrate the use of scx_bpf_dispatch_from_dsq(), implement silly
+ * selective priority boosting mechanism by scanning SHARED_DSQ looking for
+ * highpri tasks, moving them to HIGHPRI_DSQ and then consuming them first. This
+ * makes minor difference only when dsp_batch is larger than 1.
+ *
+ * scx_bpf_dispatch[_vtime]_from_dsq() are allowed both from ops.dispatch() and
+ * non-rq-lock holding BPF programs. As demonstration, this function is called
+ * from qmap_dispatch() and monitor_timerfn().
+ */
+static bool dispatch_highpri(bool from_timer)
+{
+	struct task_struct *p;
+	s32 this_cpu = bpf_get_smp_processor_id();
+
+	/* scan SHARED_DSQ and move highpri tasks to HIGHPRI_DSQ */
+	bpf_for_each(scx_dsq, p, SHARED_DSQ, 0) {
+		static u64 highpri_seq;
+		struct task_ctx *tctx;
+
+		if (!(tctx = lookup_task_ctx(p)))
+			return false;
+
+		if (tctx->highpri) {
+			/* exercise the set_*() and vtime interface too */
+			__COMPAT_scx_bpf_dispatch_from_dsq_set_slice(
+				BPF_FOR_EACH_ITER, slice_ns * 2);
+			__COMPAT_scx_bpf_dispatch_from_dsq_set_vtime(
+				BPF_FOR_EACH_ITER, highpri_seq++);
+			__COMPAT_scx_bpf_dispatch_vtime_from_dsq(
+				BPF_FOR_EACH_ITER, p, HIGHPRI_DSQ, 0);
+		}
+	}
+
+	/*
+	 * Scan HIGHPRI_DSQ and dispatch until a task that can run on this CPU
+	 * is found.
+	 */
+	bpf_for_each(scx_dsq, p, HIGHPRI_DSQ, 0) {
+		bool dispatched = false;
+		s32 cpu;
+
+		if (bpf_cpumask_test_cpu(this_cpu, p->cpus_ptr))
+			cpu = this_cpu;
+		else
+			cpu = scx_bpf_pick_any_cpu(p->cpus_ptr, 0);
+
+		if (__COMPAT_scx_bpf_dispatch_from_dsq(BPF_FOR_EACH_ITER, p,
+						       SCX_DSQ_LOCAL_ON | cpu,
+						       SCX_ENQ_PREEMPT)) {
+			if (cpu == this_cpu) {
+				dispatched = true;
+				__sync_fetch_and_add(&nr_expedited_local, 1);
+			} else {
+				__sync_fetch_and_add(&nr_expedited_remote, 1);
+			}
+			if (from_timer)
+				__sync_fetch_and_add(&nr_expedited_from_timer, 1);
+		} else {
+			__sync_fetch_and_add(&nr_expedited_lost, 1);
+		}
+
+		if (dispatched)
+			return true;
+	}
+
+	return false;
 }
 
 void BPF_STRUCT_OPS(qmap_dispatch, s32 cpu, struct task_struct *prev)
 {
 	struct task_struct *p;
 	struct cpu_ctx *cpuc;
+	struct task_ctx *tctx;
 	u32 zero = 0, batch = dsp_batch ?: 1;
 	void *fifo;
 	s32 i, pid;
 
-	if (scx_bpf_consume(SHARED_DSQ))
+	if (dispatch_highpri(false))
+		return;
+
+	if (!nr_highpri_queued && scx_bpf_consume(SHARED_DSQ))
 		return;
 
 	if (dsp_inf_loop_after && nr_dispatched > dsp_inf_loop_after) {
@@ -288,6 +411,8 @@ void BPF_STRUCT_OPS(qmap_dispatch, s32 cpu, struct task_struct *prev)
 
 		/* Dispatch or advance. */
 		bpf_repeat(BPF_MAX_LOOPS) {
+			struct task_ctx *tctx;
+
 			if (bpf_map_pop_elem(fifo, &pid))
 				break;
 
@@ -295,13 +420,25 @@ void BPF_STRUCT_OPS(qmap_dispatch, s32 cpu, struct task_struct *prev)
 			if (!p)
 				continue;
 
+			if (!(tctx = lookup_task_ctx(p))) {
+				bpf_task_release(p);
+				return;
+			}
+
+			if (tctx->highpri)
+				__sync_fetch_and_sub(&nr_highpri_queued, 1);
+
 			update_core_sched_head_seq(p);
 			__sync_fetch_and_add(&nr_dispatched, 1);
+
 			scx_bpf_dispatch(p, SHARED_DSQ, slice_ns, 0);
 			bpf_task_release(p);
+
 			batch--;
 			cpuc->dsp_cnt--;
 			if (!batch || !scx_bpf_dispatch_nr_slots()) {
+				if (dispatch_highpri(false))
+					return;
 				scx_bpf_consume(SHARED_DSQ);
 				return;
 			}
@@ -311,6 +448,44 @@ void BPF_STRUCT_OPS(qmap_dispatch, s32 cpu, struct task_struct *prev)
 
 		cpuc->dsp_cnt = 0;
 	}
+
+	/*
+	 * No other tasks. @prev will keep running. Update its core_sched_seq as
+	 * if the task were enqueued and dispatched immediately.
+	 */
+	if (prev) {
+		tctx = bpf_task_storage_get(&task_ctx_stor, prev, 0, 0);
+		if (!tctx) {
+			scx_bpf_error("task_ctx lookup failed");
+			return;
+		}
+
+		tctx->core_sched_seq =
+			core_sched_tail_seqs[weight_to_idx(prev->scx.weight)]++;
+	}
+}
+
+void BPF_STRUCT_OPS(qmap_tick, struct task_struct *p)
+{
+	struct cpu_ctx *cpuc;
+	u32 zero = 0;
+	int idx;
+
+	if (!(cpuc = bpf_map_lookup_elem(&cpu_ctx_stor, &zero))) {
+		scx_bpf_error("failed to look up cpu_ctx");
+		return;
+	}
+
+	/*
+	 * Use the running avg of weights to select the target cpuperf level.
+	 * This is a demonstration of the cpuperf feature rather than a
+	 * practical strategy to regulate CPU frequency.
+	 */
+	cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + p->scx.weight / 4;
+	idx = weight_to_idx(cpuc->avg_weight);
+	cpuc->cpuperf_target = qidx_to_cpuperf_target[idx];
+
+	scx_bpf_cpuperf_set(scx_bpf_task_cpu(p), cpuc->cpuperf_target);
 }
 
 /*
@@ -422,8 +597,9 @@ void BPF_STRUCT_OPS(qmap_dump_cpu, struct scx_dump_ctx *dctx, s32 cpu, bool idle
 	if (!(cpuc = bpf_map_lookup_percpu_elem(&cpu_ctx_stor, &zero, cpu)))
 		return;
 
-	scx_bpf_dump("QMAP: dsp_idx=%llu dsp_cnt=%llu",
-		     cpuc->dsp_idx, cpuc->dsp_cnt);
+	scx_bpf_dump("QMAP: dsp_idx=%llu dsp_cnt=%llu avg_weight=%u cpuperf_target=%u",
+		     cpuc->dsp_idx, cpuc->dsp_cnt, cpuc->avg_weight,
+		     cpuc->cpuperf_target);
 }
 
 void BPF_STRUCT_OPS(qmap_dump_task, struct scx_dump_ctx *dctx, struct task_struct *p)
@@ -492,11 +668,138 @@ void BPF_STRUCT_OPS(qmap_cpu_offline, s32 cpu)
 	print_cpus();
 }
 
+struct monitor_timer {
+	struct bpf_timer timer;
+};
+
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__type(value, struct monitor_timer);
+} monitor_timer SEC(".maps");
+
+/*
+ * Print out the min, avg and max performance levels of CPUs every second to
+ * demonstrate the cpuperf interface.
+ */
+static void monitor_cpuperf(void)
+{
+	u32 zero = 0, nr_cpu_ids;
+	u64 cap_sum = 0, cur_sum = 0, cur_min = SCX_CPUPERF_ONE, cur_max = 0;
+	u64 target_sum = 0, target_min = SCX_CPUPERF_ONE, target_max = 0;
+	const struct cpumask *online;
+	int i, nr_online_cpus = 0;
+
+	nr_cpu_ids = scx_bpf_nr_cpu_ids();
+	online = scx_bpf_get_online_cpumask();
+
+	bpf_for(i, 0, nr_cpu_ids) {
+		struct cpu_ctx *cpuc;
+		u32 cap, cur;
+
+		if (!bpf_cpumask_test_cpu(i, online))
+			continue;
+		nr_online_cpus++;
+
+		/* collect the capacity and current cpuperf */
+		cap = scx_bpf_cpuperf_cap(i);
+		cur = scx_bpf_cpuperf_cur(i);
+
+		cur_min = cur < cur_min ? cur : cur_min;
+		cur_max = cur > cur_max ? cur : cur_max;
+
+		/*
+		 * $cur is relative to $cap. Scale it down accordingly so that
+		 * it's in the same scale as other CPUs and $cur_sum/$cap_sum
+		 * makes sense.
+		 */
+		cur_sum += cur * cap / SCX_CPUPERF_ONE;
+		cap_sum += cap;
+
+		if (!(cpuc = bpf_map_lookup_percpu_elem(&cpu_ctx_stor, &zero, i))) {
+			scx_bpf_error("failed to look up cpu_ctx");
+			goto out;
+		}
+
+		/* collect target */
+		cur = cpuc->cpuperf_target;
+		target_sum += cur;
+		target_min = cur < target_min ? cur : target_min;
+		target_max = cur > target_max ? cur : target_max;
+	}
+
+	cpuperf_min = cur_min;
+	cpuperf_avg = cur_sum * SCX_CPUPERF_ONE / cap_sum;
+	cpuperf_max = cur_max;
+
+	cpuperf_target_min = target_min;
+	cpuperf_target_avg = target_sum / nr_online_cpus;
+	cpuperf_target_max = target_max;
+out:
+	scx_bpf_put_cpumask(online);
+}
+
+/*
+ * Dump the currently queued tasks in the shared DSQ to demonstrate the usage of
+ * scx_bpf_dsq_nr_queued() and DSQ iterator. Raise the dispatch batch count to
+ * see meaningful dumps in the trace pipe.
+ */
+static void dump_shared_dsq(void)
+{
+	struct task_struct *p;
+	s32 nr;
+
+	if (!(nr = scx_bpf_dsq_nr_queued(SHARED_DSQ)))
+		return;
+
+	bpf_printk("Dumping %d tasks in SHARED_DSQ in reverse order", nr);
+
+	bpf_rcu_read_lock();
+	bpf_for_each(scx_dsq, p, SHARED_DSQ, SCX_DSQ_ITER_REV)
+		bpf_printk("%s[%d]", p->comm, p->pid);
+	bpf_rcu_read_unlock();
+}
+
+static int monitor_timerfn(void *map, int *key, struct bpf_timer *timer)
+{
+	bpf_rcu_read_lock();
+	dispatch_highpri(true);
+	bpf_rcu_read_unlock();
+
+	monitor_cpuperf();
+
+	if (print_shared_dsq)
+		dump_shared_dsq();
+
+	bpf_timer_start(timer, ONE_SEC_IN_NS, 0);
+	return 0;
+}
+
 s32 BPF_STRUCT_OPS_SLEEPABLE(qmap_init)
 {
+	u32 key = 0;
+	struct bpf_timer *timer;
+	s32 ret;
+
 	print_cpus();
 
-	return scx_bpf_create_dsq(SHARED_DSQ, -1);
+	ret = scx_bpf_create_dsq(SHARED_DSQ, -1);
+	if (ret)
+		return ret;
+
+	ret = scx_bpf_create_dsq(HIGHPRI_DSQ, -1);
+	if (ret)
+		return ret;
+
+	timer = bpf_map_lookup_elem(&monitor_timer, &key);
+	if (!timer)
+		return -ESRCH;
+
+	bpf_timer_init(timer, &monitor_timer, CLOCK_MONOTONIC);
+	bpf_timer_set_callback(timer, monitor_timerfn);
+
+	return bpf_timer_start(timer, ONE_SEC_IN_NS, 0);
 }
 
 void BPF_STRUCT_OPS(qmap_exit, struct scx_exit_info *ei)
@@ -509,6 +812,7 @@ SCX_OPS_DEFINE(qmap_ops,
 	       .enqueue			= (void *)qmap_enqueue,
 	       .dequeue			= (void *)qmap_dequeue,
 	       .dispatch		= (void *)qmap_dispatch,
+	       .tick			= (void *)qmap_tick,
 	       .core_sched_before	= (void *)qmap_core_sched_before,
 	       .cpu_release		= (void *)qmap_cpu_release,
 	       .init_task		= (void *)qmap_init_task,
@@ -519,6 +823,5 @@ SCX_OPS_DEFINE(qmap_ops,
 	       .cpu_offline		= (void *)qmap_cpu_offline,
 	       .init			= (void *)qmap_init,
 	       .exit			= (void *)qmap_exit,
-	       .flags			= SCX_OPS_ENQ_LAST,
 	       .timeout_ms		= 5000U,
 	       .name			= "qmap");

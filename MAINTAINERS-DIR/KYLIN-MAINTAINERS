@@ -142,6 +142,8 @@ R:	Tang Longjun <tanglongjun@kylinos.cn>
 R:	Lei Xiang <leixiang@kylinos.cn>
 R:	He Minhong <heminhong@kylinos.cn>
 R:	zhulei <zhulei@kylinos.cn>
+R:	Yi Cong <yicong@kylinos.cn>
+R:	Zhao Dongdong <zhaodongdong@kylinos.cn>
 S:	Supported
 F:	Documentation/networking/
 F:	drivers/net/
@@ -995,6 +997,9 @@ WIRELESS DRIVERS AND STACK
 M:	Xiao Linkui <xiaolinkui@kylinos.cn>
 R:	Wei Rongguang <weirongguang@kylinos.cn>
 R:	Chenguang Zhao <zhaochenguang@kylinos.cn>
+R:	Zhao Dongdong <zhaodongdong@kylinos.cn>
+R:	Yi Cong <yicong@kylinos.cn>
+R:	Li Gongwei <ligongwei@kylinos.cn>
 S:	Supported
 F:	drivers/net/wireless/
 F:	net/mac80211/

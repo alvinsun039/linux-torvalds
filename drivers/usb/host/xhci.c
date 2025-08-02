@@ -3644,22 +3644,6 @@ void xhci_free_device_endpoint_resources(struct xhci_hcd *xhci,
 
 static void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev);
 
-static int xhci_reset_device_quirk(struct usb_hcd *hcd, struct usb_device *udev)
-{
-	int ret;
-
-	xhci_free_dev(hcd, udev);
-
-	/* Wait the Disable Slot command finish. */
-	msleep(20);
-
-	ret = xhci_alloc_dev(hcd, udev);
-	if (ret == 1)
-		return 0;
-	else
-		return -EINVAL;
-}
-
 /*
  * This submits a Reset Device Command, which will set the device state to 0,
  * set the device address to 0, and disable all the endpoints except the default
@@ -3730,8 +3714,22 @@ static int xhci_discover_or_reset_device(struct usb_hcd *hcd,
 						SLOT_STATE_DISABLED)
 		return 0;
 
-	if (xhci->quirks & XHCI_ETRON_HOST)
-		return xhci_reset_device_quirk(hcd, udev);
+	if (xhci->quirks & XHCI_ETRON_HOST) {
+		/*
+		 * Obtaining a new device slot to inform the xHCI host that
+		 * the USB device has been reset.
+		 */
+		ret = xhci_disable_slot(xhci, udev->slot_id);
+		xhci_free_virt_device(xhci, udev->slot_id);
+		if (!ret) {
+			ret = xhci_alloc_dev(hcd, udev);
+			if (ret == 1)
+				ret = 0;
+			else
+				ret = -EINVAL;
+		}
+		return ret;
+	}
 
 	trace_xhci_discover_or_reset_device(slot_ctx);
 

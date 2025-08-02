@@ -1672,6 +1672,21 @@ PAGE_SIZE multiple when read back.
 	limit, it will refuse to take any more stores before existing
 	entries fault back in or are written out to disk.
 
+  memory.zswap.writeback
+	A read-write single value file. The default value is "1". The
+	initial value of the root cgroup is 1, and when a new cgroup is
+	created, it inherits the current value of its parent.
+
+	When this is set to 0, all swapping attempts to swapping devices
+	are disabled. This included both zswap writebacks, and swapping due
+	to zswap store failures. If the zswap store failures are recurring
+	(for e.g if the pages are incompressible), users can observe
+	reclaim inefficiency after disabling writeback (because the same
+	pages might be rejected again and again).
+
+	Note that this is subtly different from setting memory.swap.max to
+	0, as it still allows for pages to be written to the zswap pool.
+
   memory.pressure
 	A read-only nested-keyed file.
 
@@ -2282,8 +2297,12 @@ Cpuset Interface Files
 	is always a subset of it.
 
 	Users can manually set it to a value that is different from
-	"cpuset.cpus".	The only constraint in setting it is that the
-	list of CPUs must be exclusive with respect to its sibling.
+	"cpuset.cpus".	One constraint in setting it is that the list of
+	CPUs must be exclusive with respect to "cpuset.cpus.exclusive"
+	of its sibling.  If "cpuset.cpus.exclusive" of a sibling cgroup
+	isn't set, its "cpuset.cpus" value, if set, cannot be a subset
+	of it to leave at least one CPU available when the exclusive
+	CPUs are taken away.
 
 	For a parent cgroup, any one of its exclusive CPUs can only
 	be distributed to at most one of its child cgroups.  Having an
@@ -2299,8 +2318,8 @@ Cpuset Interface Files
 	cpuset-enabled cgroups.
 
 	This file shows the effective set of exclusive CPUs that
-	can be used to create a partition root.  The content of this
-	file will always be a subset of "cpuset.cpus" and its parent's
+	can be used to create a partition root.  The content
+	of this file will always be a subset of its parent's
 	"cpuset.cpus.exclusive.effective" if its parent is not the root
 	cgroup.  It will also be a subset of "cpuset.cpus.exclusive"
 	if it is set.  If "cpuset.cpus.exclusive" is not set, it is

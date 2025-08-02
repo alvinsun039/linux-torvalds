@@ -7,6 +7,8 @@
 #include <linux/fs.h>
 #include <linux/dax.h>
 #include <linux/pci.h>
+#include <linux/interrupt.h>
+#include <linux/group_cpus.h>
 #include <linux/pfn_t.h>
 #include <linux/memremap.h>
 #include <linux/module.h>
@@ -53,18 +55,22 @@ struct virtio_fs_vq {
 	bool connected;
 	long in_flight;
 	struct completion in_flight_zero; /* No inflight requests */
+	struct kobject *kobj;
 	char name[VQ_NAME_LEN];
 } ____cacheline_aligned_in_smp;
 
 /* A virtio-fs device instance */
 struct virtio_fs {
 	struct kobject kobj;
+	struct kobject *mqs_kobj;
 	struct list_head list;    /* on virtio_fs_instances */
 	char *tag;
 	struct virtio_fs_vq *vqs;
 	unsigned int nvqs;               /* number of virtqueues */
 	unsigned int num_request_queues; /* number of request queues */
 	struct dax_device *dax_dev;
+
+	unsigned int *mq_map; /* index = cpu id, value = request vq id */
 
 	/* DAX memory window where file contents are mapped */
 	void *window_kaddr;
@@ -184,6 +190,7 @@ static void virtio_fs_ktype_release(struct kobject *kobj)
 {
 	struct virtio_fs *vfs = container_of(kobj, struct virtio_fs, kobj);
 
+	kfree(vfs->mq_map);
 	kfree(vfs->vqs);
 	kfree(vfs);
 }
@@ -194,19 +201,94 @@ static const struct kobj_type virtio_fs_ktype = {
 	.default_groups = virtio_fs_groups,
 };
 
+static struct virtio_fs_vq *virtio_fs_kobj_to_vq(struct virtio_fs *fs,
+		struct kobject *kobj)
+{
+	int i;
+
+	for (i = 0; i < fs->nvqs; i++) {
+		if (kobj == fs->vqs[i].kobj)
+			return &fs->vqs[i];
+	}
+	return NULL;
+}
+
+static ssize_t name_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	struct virtio_fs *fs = container_of(kobj->parent->parent, struct virtio_fs, kobj);
+	struct virtio_fs_vq *fsvq = virtio_fs_kobj_to_vq(fs, kobj);
+
+	if (!fsvq)
+		return -EINVAL;
+	return sysfs_emit(buf, "%s\n", fsvq->name);
+}
+
+static struct kobj_attribute virtio_fs_vq_name_attr = __ATTR_RO(name);
+
+static ssize_t cpu_list_show(struct kobject *kobj,
+		struct kobj_attribute *attr, char *buf)
+{
+	struct virtio_fs *fs = container_of(kobj->parent->parent, struct virtio_fs, kobj);
+	struct virtio_fs_vq *fsvq = virtio_fs_kobj_to_vq(fs, kobj);
+	unsigned int cpu, qid;
+	const size_t size = PAGE_SIZE - 1;
+	bool first = true;
+	int ret = 0, pos = 0;
+
+	if (!fsvq)
+		return -EINVAL;
+
+	qid = fsvq->vq->index;
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
+		if (qid < VQ_REQUEST || (fs->mq_map[cpu] == qid - VQ_REQUEST)) {
+			if (first)
+				ret = snprintf(buf + pos, size - pos, "%u", cpu);
+			else
+				ret = snprintf(buf + pos, size - pos, ", %u", cpu);
+
+			if (ret >= size - pos)
+				break;
+			first = false;
+			pos += ret;
+		}
+	}
+	ret = snprintf(buf + pos, size + 1 - pos, "\n");
+	return pos + ret;
+}
+
+static struct kobj_attribute virtio_fs_vq_cpu_list_attr = __ATTR_RO(cpu_list);
+
+static struct attribute *virtio_fs_vq_attrs[] = {
+	&virtio_fs_vq_name_attr.attr,
+	&virtio_fs_vq_cpu_list_attr.attr,
+	NULL
+};
+
+static struct attribute_group virtio_fs_vq_attr_group = {
+	.attrs = virtio_fs_vq_attrs,
+};
+
 /* Make sure virtiofs_mutex is held */
+static void virtio_fs_put_locked(struct virtio_fs *fs)
+{
+	lockdep_assert_held(&virtio_fs_mutex);
+
+	kobject_put(&fs->kobj);
+}
+
 static void virtio_fs_put(struct virtio_fs *fs)
 {
-	kobject_put(&fs->kobj);
+	mutex_lock(&virtio_fs_mutex);
+	virtio_fs_put_locked(fs);
+	mutex_unlock(&virtio_fs_mutex);
 }
 
 static void virtio_fs_fiq_release(struct fuse_iqueue *fiq)
 {
 	struct virtio_fs *vfs = fiq->priv;
 
-	mutex_lock(&virtio_fs_mutex);
 	virtio_fs_put(vfs);
-	mutex_unlock(&virtio_fs_mutex);
 }
 
 static void virtio_fs_drain_queue(struct virtio_fs_vq *fsvq)
@@ -267,6 +349,50 @@ static void virtio_fs_start_all_queues(struct virtio_fs *fs)
 	}
 }
 
+static void virtio_fs_delete_queues_sysfs(struct virtio_fs *fs)
+{
+	struct virtio_fs_vq *fsvq;
+	int i;
+
+	for (i = 0; i < fs->nvqs; i++) {
+		fsvq = &fs->vqs[i];
+		kobject_put(fsvq->kobj);
+	}
+}
+
+static int virtio_fs_add_queues_sysfs(struct virtio_fs *fs)
+{
+	struct virtio_fs_vq *fsvq;
+	char buff[12];
+	int i, j, ret;
+
+	for (i = 0; i < fs->nvqs; i++) {
+		fsvq = &fs->vqs[i];
+
+		sprintf(buff, "%d", i);
+		fsvq->kobj = kobject_create_and_add(buff, fs->mqs_kobj);
+		if (!fs->mqs_kobj) {
+			ret = -ENOMEM;
+			goto out_del;
+		}
+
+		ret = sysfs_create_group(fsvq->kobj, &virtio_fs_vq_attr_group);
+		if (ret) {
+			kobject_put(fsvq->kobj);
+			goto out_del;
+		}
+	}
+
+	return 0;
+
+out_del:
+	for (j = 0; j < i; j++) {
+		fsvq = &fs->vqs[j];
+		kobject_put(fsvq->kobj);
+	}
+	return ret;
+}
+
 /* Add a new instance to the list or return -EEXIST if tag name exists*/
 static int virtio_fs_add_instance(struct virtio_device *vdev,
 				  struct virtio_fs *fs)
@@ -290,17 +416,22 @@ static int virtio_fs_add_instance(struct virtio_device *vdev,
 	 */
 	fs->kobj.kset = virtio_fs_kset;
 	ret = kobject_add(&fs->kobj, NULL, "%d", vdev->index);
-	if (ret < 0) {
-		mutex_unlock(&virtio_fs_mutex);
-		return ret;
+	if (ret < 0)
+		goto out_unlock;
+
+	fs->mqs_kobj = kobject_create_and_add("mqs", &fs->kobj);
+	if (!fs->mqs_kobj) {
+		ret = -ENOMEM;
+		goto out_del;
 	}
 
 	ret = sysfs_create_link(&fs->kobj, &vdev->dev.kobj, "device");
-	if (ret < 0) {
-		kobject_del(&fs->kobj);
-		mutex_unlock(&virtio_fs_mutex);
-		return ret;
-	}
+	if (ret < 0)
+		goto out_put;
+
+	ret = virtio_fs_add_queues_sysfs(fs);
+	if (ret)
+		goto out_remove;
 
 	list_add_tail(&fs->list, &virtio_fs_instances);
 
@@ -309,6 +440,16 @@ static int virtio_fs_add_instance(struct virtio_device *vdev,
 	kobject_uevent(&fs->kobj, KOBJ_ADD);
 
 	return 0;
+
+out_remove:
+	sysfs_remove_link(&fs->kobj, "device");
+out_put:
+	kobject_put(fs->mqs_kobj);
+out_del:
+	kobject_del(&fs->kobj);
+out_unlock:
+	mutex_unlock(&virtio_fs_mutex);
+	return ret;
 }
 
 /* Return the virtio_fs with a given tag, or NULL */
@@ -705,6 +846,44 @@ static void virtio_fs_requests_done_work(struct work_struct *work)
 	}
 }
 
+static void virtio_fs_map_queues(struct virtio_device *vdev, struct virtio_fs *fs)
+{
+	const struct cpumask *mask, *masks;
+	unsigned int q, cpu;
+
+	/* First attempt to map using existing transport layer affinities
+	 * e.g. PCIe MSI-X
+	 */
+	if (!vdev->config->get_vq_affinity)
+		goto fallback;
+
+	for (q = 0; q < fs->num_request_queues; q++) {
+		mask = vdev->config->get_vq_affinity(vdev, VQ_REQUEST + q);
+		if (!mask)
+			goto fallback;
+
+		for_each_cpu(cpu, mask)
+			fs->mq_map[cpu] = q;
+	}
+
+	return;
+fallback:
+	/* Attempt to map evenly in groups over the CPUs */
+	masks = group_cpus_evenly(fs->num_request_queues);
+	/* If even this fails we default to all CPUs use queue zero */
+	if (!masks) {
+		for_each_possible_cpu(cpu)
+			fs->mq_map[cpu] = 0;
+		return;
+	}
+
+	for (q = 0; q < fs->num_request_queues; q++) {
+		for_each_cpu(cpu, &masks[q])
+			fs->mq_map[cpu] = q;
+	}
+	kfree(masks);
+}
+
 /* Virtqueue interrupt handler */
 static void virtio_fs_vq_done(struct virtqueue *vq)
 {
@@ -741,6 +920,11 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 {
 	struct virtqueue **vqs;
 	vq_callback_t **callbacks;
+	/* Specify pre_vectors to ensure that the queues before the
+	 * request queues (e.g. hiprio) don't claim any of the CPUs in
+	 * the multi-queue mapping and interrupt affinities
+	 */
+	struct irq_affinity desc = { .pre_vectors = VQ_REQUEST };
 	const char **names;
 	unsigned int i;
 	int ret = 0;
@@ -750,6 +934,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 	if (fs->num_request_queues == 0)
 		return -EINVAL;
 
+	/* Truncate nr of request queues to nr_cpu_id */
+	fs->num_request_queues = min_t(unsigned int, fs->num_request_queues,
+					nr_cpu_ids);
 	fs->nvqs = VQ_REQUEST + fs->num_request_queues;
 	fs->vqs = kcalloc(fs->nvqs, sizeof(fs->vqs[VQ_HIPRIO]), GFP_KERNEL);
 	if (!fs->vqs)
@@ -759,7 +946,9 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 	callbacks = kmalloc_array(fs->nvqs, sizeof(callbacks[VQ_HIPRIO]),
 					GFP_KERNEL);
 	names = kmalloc_array(fs->nvqs, sizeof(names[VQ_HIPRIO]), GFP_KERNEL);
-	if (!vqs || !callbacks || !names) {
+	fs->mq_map = kcalloc_node(nr_cpu_ids, sizeof(*fs->mq_map), GFP_KERNEL,
+					dev_to_node(&vdev->dev));
+	if (!vqs || !callbacks || !names || !fs->mq_map) {
 		ret = -ENOMEM;
 		goto out;
 	}
@@ -779,7 +968,7 @@ static int virtio_fs_setup_vqs(struct virtio_device *vdev,
 		names[i] = fs->vqs[i].name;
 	}
 
-	ret = virtio_find_vqs(vdev, fs->nvqs, vqs, callbacks, names, NULL);
+	ret = virtio_find_vqs(vdev, fs->nvqs, vqs, callbacks, names, &desc);
 	if (ret < 0)
 		goto out;
 
@@ -791,8 +980,10 @@ out:
 	kfree(names);
 	kfree(callbacks);
 	kfree(vqs);
-	if (ret)
+	if (ret) {
 		kfree(fs->vqs);
+		kfree(fs->mq_map);
+	}
 	return ret;
 }
 
@@ -932,7 +1123,7 @@ static int virtio_fs_probe(struct virtio_device *vdev)
 	if (ret < 0)
 		goto out;
 
-	/* TODO vq affinity */
+	virtio_fs_map_queues(vdev, fs);
 
 	ret = virtio_fs_setup_dax(vdev, fs);
 	if (ret < 0)
@@ -979,7 +1170,9 @@ static void virtio_fs_remove(struct virtio_device *vdev)
 	mutex_lock(&virtio_fs_mutex);
 	/* This device is going away. No one should get new reference */
 	list_del_init(&fs->list);
+	virtio_fs_delete_queues_sysfs(fs);
 	sysfs_remove_link(&fs->kobj, "device");
+	kobject_put(fs->mqs_kobj);
 	kobject_del(&fs->kobj);
 	virtio_fs_stop_all_queues(fs);
 	virtio_fs_drain_all_queues_locked(fs);
@@ -988,7 +1181,7 @@ static void virtio_fs_remove(struct virtio_device *vdev)
 
 	vdev->priv = NULL;
 	/* Put device reference on virtio_fs object */
-	virtio_fs_put(fs);
+	virtio_fs_put_locked(fs);
 	mutex_unlock(&virtio_fs_mutex);
 }
 
@@ -1281,7 +1474,7 @@ out:
 static void virtio_fs_wake_pending_and_unlock(struct fuse_iqueue *fiq)
 __releases(fiq->lock)
 {
-	unsigned int queue_id = VQ_REQUEST; /* TODO multiqueue */
+	unsigned int queue_id;
 	struct virtio_fs *fs;
 	struct fuse_req *req;
 	struct virtio_fs_vq *fsvq;
@@ -1295,11 +1488,13 @@ __releases(fiq->lock)
 	spin_unlock(&fiq->lock);
 
 	fs = fiq->priv;
+	queue_id = VQ_REQUEST + fs->mq_map[raw_smp_processor_id()];
 
-	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u\n",
-		  __func__, req->in.h.opcode, req->in.h.unique,
+	pr_debug("%s: opcode %u unique %#llx nodeid %#llx in.len %u out.len %u queue_id %u\n",
+		 __func__, req->in.h.opcode, req->in.h.unique,
 		 req->in.h.nodeid, req->in.h.len,
-		 fuse_len_args(req->args->out_numargs, req->args->out_args));
+		 fuse_len_args(req->args->out_numargs, req->args->out_args),
+		 queue_id);
 
 	fsvq = &fs->vqs[queue_id];
 	ret = virtio_fs_enqueue_req(fsvq, req, false);
@@ -1533,9 +1728,7 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 
 out_err:
 	kfree(fc);
-	mutex_lock(&virtio_fs_mutex);
 	virtio_fs_put(fs);
-	mutex_unlock(&virtio_fs_mutex);
 	return err;
 }
 

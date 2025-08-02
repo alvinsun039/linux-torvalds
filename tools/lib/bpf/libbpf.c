@@ -3236,9 +3236,15 @@ static bool prog_needs_vmlinux_btf(struct bpf_program *prog)
 	return false;
 }
 
+static bool map_needs_vmlinux_btf(struct bpf_map *map)
+{
+	return bpf_map__is_struct_ops(map);
+}
+
 static bool obj_needs_vmlinux_btf(const struct bpf_object *obj)
 {
 	struct bpf_program *prog;
+	struct bpf_map *map;
 	int i;
 
 	/* CO-RE relocations need kernel BTF, only when btf_custom_path
@@ -3260,6 +3266,11 @@ static bool obj_needs_vmlinux_btf(const struct bpf_object *obj)
 		if (!prog->autoload)
 			continue;
 		if (prog_needs_vmlinux_btf(prog))
+			return true;
+	}
+
+	bpf_object__for_each_map(map, obj) {
+		if (map_needs_vmlinux_btf(map))
 			return true;
 	}
 
@@ -3783,7 +3794,7 @@ static bool sym_is_subprog(const Elf64_Sym *sym, int text_shndx)
 		return true;
 
 	/* global function */
-	return bind == STB_GLOBAL && type == STT_FUNC;
+	return (bind == STB_GLOBAL || bind == STB_WEAK) && type == STT_FUNC;
 }
 
 static int find_extern_btf_id(const struct btf *btf, const char *ext_name)
@@ -4187,7 +4198,7 @@ static int bpf_object__collect_externs(struct bpf_object *obj)
 
 static bool prog_is_subprog(const struct bpf_object *obj, const struct bpf_program *prog)
 {
-	return prog->sec_idx == obj->efile.text_shndx && obj->nr_programs > 1;
+	return prog->sec_idx == obj->efile.text_shndx;
 }
 
 struct bpf_program *
@@ -7181,8 +7192,14 @@ static int libbpf_prepare_prog_load(struct bpf_program *prog,
 		opts->prog_flags |= BPF_F_XDP_HAS_FRAGS;
 
 	/* special check for usdt to use uprobe_multi link */
-	if ((def & SEC_USDT) && kernel_supports(prog->obj, FEAT_UPROBE_MULTI_LINK))
+	if ((def & SEC_USDT) && kernel_supports(prog->obj, FEAT_UPROBE_MULTI_LINK)) {
+		/* for BPF_TRACE_UPROBE_MULTI, user might want to query expected_attach_type
+		 * in prog, and expected_attach_type we set in kernel is from opts, so we
+		 * update both.
+		 */
 		prog->expected_attach_type = BPF_TRACE_UPROBE_MULTI;
+		opts->expected_attach_type = BPF_TRACE_UPROBE_MULTI;
+	}
 
 	if ((def & SEC_ATTACH_BTF) && !prog->attach_btf_id) {
 		int btf_obj_fd = 0, btf_type_id = 0, err;
@@ -7259,6 +7276,7 @@ static int bpf_object_load_prog(struct bpf_object *obj, struct bpf_program *prog
 	load_attr.attach_btf_id = prog->attach_btf_id;
 	load_attr.kern_version = kern_version;
 	load_attr.prog_ifindex = prog->prog_ifindex;
+	load_attr.expected_attach_type = prog->expected_attach_type;
 
 	/* specify func_info/line_info only if kernel supports them */
 	if (obj->btf && btf__fd(obj->btf) >= 0 && kernel_supports(obj, FEAT_BTF_FUNC)) {
@@ -7289,9 +7307,6 @@ static int bpf_object_load_prog(struct bpf_object *obj, struct bpf_program *prog
 		insns = prog->insns;
 		insns_cnt = prog->insns_cnt;
 	}
-
-	/* allow prog_prepare_load_fn to change expected_attach_type */
-	load_attr.expected_attach_type = prog->expected_attach_type;
 
 	if (obj->gen_loader) {
 		bpf_gen__prog_load(obj->gen_loader, prog->type, prog->name,
@@ -12180,12 +12195,18 @@ static int attach_tp(const struct bpf_program *prog, long cookie, struct bpf_lin
 	return libbpf_get_error(*link);
 }
 
-struct bpf_link *bpf_program__attach_raw_tracepoint(const struct bpf_program *prog,
-						    const char *tp_name)
+struct bpf_link *
+bpf_program__attach_raw_tracepoint_opts(const struct bpf_program *prog,
+					const char *tp_name,
+					struct bpf_raw_tracepoint_opts *opts)
 {
+	LIBBPF_OPTS(bpf_raw_tp_opts, raw_opts);
 	char errmsg[STRERR_BUFSIZE];
 	struct bpf_link *link;
 	int prog_fd, pfd;
+
+	if (!OPTS_VALID(opts, bpf_raw_tracepoint_opts))
+		return libbpf_err_ptr(-EINVAL);
 
 	prog_fd = bpf_program__fd(prog);
 	if (prog_fd < 0) {
@@ -12198,7 +12219,9 @@ struct bpf_link *bpf_program__attach_raw_tracepoint(const struct bpf_program *pr
 		return libbpf_err_ptr(-ENOMEM);
 	link->detach = &bpf_link__detach_fd;
 
-	pfd = bpf_raw_tracepoint_open(tp_name, prog_fd);
+	raw_opts.tp_name = tp_name;
+	raw_opts.cookie = OPTS_GET(opts, cookie, 0);
+	pfd = bpf_raw_tracepoint_open_opts(prog_fd, &raw_opts);
 	if (pfd < 0) {
 		pfd = -errno;
 		free(link);
@@ -12208,6 +12231,12 @@ struct bpf_link *bpf_program__attach_raw_tracepoint(const struct bpf_program *pr
 	}
 	link->fd = pfd;
 	return link;
+}
+
+struct bpf_link *bpf_program__attach_raw_tracepoint(const struct bpf_program *prog,
+						    const char *tp_name)
+{
+	return bpf_program__attach_raw_tracepoint_opts(prog, tp_name, NULL);
 }
 
 static int attach_raw_tp(const struct bpf_program *prog, long cookie, struct bpf_link **link)

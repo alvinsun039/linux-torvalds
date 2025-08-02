@@ -47,7 +47,6 @@ static unsigned short int prof_shift;
 int prof_on __read_mostly;
 EXPORT_SYMBOL_GPL(prof_on);
 
-static cpumask_var_t prof_cpu_mask;
 #if defined(CONFIG_SMP) && defined(CONFIG_PROC_FS)
 static DEFINE_PER_CPU(struct profile_hit *[2], cpu_profile_hits);
 static DEFINE_PER_CPU(int, cpu_profile_flip);
@@ -105,11 +104,6 @@ int __ref profile_init(void)
 
 	buffer_bytes = prof_len*sizeof(atomic_t);
 
-	if (!alloc_cpumask_var(&prof_cpu_mask, GFP_KERNEL))
-		return -ENOMEM;
-
-	cpumask_copy(prof_cpu_mask, cpu_possible_mask);
-
 	prof_buffer = kzalloc(buffer_bytes, GFP_KERNEL|__GFP_NOWARN);
 	if (prof_buffer)
 		return 0;
@@ -123,7 +117,6 @@ int __ref profile_init(void)
 	if (prof_buffer)
 		return 0;
 
-	free_cpumask_var(prof_cpu_mask);
 	return -ENOMEM;
 }
 
@@ -258,9 +251,6 @@ static int profile_dead_cpu(unsigned int cpu)
 	struct page *page;
 	int i;
 
-	if (cpumask_available(prof_cpu_mask))
-		cpumask_clear_cpu(cpu, prof_cpu_mask);
-
 	for (i = 0; i < 2; i++) {
 		if (per_cpu(cpu_profile_hits, cpu)[i]) {
 			page = virt_to_page(per_cpu(cpu_profile_hits, cpu)[i]);
@@ -293,14 +283,6 @@ static int profile_prepare_cpu(unsigned int cpu)
 	return 0;
 }
 
-static int profile_online_cpu(unsigned int cpu)
-{
-	if (cpumask_available(prof_cpu_mask))
-		cpumask_set_cpu(cpu, prof_cpu_mask);
-
-	return 0;
-}
-
 #else /* !CONFIG_SMP */
 #define profile_flip_buffers()		do { } while (0)
 #define profile_discard_flip_buffers()	do { } while (0)
@@ -325,8 +307,8 @@ void profile_tick(int type)
 {
 	struct pt_regs *regs = get_irq_regs();
 
-	if (!user_mode(regs) && cpumask_available(prof_cpu_mask) &&
-	    cpumask_test_cpu(smp_processor_id(), prof_cpu_mask))
+	/* This is the old kernel-only legacy profiling */
+	if (!user_mode(regs))
 		profile_hit(type, (void *)profile_pc(regs));
 }
 
@@ -334,49 +316,6 @@ void profile_tick(int type)
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
-
-static int prof_cpu_mask_proc_show(struct seq_file *m, void *v)
-{
-	seq_printf(m, "%*pb\n", cpumask_pr_args(prof_cpu_mask));
-	return 0;
-}
-
-static int prof_cpu_mask_proc_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, prof_cpu_mask_proc_show, NULL);
-}
-
-static ssize_t prof_cpu_mask_proc_write(struct file *file,
-	const char __user *buffer, size_t count, loff_t *pos)
-{
-	cpumask_var_t new_value;
-	int err;
-
-	if (!zalloc_cpumask_var(&new_value, GFP_KERNEL))
-		return -ENOMEM;
-
-	err = cpumask_parse_user(buffer, count, new_value);
-	if (!err) {
-		cpumask_copy(prof_cpu_mask, new_value);
-		err = count;
-	}
-	free_cpumask_var(new_value);
-	return err;
-}
-
-static const struct proc_ops prof_cpu_mask_proc_ops = {
-	.proc_open	= prof_cpu_mask_proc_open,
-	.proc_read	= seq_read,
-	.proc_lseek	= seq_lseek,
-	.proc_release	= single_release,
-	.proc_write	= prof_cpu_mask_proc_write,
-};
-
-void create_prof_cpu_mask(void)
-{
-	/* create /proc/irq/prof_cpu_mask */
-	proc_create("irq/prof_cpu_mask", 0600, NULL, &prof_cpu_mask_proc_ops);
-}
 
 /*
  * This function accesses profiling information. The returned data is
@@ -452,10 +391,6 @@ static const struct proc_ops profile_proc_ops = {
 int __ref create_proc_profile(void)
 {
 	struct proc_dir_entry *entry;
-#ifdef CONFIG_SMP
-	enum cpuhp_state online_state;
-#endif
-
 	int err = 0;
 
 	if (!prof_on)
@@ -465,26 +400,14 @@ int __ref create_proc_profile(void)
 				profile_prepare_cpu, profile_dead_cpu);
 	if (err)
 		return err;
-
-	err = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "AP_PROFILE_ONLINE",
-				profile_online_cpu, NULL);
-	if (err < 0)
-		goto err_state_prep;
-	online_state = err;
-	err = 0;
 #endif
 	entry = proc_create("profile", S_IWUSR | S_IRUGO,
 			    NULL, &profile_proc_ops);
-	if (!entry)
-		goto err_state_onl;
-	proc_set_size(entry, (1 + prof_len) * sizeof(atomic_t));
-
-	return err;
-err_state_onl:
+	if (entry)
+		proc_set_size(entry, (1 + prof_len) * sizeof(atomic_t));
 #ifdef CONFIG_SMP
-	cpuhp_remove_state(online_state);
-err_state_prep:
-	cpuhp_remove_state(CPUHP_PROFILE_PREPARE);
+	else
+		cpuhp_remove_state(CPUHP_PROFILE_PREPARE);
 #endif
 	return err;
 }

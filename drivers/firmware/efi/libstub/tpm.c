@@ -60,7 +60,7 @@ void efi_retrieve_tpm2_eventlog(void)
 	efi_bool_t truncated;
 	int version = EFI_TCG2_EVENT_LOG_FORMAT_TCG_2;
 	efi_tcg2_protocol_t *tcg2_protocol = NULL;
-	int final_events_size = 0;
+	u32 final_events_size = 0;
 
 	status = efi_bs_call(locate_protocol, &tcg2_guid, NULL,
 			     (void **)&tcg2_protocol);
@@ -131,9 +131,9 @@ void efi_retrieve_tpm2_eventlog(void)
 		final_events_table = get_efi_config_table(LINUX_EFI_TPM_FINAL_LOG_GUID);
 	if (final_events_table && final_events_table->nr_events) {
 		struct tcg_pcr_event2_head *header;
-		int offset;
+		u32 offset;
 		void *data;
-		int event_size;
+		u32 event_size;
 		int i = final_events_table->nr_events;
 
 		data = (void *)final_events_table;
@@ -145,6 +145,9 @@ void efi_retrieve_tpm2_eventlog(void)
 			event_size = __calc_tpm2_event_size(header,
 						   (void *)(long)log_location,
 						   false);
+			/* If calc fails this is a malformed log */
+			if (!event_size)
+				break;
 			final_events_size += event_size;
 			i--;
 		}

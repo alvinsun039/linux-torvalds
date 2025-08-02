@@ -126,6 +126,8 @@ enum mthp_stat_item {
 	MTHP_STAT_SPLIT,
 	MTHP_STAT_SPLIT_FAILED,
 	MTHP_STAT_SPLIT_DEFERRED,
+	MTHP_STAT_NR_ANON,
+	MTHP_STAT_NR_ANON_PARTIALLY_MAPPED,
 	__MTHP_STAT_COUNT
 };
 
@@ -136,14 +138,24 @@ struct mthp_stat {
 
 DECLARE_PER_CPU(struct mthp_stat, mthp_stats);
 
-static inline void count_mthp_stat(int order, enum mthp_stat_item item)
+static inline void mod_mthp_stat(int order, enum mthp_stat_item item, int delta)
 {
 	if (order <= 0 || order > PMD_ORDER)
 		return;
 
-	this_cpu_inc(mthp_stats.stats[order][item]);
+	this_cpu_add(mthp_stats.stats[order][item], delta);
 }
+
+static inline void count_mthp_stat(int order, enum mthp_stat_item item)
+{
+	mod_mthp_stat(order, item, 1);
+}
+
 #else
+static inline void mod_mthp_stat(int order, enum mthp_stat_item item, int delta)
+{
+}
+
 static inline void count_mthp_stat(int order, enum mthp_stat_item item)
 {
 }
@@ -307,6 +319,24 @@ struct thpsize {
 #define transparent_hugepage_use_zero_page()				\
 	(transparent_hugepage_flags &					\
 	 (1<<TRANSPARENT_HUGEPAGE_USE_ZERO_PAGE_FLAG))
+
+static inline bool vma_thp_disabled(struct vm_area_struct *vma,
+		unsigned long vm_flags)
+{
+	/*
+	 * Explicitly disabled through madvise or prctl, or some
+	 * architectures may disable THP for some mappings, for
+	 * example, s390 kvm.
+	 */
+	return (vm_flags & VM_NOHUGEPAGE) ||
+	       test_bit(MMF_DISABLE_THP, &vma->vm_mm->flags);
+}
+
+static inline bool thp_disabled_by_hw(void)
+{
+	/* If the hardware/firmware marked hugepage support disabled. */
+	return transparent_hugepage_flags & (1 << TRANSPARENT_HUGEPAGE_UNSUPPORTED);
+}
 
 unsigned long thp_get_unmapped_area(struct file *filp, unsigned long addr,
 		unsigned long len, unsigned long pgoff, unsigned long flags);

@@ -4,11 +4,11 @@
  * Copyright (C) 2015-2021 Google, Inc.
  */
 
-#include <linux/ethtool.h>
 #include <linux/rtnetlink.h>
 #include "gve.h"
 #include "gve_adminq.h"
 #include "gve_dqo.h"
+#include "gve_utils.h"
 
 static void gve_get_drvinfo(struct net_device *netdev,
 			    struct ethtool_drvinfo *info)
@@ -40,17 +40,18 @@ static u32 gve_get_msglevel(struct net_device *netdev)
  * as declared in enum xdp_action inside file uapi/linux/bpf.h .
  */
 static const char gve_gstrings_main_stats[][ETH_GSTRING_LEN] = {
-	"rx_packets", "tx_packets", "rx_bytes", "tx_bytes",
-	"rx_dropped", "tx_dropped", "tx_timeouts",
+	"rx_packets", "rx_hsplit_pkt", "tx_packets", "rx_bytes",
+	"tx_bytes", "rx_dropped", "tx_dropped", "tx_timeouts",
 	"rx_skb_alloc_fail", "rx_buf_alloc_fail", "rx_desc_err_dropped_pkt",
+	"rx_hsplit_unsplit_pkt",
 	"interface_up_cnt", "interface_down_cnt", "reset_cnt",
 	"page_alloc_fail", "dma_mapping_error", "stats_report_trigger_cnt",
 };
 
 static const char gve_gstrings_rx_stats[][ETH_GSTRING_LEN] = {
-	"rx_posted_desc[%u]", "rx_completed_desc[%u]", "rx_consumed_desc[%u]", "rx_bytes[%u]",
-	"rx_cont_packet_cnt[%u]", "rx_frag_flip_cnt[%u]", "rx_frag_copy_cnt[%u]",
-	"rx_frag_alloc_cnt[%u]",
+	"rx_posted_desc[%u]", "rx_completed_desc[%u]", "rx_consumed_desc[%u]",
+	"rx_bytes[%u]", "rx_hsplit_bytes[%u]", "rx_cont_packet_cnt[%u]",
+	"rx_frag_flip_cnt[%u]", "rx_frag_copy_cnt[%u]", "rx_frag_alloc_cnt[%u]",
 	"rx_dropped_pkt[%u]", "rx_copybreak_pkt[%u]", "rx_copied_pkt[%u]",
 	"rx_queue_drop_cnt[%u]", "rx_no_buffers_posted[%u]",
 	"rx_drops_packet_over_mru[%u]", "rx_drops_invalid_checksum[%u]",
@@ -154,15 +155,19 @@ static void
 gve_get_ethtool_stats(struct net_device *netdev,
 		      struct ethtool_stats *stats, u64 *data)
 {
-	u64 tmp_rx_pkts, tmp_rx_bytes, tmp_rx_skb_alloc_fail,
-		tmp_rx_buf_alloc_fail, tmp_rx_desc_err_dropped_pkt,
+	u64 tmp_rx_pkts, tmp_rx_hsplit_pkt, tmp_rx_bytes, tmp_rx_hsplit_bytes,
+		tmp_rx_skb_alloc_fail, tmp_rx_buf_alloc_fail,
+		tmp_rx_desc_err_dropped_pkt, tmp_rx_hsplit_unsplit_pkt,
 		tmp_tx_pkts, tmp_tx_bytes;
-	u64 rx_buf_alloc_fail, rx_desc_err_dropped_pkt, rx_pkts,
-		rx_skb_alloc_fail, rx_bytes, tx_pkts, tx_bytes, tx_dropped;
+	u64 rx_buf_alloc_fail, rx_desc_err_dropped_pkt, rx_hsplit_unsplit_pkt,
+		rx_pkts, rx_hsplit_pkt, rx_skb_alloc_fail, rx_bytes, tx_pkts, tx_bytes,
+		tx_dropped;
 	int stats_idx, base_stats_idx, max_stats_idx;
 	struct stats *report_stats;
 	int *rx_qid_to_stats_idx;
 	int *tx_qid_to_stats_idx;
+	int num_stopped_rxqs = 0;
+	int num_stopped_txqs = 0;
 	struct gve_priv *priv;
 	bool skip_nic_stats;
 	unsigned int start;
@@ -179,14 +184,27 @@ gve_get_ethtool_stats(struct net_device *netdev,
 					    sizeof(int), GFP_KERNEL);
 	if (!rx_qid_to_stats_idx)
 		return;
+	for (ring = 0; ring < priv->rx_cfg.num_queues; ring++) {
+		rx_qid_to_stats_idx[ring] = -1;
+		if (!gve_rx_was_added_to_block(priv, ring))
+			num_stopped_rxqs++;
+	}
 	tx_qid_to_stats_idx = kmalloc_array(num_tx_queues,
 					    sizeof(int), GFP_KERNEL);
 	if (!tx_qid_to_stats_idx) {
 		kfree(rx_qid_to_stats_idx);
 		return;
 	}
-	for (rx_pkts = 0, rx_bytes = 0, rx_skb_alloc_fail = 0,
-	     rx_buf_alloc_fail = 0, rx_desc_err_dropped_pkt = 0, ring = 0;
+	for (ring = 0; ring < num_tx_queues; ring++) {
+		tx_qid_to_stats_idx[ring] = -1;
+		if (!gve_tx_was_added_to_block(priv, ring))
+			num_stopped_txqs++;
+	}
+
+	for (rx_pkts = 0, rx_bytes = 0, rx_hsplit_pkt = 0,
+	     rx_skb_alloc_fail = 0, rx_buf_alloc_fail = 0,
+	     rx_desc_err_dropped_pkt = 0, rx_hsplit_unsplit_pkt = 0,
+	     ring = 0;
 	     ring < priv->rx_cfg.num_queues; ring++) {
 		if (priv->rx) {
 			do {
@@ -195,18 +213,23 @@ gve_get_ethtool_stats(struct net_device *netdev,
 				start =
 				  u64_stats_fetch_begin(&priv->rx[ring].statss);
 				tmp_rx_pkts = rx->rpackets;
+				tmp_rx_hsplit_pkt = rx->rx_hsplit_pkt;
 				tmp_rx_bytes = rx->rbytes;
 				tmp_rx_skb_alloc_fail = rx->rx_skb_alloc_fail;
 				tmp_rx_buf_alloc_fail = rx->rx_buf_alloc_fail;
 				tmp_rx_desc_err_dropped_pkt =
 					rx->rx_desc_err_dropped_pkt;
+				tmp_rx_hsplit_unsplit_pkt =
+					rx->rx_hsplit_unsplit_pkt;
 			} while (u64_stats_fetch_retry(&priv->rx[ring].statss,
 						       start));
 			rx_pkts += tmp_rx_pkts;
+			rx_hsplit_pkt += tmp_rx_hsplit_pkt;
 			rx_bytes += tmp_rx_bytes;
 			rx_skb_alloc_fail += tmp_rx_skb_alloc_fail;
 			rx_buf_alloc_fail += tmp_rx_buf_alloc_fail;
 			rx_desc_err_dropped_pkt += tmp_rx_desc_err_dropped_pkt;
+			rx_hsplit_unsplit_pkt += tmp_rx_hsplit_unsplit_pkt;
 		}
 	}
 	for (tx_pkts = 0, tx_bytes = 0, tx_dropped = 0, ring = 0;
@@ -227,6 +250,7 @@ gve_get_ethtool_stats(struct net_device *netdev,
 
 	i = 0;
 	data[i++] = rx_pkts;
+	data[i++] = rx_hsplit_pkt;
 	data[i++] = tx_pkts;
 	data[i++] = rx_bytes;
 	data[i++] = tx_bytes;
@@ -238,6 +262,7 @@ gve_get_ethtool_stats(struct net_device *netdev,
 	data[i++] = rx_skb_alloc_fail;
 	data[i++] = rx_buf_alloc_fail;
 	data[i++] = rx_desc_err_dropped_pkt;
+	data[i++] = rx_hsplit_unsplit_pkt;
 	data[i++] = priv->interface_up_cnt;
 	data[i++] = priv->interface_down_cnt;
 	data[i++] = priv->reset_cnt;
@@ -249,7 +274,13 @@ gve_get_ethtool_stats(struct net_device *netdev,
 	/* For rx cross-reporting stats, start from nic rx stats in report */
 	base_stats_idx = GVE_TX_STATS_REPORT_NUM * num_tx_queues +
 		GVE_RX_STATS_REPORT_NUM * priv->rx_cfg.num_queues;
-	max_stats_idx = NIC_RX_STATS_REPORT_NUM * priv->rx_cfg.num_queues +
+	/* The boundary between driver stats and NIC stats shifts if there are
+	 * stopped queues.
+	 */
+	base_stats_idx += NIC_RX_STATS_REPORT_NUM * num_stopped_rxqs +
+		NIC_TX_STATS_REPORT_NUM * num_stopped_txqs;
+	max_stats_idx = NIC_RX_STATS_REPORT_NUM *
+		(priv->rx_cfg.num_queues - num_stopped_rxqs) +
 		base_stats_idx;
 	/* Preprocess the stats report for rx, map queue id to start index */
 	skip_nic_stats = false;
@@ -262,6 +293,10 @@ gve_get_ethtool_stats(struct net_device *netdev,
 			/* no stats written by NIC yet */
 			skip_nic_stats = true;
 			break;
+		}
+		if (queue_id < 0 || queue_id >= priv->rx_cfg.num_queues) {
+			net_err_ratelimited("Invalid rxq id in NIC stats\n");
+			continue;
 		}
 		rx_qid_to_stats_idx[queue_id] = stats_idx;
 	}
@@ -277,6 +312,7 @@ gve_get_ethtool_stats(struct net_device *netdev,
 				start =
 				  u64_stats_fetch_begin(&priv->rx[ring].statss);
 				tmp_rx_bytes = rx->rbytes;
+				tmp_rx_hsplit_bytes = rx->rx_hsplit_bytes;
 				tmp_rx_skb_alloc_fail = rx->rx_skb_alloc_fail;
 				tmp_rx_buf_alloc_fail = rx->rx_buf_alloc_fail;
 				tmp_rx_desc_err_dropped_pkt =
@@ -284,6 +320,7 @@ gve_get_ethtool_stats(struct net_device *netdev,
 			} while (u64_stats_fetch_retry(&priv->rx[ring].statss,
 						       start));
 			data[i++] = tmp_rx_bytes;
+			data[i++] = tmp_rx_hsplit_bytes;
 			data[i++] = rx->rx_cont_packet_cnt;
 			data[i++] = rx->rx_frag_flip_cnt;
 			data[i++] = rx->rx_frag_copy_cnt;
@@ -295,11 +332,11 @@ gve_get_ethtool_stats(struct net_device *netdev,
 			data[i++] = rx->rx_copybreak_pkt;
 			data[i++] = rx->rx_copied_pkt;
 			/* stats from NIC */
-			if (skip_nic_stats) {
+			stats_idx = rx_qid_to_stats_idx[ring];
+			if (skip_nic_stats || stats_idx < 0) {
 				/* skip NIC rx stats */
 				i += NIC_RX_STATS_REPORT_NUM;
 			} else {
-				stats_idx = rx_qid_to_stats_idx[ring];
 				for (j = 0; j < NIC_RX_STATS_REPORT_NUM; j++) {
 					u64 value =
 						be64_to_cpu(report_stats[stats_idx + j].value);
@@ -325,7 +362,8 @@ gve_get_ethtool_stats(struct net_device *netdev,
 
 	/* For tx cross-reporting stats, start from nic tx stats in report */
 	base_stats_idx = max_stats_idx;
-	max_stats_idx = NIC_TX_STATS_REPORT_NUM * num_tx_queues +
+	max_stats_idx = NIC_TX_STATS_REPORT_NUM *
+		(num_tx_queues - num_stopped_txqs) +
 		max_stats_idx;
 	/* Preprocess the stats report for tx, map queue id to start index */
 	skip_nic_stats = false;
@@ -338,6 +376,10 @@ gve_get_ethtool_stats(struct net_device *netdev,
 			/* no stats written by NIC yet */
 			skip_nic_stats = true;
 			break;
+		}
+		if (queue_id < 0 || queue_id >= num_tx_queues) {
+			net_err_ratelimited("Invalid txq id in NIC stats\n");
+			continue;
 		}
 		tx_qid_to_stats_idx[queue_id] = stats_idx;
 	}
@@ -370,11 +412,11 @@ gve_get_ethtool_stats(struct net_device *netdev,
 			data[i++] = gve_tx_load_event_counter(priv, tx);
 			data[i++] = tx->dma_mapping_error;
 			/* stats from NIC */
-			if (skip_nic_stats) {
+			stats_idx = tx_qid_to_stats_idx[ring];
+			if (skip_nic_stats || stats_idx < 0) {
 				/* skip NIC tx stats */
 				i += NIC_TX_STATS_REPORT_NUM;
 			} else {
-				stats_idx = tx_qid_to_stats_idx[ring];
 				for (j = 0; j < NIC_TX_STATS_REPORT_NUM; j++) {
 					u64 value =
 						be64_to_cpu(report_stats[stats_idx + j].value);
@@ -457,7 +499,7 @@ static int gve_set_channels(struct net_device *netdev,
 		return -EINVAL;
 	}
 
-	if (!netif_carrier_ok(netdev)) {
+	if (!netif_running(netdev)) {
 		priv->tx_cfg.num_queues = new_tx;
 		priv->rx_cfg.num_queues = new_rx;
 		return 0;
@@ -480,6 +522,29 @@ static void gve_get_ringparam(struct net_device *netdev,
 	cmd->tx_max_pending = priv->tx_desc_cnt;
 	cmd->rx_pending = priv->rx_desc_cnt;
 	cmd->tx_pending = priv->tx_desc_cnt;
+
+	if (!gve_header_split_supported(priv))
+		kernel_cmd->tcp_data_split = ETHTOOL_TCP_DATA_SPLIT_UNKNOWN;
+	else if (priv->header_split_enabled)
+		kernel_cmd->tcp_data_split = ETHTOOL_TCP_DATA_SPLIT_ENABLED;
+	else
+		kernel_cmd->tcp_data_split = ETHTOOL_TCP_DATA_SPLIT_DISABLED;
+}
+
+static int gve_set_ringparam(struct net_device *netdev,
+			     struct ethtool_ringparam *cmd,
+			     struct kernel_ethtool_ringparam *kernel_cmd,
+			     struct netlink_ext_ack *extack)
+{
+	struct gve_priv *priv = netdev_priv(netdev);
+
+	if (priv->tx_desc_cnt != cmd->tx_pending ||
+	    priv->rx_desc_cnt != cmd->rx_pending) {
+		dev_info(&priv->pdev->dev, "Modify ring size is not supported.\n");
+		return -EOPNOTSUPP;
+	}
+
+	return gve_set_hsplit_config(priv, kernel_cmd->tcp_data_split);
 }
 
 static int gve_user_reset(struct net_device *netdev, u32 *flags)
@@ -519,7 +584,7 @@ static int gve_set_tunable(struct net_device *netdev,
 	case ETHTOOL_RX_COPYBREAK:
 	{
 		u32 max_copybreak = gve_is_gqi(priv) ?
-			(PAGE_SIZE / 2) : priv->data_buffer_size_dqo;
+			GVE_DEFAULT_RX_BUFFER_SIZE : priv->data_buffer_size_dqo;
 
 		len = *(u32 *)value;
 		if (len > max_copybreak)
@@ -655,6 +720,7 @@ static int gve_set_coalesce(struct net_device *netdev,
 
 const struct ethtool_ops gve_ethtool_ops = {
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS,
+	.supported_ring_params = ETHTOOL_RING_USE_TCP_DATA_SPLIT,
 	.get_drvinfo = gve_get_drvinfo,
 	.get_strings = gve_get_strings,
 	.get_sset_count = gve_get_sset_count,
@@ -667,6 +733,7 @@ const struct ethtool_ops gve_ethtool_ops = {
 	.get_coalesce = gve_get_coalesce,
 	.set_coalesce = gve_set_coalesce,
 	.get_ringparam = gve_get_ringparam,
+	.set_ringparam = gve_set_ringparam,
 	.reset = gve_user_reset,
 	.get_tunable = gve_get_tunable,
 	.set_tunable = gve_set_tunable,

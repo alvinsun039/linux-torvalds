@@ -161,8 +161,14 @@ MODULE_ALIAS("ext3");
 
 
 static inline void __ext4_read_bh(struct buffer_head *bh, blk_opf_t op_flags,
-				  bh_end_io_t *end_io)
+				  bh_end_io_t *end_io, bool simu_fail)
 {
+	if (simu_fail) {
+		clear_buffer_uptodate(bh);
+		unlock_buffer(bh);
+		return;
+	}
+
 	/*
 	 * buffer's verified bit is no longer valid after reading from
 	 * disk again due to write out error, clear it to make sure we
@@ -176,7 +182,7 @@ static inline void __ext4_read_bh(struct buffer_head *bh, blk_opf_t op_flags,
 }
 
 void ext4_read_bh_nowait(struct buffer_head *bh, blk_opf_t op_flags,
-			 bh_end_io_t *end_io)
+			 bh_end_io_t *end_io, bool simu_fail)
 {
 	BUG_ON(!buffer_locked(bh));
 
@@ -184,10 +190,11 @@ void ext4_read_bh_nowait(struct buffer_head *bh, blk_opf_t op_flags,
 		unlock_buffer(bh);
 		return;
 	}
-	__ext4_read_bh(bh, op_flags, end_io);
+	__ext4_read_bh(bh, op_flags, end_io, simu_fail);
 }
 
-int ext4_read_bh(struct buffer_head *bh, blk_opf_t op_flags, bh_end_io_t *end_io)
+int ext4_read_bh(struct buffer_head *bh, blk_opf_t op_flags,
+		 bh_end_io_t *end_io, bool simu_fail)
 {
 	BUG_ON(!buffer_locked(bh));
 
@@ -196,7 +203,7 @@ int ext4_read_bh(struct buffer_head *bh, blk_opf_t op_flags, bh_end_io_t *end_io
 		return 0;
 	}
 
-	__ext4_read_bh(bh, op_flags, end_io);
+	__ext4_read_bh(bh, op_flags, end_io, simu_fail);
 
 	wait_on_buffer(bh);
 	if (buffer_uptodate(bh))
@@ -208,10 +215,10 @@ int ext4_read_bh_lock(struct buffer_head *bh, blk_opf_t op_flags, bool wait)
 {
 	lock_buffer(bh);
 	if (!wait) {
-		ext4_read_bh_nowait(bh, op_flags, NULL);
+		ext4_read_bh_nowait(bh, op_flags, NULL, false);
 		return 0;
 	}
-	return ext4_read_bh(bh, op_flags, NULL);
+	return ext4_read_bh(bh, op_flags, NULL, false);
 }
 
 /*
@@ -266,7 +273,7 @@ void ext4_sb_breadahead_unmovable(struct super_block *sb, sector_t block)
 
 	if (likely(bh)) {
 		if (trylock_buffer(bh))
-			ext4_read_bh_nowait(bh, REQ_RAHEAD, NULL);
+			ext4_read_bh_nowait(bh, REQ_RAHEAD, NULL, false);
 		brelse(bh);
 	}
 }
@@ -346,9 +353,9 @@ __u32 ext4_free_group_clusters(struct super_block *sb,
 __u32 ext4_free_inodes_count(struct super_block *sb,
 			      struct ext4_group_desc *bg)
 {
-	return le16_to_cpu(bg->bg_free_inodes_count_lo) |
+	return le16_to_cpu(READ_ONCE(bg->bg_free_inodes_count_lo)) |
 		(EXT4_DESC_SIZE(sb) >= EXT4_MIN_DESC_SIZE_64BIT ?
-		 (__u32)le16_to_cpu(bg->bg_free_inodes_count_hi) << 16 : 0);
+		 (__u32)le16_to_cpu(READ_ONCE(bg->bg_free_inodes_count_hi)) << 16 : 0);
 }
 
 __u32 ext4_used_dirs_count(struct super_block *sb,
@@ -402,9 +409,9 @@ void ext4_free_group_clusters_set(struct super_block *sb,
 void ext4_free_inodes_set(struct super_block *sb,
 			  struct ext4_group_desc *bg, __u32 count)
 {
-	bg->bg_free_inodes_count_lo = cpu_to_le16((__u16)count);
+	WRITE_ONCE(bg->bg_free_inodes_count_lo, cpu_to_le16((__u16)count));
 	if (EXT4_DESC_SIZE(sb) >= EXT4_MIN_DESC_SIZE_64BIT)
-		bg->bg_free_inodes_count_hi = cpu_to_le16(count >> 16);
+		WRITE_ONCE(bg->bg_free_inodes_count_hi, cpu_to_le16(count >> 16));
 }
 
 void ext4_used_dirs_set(struct super_block *sb,
@@ -1363,14 +1370,14 @@ static void ext4_put_super(struct super_block *sb)
 
 	sync_blockdev(sb->s_bdev);
 	invalidate_bdev(sb->s_bdev);
-	if (sbi->s_journal_bdev) {
+	if (sbi->s_journal_bdev_handle) {
 		/*
 		 * Invalidate the journal device's buffers.  We don't want them
 		 * floating about in memory - the physical journal device may
 		 * hotswapped, and it breaks the `ro-after' testing code.
 		 */
-		sync_blockdev(sbi->s_journal_bdev);
-		invalidate_bdev(sbi->s_journal_bdev);
+		sync_blockdev(sbi->s_journal_bdev_handle->bdev);
+		invalidate_bdev(sbi->s_journal_bdev_handle->bdev);
 	}
 
 	ext4_xattr_destroy_cache(sbi->s_ea_inode_cache);
@@ -4236,7 +4243,7 @@ int ext4_calculate_overhead(struct super_block *sb)
 	 * Add the internal journal blocks whether the journal has been
 	 * loaded or not
 	 */
-	if (sbi->s_journal && !sbi->s_journal_bdev)
+	if (sbi->s_journal && !sbi->s_journal_bdev_handle)
 		overhead += EXT4_NUM_B2C(sbi, sbi->s_journal->j_total_len);
 	else if (ext4_has_feature_journal(sb) && !sbi->s_journal && j_inum) {
 		/* j_inum for internal journal is non-zero */
@@ -5125,16 +5132,27 @@ out:
 	return ret;
 }
 
-static void ext4_hash_info_init(struct super_block *sb)
+static int ext4_hash_info_init(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 	struct ext4_super_block *es = sbi->s_es;
 	unsigned int i;
 
+	sbi->s_def_hash_version = es->s_def_hash_version;
+
+	if (sbi->s_def_hash_version > DX_HASH_LAST) {
+		ext4_msg(sb, KERN_ERR,
+			 "Invalid default hash set in the superblock");
+		return -EINVAL;
+	} else if (sbi->s_def_hash_version == DX_HASH_SIPHASH) {
+		ext4_msg(sb, KERN_ERR,
+			 "SIPHASH is not a valid default hash value");
+		return -EINVAL;
+	}
+
 	for (i = 0; i < 4; i++)
 		sbi->s_hash_seed[i] = le32_to_cpu(es->s_hash_seed[i]);
 
-	sbi->s_def_hash_version = es->s_def_hash_version;
 	if (ext4_has_feature_dir_index(sb)) {
 		i = le32_to_cpu(es->s_flags);
 		if (i & EXT2_FLAGS_UNSIGNED_HASH)
@@ -5152,6 +5170,7 @@ static void ext4_hash_info_init(struct super_block *sb)
 #endif
 		}
 	}
+	return 0;
 }
 
 static int ext4_block_group_meta_init(struct super_block *sb, int silent)
@@ -5299,7 +5318,9 @@ static int __ext4_fill_super(struct fs_context *fc, struct super_block *sb)
 	if (err)
 		goto failed_mount;
 
-	ext4_hash_info_init(sb);
+	err = ext4_hash_info_init(sb);
+	if (err)
+		goto failed_mount;
 
 	err = ext4_handle_clustersize(sb);
 	if (err)
@@ -5674,9 +5695,9 @@ failed_mount:
 #endif
 	fscrypt_free_dummy_policy(&sbi->s_dummy_enc_policy);
 	brelse(sbi->s_sbh);
-	if (sbi->s_journal_bdev) {
-		invalidate_bdev(sbi->s_journal_bdev);
-		blkdev_put(sbi->s_journal_bdev, sb);
+	if (sbi->s_journal_bdev_handle) {
+		invalidate_bdev(sbi->s_journal_bdev_handle->bdev);
+		bdev_release(sbi->s_journal_bdev_handle);
 	}
 out_fail:
 	invalidate_bdev(sb->s_bdev);
@@ -5846,12 +5867,13 @@ static journal_t *ext4_open_inode_journal(struct super_block *sb,
 	return journal;
 }
 
-static struct block_device *ext4_get_journal_blkdev(struct super_block *sb,
+static struct bdev_handle *ext4_get_journal_blkdev(struct super_block *sb,
 					dev_t j_dev, ext4_fsblk_t *j_start,
 					ext4_fsblk_t *j_len)
 {
 	struct buffer_head *bh;
 	struct block_device *bdev;
+	struct bdev_handle *bdev_handle;
 	int hblock, blocksize;
 	ext4_fsblk_t sb_block;
 	unsigned long offset;
@@ -5860,16 +5882,17 @@ static struct block_device *ext4_get_journal_blkdev(struct super_block *sb,
 
 	/* see get_tree_bdev why this is needed and safe */
 	up_write(&sb->s_umount);
-	bdev = blkdev_get_by_dev(j_dev, BLK_OPEN_READ | BLK_OPEN_WRITE, sb,
-				 &fs_holder_ops);
+	bdev_handle = bdev_open_by_dev(j_dev, BLK_OPEN_READ | BLK_OPEN_WRITE,
+				       sb, &fs_holder_ops);
 	down_write(&sb->s_umount);
-	if (IS_ERR(bdev)) {
+	if (IS_ERR(bdev_handle)) {
 		ext4_msg(sb, KERN_ERR,
 			 "failed to open journal device unknown-block(%u,%u) %ld",
-			 MAJOR(j_dev), MINOR(j_dev), PTR_ERR(bdev));
-		return ERR_CAST(bdev);
+			 MAJOR(j_dev), MINOR(j_dev), PTR_ERR(bdev_handle));
+		return bdev_handle;
 	}
 
+	bdev = bdev_handle->bdev;
 	blocksize = sb->s_blocksize;
 	hblock = bdev_logical_block_size(bdev);
 	if (blocksize < hblock) {
@@ -5916,12 +5939,12 @@ static struct block_device *ext4_get_journal_blkdev(struct super_block *sb,
 	*j_start = sb_block + 1;
 	*j_len = ext4_blocks_count(es);
 	brelse(bh);
-	return bdev;
+	return bdev_handle;
 
 out_bh:
 	brelse(bh);
 out_bdev:
-	blkdev_put(bdev, sb);
+	bdev_release(bdev_handle);
 	return ERR_PTR(errno);
 }
 
@@ -5931,14 +5954,14 @@ static journal_t *ext4_open_dev_journal(struct super_block *sb,
 	journal_t *journal;
 	ext4_fsblk_t j_start;
 	ext4_fsblk_t j_len;
-	struct block_device *journal_bdev;
+	struct bdev_handle *bdev_handle;
 	int errno = 0;
 
-	journal_bdev = ext4_get_journal_blkdev(sb, j_dev, &j_start, &j_len);
-	if (IS_ERR(journal_bdev))
-		return ERR_CAST(journal_bdev);
+	bdev_handle = ext4_get_journal_blkdev(sb, j_dev, &j_start, &j_len);
+	if (IS_ERR(bdev_handle))
+		return ERR_CAST(bdev_handle);
 
-	journal = jbd2_journal_init_dev(journal_bdev, sb->s_bdev, j_start,
+	journal = jbd2_journal_init_dev(bdev_handle->bdev, sb->s_bdev, j_start,
 					j_len, sb->s_blocksize);
 	if (IS_ERR(journal)) {
 		ext4_msg(sb, KERN_ERR, "failed to create device journal");
@@ -5953,14 +5976,14 @@ static journal_t *ext4_open_dev_journal(struct super_block *sb,
 		goto out_journal;
 	}
 	journal->j_private = sb;
-	EXT4_SB(sb)->s_journal_bdev = journal_bdev;
+	EXT4_SB(sb)->s_journal_bdev_handle = bdev_handle;
 	ext4_init_journal_params(sb, journal);
 	return journal;
 
 out_journal:
 	jbd2_journal_destroy(journal);
 out_bdev:
-	blkdev_put(journal_bdev, sb);
+	bdev_release(bdev_handle);
 	return ERR_PTR(errno);
 }
 
@@ -6542,9 +6565,6 @@ static int __ext4_remount(struct fs_context *fc, struct super_block *sb)
 		goto restore_opts;
 	}
 
-	if (test_opt2(sb, ABORT))
-		ext4_abort(sb, ESHUTDOWN, "Abort forced by user");
-
 	sb->s_flags = (sb->s_flags & ~SB_POSIXACL) |
 		(test_opt(sb, POSIX_ACL) ? SB_POSIXACL : 0);
 
@@ -6712,6 +6732,14 @@ static int __ext4_remount(struct fs_context *fc, struct super_block *sb)
 
 	if (!ext4_has_feature_mmp(sb) || sb_rdonly(sb))
 		ext4_stop_mmpd(sbi);
+
+	/*
+	 * Handle aborting the filesystem as the last thing during remount to
+	 * avoid obsure errors during remount when some option changes fail to
+	 * apply due to shutdown filesystem.
+	 */
+	if (test_opt2(sb, ABORT))
+		ext4_abort(sb, ESHUTDOWN, "Abort forced by user");
 
 	return 0;
 
@@ -7339,12 +7367,12 @@ static inline int ext3_feature_set_ok(struct super_block *sb)
 static void ext4_kill_sb(struct super_block *sb)
 {
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
-	struct block_device *journal_bdev = sbi ? sbi->s_journal_bdev : NULL;
+	struct bdev_handle *handle = sbi ? sbi->s_journal_bdev_handle : NULL;
 
 	kill_block_super(sb);
 
-	if (journal_bdev)
-		blkdev_put(journal_bdev, sb);
+	if (handle)
+		bdev_release(handle);
 }
 
 static struct file_system_type ext4_fs_type = {

@@ -90,3 +90,9 @@ bool __weak is_vendor_hygon(void)
 	return false;
 }
 EXPORT_SYMBOL(is_vendor_hygon);
+
+bool __weak is_vendor_zhaoxin(void)
+{
+	return false;
+}
+EXPORT_SYMBOL(is_vendor_zhaoxin);

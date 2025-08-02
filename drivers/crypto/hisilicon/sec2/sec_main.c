@@ -1021,16 +1021,6 @@ static void sec_disable_error_report(struct hisi_qm *qm, u32 err_type)
 	writel(nfe_mask & (~err_type), qm->io_base + SEC_RAS_NFE_REG);
 }
 
-static void sec_enable_error_report(struct hisi_qm *qm)
-{
-	u32 nfe_mask, ce_mask;
-
-	nfe_mask = hisi_qm_get_hw_info(qm, sec_basic_info, SEC_NFE_MASK_CAP, qm->cap_ver);
-	ce_mask = hisi_qm_get_hw_info(qm, sec_basic_info, SEC_CE_MASK_CAP, qm->cap_ver);
-	writel(nfe_mask, qm->io_base + SEC_RAS_NFE_REG);
-	writel(ce_mask, qm->io_base + SEC_RAS_CE_REG);
-}
-
 static void sec_open_axi_master_ooo(struct hisi_qm *qm)
 {
 	u32 val;
@@ -1038,6 +1028,27 @@ static void sec_open_axi_master_ooo(struct hisi_qm *qm)
 	val = readl(qm->io_base + SEC_CONTROL_REG);
 	writel(val & SEC_AXI_SHUTDOWN_DISABLE, qm->io_base + SEC_CONTROL_REG);
 	writel(val | SEC_AXI_SHUTDOWN_ENABLE, qm->io_base + SEC_CONTROL_REG);
+}
+
+static enum acc_err_result sec_get_err_result(struct hisi_qm *qm)
+{
+	u32 err_status;
+
+	err_status = sec_get_hw_err_status(qm);
+	if (err_status) {
+		if (err_status & qm->err_info.ecc_2bits_mask)
+			qm->err_status.is_dev_ecc_mbit = true;
+		sec_log_hw_error(qm, err_status);
+
+		if (err_status & qm->err_info.dev_reset_mask) {
+			/* Disable the same error reporting until device is recovered. */
+			sec_disable_error_report(qm, err_status);
+			return ACC_ERR_NEED_RESET;
+		}
+		sec_clear_hw_err_status(qm, err_status);
+	}
+
+	return ACC_ERR_RECOVERED;
 }
 
 static void sec_err_info_init(struct hisi_qm *qm)
@@ -1066,14 +1077,12 @@ static const struct hisi_qm_err_ini sec_err_ini = {
 	.hw_err_disable		= sec_hw_error_disable,
 	.get_dev_hw_err_status	= sec_get_hw_err_status,
 	.clear_dev_hw_err_status = sec_clear_hw_err_status,
-	.disable_error_report   = sec_disable_error_report,
-	.enable_error_report    = sec_enable_error_report,
-	.log_dev_hw_err		= sec_log_hw_error,
 	.open_axi_master_ooo	= sec_open_axi_master_ooo,
 	.open_sva_prefetch	= sec_open_sva_prefetch,
 	.close_sva_prefetch	= sec_close_sva_prefetch,
 	.show_last_dfx_regs	= sec_show_last_dfx_regs,
 	.err_info_init		= sec_err_info_init,
+	.get_err_result		= sec_get_err_result,
 };
 
 static int sec_pf_probe_init(struct sec_dev *sec)

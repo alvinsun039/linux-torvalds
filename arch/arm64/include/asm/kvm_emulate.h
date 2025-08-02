@@ -17,6 +17,7 @@
 #include <asm/esr.h>
 #include <asm/kvm_arm.h>
 #include <asm/kvm_hyp.h>
+#include <asm/kvm_nested.h>
 #include <asm/ptrace.h>
 #include <asm/cputype.h>
 #include <asm/virt.h>
@@ -62,7 +63,7 @@ static __always_inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
 #else
 static __always_inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
 {
-	return test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features);
+	return vcpu_has_feature(vcpu, KVM_ARM_VCPU_EL1_32BIT);
 }
 #endif
 
@@ -229,7 +230,8 @@ static inline bool vcpu_is_el2(const struct kvm_vcpu *vcpu)
 
 static inline bool __vcpu_el2_e2h_is_set(const struct kvm_cpu_context *ctxt)
 {
-	return ctxt_sys_reg(ctxt, HCR_EL2) & HCR_E2H;
+	return (!cpus_have_final_cap(ARM64_HAS_HCR_NV1) ||
+		(ctxt_sys_reg(ctxt, HCR_EL2) & HCR_E2H));
 }
 
 static inline bool vcpu_el2_e2h_is_set(const struct kvm_vcpu *vcpu)
@@ -264,7 +266,7 @@ static inline bool __is_hyp_ctxt(const struct kvm_cpu_context *ctxt)
 
 static inline bool is_hyp_ctxt(const struct kvm_vcpu *vcpu)
 {
-	return __is_hyp_ctxt(&vcpu->arch.ctxt);
+	return vcpu_has_nv(vcpu) && __is_hyp_ctxt(&vcpu->arch.ctxt);
 }
 
 /*
@@ -595,12 +597,6 @@ static __always_inline void kvm_incr_pc(struct kvm_vcpu *vcpu)
 		vcpu_set_flag((v), PENDING_EXCEPTION);			\
 		vcpu_set_flag((v), e);					\
 	} while (0)
-
-
-static inline bool vcpu_has_feature(struct kvm_vcpu *vcpu, int feature)
-{
-	return test_bit(feature, vcpu->arch.features);
-}
 
 static __always_inline void kvm_write_cptr_el2(u64 val)
 {

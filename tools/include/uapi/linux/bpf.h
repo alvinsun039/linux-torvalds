@@ -1254,6 +1254,9 @@ enum bpf_perf_event_type {
  */
 #define BPF_F_XDP_DEV_BOUND_ONLY	(1U << 6)
 
+/* The verifier internal test flag. Behavior is undefined */
+#define BPF_F_TEST_SANITY_STRICT	(1U << 7)
+
 /* link_create.kprobe_multi.flags used in LINK_CREATE command for
  * BPF_TRACE_KPROBE_MULTI attach type to create return probe.
  */
@@ -1652,6 +1655,7 @@ union bpf_attr {
 	struct { /* anonymous struct used by BPF_RAW_TRACEPOINT_OPEN command */
 		__u64 name;
 		__u32 prog_fd;
+		__aligned_u64 cookie;
 	} raw_tracepoint;
 
 	struct { /* anonymous struct for BPF_BTF_LOAD */

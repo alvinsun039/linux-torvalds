@@ -73,7 +73,10 @@ enum bpf_iter_state {
 struct bpf_reg_state {
 	/* Ordering of fields matters.  See states_equal() */
 	enum bpf_reg_type type;
-	/* Fixed part of pointer offset, pointer types only */
+	/*
+	 * Fixed part of pointer offset, pointer types only.
+	 * Or constant delta between "linked" scalars with the same ID.
+	 */
 	s32 off;
 	union {
 		/* valid when type == PTR_TO_PACKET */
@@ -167,6 +170,13 @@ struct bpf_reg_state {
 	 * Similarly to dynptrs, we use ID to track "belonging" of a reference
 	 * to a specific instance of bpf_iter.
 	 */
+	/*
+	 * Upper bit of ID is used to remember relationship between "linked"
+	 * registers. Example:
+	 * r1 = r2;    both will have r1->id == r2->id == N
+	 * r1 += 10;   r1->id == N | BPF_ADD_CONST and r1->off == 10
+	 */
+#define BPF_ADD_CONST (1U << 31)
 	u32 id;
 	/* PTR_TO_SOCKET and PTR_TO_TCP_SOCK could be a ptr returned
 	 * from a pointer-cast helper, bpf_sk_fullsock() and
@@ -320,12 +330,38 @@ struct bpf_func_state {
 	struct bpf_stack_state *stack;
 };
 
-struct bpf_idx_pair {
-	u32 prev_idx;
-	u32 idx;
+#define MAX_CALL_FRAMES 8
+
+/* instruction history flags, used in bpf_jmp_history_entry.flags field */
+enum {
+	/* instruction references stack slot through PTR_TO_STACK register;
+	 * we also store stack's frame number in lower 3 bits (MAX_CALL_FRAMES is 8)
+	 * and accessed stack slot's index in next 6 bits (MAX_BPF_STACK is 512,
+	 * 8 bytes per slot, so slot index (spi) is [0, 63])
+	 */
+	INSN_F_FRAMENO_MASK = 0x7, /* 3 bits */
+
+	INSN_F_SPI_MASK = 0x3f, /* 6 bits */
+	INSN_F_SPI_SHIFT = 3, /* shifted 3 bits to the left */
+
+	INSN_F_STACK_ACCESS = BIT(9), /* we need 10 bits total */
 };
 
-#define MAX_CALL_FRAMES 8
+static_assert(INSN_F_FRAMENO_MASK + 1 >= MAX_CALL_FRAMES);
+static_assert(INSN_F_SPI_MASK + 1 >= MAX_BPF_STACK / 8);
+
+struct bpf_jmp_history_entry {
+	u32 idx;
+	/* insn idx can't be bigger than 1 million */
+	u32 prev_idx : 22;
+	/* special flags, e.g., whether insn is doing register stack spill/load */
+	u32 flags : 10;
+	/* additional registers that need precision tracking when this
+	 * jump is backtracked, vector of six 10-bit records
+	 */
+	u64 linked_regs;
+};
+
 /* Maximum number of register states that can exist at once */
 #define BPF_ID_MAP_SIZE ((MAX_BPF_REG + MAX_BPF_STACK / BPF_REG_SIZE) * MAX_CALL_FRAMES)
 struct bpf_verifier_state {
@@ -408,7 +444,7 @@ struct bpf_verifier_state {
 	 * For most states jmp_history_cnt is [0-3].
 	 * For loops can go up to ~40.
 	 */
-	struct bpf_idx_pair *jmp_history;
+	struct bpf_jmp_history_entry *jmp_history;
 	u32 jmp_history_cnt;
 	u32 dfs_depth;
 	u32 callback_unroll_depth;
@@ -634,6 +670,7 @@ struct bpf_verifier_env {
 	int stack_size;			/* number of states to be processed */
 	bool strict_alignment;		/* perform strict pointer alignment checks */
 	bool test_state_freq;		/* test verifier with different pruning frequency */
+	bool test_sanity_strict;	/* fail verification on sanity violations */
 	struct bpf_verifier_state *cur_state; /* current verifier state */
 	struct bpf_verifier_state_list **explored_states; /* search pruning optimization */
 	struct bpf_verifier_state_list *free_list;
@@ -666,6 +703,7 @@ struct bpf_verifier_env {
 		int cur_stack;
 	} cfg;
 	struct backtrack_state bt;
+	struct bpf_jmp_history_entry *cur_hist_ent;
 	u32 pass_cnt; /* number of times do_check() was called */
 	u32 subprog_cnt;
 	/* number of instructions analyzed by the verifier */
@@ -694,6 +732,8 @@ struct bpf_verifier_env {
 	/* Same as scratched_regs but for stack slots */
 	u64 scratched_stack_slots;
 	u64 prev_log_pos, prev_insn_print_pos;
+	/* buffer used to temporary hold constants as scalar registers */
+	struct bpf_reg_state fake_reg[2];
 	/* buffer used to generate temporary string representations,
 	 * e.g., in reg_type_str() to generate reg_type string
 	 */

@@ -751,6 +751,21 @@ struct inode {
 	void			*i_private; /* fs or device private pointer */
 } __randomize_layout;
 
+/*
+ * Get bit address from inode->i_state to use with wait_var_event()
+ * infrastructre.
+ */
+#define inode_state_wait_address(inode, bit) ((char *)&(inode)->i_state + (bit))
+
+struct wait_queue_head *inode_bit_waitqueue(struct wait_bit_queue_entry *wqe,
+					    struct inode *inode, u32 bit);
+
+static inline void inode_wake_up_bit(struct inode *inode, u32 bit)
+{
+	/* Caller is responsible for correct memory barriers. */
+	wake_up_var(inode_state_wait_address(inode, bit));
+}
+
 struct timespec64 timestamp_truncate(struct timespec64 t, struct inode *inode);
 
 static inline unsigned int i_blocksize(const struct inode *node)
@@ -1000,8 +1015,10 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
  */
 struct file {
 	union {
+		/* fput() uses task work when closing and freeing file (default). */
+		struct callback_head 	f_task_work;
+		/* fput() must use workqueue (most kernel threads). */
 		struct llist_node	f_llist;
-		struct rcu_head 	f_rcuhead;
 		unsigned int 		f_iocb_flags;
 	};
 
@@ -1853,6 +1870,8 @@ void inode_init_owner(struct mnt_idmap *idmap, struct inode *inode,
 extern bool may_open_dev(const struct path *path);
 umode_t mode_strip_sgid(struct mnt_idmap *idmap,
 			const struct inode *dir, umode_t mode);
+bool in_group_or_capable(struct mnt_idmap *idmap,
+			 const struct inode *inode, vfsgid_t vfsgid);
 
 /*
  * This is the "filldir" function type, used by readdir() to let
@@ -2942,7 +2961,14 @@ static inline bool is_zero_ino(ino_t ino)
 	return (u32)ino == 0;
 }
 
-extern void __iget(struct inode * inode);
+/*
+ * inode->i_lock must be held
+ */
+static inline void __iget(struct inode *inode)
+{
+	atomic_inc(&inode->i_count);
+}
+
 extern void iget_failed(struct inode *);
 extern void clear_inode(struct inode *);
 extern void __destroy_inode(struct inode *);
