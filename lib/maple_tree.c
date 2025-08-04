@@ -5572,7 +5572,7 @@ int mas_preallocate(struct ma_state *mas, void *entry, gfp_t gfp)
 	/* At this point, we are at the leaf node that needs to be altered. */
 	/* Exact fit, no nodes needed. */
 	if (wr_mas.r_min == mas->index && wr_mas.r_max == mas->last)
-		goto set_flag;
+		return 0;
 
 	mas_wr_end_piv(&wr_mas);
 	node_size = mas_wr_new_end(&wr_mas);
@@ -5581,10 +5581,10 @@ int mas_preallocate(struct ma_state *mas, void *entry, gfp_t gfp)
 	if (node_size == mas->end) {
 		/* reuse node */
 		if (!mt_in_rcu(mas->tree))
-			goto set_flag;
+			return 0;
 		/* shifting boundary */
 		if (wr_mas.offset_end - mas->offset == 1)
-			goto set_flag;
+			return 0;
 	}
 
 	if (node_size >= mt_slots[wr_mas.type]) {
@@ -5603,13 +5603,10 @@ int mas_preallocate(struct ma_state *mas, void *entry, gfp_t gfp)
 
 	/* node store, slot store needs one node */
 ask_now:
-	mas->mas_flags &= ~MA_STATE_PREALLOC;
 	mas_node_count_gfp(mas, request, gfp);
-	if (likely(!mas_is_err(mas))) {
-set_flag:
-		mas->mas_flags |= MA_STATE_PREALLOC;
+	mas->mas_flags |= MA_STATE_PREALLOC;
+	if (likely(!mas_is_err(mas)))
 		return 0;
-	}
 
 	mas_set_alloc_req(mas, 0);
 	ret = xa_err(mas->node);
