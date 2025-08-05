@@ -2822,6 +2822,61 @@ __bpf_kfunc void bpf_throw(u64 cookie)
 	WARN(1, "A call to BPF exception callback should never return\n");
 }
 
+__bpf_kfunc int bpf_wq_init(struct bpf_wq *wq, void *p__map, unsigned int flags)
+{
+	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
+	struct bpf_map *map = p__map;
+
+	BUILD_BUG_ON(sizeof(struct bpf_async_kern) > sizeof(struct bpf_wq));
+	BUILD_BUG_ON(__alignof__(struct bpf_async_kern) != __alignof__(struct bpf_wq));
+
+	if (flags)
+		return -EINVAL;
+
+	return __bpf_async_init(async, map, flags, BPF_ASYNC_TYPE_WQ);
+}
+
+__bpf_kfunc int bpf_wq_start(struct bpf_wq *wq, unsigned int flags)
+{
+	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
+	struct bpf_work *w;
+
+	if (in_nmi())
+		return -EOPNOTSUPP;
+	if (flags)
+		return -EINVAL;
+	w = READ_ONCE(async->work);
+	if (!w || !READ_ONCE(w->cb.prog))
+		return -EINVAL;
+
+	schedule_work(&w->work);
+	return 0;
+}
+
+__bpf_kfunc int bpf_wq_set_callback_impl(struct bpf_wq *wq,
+					 int (callback_fn)(void *map, int *key, void *value),
+					 unsigned int flags,
+					 void *aux__ign)
+{
+	struct bpf_prog_aux *aux = (struct bpf_prog_aux *)aux__ign;
+	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
+
+	if (flags)
+		return -EINVAL;
+
+	return __bpf_async_set_callback(async, callback_fn, aux, flags, BPF_ASYNC_TYPE_WQ);
+}
+
+__bpf_kfunc void bpf_preempt_disable(void)
+{
+	preempt_disable();
+}
+
+__bpf_kfunc void bpf_preempt_enable(void)
+{
+	preempt_enable();
+}
+
 struct bpf_iter_bits {
 	__u64 __opaque[2];
 } __aligned(8);
@@ -2970,61 +3025,6 @@ __bpf_kfunc void bpf_iter_bits_destroy(struct bpf_iter_bits *it)
 	if (kit->nr_bits <= 64)
 		return;
 	bpf_mem_free(&bpf_global_ma, kit->bits);
-}
-
-__bpf_kfunc int bpf_wq_init(struct bpf_wq *wq, void *p__map, unsigned int flags)
-{
-	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
-	struct bpf_map *map = p__map;
-
-	BUILD_BUG_ON(sizeof(struct bpf_async_kern) > sizeof(struct bpf_wq));
-	BUILD_BUG_ON(__alignof__(struct bpf_async_kern) != __alignof__(struct bpf_wq));
-
-	if (flags)
-		return -EINVAL;
-
-	return __bpf_async_init(async, map, flags, BPF_ASYNC_TYPE_WQ);
-}
-
-__bpf_kfunc int bpf_wq_start(struct bpf_wq *wq, unsigned int flags)
-{
-	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
-	struct bpf_work *w;
-
-	if (in_nmi())
-		return -EOPNOTSUPP;
-	if (flags)
-		return -EINVAL;
-	w = READ_ONCE(async->work);
-	if (!w || !READ_ONCE(w->cb.prog))
-		return -EINVAL;
-
-	schedule_work(&w->work);
-	return 0;
-}
-
-__bpf_kfunc int bpf_wq_set_callback_impl(struct bpf_wq *wq,
-					 int (callback_fn)(void *map, int *key, void *value),
-					 unsigned int flags,
-					 void *aux__ign)
-{
-	struct bpf_prog_aux *aux = (struct bpf_prog_aux *)aux__ign;
-	struct bpf_async_kern *async = (struct bpf_async_kern *)wq;
-
-	if (flags)
-		return -EINVAL;
-
-	return __bpf_async_set_callback(async, callback_fn, aux, flags, BPF_ASYNC_TYPE_WQ);
-}
-
-__bpf_kfunc void bpf_preempt_disable(void)
-{
-	preempt_disable();
-}
-
-__bpf_kfunc void bpf_preempt_enable(void)
-{
-	preempt_enable();
 }
 
 __bpf_kfunc_end_defs();
