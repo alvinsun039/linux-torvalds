@@ -2644,6 +2644,156 @@ __bpf_kfunc void bpf_throw(u64 cookie)
 	WARN(1, "A call to BPF exception callback should never return\n");
 }
 
+struct bpf_iter_bits {
+	__u64 __opaque[2];
+} __aligned(8);
+
+#define BITS_ITER_NR_WORDS_MAX 511
+
+struct bpf_iter_bits_kern {
+	union {
+		__u64 *bits;
+		__u64 bits_copy;
+	};
+	int nr_bits;
+	int bit;
+} __aligned(8);
+
+/* On 64-bit hosts, unsigned long and u64 have the same size, so passing
+ * a u64 pointer and an unsigned long pointer to find_next_bit() will
+ * return the same result, as both point to the same 8-byte area.
+ *
+ * For 32-bit little-endian hosts, using a u64 pointer or unsigned long
+ * pointer also makes no difference. This is because the first iterated
+ * unsigned long is composed of bits 0-31 of the u64 and the second unsigned
+ * long is composed of bits 32-63 of the u64.
+ *
+ * However, for 32-bit big-endian hosts, this is not the case. The first
+ * iterated unsigned long will be bits 32-63 of the u64, so swap these two
+ * ulong values within the u64.
+ */
+static void swap_ulong_in_u64(u64 *bits, unsigned int nr)
+{
+#if (BITS_PER_LONG == 32) && defined(__BIG_ENDIAN)
+	unsigned int i;
+
+	for (i = 0; i < nr; i++)
+		bits[i] = (bits[i] >> 32) | ((u64)(u32)bits[i] << 32);
+#endif
+}
+
+/**
+ * bpf_iter_bits_new() - Initialize a new bits iterator for a given memory area
+ * @it: The new bpf_iter_bits to be created
+ * @unsafe_ptr__ign: A pointer pointing to a memory area to be iterated over
+ * @nr_words: The size of the specified memory area, measured in 8-byte units.
+ * The maximum value of @nr_words is @BITS_ITER_NR_WORDS_MAX. This limit may be
+ * further reduced by the BPF memory allocator implementation.
+ *
+ * This function initializes a new bpf_iter_bits structure for iterating over
+ * a memory area which is specified by the @unsafe_ptr__ign and @nr_words. It
+ * copies the data of the memory area to the newly created bpf_iter_bits @it for
+ * subsequent iteration operations.
+ *
+ * On success, 0 is returned. On failure, ERR is returned.
+ */
+__bpf_kfunc int
+bpf_iter_bits_new(struct bpf_iter_bits *it, const u64 *unsafe_ptr__ign, u32 nr_words)
+{
+	struct bpf_iter_bits_kern *kit = (void *)it;
+	u32 nr_bytes = nr_words * sizeof(u64);
+	u32 nr_bits = BYTES_TO_BITS(nr_bytes);
+	int err;
+
+	BUILD_BUG_ON(sizeof(struct bpf_iter_bits_kern) != sizeof(struct bpf_iter_bits));
+	BUILD_BUG_ON(__alignof__(struct bpf_iter_bits_kern) !=
+		     __alignof__(struct bpf_iter_bits));
+
+	kit->nr_bits = 0;
+	kit->bits_copy = 0;
+	kit->bit = -1;
+
+	if (!unsafe_ptr__ign || !nr_words)
+		return -EINVAL;
+	if (nr_words > BITS_ITER_NR_WORDS_MAX)
+		return -E2BIG;
+
+	/* Optimization for u64 mask */
+	if (nr_bits == 64) {
+		err = bpf_probe_read_kernel_common(&kit->bits_copy, nr_bytes, unsafe_ptr__ign);
+		if (err)
+			return -EFAULT;
+
+		swap_ulong_in_u64(&kit->bits_copy, nr_words);
+
+		kit->nr_bits = nr_bits;
+		return 0;
+	}
+
+	if (bpf_mem_alloc_check_size(false, nr_bytes))
+		return -E2BIG;
+
+	/* Fallback to memalloc */
+	kit->bits = bpf_mem_alloc(&bpf_global_ma, nr_bytes);
+	if (!kit->bits)
+		return -ENOMEM;
+
+	err = bpf_probe_read_kernel_common(kit->bits, nr_bytes, unsafe_ptr__ign);
+	if (err) {
+		bpf_mem_free(&bpf_global_ma, kit->bits);
+		return err;
+	}
+
+	swap_ulong_in_u64(kit->bits, nr_words);
+
+	kit->nr_bits = nr_bits;
+	return 0;
+}
+
+/**
+ * bpf_iter_bits_next() - Get the next bit in a bpf_iter_bits
+ * @it: The bpf_iter_bits to be checked
+ *
+ * This function returns a pointer to a number representing the value of the
+ * next bit in the bits.
+ *
+ * If there are no further bits available, it returns NULL.
+ */
+__bpf_kfunc int *bpf_iter_bits_next(struct bpf_iter_bits *it)
+{
+	struct bpf_iter_bits_kern *kit = (void *)it;
+	int bit = kit->bit, nr_bits = kit->nr_bits;
+	const void *bits;
+
+	if (!nr_bits || bit >= nr_bits)
+		return NULL;
+
+	bits = nr_bits == 64 ? &kit->bits_copy : kit->bits;
+	bit = find_next_bit(bits, nr_bits, bit + 1);
+	if (bit >= nr_bits) {
+		kit->bit = bit;
+		return NULL;
+	}
+
+	kit->bit = bit;
+	return &kit->bit;
+}
+
+/**
+ * bpf_iter_bits_destroy() - Destroy a bpf_iter_bits
+ * @it: The bpf_iter_bits to be destroyed
+ *
+ * Destroy the resource associated with the bpf_iter_bits.
+ */
+__bpf_kfunc void bpf_iter_bits_destroy(struct bpf_iter_bits *it)
+{
+	struct bpf_iter_bits_kern *kit = (void *)it;
+
+	if (kit->nr_bits <= 64)
+		return;
+	bpf_mem_free(&bpf_global_ma, kit->bits);
+}
+
 __bpf_kfunc_end_defs();
 
 BTF_SET8_START(generic_btf_ids)
@@ -2720,6 +2870,9 @@ BTF_ID_FLAGS(func, bpf_dynptr_is_null)
 BTF_ID_FLAGS(func, bpf_dynptr_is_rdonly)
 BTF_ID_FLAGS(func, bpf_dynptr_size)
 BTF_ID_FLAGS(func, bpf_dynptr_clone)
+BTF_ID_FLAGS(func, bpf_iter_bits_new, KF_ITER_NEW)
+BTF_ID_FLAGS(func, bpf_iter_bits_next, KF_ITER_NEXT | KF_RET_NULL)
+BTF_ID_FLAGS(func, bpf_iter_bits_destroy, KF_ITER_DESTROY)
 BTF_SET8_END(common_btf_ids)
 
 static const struct btf_kfunc_id_set common_kfunc_set = {
@@ -2746,6 +2899,7 @@ static int __init kfunc_init(void)
 	ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_TRACING, &generic_kfunc_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_SCHED_CLS, &generic_kfunc_set);
 	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS, &generic_kfunc_set);
+	ret = ret ?: register_btf_kfunc_id_set(BPF_PROG_TYPE_SYSCALL, &generic_kfunc_set);
 	ret = ret ?: register_btf_id_dtor_kfuncs(generic_dtors,
 						  ARRAY_SIZE(generic_dtors),
 						  THIS_MODULE);
@@ -2753,3 +2907,22 @@ static int __init kfunc_init(void)
 }
 
 late_initcall(kfunc_init);
+
+/* Get a pointer to dynptr data up to len bytes for read only access. If
+ * the dynptr doesn't have continuous data up to len bytes, return NULL.
+ */
+const void *__bpf_dynptr_data(const struct bpf_dynptr_kern *ptr, u32 len)
+{
+	return bpf_dynptr_slice(ptr, 0, NULL, len);
+}
+
+/* Get a pointer to dynptr data up to len bytes for read write access. If
+ * the dynptr doesn't have continuous data up to len bytes, or the dynptr
+ * is read only, return NULL.
+ */
+void *__bpf_dynptr_data_rw(const struct bpf_dynptr_kern *ptr, u32 len)
+{
+	if (__bpf_dynptr_is_rdonly(ptr))
+		return NULL;
+	return (void *)__bpf_dynptr_data(ptr, len);
+}

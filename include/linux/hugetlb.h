@@ -720,7 +720,11 @@ int isolate_or_dissolve_huge_page(struct page *page, struct list_head *list);
 struct folio *alloc_hugetlb_folio(struct vm_area_struct *vma,
 				unsigned long addr, int avoid_reserve);
 struct folio *alloc_hugetlb_folio_nodemask(struct hstate *h, int preferred_nid,
-				nodemask_t *nmask, gfp_t gfp_mask);
+				nodemask_t *nmask, gfp_t gfp_mask,
+				bool allow_alloc_fallback);
+struct folio *alloc_hugetlb_folio_reserve(struct hstate *h, int preferred_nid,
+					  nodemask_t *nmask, gfp_t gfp_mask);
+
 int hugetlb_add_to_page_cache(struct folio *folio, struct address_space *mapping,
 			pgoff_t idx);
 void restore_reserve_on_error(struct hstate *h, struct vm_area_struct *vma,
@@ -944,6 +948,30 @@ static inline gfp_t htlb_modify_alloc_mask(struct hstate *h, gfp_t gfp_mask)
 	return modified_mask;
 }
 
+static inline bool htlb_allow_alloc_fallback(int reason)
+{
+	bool allowed_fallback = false;
+
+	/*
+	 * Note: the memory offline, memory failure and migration syscalls will
+	 * be allowed to fallback to other nodes due to lack of a better chioce,
+	 * that might break the per-node hugetlb pool. While other cases will
+	 * set the __GFP_THISNODE to avoid breaking the per-node hugetlb pool.
+	 */
+	switch (reason) {
+	case MR_MEMORY_HOTPLUG:
+	case MR_MEMORY_FAILURE:
+	case MR_SYSCALL:
+	case MR_MEMPOLICY_MBIND:
+		allowed_fallback = true;
+		break;
+	default:
+		break;
+	}
+
+	return allowed_fallback;
+}
+
 static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
 					   struct mm_struct *mm, pte_t *pte)
 {
@@ -1065,8 +1093,16 @@ static inline struct folio *alloc_hugetlb_folio(struct vm_area_struct *vma,
 }
 
 static inline struct folio *
+alloc_hugetlb_folio_reserve(struct hstate *h, int preferred_nid,
+			    nodemask_t *nmask, gfp_t gfp_mask)
+{
+	return NULL;
+}
+
+static inline struct folio *
 alloc_hugetlb_folio_nodemask(struct hstate *h, int preferred_nid,
-			nodemask_t *nmask, gfp_t gfp_mask)
+			nodemask_t *nmask, gfp_t gfp_mask,
+			bool allow_alloc_fallback)
 {
 	return NULL;
 }
@@ -1182,6 +1218,11 @@ static inline gfp_t htlb_modify_alloc_mask(struct hstate *h, gfp_t gfp_mask)
 	return 0;
 }
 
+static inline bool htlb_allow_alloc_fallback(int reason)
+{
+	return false;
+}
+
 static inline spinlock_t *huge_pte_lockptr(struct hstate *h,
 					   struct mm_struct *mm, pte_t *pte)
 {
@@ -1248,7 +1289,7 @@ static inline __init void hugetlb_cma_reserve(int order)
 }
 #endif
 
-#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
+#ifdef CONFIG_HUGETLB_PMD_PAGE_TABLE_SHARING
 static inline bool hugetlb_pmd_shared(pte_t *pte)
 {
 	return page_count(virt_to_page(pte)) > 1;
@@ -1284,8 +1325,7 @@ bool __vma_private_lock(struct vm_area_struct *vma);
 static inline pte_t *
 hugetlb_walk(struct vm_area_struct *vma, unsigned long addr, unsigned long sz)
 {
-#if defined(CONFIG_HUGETLB_PAGE) && \
-	defined(CONFIG_ARCH_WANT_HUGE_PMD_SHARE) && defined(CONFIG_LOCKDEP)
+#if defined(CONFIG_HUGETLB_PMD_PAGE_TABLE_SHARING) && defined(CONFIG_LOCKDEP)
 	struct hugetlb_vma_lock *vma_lock = vma->vm_private_data;
 
 	/*

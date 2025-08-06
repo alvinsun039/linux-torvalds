@@ -2727,11 +2727,9 @@ static const struct zhaoxin_uncore_init_fun kx7000_uncore_init __initconst = {
 static const struct x86_cpu_id zhaoxin_uncore_match[] __initconst = {
 	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, ZHAOXIN_FAM7_KX5000, &kx5000_uncore_init),
 	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, ZHAOXIN_FAM7_KX6000, &kx5000_uncore_init),
-	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, ZHAOXIN_FAM7_KH40000, &kh40000_uncore_init),
 	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, ZHAOXIN_FAM7_KX7000, &kx7000_uncore_init),
 	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, ZHAOXIN_FAM7_KX5000, &kx5000_uncore_init),
 	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, ZHAOXIN_FAM7_KX6000, &kx5000_uncore_init),
-	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, ZHAOXIN_FAM7_KH40000, &kh40000_uncore_init),
 	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, ZHAOXIN_FAM7_KX7000, &kx7000_uncore_init),
 	{},
 };

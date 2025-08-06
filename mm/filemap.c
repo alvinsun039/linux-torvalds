@@ -2038,17 +2038,20 @@ unsigned find_get_entries(struct address_space *mapping, pgoff_t *start,
 		if (!folio_batch_add(fbatch, folio))
 			break;
 	}
-	rcu_read_unlock();
 
 	if (folio_batch_count(fbatch)) {
-		unsigned long nr = 1;
+		unsigned long nr;
 		int idx = folio_batch_count(fbatch) - 1;
 
 		folio = fbatch->folios[idx];
 		if (!xa_is_value(folio))
 			nr = folio_nr_pages(folio);
-		*start = indices[idx] + nr;
+		else
+			nr = 1 << xa_get_order(&mapping->i_pages, indices[idx]);
+		*start = round_down(indices[idx] + nr, nr);
 	}
+	rcu_read_unlock();
+
 	return folio_batch_count(fbatch);
 }
 
@@ -2080,10 +2083,17 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t *start,
 
 	rcu_read_lock();
 	while ((folio = find_get_entry(&xas, end, XA_PRESENT))) {
+		unsigned long base;
+		unsigned long nr;
+
 		if (!xa_is_value(folio)) {
-			if (folio->index < *start)
+			nr = folio_nr_pages(folio);
+			base = folio->index;
+			/* Omit large folio which begins before the start */
+			if (base < *start)
 				goto put;
-			if (folio_next_index(folio) - 1 > end)
+			/* Omit large folio which extends beyond the end */
+			if (base + nr - 1 > end)
 				goto put;
 			if (!folio_trylock(folio))
 				goto put;
@@ -2092,7 +2102,19 @@ unsigned find_lock_entries(struct address_space *mapping, pgoff_t *start,
 				goto unlock;
 			VM_BUG_ON_FOLIO(!folio_contains(folio, xas.xa_index),
 					folio);
+		} else {
+			nr = 1 << xa_get_order(&mapping->i_pages, xas.xa_index);
+			base = xas.xa_index & ~(nr - 1);
+			/* Omit order>0 value which begins before the start */
+			if (base < *start)
+				continue;
+			/* Omit order>0 value which extends beyond the end */
+			if (base + nr - 1 > end)
+				break;
 		}
+
+		/* Update start now so that last update is correct on return */
+		*start = base + nr;
 		indices[fbatch->nr] = xas.xa_index;
 		if (!folio_batch_add(fbatch, folio))
 			break;
@@ -2104,15 +2126,6 @@ put:
 	}
 	rcu_read_unlock();
 
-	if (folio_batch_count(fbatch)) {
-		unsigned long nr = 1;
-		int idx = folio_batch_count(fbatch) - 1;
-
-		folio = fbatch->folios[idx];
-		if (!xa_is_value(folio))
-			nr = folio_nr_pages(folio);
-		*start = indices[idx] + nr;
-	}
 	return folio_batch_count(fbatch);
 }
 
@@ -2205,6 +2218,10 @@ unsigned filemap_get_folios_contig(struct address_space *mapping,
 		 * No current caller is looking for DAX entries.
 		 */
 		if (xa_is_value(folio))
+			goto update_start;
+
+		/* If we landed in the middle of a THP, continue at its end. */
+		if (xa_is_sibling(folio))
 			goto update_start;
 
 		if (!folio_try_get(folio))
@@ -2995,7 +3012,7 @@ static inline loff_t folio_seek_hole_data(struct xa_state *xas,
 		if (ops->is_partially_uptodate(folio, offset, bsz) ==
 							seek_data)
 			break;
-		start = (start + bsz) & ~(bsz - 1);
+		start = (start + bsz) & ~((u64)bsz - 1);
 		offset += bsz;
 	} while (offset < folio_size(folio));
 unlock:
@@ -4267,6 +4284,20 @@ resched:
 }
 
 /*
+ * See mincore: reveal pagecache information only for files
+ * that the calling process has write access to, or could (if
+ * tried) open for writing.
+ */
+static inline bool can_do_cachestat(struct file *f)
+{
+	if (f->f_mode & FMODE_WRITE)
+		return true;
+	if (inode_owner_or_capable(file_mnt_idmap(f), file_inode(f)))
+		return true;
+	return file_permission(f, MAY_WRITE) == 0;
+}
+
+/*
  * The cachestat(2) system call.
  *
  * cachestat() returns the page cache statistics of a file in the
@@ -4304,7 +4335,7 @@ SYSCALL_DEFINE4(cachestat, unsigned int, fd,
 		struct cachestat_range __user *, cstat_range,
 		struct cachestat __user *, cstat, unsigned int, flags)
 {
-	struct fd f = fdget(fd);
+	CLASS(fd, f)(fd);
 	struct address_space *mapping;
 	struct cachestat_range csr;
 	struct cachestat cs;
@@ -4314,21 +4345,18 @@ SYSCALL_DEFINE4(cachestat, unsigned int, fd,
 		return -EBADF;
 
 	if (copy_from_user(&csr, cstat_range,
-			sizeof(struct cachestat_range))) {
-		fdput(f);
+			sizeof(struct cachestat_range)))
 		return -EFAULT;
-	}
 
 	/* hugetlbfs is not supported */
-	if (is_file_hugepages(f.file)) {
-		fdput(f);
+	if (is_file_hugepages(f.file))
 		return -EOPNOTSUPP;
-	}
 
-	if (flags != 0) {
-		fdput(f);
+	if (!can_do_cachestat(f.file))
+		return -EPERM;
+
+	if (flags != 0)
 		return -EINVAL;
-	}
 
 	first_index = csr.off >> PAGE_SHIFT;
 	last_index =
@@ -4336,7 +4364,6 @@ SYSCALL_DEFINE4(cachestat, unsigned int, fd,
 	memset(&cs, 0, sizeof(struct cachestat));
 	mapping = f.file->f_mapping;
 	filemap_cachestat(mapping, first_index, last_index, &cs);
-	fdput(f);
 
 	if (copy_to_user(cstat, &cs, sizeof(struct cachestat)))
 		return -EFAULT;

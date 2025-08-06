@@ -373,7 +373,6 @@ F:	net/can/
 
 FILESYSTEM DRIVER
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
-M:	Hu Song <husong@kylinos.cn>
 M:	Hu Hai <huhai@kylinos.cn>
 M:	Shida Zhang <zhangshida@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>

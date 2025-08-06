@@ -7,6 +7,7 @@
 #include <linux/kernel.h>
 #include <linux/efi.h>
 #include <linux/export.h>
+#include <linux/filter.h>
 #include <linux/ftrace.h>
 #include <linux/kprobes.h>
 #include <linux/sched.h>
@@ -156,8 +157,10 @@ kunwind_next(struct kunwind_state *state)
 	return kunwind_recover_return_address(state);
 }
 
+typedef bool (*kunwind_consume_fn)(const struct kunwind_state *state, void *cookie);
+
 static __always_inline void
-do_kunwind(struct kunwind_state *state, stack_trace_consume_fn consume_entry,
+do_kunwind(struct kunwind_state *state, kunwind_consume_fn consume_state,
 	   void *cookie)
 {
 	if (kunwind_recover_return_address(state))
@@ -166,7 +169,7 @@ do_kunwind(struct kunwind_state *state, stack_trace_consume_fn consume_entry,
 	while (1) {
 		int ret;
 
-		if (!consume_entry(cookie, state->common.pc))
+		if (!consume_state(state, cookie))
 			break;
 		ret = kunwind_next(state);
 		if (ret < 0)
@@ -203,9 +206,10 @@ do_kunwind(struct kunwind_state *state, stack_trace_consume_fn consume_entry,
 			: stackinfo_get_unknown();		\
 	})
 
-noinline noinstr void arch_stack_walk(stack_trace_consume_fn consume_entry,
-			      void *cookie, struct task_struct *task,
-			      struct pt_regs *regs)
+static __always_inline void
+kunwind_stack_walk(kunwind_consume_fn consume_state,
+		   void *cookie, struct task_struct *task,
+		   struct pt_regs *regs)
 {
 	struct stack_info stacks[] = {
 		stackinfo_get_task(task),
@@ -238,7 +242,56 @@ noinline noinstr void arch_stack_walk(stack_trace_consume_fn consume_entry,
 		kunwind_init_from_task(&state, task);
 	}
 
-	do_kunwind(&state, consume_entry, cookie);
+	do_kunwind(&state, consume_state, cookie);
+}
+
+struct kunwind_consume_entry_data {
+	stack_trace_consume_fn consume_entry;
+	void *cookie;
+};
+
+static __always_inline bool
+arch_kunwind_consume_entry(const struct kunwind_state *state, void *cookie)
+{
+	struct kunwind_consume_entry_data *data = cookie;
+	return data->consume_entry(data->cookie, state->common.pc);
+}
+
+noinline noinstr void arch_stack_walk(stack_trace_consume_fn consume_entry,
+			      void *cookie, struct task_struct *task,
+			      struct pt_regs *regs)
+{
+	struct kunwind_consume_entry_data data = {
+		.consume_entry = consume_entry,
+		.cookie = cookie,
+	};
+
+	kunwind_stack_walk(arch_kunwind_consume_entry, &data, task, regs);
+}
+
+struct bpf_unwind_consume_entry_data {
+	bool (*consume_entry)(void *cookie, u64 ip, u64 sp, u64 fp);
+	void *cookie;
+};
+
+static bool
+arch_bpf_unwind_consume_entry(const struct kunwind_state *state, void *cookie)
+{
+	struct bpf_unwind_consume_entry_data *data = cookie;
+
+	return data->consume_entry(data->cookie, state->common.pc, 0,
+				   state->common.fp);
+}
+
+noinline noinstr void arch_bpf_stack_walk(bool (*consume_entry)(void *cookie, u64 ip, u64 sp,
+								u64 fp), void *cookie)
+{
+	struct bpf_unwind_consume_entry_data data = {
+		.consume_entry = consume_entry,
+		.cookie = cookie,
+	};
+
+	kunwind_stack_walk(arch_bpf_unwind_consume_entry, &data, current, NULL);
 }
 
 static bool dump_backtrace_entry(void *arg, unsigned long where)

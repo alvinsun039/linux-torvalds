@@ -348,7 +348,14 @@ unsigned long zone_reclaimable_pages(struct zone *zone)
 	if (can_reclaim_anon_pages(NULL, zone_to_nid(zone), NULL))
 		nr += zone_page_state_snapshot(zone, NR_ZONE_INACTIVE_ANON) +
 			zone_page_state_snapshot(zone, NR_ZONE_ACTIVE_ANON);
-
+	/*
+	 * If there are no reclaimable file-backed or anonymous pages,
+	 * ensure zones with sufficient free pages are not skipped.
+	 * This prevents zones like DMA32 from being ignored in reclaim
+	 * scenarios where they can still help alleviate memory pressure.
+	 */
+	if (nr == 0)
+		nr = zone_page_state_snapshot(zone, NR_FREE_PAGES);
 	return nr;
 }
 
@@ -603,7 +610,7 @@ typedef enum {
  * Calls ->writepage().
  */
 static pageout_t pageout(struct folio *folio, struct address_space *mapping,
-			 struct swap_iocb **plug)
+			 struct swap_iocb **plug, struct list_head *folio_list)
 {
 	/*
 	 * If the folio is dirty, only perform writeback if that write
@@ -650,6 +657,14 @@ static pageout_t pageout(struct folio *folio, struct address_space *mapping,
 			.for_reclaim = 1,
 			.swap_plug = plug,
 		};
+
+		/*
+		 * The large shmem folio can be split if CONFIG_THP_SWAP is
+		 * not enabled or contiguous swap entries are failed to
+		 * allocate.
+		 */
+		if (shmem_mapping(mapping) && folio_test_large(folio))
+			wbc.list = folio_list;
 
 		folio_set_reclaim(folio);
 		res = mapping->a_ops->writepage(&folio->page, &wbc);
@@ -962,7 +977,8 @@ static unsigned int demote_folio_list(struct list_head *demote_folios,
 		.gfp_mask = (GFP_HIGHUSER_MOVABLE & ~__GFP_RECLAIM) | __GFP_NOWARN |
 			__GFP_NOMEMALLOC | GFP_NOWAIT,
 		.nid = target_nid,
-		.nmask = &allowed_mask
+		.nmask = &allowed_mask,
+		.reason = MR_DEMOTION,
 	};
 
 	if (list_empty(demote_folios))
@@ -1227,11 +1243,6 @@ retry:
 						goto activate_locked_split;
 				}
 			}
-		} else if (folio_test_swapbacked(folio) &&
-			   folio_test_large(folio)) {
-			/* Split shmem folio */
-			if (split_folio_to_list(folio, folio_list))
-				goto keep_locked;
 		}
 
 		/*
@@ -1332,12 +1343,25 @@ retry:
 			 * starts and then write it out here.
 			 */
 			try_to_unmap_flush_dirty();
-			switch (pageout(folio, mapping, &plug)) {
+			switch (pageout(folio, mapping, &plug, folio_list)) {
 			case PAGE_KEEP:
 				goto keep_locked;
 			case PAGE_ACTIVATE:
+				/*
+				 * If shmem folio is split when writeback to swap,
+				 * the tail pages will make their own pass through
+				 * this function and be accounted then.
+				 */
+				if (nr_pages > 1 && !folio_test_large(folio)) {
+					sc->nr_scanned -= (nr_pages - 1);
+					nr_pages = 1;
+				}
 				goto activate_locked;
 			case PAGE_SUCCESS:
+				if (nr_pages > 1 && !folio_test_large(folio)) {
+					sc->nr_scanned -= (nr_pages - 1);
+					nr_pages = 1;
+				}
 				stat->nr_pageout += nr_pages;
 
 				if (folio_test_writeback(folio))
@@ -1431,7 +1455,7 @@ free_it:
 		 */
 		nr_reclaimed += nr_pages;
 
-		folio_undo_large_rmappable(folio);
+		folio_unqueue_deferred_split(folio);
 		if (folio_batch_add(&free_folios, folio) == 0) {
 			mem_cgroup_uncharge_folios(&free_folios);
 			try_to_unmap_flush();
@@ -1819,7 +1843,7 @@ static unsigned int move_folios_to_lru(struct lruvec *lruvec,
 		if (unlikely(folio_put_testzero(folio))) {
 			__folio_clear_lru_flags(folio);
 
-			folio_undo_large_rmappable(folio);
+			folio_unqueue_deferred_split(folio);
 			if (folio_batch_add(&free_folios, folio) == 0) {
 				spin_unlock_irq(&lruvec->lru_lock);
 				mem_cgroup_uncharge_folios(&free_folios);
@@ -2083,7 +2107,7 @@ static unsigned int reclaim_folio_list(struct list_head *folio_list,
 				      struct pglist_data *pgdat,
 				      bool ignore_references)
 {
-	struct reclaim_stat dummy_stat;
+	struct reclaim_stat stat;
 	unsigned int nr_reclaimed;
 	struct folio *folio;
 	struct scan_control sc = {
@@ -2094,12 +2118,13 @@ static unsigned int reclaim_folio_list(struct list_head *folio_list,
 		.no_demotion = 1,
 	};
 
-	nr_reclaimed = shrink_folio_list(folio_list, pgdat, &sc, &dummy_stat, ignore_references);
+	nr_reclaimed = shrink_folio_list(folio_list, pgdat, &sc, &stat, ignore_references);
 	while (!list_empty(folio_list)) {
 		folio = lru_to_folio(folio_list);
 		list_del(&folio->lru);
 		folio_putback_lru(folio);
 	}
+	trace_mm_vmscan_reclaim_pages(pgdat->node_id, sc.nr_scanned, nr_reclaimed, &stat);
 
 	return nr_reclaimed;
 }
@@ -6095,9 +6120,9 @@ static void shrink_zones(struct zonelist *zonelist, struct scan_control *sc)
 			 * and balancing, not for a memcg's limit.
 			 */
 			nr_soft_scanned = 0;
-			nr_soft_reclaimed = mem_cgroup_soft_limit_reclaim(zone->zone_pgdat,
-						sc->order, sc->gfp_mask,
-						&nr_soft_scanned);
+			nr_soft_reclaimed = memcg1_soft_limit_reclaim(zone->zone_pgdat,
+								      sc->order, sc->gfp_mask,
+								      &nr_soft_scanned);
 			sc->nr_reclaimed += nr_soft_reclaimed;
 			sc->nr_scanned += nr_soft_scanned;
 			/* need some check for avoid more shrink_zone() */
@@ -6845,8 +6870,8 @@ restart:
 		/* Call soft limit reclaim before calling shrink_node. */
 		sc.nr_scanned = 0;
 		nr_soft_scanned = 0;
-		nr_soft_reclaimed = mem_cgroup_soft_limit_reclaim(pgdat, sc.order,
-						sc.gfp_mask, &nr_soft_scanned);
+		nr_soft_reclaimed = memcg1_soft_limit_reclaim(pgdat, sc.order,
+							      sc.gfp_mask, &nr_soft_scanned);
 		sc.nr_reclaimed += nr_soft_reclaimed;
 
 		/*

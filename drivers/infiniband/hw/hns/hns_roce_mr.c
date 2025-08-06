@@ -155,7 +155,7 @@ static void hns_roce_mr_free(struct hns_roce_dev *hr_dev, struct hns_roce_mr *mr
 					      (hr_dev->caps.num_mtpts - 1));
 		if (ret)
 			ibdev_warn_ratelimited(ibdev, "failed to destroy mpt, ret = %d.\n",
-				   ret);
+					       ret);
 		if (ret == -EBUSY)
 			mr->delayed_destroy_flag = true;
 	}
@@ -180,7 +180,7 @@ static int hns_roce_mr_enable(struct hns_roce_dev *hr_dev,
 	if (mr->type != MR_TYPE_FRMR)
 		ret = hr_dev->hw->write_mtpt(hr_dev, mailbox->buf, mr);
 	else
-		ret = hr_dev->hw->frmr_write_mtpt(hr_dev, mailbox->buf, mr);
+		ret = hr_dev->hw->frmr_write_mtpt(mailbox->buf, mr);
 	if (ret) {
 		dev_err(dev, "failed to write mtpt, ret = %d.\n", ret);
 		goto err_page;
@@ -775,7 +775,7 @@ static int mtr_map_bufs(struct hns_roce_dev *hr_dev, struct hns_roce_mtr *mtr)
 		return -ENOMEM;
 
 	if (mtr->umem)
-		npage = hns_roce_get_umem_bufs(hr_dev, pages, page_count,
+		npage = hns_roce_get_umem_bufs(pages, page_count,
 					       mtr->umem, page_shift);
 	else
 		npage = hns_roce_get_kmem_bufs(hr_dev, pages, page_count,
@@ -828,11 +828,6 @@ int hns_roce_mtr_map(struct hns_roce_dev *hr_dev, struct hns_roce_mtr *mtr,
 	for (i = 0, mapped_cnt = 0; i < mtr->hem_cfg.region_count &&
 	     mapped_cnt < page_cnt; i++) {
 		r = &mtr->hem_cfg.region[i];
-		/* if hopnum is 0, no need to map pages in this region */
-		if (!r->hopnum) {
-			mapped_cnt += r->count;
-			continue;
-		}
 
 		if (r->offset + r->count > page_cnt) {
 			ret = -EINVAL;

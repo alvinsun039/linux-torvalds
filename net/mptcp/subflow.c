@@ -542,6 +542,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 		subflow->mp_capable = 1;
 		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_MPCAPABLEACTIVEACK);
 		mptcp_finish_connect(sk);
+		mptcp_active_enable(parent);
 		mptcp_propagate_state(parent, sk, subflow, &mp_opt);
 	} else if (subflow->request_join) {
 		u8 hmac[SHA256_DIGEST_SIZE];
@@ -587,6 +588,9 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_JOINPORTSYNACKRX);
 		}
 	} else if (mptcp_check_fallback(sk)) {
+		/* It looks like MPTCP is blocked, while TCP is not */
+		if (subflow->mpc_drop)
+			mptcp_active_disable(parent);
 fallback:
 		mptcp_propagate_state(parent, sk, subflow, NULL);
 	}
@@ -781,7 +785,7 @@ void __mptcp_subflow_fully_established(struct mptcp_sock *msk,
 				       const struct mptcp_options_received *mp_opt)
 {
 	subflow_set_remote_key(msk, subflow, mp_opt);
-	subflow->fully_established = 1;
+	WRITE_ONCE(subflow->fully_established, true);
 	WRITE_ONCE(msk->fully_established, true);
 
 	if (subflow->is_mptfo)
@@ -950,7 +954,8 @@ enum mapping_status {
 	MAPPING_EMPTY,
 	MAPPING_DATA_FIN,
 	MAPPING_DUMMY,
-	MAPPING_BAD_CSUM
+	MAPPING_BAD_CSUM,
+	MAPPING_NODSS
 };
 
 static void dbg_bad_map(struct mptcp_subflow_context *subflow, u32 ssn)
@@ -1107,8 +1112,9 @@ static enum mapping_status get_mapping_status(struct sock *ssk,
 			return MAPPING_EMPTY;
 		}
 
+		/* If the required DSS has likely been dropped by a middlebox */
 		if (!subflow->map_valid)
-			return MAPPING_INVALID;
+			return MAPPING_NODSS;
 
 		goto validate_seq;
 	}
@@ -1322,7 +1328,7 @@ static bool subflow_check_data_avail(struct sock *ssk)
 		status = get_mapping_status(ssk, msk);
 		trace_subflow_check_data_avail(status, skb_peek(&ssk->sk_receive_queue));
 		if (unlikely(status == MAPPING_INVALID || status == MAPPING_DUMMY ||
-			     status == MAPPING_BAD_CSUM))
+			     status == MAPPING_BAD_CSUM || status == MAPPING_NODSS))
 			goto fallback;
 
 		if (status != MAPPING_OK)
@@ -1375,7 +1381,9 @@ fallback:
 			 * subflow_error_report() will introduce the appropriate barriers
 			 */
 			subflow->reset_transient = 0;
-			subflow->reset_reason = MPTCP_RST_EMPTCP;
+			subflow->reset_reason = status == MAPPING_NODSS ?
+						MPTCP_RST_EMIDDLEBOX :
+						MPTCP_RST_EMPTCP;
 
 reset:
 			WRITE_ONCE(ssk->sk_err, EBADMSG);
@@ -2041,7 +2049,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	} else if (subflow_req->mp_join) {
 		new_ctx->ssn_offset = subflow_req->ssn_offset;
 		new_ctx->mp_join = 1;
-		new_ctx->fully_established = 1;
+		WRITE_ONCE(new_ctx->fully_established, true);
 		new_ctx->remote_key_valid = 1;
 		new_ctx->backup = subflow_req->backup;
 		new_ctx->request_bkup = subflow_req->request_bkup;

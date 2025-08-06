@@ -1931,7 +1931,7 @@ static inline void setup_vmalloc_vm(struct vm_struct *vm,
 {
 	vm->flags = flags;
 	vm->addr = (void *)va->va_start;
-	vm->size = va->va_end - va->va_start;
+	vm->size = va_size(va);
 	vm->caller = caller;
 	va->vm = vm;
 }
@@ -1944,8 +1944,7 @@ static struct vmap_area *alloc_vmap_area(unsigned long size,
 				unsigned long align,
 				unsigned long vstart, unsigned long vend,
 				int node, gfp_t gfp_mask,
-				unsigned long va_flags, struct vm_struct *vm,
-				unsigned long flags, const void *caller)
+				unsigned long va_flags, struct vm_struct *vm)
 {
 	struct vmap_node *vn;
 	struct vmap_area *va;
@@ -2008,8 +2007,11 @@ retry:
 	va->vm = NULL;
 	va->flags = (va_flags | vn_id);
 
-	if (vm)
-		setup_vmalloc_vm(vm, va, flags, caller);
+	if (vm) {
+		vm->addr = (void *)va->va_start;
+		vm->size = va_size(va);
+		va->vm = vm;
+	}
 
 	vn = addr_to_node(va->va_start);
 
@@ -2176,28 +2178,45 @@ decay_va_pool_node(struct vmap_node *vn, bool full_decay)
 	reclaim_list_global(&decay_list);
 }
 
+static void
+kasan_release_vmalloc_node(struct vmap_node *vn)
+{
+	struct vmap_area *va;
+	unsigned long start, end;
+
+	start = list_first_entry(&vn->purge_list, struct vmap_area, list)->va_start;
+	end = list_last_entry(&vn->purge_list, struct vmap_area, list)->va_end;
+
+	list_for_each_entry(va, &vn->purge_list, list) {
+		if (is_vmalloc_or_module_addr((void *) va->va_start))
+			kasan_release_vmalloc(va->va_start, va->va_end,
+				va->va_start, va->va_end,
+				KASAN_VMALLOC_PAGE_RANGE);
+	}
+
+	kasan_release_vmalloc(start, end, start, end, KASAN_VMALLOC_TLB_FLUSH);
+}
+
 static void purge_vmap_node(struct work_struct *work)
 {
 	struct vmap_node *vn = container_of(work,
 		struct vmap_node, purge_work);
+	unsigned long nr_purged_pages = 0;
 	struct vmap_area *va, *n_va;
 	LIST_HEAD(local_list);
+
+	if (IS_ENABLED(CONFIG_KASAN_VMALLOC))
+		kasan_release_vmalloc_node(vn);
 
 	vn->nr_purged = 0;
 
 	list_for_each_entry_safe(va, n_va, &vn->purge_list, list) {
-		unsigned long nr = (va->va_end - va->va_start) >> PAGE_SHIFT;
-		unsigned long orig_start = va->va_start;
-		unsigned long orig_end = va->va_end;
+		unsigned long nr = va_size(va) >> PAGE_SHIFT;
 		unsigned int vn_id = decode_vn_id(va->flags);
 
 		list_del_init(&va->list);
 
-		if (is_vmalloc_or_module_addr((void *)orig_start))
-			kasan_release_vmalloc(orig_start, orig_end,
-					      va->va_start, va->va_end);
-
-		atomic_long_sub(nr, &vmap_lazy_nr);
+		nr_purged_pages += nr;
 		vn->nr_purged++;
 
 		if (is_vn_id_valid(vn_id) && !vn->skip_populate)
@@ -2207,6 +2226,8 @@ static void purge_vmap_node(struct work_struct *work)
 		/* Go back to global. */
 		list_add(&va->list, &local_list);
 	}
+
+	atomic_long_sub(nr_purged_pages, &vmap_lazy_nr);
 
 	reclaim_list_global(&local_list);
 }
@@ -2330,8 +2351,8 @@ static void free_vmap_area_noflush(struct vmap_area *va)
 	if (WARN_ON_ONCE(!list_empty(&va->list)))
 		return;
 
-	nr_lazy = atomic_long_add_return((va->va_end - va->va_start) >>
-				PAGE_SHIFT, &vmap_lazy_nr);
+	nr_lazy = atomic_long_add_return(va_size(va) >> PAGE_SHIFT,
+					 &vmap_lazy_nr);
 
 	/*
 	 * If it was request by a certain node we would like to
@@ -2597,8 +2618,7 @@ static void *new_vmap_block(unsigned int order, gfp_t gfp_mask)
 	va = alloc_vmap_area(VMAP_BLOCK_SIZE, VMAP_BLOCK_SIZE,
 					VMALLOC_START, VMALLOC_END,
 					node, gfp_mask,
-					VMAP_RAM|VMAP_BLOCK, NULL,
-					0, NULL);
+					VMAP_RAM|VMAP_BLOCK, NULL);
 	if (IS_ERR(va)) {
 		kfree(vb);
 		return ERR_CAST(va);
@@ -2928,8 +2948,7 @@ void vm_unmap_ram(const void *mem, unsigned int count)
 	if (WARN_ON_ONCE(!va))
 		return;
 
-	debug_check_no_locks_freed((void *)va->va_start,
-				    (va->va_end - va->va_start));
+	debug_check_no_locks_freed((void *)va->va_start, va_size(va));
 	free_unmap_vmap_area(va);
 }
 EXPORT_SYMBOL(vm_unmap_ram);
@@ -2964,7 +2983,7 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node)
 		va = alloc_vmap_area(size, PAGE_SIZE,
 				VMALLOC_START, VMALLOC_END,
 				node, GFP_KERNEL, VMAP_RAM,
-				NULL, 0, NULL);
+				NULL);
 		if (IS_ERR(va))
 			return NULL;
 
@@ -3103,7 +3122,10 @@ static struct vm_struct *__get_vm_area_node(unsigned long size,
 	if (!(flags & VM_NO_GUARD))
 		size += PAGE_SIZE;
 
-	va = alloc_vmap_area(size, align, start, end, node, gfp_mask, 0, area, flags, caller);
+	area->flags = flags;
+	area->caller = caller;
+
+	va = alloc_vmap_area(size, align, start, end, node, gfp_mask, 0, area);
 	if (IS_ERR(va)) {
 		kfree(area);
 		return NULL;
@@ -4709,7 +4731,8 @@ recovery:
 				&free_vmap_area_list);
 		if (va)
 			kasan_release_vmalloc(orig_start, orig_end,
-				va->va_start, va->va_end);
+				va->va_start, va->va_end,
+				KASAN_VMALLOC_PAGE_RANGE | KASAN_VMALLOC_TLB_FLUSH);
 		vas[area] = NULL;
 	}
 
@@ -4759,7 +4782,8 @@ err_free_shadow:
 				&free_vmap_area_list);
 		if (va)
 			kasan_release_vmalloc(orig_start, orig_end,
-				va->va_start, va->va_end);
+				va->va_start, va->va_end,
+				KASAN_VMALLOC_PAGE_RANGE | KASAN_VMALLOC_TLB_FLUSH);
 		vas[area] = NULL;
 		kfree(vms[area]);
 	}
@@ -4859,7 +4883,7 @@ static void show_purge_info(struct seq_file *m)
 		list_for_each_entry(va, &vn->lazy.head, list) {
 			seq_printf(m, "0x%pK-0x%pK %7ld unpurged vm_area\n",
 				(void *)va->va_start, (void *)va->va_end,
-				va->va_end - va->va_start);
+				va_size(va));
 		}
 		spin_unlock(&vn->lazy.lock);
 	}
@@ -4881,7 +4905,7 @@ static int vmalloc_info_show(struct seq_file *m, void *p)
 				if (va->flags & VMAP_RAM)
 					seq_printf(m, "0x%pK-0x%pK %7ld vm_map_ram\n",
 						(void *)va->va_start, (void *)va->va_end,
-						va->va_end - va->va_start);
+						va_size(va));
 
 				continue;
 			}

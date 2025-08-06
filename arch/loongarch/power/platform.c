@@ -17,7 +17,7 @@ void enable_gpe_wakeup(void)
 	if (acpi_gbl_reduced_hardware)
 	       return;
 
-	acpi_enable_all_wakeup_gpes();
+	acpi_hw_enable_all_wakeup_gpes();
 }
 
 void enable_pci_wakeup(void)
@@ -49,7 +49,7 @@ static int __init loongson3_acpi_suspend_init(void)
 		pr_err("ACPI S3 is not support!\n");
 		return -1;
 	}
-	loongson_sysconf.suspend_addr = (u64)phys_to_virt(PHYSADDR(suspend_addr));
+	loongson_sysconf.suspend_addr = (u64)__va(PHYSADDR(suspend_addr));
 #endif
 	return 0;
 }

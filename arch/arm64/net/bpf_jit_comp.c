@@ -26,7 +26,7 @@
 
 #define TMP_REG_1 (MAX_BPF_JIT_REG + 0)
 #define TMP_REG_2 (MAX_BPF_JIT_REG + 1)
-#define TCALL_CNT (MAX_BPF_JIT_REG + 2)
+#define TCCNT_PTR (MAX_BPF_JIT_REG + 2)
 #define TMP_REG_3 (MAX_BPF_JIT_REG + 3)
 #define FP_BOTTOM (MAX_BPF_JIT_REG + 4)
 
@@ -62,8 +62,8 @@ static const int bpf2a64[] = {
 	[TMP_REG_1] = A64_R(10),
 	[TMP_REG_2] = A64_R(11),
 	[TMP_REG_3] = A64_R(12),
-	/* tail_call_cnt */
-	[TCALL_CNT] = A64_R(26),
+	/* tail_call_cnt_ptr */
+	[TCCNT_PTR] = A64_R(26),
 	/* temporary register for blinding constants */
 	[BPF_REG_AX] = A64_R(9),
 	[FP_BOTTOM] = A64_R(27),
@@ -278,12 +278,34 @@ static bool is_lsi_offset(int offset, int scale)
  *      mov x29, sp
  *      stp x19, x20, [sp, #-16]!
  *      stp x21, x22, [sp, #-16]!
- *      stp x25, x26, [sp, #-16]!
+ *      stp x26, x25, [sp, #-16]!
+ *      stp x26, x25, [sp, #-16]!
  *      stp x27, x28, [sp, #-16]!
  *      mov x25, sp
  *      mov tcc, #0
  *      // PROLOGUE_OFFSET
  */
+
+static void prepare_bpf_tail_call_cnt(struct jit_ctx *ctx)
+{
+	const struct bpf_prog *prog = ctx->prog;
+	const bool is_main_prog = !bpf_is_subprog(prog);
+	const u8 ptr = bpf2a64[TCCNT_PTR];
+	const u8 fp = bpf2a64[BPF_REG_FP];
+	const u8 tcc = ptr;
+
+	emit(A64_PUSH(ptr, fp, A64_SP), ctx);
+	if (is_main_prog) {
+		/* Initialize tail_call_cnt. */
+		emit(A64_MOVZ(1, tcc, 0, 0), ctx);
+		emit(A64_PUSH(tcc, fp, A64_SP), ctx);
+		emit(A64_MOV(1, ptr, A64_SP), ctx);
+	} else {
+		emit(A64_PUSH(ptr, fp, A64_SP), ctx);
+		emit(A64_NOP, ctx);
+		emit(A64_NOP, ctx);
+	}
+}
 
 #define BTI_INSNS (IS_ENABLED(CONFIG_ARM64_BTI_KERNEL) ? 1 : 0)
 #define PAC_INSNS (IS_ENABLED(CONFIG_ARM64_PTR_AUTH_KERNEL) ? 1 : 0)
@@ -292,9 +314,10 @@ static bool is_lsi_offset(int offset, int scale)
 #define POKE_OFFSET (BTI_INSNS + 1)
 
 /* Tail call offset to jump into */
-#define PROLOGUE_OFFSET (BTI_INSNS + 2 + PAC_INSNS + 8)
+#define PROLOGUE_OFFSET (BTI_INSNS + 2 + PAC_INSNS + 10)
 
-static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
+static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf,
+			  bool is_exception_cb)
 {
 	const struct bpf_prog *prog = ctx->prog;
 	const bool is_main_prog = !bpf_is_subprog(prog);
@@ -303,7 +326,6 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 	const u8 r8 = bpf2a64[BPF_REG_8];
 	const u8 r9 = bpf2a64[BPF_REG_9];
 	const u8 fp = bpf2a64[BPF_REG_FP];
-	const u8 tcc = bpf2a64[TCALL_CNT];
 	const u8 fpb = bpf2a64[FP_BOTTOM];
 	const int idx0 = ctx->idx;
 	int cur_offset;
@@ -342,27 +364,39 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 	emit(A64_MOV(1, A64_R(9), A64_LR), ctx);
 	emit(A64_NOP, ctx);
 
-	/* Sign lr */
-	if (IS_ENABLED(CONFIG_ARM64_PTR_AUTH_KERNEL))
-		emit(A64_PACIASP, ctx);
+	if (!is_exception_cb) {
+		/* Sign lr */
+		if (IS_ENABLED(CONFIG_ARM64_PTR_AUTH_KERNEL))
+			emit(A64_PACIASP, ctx);
+		/* Save FP and LR registers to stay align with ARM64 AAPCS */
+		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
+		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
 
-	/* Save FP and LR registers to stay align with ARM64 AAPCS */
-	emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
-	emit(A64_MOV(1, A64_FP, A64_SP), ctx);
-
-	/* Save callee-saved registers */
-	emit(A64_PUSH(r6, r7, A64_SP), ctx);
-	emit(A64_PUSH(r8, r9, A64_SP), ctx);
-	emit(A64_PUSH(fp, tcc, A64_SP), ctx);
-	emit(A64_PUSH(fpb, A64_R(28), A64_SP), ctx);
+		/* Save callee-saved registers */
+		emit(A64_PUSH(r6, r7, A64_SP), ctx);
+		emit(A64_PUSH(r8, r9, A64_SP), ctx);
+		prepare_bpf_tail_call_cnt(ctx);
+		emit(A64_PUSH(fpb, A64_R(28), A64_SP), ctx);
+	} else {
+		/*
+		 * Exception callback receives FP of Main Program as third
+		 * parameter
+		 */
+		emit(A64_MOV(1, A64_FP, A64_R(2)), ctx);
+		/*
+		 * Main Program already pushed the frame record and the
+		 * callee-saved registers. The exception callback will not push
+		 * anything and re-use the main program's stack.
+		 *
+		 * 12 registers are on the stack
+		 */
+		emit(A64_SUB_I(1, A64_SP, A64_FP, 96), ctx);
+	}
 
 	/* Set up BPF prog stack base register */
 	emit(A64_MOV(1, fp, A64_SP), ctx);
 
 	if (!ebpf_from_cbpf && is_main_prog) {
-		/* Initialize tail_call_cnt */
-		emit(A64_MOVZ(1, tcc, 0, 0), ctx);
-
 		cur_offset = ctx->idx - idx0;
 		if (cur_offset != PROLOGUE_OFFSET) {
 			pr_err_once("PROLOGUE_OFFSET = %d, expected %d!\n",
@@ -372,6 +406,20 @@ static int build_prologue(struct jit_ctx *ctx, bool ebpf_from_cbpf)
 
 		/* BTI landing pad for the tail call, done with a BR */
 		emit_bti(A64_BTI_J, ctx);
+	}
+
+	/*
+	 * Program acting as exception boundary should save all ARM64
+	 * Callee-saved registers as the exception callback needs to recover
+	 * all ARM64 Callee-saved registers in its epilogue.
+	 */
+	if (prog->aux->exception_boundary) {
+		/*
+		 * As we are pushing two more registers, BPF_FP should be moved
+		 * 16 bytes
+		 */
+		emit(A64_SUB_I(1, fp, fp, 16), ctx);
+		emit(A64_PUSH(A64_R(23), A64_R(24), A64_SP), ctx);
 	}
 
 	emit(A64_SUB_I(1, fpb, fp, ctx->fpb_offset), ctx);
@@ -393,7 +441,8 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 
 	const u8 tmp = bpf2a64[TMP_REG_1];
 	const u8 prg = bpf2a64[TMP_REG_2];
-	const u8 tcc = bpf2a64[TCALL_CNT];
+	const u8 tcc = bpf2a64[TMP_REG_3];
+	const u8 ptr = bpf2a64[TCCNT_PTR];
 	const int idx0 = ctx->idx;
 #define cur_offset (ctx->idx - idx0)
 #define jmp_offset (out_offset - (cur_offset))
@@ -410,11 +459,12 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	emit(A64_B_(A64_COND_CS, jmp_offset), ctx);
 
 	/*
-	 * if (tail_call_cnt >= MAX_TAIL_CALL_CNT)
+	 * if ((*tail_call_cnt_ptr) >= MAX_TAIL_CALL_CNT)
 	 *     goto out;
-	 * tail_call_cnt++;
+	 * (*tail_call_cnt_ptr)++;
 	 */
 	emit_a64_mov_i64(tmp, MAX_TAIL_CALL_CNT, ctx);
+	emit(A64_LDR64I(tcc, ptr, 0), ctx);
 	emit(A64_CMP(1, tcc, tmp), ctx);
 	emit(A64_B_(A64_COND_CS, jmp_offset), ctx);
 	emit(A64_ADD_I(1, tcc, tcc, 1), ctx);
@@ -429,6 +479,9 @@ static int emit_bpf_tail_call(struct jit_ctx *ctx)
 	emit(A64_LSL(1, prg, r3, 3), ctx);
 	emit(A64_LDR64(prg, tmp, prg), ctx);
 	emit(A64_CBZ(1, prg, jmp_offset), ctx);
+
+	/* Update tail_call_cnt if the slot is populated. */
+	emit(A64_STR64I(tcc, ptr, 0), ctx);
 
 	/* goto *(prog->bpf_func + prologue_offset); */
 	off = offsetof(struct bpf_prog, bpf_func);
@@ -662,7 +715,7 @@ static void build_plt(struct jit_ctx *ctx)
 		plt->target = (u64)&dummy_tramp;
 }
 
-static void build_epilogue(struct jit_ctx *ctx)
+static void build_epilogue(struct jit_ctx *ctx, bool is_exception_cb)
 {
 	const u8 r0 = bpf2a64[BPF_REG_0];
 	const u8 r6 = bpf2a64[BPF_REG_6];
@@ -670,15 +723,26 @@ static void build_epilogue(struct jit_ctx *ctx)
 	const u8 r8 = bpf2a64[BPF_REG_8];
 	const u8 r9 = bpf2a64[BPF_REG_9];
 	const u8 fp = bpf2a64[BPF_REG_FP];
+	const u8 ptr = bpf2a64[TCCNT_PTR];
 	const u8 fpb = bpf2a64[FP_BOTTOM];
 
 	/* We're done with BPF stack */
 	emit(A64_ADD_I(1, A64_SP, A64_SP, ctx->stack_size), ctx);
 
+	/*
+	 * Program acting as exception boundary pushes R23 and R24 in addition
+	 * to BPF callee-saved registers. Exception callback uses the boundary
+	 * program's stack frame, so recover these extra registers in the above
+	 * two cases.
+	 */
+	if (ctx->prog->aux->exception_boundary || is_exception_cb)
+		emit(A64_POP(A64_R(23), A64_R(24), A64_SP), ctx);
+
 	/* Restore x27 and x28 */
 	emit(A64_POP(fpb, A64_R(28), A64_SP), ctx);
 	/* Restore fs (x25) and x26 */
-	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
+	emit(A64_POP(ptr, fp, A64_SP), ctx);
+	emit(A64_POP(ptr, fp, A64_SP), ctx);
 
 	/* Restore callee-saved register */
 	emit(A64_POP(r8, r9, A64_SP), ctx);
@@ -1609,7 +1673,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	 * BPF line info needs ctx->offset[i] to be the offset of
 	 * instruction[i] in jited image, so build prologue first.
 	 */
-	if (build_prologue(&ctx, was_classic)) {
+	if (build_prologue(&ctx, was_classic, prog->aux->exception_cb)) {
 		prog = orig_prog;
 		goto out_off;
 	}
@@ -1620,7 +1684,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	}
 
 	ctx.epilogue_offset = ctx.idx;
-	build_epilogue(&ctx);
+	build_epilogue(&ctx, prog->aux->exception_cb);
 	build_plt(&ctx);
 
 	extable_align = __alignof__(struct exception_table_entry);
@@ -1657,14 +1721,14 @@ skip_init_ctx:
 	ctx.idx = 0;
 	ctx.exentry_idx = 0;
 
-	build_prologue(&ctx, was_classic);
+	build_prologue(&ctx, was_classic, prog->aux->exception_cb);
 
 	if (build_body(&ctx, extra_pass)) {
 		prog = orig_prog;
 		goto out_free_hdr;
 	}
 
-	build_epilogue(&ctx);
+	build_epilogue(&ctx, prog->aux->exception_cb);
 	build_plt(&ctx);
 
 	/* 3. Extra pass to validate JITed code. */
@@ -2451,4 +2515,14 @@ void bpf_jit_free(struct bpf_prog *prog)
 	}
 
 	bpf_prog_unlock_free(prog);
+}
+
+bool bpf_jit_supports_exceptions(void)
+{
+	/* We unwind through both kernel frames starting from within bpf_throw
+	 * call and BPF frames. Therefore we require FP unwinder to be enabled
+	 * to walk kernel frames and reach BPF frames in the stack trace.
+	 * ARM64 kernel is aways compiled with CONFIG_FRAME_POINTER=y
+	 */
+	return true;
 }

@@ -4423,20 +4423,6 @@ static u64 reg_const_value(struct bpf_reg_state *reg, bool subreg32)
 	return subreg32 ? tnum_subreg(reg->var_off).value : reg->var_off.value;
 }
 
-static bool __is_scalar_unbounded(struct bpf_reg_state *reg)
-{
-	return tnum_is_unknown(reg->var_off) &&
-	       reg->smin_value == S64_MIN && reg->smax_value == S64_MAX &&
-	       reg->umin_value == 0 && reg->umax_value == U64_MAX &&
-	       reg->s32_min_value == S32_MIN && reg->s32_max_value == S32_MAX &&
-	       reg->u32_min_value == 0 && reg->u32_max_value == U32_MAX;
-}
-
-static bool register_is_bounded(struct bpf_reg_state *reg)
-{
-	return reg->type == SCALAR_VALUE && !__is_scalar_unbounded(reg);
-}
-
 static bool __is_pointer_value(bool allow_ptr_leaks,
 			       const struct bpf_reg_state *reg)
 {
@@ -4560,11 +4546,16 @@ static int check_stack_write_fixed_off(struct bpf_verifier_env *env,
 		return err;
 
 	mark_stack_slot_scratched(env, spi);
-	if (reg && !(off % BPF_REG_SIZE) && register_is_bounded(reg) &&
-	    !register_is_null(reg) && env->bpf_capable) {
+	if (reg && !(off % BPF_REG_SIZE) && reg->type == SCALAR_VALUE && env->bpf_capable) {
+		bool reg_value_fits;
+
+		reg_value_fits = get_reg_width(reg) <= BITS_PER_BYTE * size;
+		/* Make sure that reg had an ID to build a relation on spill. */
+		if (reg_value_fits)
+			assign_scalar_id_before_mov(env, reg);
 		save_register_state(env, state, spi, reg, size);
 		/* Break the relation on a narrowing spill. */
-		if (get_reg_width(reg) > BITS_PER_BYTE * size)
+		if (!reg_value_fits)
 			state->stack[spi].spilled_ptr.id = 0;
 	} else if (!reg && !(off % BPF_REG_SIZE) && is_bpf_st_mem(insn) &&
 		   env->bpf_capable) {
@@ -4610,7 +4601,12 @@ static int check_stack_write_fixed_off(struct bpf_verifier_env *env,
 		/* when we zero initialize stack slots mark them as such */
 		if ((reg && register_is_null(reg)) ||
 		    (!reg && is_bpf_st_mem(insn) && insn->imm == 0)) {
-			/* backtracking doesn't work for STACK_ZERO yet. */
+			/* STACK_ZERO case happened because register spill
+			 * wasn't properly aligned at the stack slot boundary,
+			 * so it's not a register spill anymore; force
+			 * originating register to be precise to make
+			 * STACK_ZERO correct for subsequent states
+			 */
 			err = mark_chain_precision(env, value_regno);
 			if (err)
 				return err;
@@ -4850,7 +4846,8 @@ static int check_stack_read_fixed_off(struct bpf_verifier_env *env,
 			if (dst_regno < 0)
 				return 0;
 
-			if (!(off % BPF_REG_SIZE) && size == spill_size) {
+			if (size <= spill_size &&
+			    bpf_stack_narrow_access_ok(off, size, spill_size)) {
 				/* The earlier check_reg_arg() has decided the
 				 * subreg_def for this insn.  Save it first.
 				 */
@@ -4858,23 +4855,46 @@ static int check_stack_read_fixed_off(struct bpf_verifier_env *env,
 
 				copy_register_state(&state->regs[dst_regno], reg);
 				state->regs[dst_regno].subreg_def = subreg_def;
+
+				/* Break the relation on a narrowing fill.
+				 * coerce_reg_to_size will adjust the boundaries.
+				 */
+				if (get_reg_width(reg) > size * BITS_PER_BYTE)
+					state->regs[dst_regno].id = 0;
 			} else {
+				int spill_cnt = 0, zero_cnt = 0;
+
 				for (i = 0; i < size; i++) {
 					type = stype[(slot - i) % BPF_REG_SIZE];
-					if (type == STACK_SPILL)
+					if (type == STACK_SPILL) {
+						spill_cnt++;
 						continue;
+					}
 					if (type == STACK_MISC)
 						continue;
-					if (type == STACK_ZERO)
+					if (type == STACK_ZERO) {
+						zero_cnt++;
 						continue;
+					}
 					if (type == STACK_INVALID && env->allow_uninit_stack)
 						continue;
 					verbose(env, "invalid read from stack off %d+%d size %d\n",
 						off, i, size);
 					return -EACCES;
 				}
-				mark_reg_unknown(env, state->regs, dst_regno);
-				insn_flags = 0; /* not restoring original register state */
+
+				if (spill_cnt == size &&
+				    tnum_is_const(reg->var_off) && reg->var_off.value == 0) {
+					__mark_reg_const_zero(&state->regs[dst_regno]);
+					/* this IS register fill, so keep insn_flags */
+				} else if (zero_cnt == size) {
+					/* similarly to mark_reg_stack_read(), preserve zeroes */
+					__mark_reg_const_zero(&state->regs[dst_regno]);
+					insn_flags = 0; /* not restoring original register state */
+				} else {
+					mark_reg_unknown(env, state->regs, dst_regno);
+					insn_flags = 0; /* not restoring original register state */
+				}
 			}
 			state->regs[dst_regno].live |= REG_LIVE_WRITTEN;
 		} else if (dst_regno >= 0) {
@@ -6099,10 +6119,10 @@ static void coerce_reg_to_size(struct bpf_reg_state *reg, int size)
 	 * values are also truncated so we push 64-bit bounds into
 	 * 32-bit bounds. Above were truncated < 32-bits already.
 	 */
-	if (size < 4) {
+	if (size < 4)
 		__mark_reg32_unbounded(reg);
-		reg_bounds_sync(reg);
-	}
+
+	reg_bounds_sync(reg);
 }
 
 static void set_sext64_default_val(struct bpf_reg_state *reg, int size)
@@ -8499,6 +8519,54 @@ static enum bpf_dynptr_type dynptr_get_type(struct bpf_verifier_env *env,
 	return state->stack[spi].spilled_ptr.dynptr.type;
 }
 
+static int check_reg_const_str(struct bpf_verifier_env *env,
+			       struct bpf_reg_state *reg, u32 regno)
+{
+	struct bpf_map *map = reg->map_ptr;
+	int err;
+	int map_off;
+	u64 map_addr;
+	char *str_ptr;
+
+	if (reg->type != PTR_TO_MAP_VALUE)
+		return -EINVAL;
+
+	if (!bpf_map_is_rdonly(map)) {
+		verbose(env, "R%d does not point to a readonly map'\n", regno);
+		return -EACCES;
+	}
+
+	if (!tnum_is_const(reg->var_off)) {
+		verbose(env, "R%d is not a constant address'\n", regno);
+		return -EACCES;
+	}
+
+	if (!map->ops->map_direct_value_addr) {
+		verbose(env, "no direct value access support for this map type\n");
+		return -EACCES;
+	}
+
+	err = check_map_access(env, regno, reg->off,
+			       map->value_size - reg->off, false,
+			       ACCESS_HELPER);
+	if (err)
+		return err;
+
+	map_off = reg->off + reg->var_off.value;
+	err = map->ops->map_direct_value_addr(map, &map_addr, map_off);
+	if (err) {
+		verbose(env, "direct value access on string failed\n");
+		return err;
+	}
+
+	str_ptr = (char *)(long)(map_addr);
+	if (!strnchr(str_ptr + map_off, map->value_size - map_off, 0)) {
+		verbose(env, "string is not zero-terminated\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int check_func_arg(struct bpf_verifier_env *env, u32 arg,
 			  struct bpf_call_arg_meta *meta,
 			  const struct bpf_func_proto *fn,
@@ -8741,44 +8809,9 @@ skip_type_check:
 		break;
 	case ARG_PTR_TO_CONST_STR:
 	{
-		struct bpf_map *map = reg->map_ptr;
-		int map_off;
-		u64 map_addr;
-		char *str_ptr;
-
-		if (!bpf_map_is_rdonly(map)) {
-			verbose(env, "R%d does not point to a readonly map'\n", regno);
-			return -EACCES;
-		}
-
-		if (!tnum_is_const(reg->var_off)) {
-			verbose(env, "R%d is not a constant address'\n", regno);
-			return -EACCES;
-		}
-
-		if (!map->ops->map_direct_value_addr) {
-			verbose(env, "no direct value access support for this map type\n");
-			return -EACCES;
-		}
-
-		err = check_map_access(env, regno, reg->off,
-				       map->value_size - reg->off, false,
-				       ACCESS_HELPER);
+		err = check_reg_const_str(env, reg, regno);
 		if (err)
 			return err;
-
-		map_off = reg->off + reg->var_off.value;
-		err = map->ops->map_direct_value_addr(map, &map_addr, map_off);
-		if (err) {
-			verbose(env, "direct value access on string failed\n");
-			return err;
-		}
-
-		str_ptr = (char *)(long)(map_addr);
-		if (!strnchr(str_ptr + map_off, map->value_size - map_off, 0)) {
-			verbose(env, "string is not zero-terminated\n");
-			return -EINVAL;
-		}
 		break;
 	}
 	case ARG_PTR_TO_KPTR:
@@ -10774,6 +10807,11 @@ static bool is_kfunc_arg_nullable(const struct btf *btf, const struct btf_param 
 	return btf_param_match_suffix(btf, arg, "__nullable");
 }
 
+static bool is_kfunc_arg_const_str(const struct btf *btf, const struct btf_param *arg)
+{
+	return btf_param_match_suffix(btf, arg, "__str");
+}
+
 static bool is_kfunc_arg_scalar_with_name(const struct btf *btf,
 					  const struct btf_param *arg,
 					  const char *name)
@@ -10917,7 +10955,8 @@ enum kfunc_ptr_arg_type {
 	KF_ARG_PTR_TO_RB_ROOT,
 	KF_ARG_PTR_TO_RB_NODE,
 	KF_ARG_PTR_TO_NULL,
-	KF_ARG_PTR_TO_MAP = 15,
+	KF_ARG_PTR_TO_CONST_STR,
+	KF_ARG_PTR_TO_MAP,
 };
 
 enum special_kfunc_type {
@@ -11067,6 +11106,9 @@ get_kfunc_ptr_arg_type(struct bpf_verifier_env *env,
 
 	if (is_kfunc_arg_rbtree_node(meta->btf, &args[argno]))
 		return KF_ARG_PTR_TO_RB_NODE;
+
+	if (is_kfunc_arg_const_str(meta->btf, &args[argno]))
+		return KF_ARG_PTR_TO_CONST_STR;
 
 	if (is_kfunc_arg_map(meta->btf, &args[argno]))
 		return KF_ARG_PTR_TO_MAP;
@@ -11703,6 +11745,7 @@ static int check_kfunc_args(struct bpf_verifier_env *env, struct bpf_kfunc_call_
 		case KF_ARG_PTR_TO_MEM_SIZE:
 		case KF_ARG_PTR_TO_CALLBACK:
 		case KF_ARG_PTR_TO_REFCOUNTED_KPTR:
+		case KF_ARG_PTR_TO_CONST_STR:
 			/* Trusted by default */
 			break;
 		default:
@@ -11973,6 +12016,15 @@ static int check_kfunc_args(struct bpf_verifier_env *env, struct bpf_kfunc_call_
 
 			meta->arg_btf = reg->btf;
 			meta->arg_btf_id = reg->btf_id;
+			break;
+		case KF_ARG_PTR_TO_CONST_STR:
+			if (reg->type != PTR_TO_MAP_VALUE) {
+				verbose(env, "arg#%d doesn't point to a const string\n", i);
+				return -EINVAL;
+			}
+			ret = check_reg_const_str(env, reg, regno);
+			if (ret)
+				return ret;
 			break;
 		}
 	}
