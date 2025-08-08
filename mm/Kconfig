@@ -505,7 +505,7 @@ config MEMORY_ISOLATION
 
 config PTP
 	depends on IEE
-	def_bool y
+	def_bool n
 
 # IORESOURCE_SYSTEM_RAM regions in the kernel resource tree that are marked
 # IORESOURCE_EXCLUSIVE cannot be mapped to user space, for example, via
