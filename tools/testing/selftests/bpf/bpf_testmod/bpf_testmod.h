@@ -56,6 +56,17 @@ struct bpf_testmod_ops {
 		int (*test_2)(void);
 	};
 
+	struct st_ops_args {
+		u64 a;
+	};
+
+	struct bpf_testmod_st_ops {
+		int (*test_prologue)(struct st_ops_args *args);
+		int (*test_epilogue)(struct st_ops_args *args);
+		int (*test_pro_epilogue)(struct st_ops_args *args);
+		struct module *owner;
+	};
+
 	/* The following pointers are used to test the maps having multiple
 	 * pages of trampolines.
 	 */
