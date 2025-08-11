@@ -1,85 +1,85 @@
 # SPDX-License-Identifier: GPL-2.0
 #
 
-ccflags-y += $(DEFINES) -I$(src) -I$(srctree)/include/linux
-subdir-ccflags-y += $(DEFINES) -I$(src)  -I$(srctree)/include/linux
+ccflags-y += $(DEFINES) -I$(srctree)/$(src) -I$(srctree)/include/linux
+subdir-ccflags-y += $(DEFINES) -I$(srctree)/$(src)  -I$(srctree)/include/linux
 
-ccflags-y += -I$(src)/gpu -I$(src)/kms -I$(src)/common -I$(src)/vpu/vpu_dec  -I$(src)/vpu/vpu_comm -I$(src)/vpu/vpu_dec1 -I$(src)/vpu/vpu_enc -I$(src)/vpu/vpu_mm -I$(src)/gpio
-subdir-ccflags-y += -I$(src)/common -I$(src)/gpu -I$(src)/kms
+ccflags-y += -I$(srctree)/$(src)/gpu -I$(srctree)/$(src)/kms -I$(srctree)/$(src)/common -I$(srctree)/$(src)/vpu/vpu_dec  -I$(srctree)/$(src)/vpu/vpu_comm -I$(srctree)/$(src)/vpu/vpu_dec1 -I$(srctree)/$(src)/vpu/vpu_enc -I$(srctree)/$(src)/vpu/vpu_mm -I$(srctree)/$(src)/gpio
+subdir-ccflags-y += -I$(srctree)/$(src)/common -I$(srctree)/$(src)/gpu -I$(srctree)/$(src)/kms
 
 obj-$(CONFIG_DRM_GB02) += gb02.o
 
-include $(src)/common/Kbuild
+include $(srctree)/$(src)/common/Kbuild
 gb02-objs += $(gb_common-y)
 
-include $(src)/kms/Kbuild
+include $(srctree)/$(src)/kms/Kbuild
 gb02-objs += $(dc_kms-y)
 
-include $(src)/kms/device/Kbuild
+include $(srctree)/$(src)/kms/device/Kbuild
 gb02-objs += $(dev_kms-y)
 
-include $(src)/ip/Kbuild
+include $(srctree)/$(src)/ip/Kbuild
 gb02-objs += $(ipcfg-y)
 
-include $(src)/gpu/Kbuild
+include $(srctree)/$(src)/gpu/Kbuild
 gb02-objs += $(gpu-y)
 
-include $(src)/audio/Kbuild
+include $(srctree)/$(src)/audio/Kbuild
 gb02-objs += $(audio-y)
 
-include $(src)/mcu_peripherals/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/Kbuild
 gb02-objs += $(gb_peri_common-$(CONFIG_MCU_PERI))
 
-include $(src)/mcu_peripherals/gpio/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/gpio/Kbuild
 gb02-objs += $(gpio-$(CONFIG_MCU_GPIO))
 
-include $(src)/mcu_peripherals/uart/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/uart/Kbuild
 gb02-objs += $(uart-$(CONFIG_MCU_UART))
 
-include $(src)/mcu_peripherals/pwm/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/pwm/Kbuild
 gb02-objs += $(pwm-$(CONFIG_MCU_PWM))
 
-include $(src)/mcu_peripherals/pwm/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/pwm/Kbuild
 gb02-objs += $(gpio-pwm-$(CONFIG_GPIO_PWM))
 
-include $(src)/mcu_peripherals/spi/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/spi/Kbuild
 gb02-objs += $(spi-$(CONFIG_MCU_SPI))
 
-include $(src)/mcu_peripherals/i2c/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/i2c/Kbuild
 gb02-objs += $(i2c-$(CONFIG_MCU_I2C))
 
-include $(src)/mcu_peripherals/sn_info/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/sn_info/Kbuild
 gb02-objs += $(sn_info-$(CONFIG_SN_INFO))
 
-include $(src)/mcu_peripherals/pcie_msg/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/pcie_msg/Kbuild
 gb02-objs += $(pcie_msg-$(CONFIG_PCIE_MSG))
 
-include $(src)/mcu_peripherals/pvt/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/pvt/Kbuild
 gb02-objs += $(pvt-$(CONFIG_MCU_PVT))
 
-include $(src)/mcu_peripherals/gpu_freq/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/gpu_freq/Kbuild
 gb02-objs += $(gpu_freq-$(CONFIG_MCU_FREQ))
 
-include $(src)/mcu_peripherals/fan/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/fan/Kbuild
 gb02-objs += $(fan-$(CONFIG_MCU_FAN))
 
-include $(src)/mcu_peripherals/backlight/Kbuild
+include $(srctree)/$(src)/mcu_peripherals/backlight/Kbuild
 gb02-objs += $(backlight-$(CONFIG_GB_BACKLIGHT))
 
-include $(src)/vpu/vpu_comm/Kbuild
+include $(srctree)/$(src)/vpu/vpu_comm/Kbuild
 gb02-objs += $(vpu_comm-y)
 
-include $(src)/vpu/vpu_dec/Kbuild
+include $(srctree)/$(src)/vpu/vpu_dec/Kbuild
 gb02-objs += $(vpu_dec-y)
 
-include $(src)/vpu/vpu_dec1/Kbuild
+include $(srctree)/$(src)/vpu/vpu_dec1/Kbuild
 gb02-objs += $(vpu_dec1-y)
 
-include $(src)/vpu/vpu_enc/Kbuild
+include $(srctree)/$(src)/vpu/vpu_enc/Kbuild
 gb02-objs += $(vpu_enc-y)
 
-include $(src)/vpu/vpu_mm/Kbuild
+include $(srctree)/$(src)/vpu/vpu_mm/Kbuild
 gb02-objs += $(vpu_mm-y)
 
-include $(src)/gpu_test/Kbuild
+include $(srctree)/$(src)/gpu_test/Kbuild
 gb02-objs += $(gpu_debug-y)
