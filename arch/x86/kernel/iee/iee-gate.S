@@ -37,7 +37,7 @@ SYM_FUNC_START(iee_rw_gate)
     DISABLE_WP r12
 
     /* switch to iee stack */
-    movq PER_CPU_VAR(pcpu_hot) + X86_current_task, %r12 /* r12 -> task_struct */
+    movq PER_CPU_VAR(pcpu_hot + X86_current_task), %r12 /* r12 -> task_struct */
     addq iee_offset(%rip), %r12
     movq %rsp, kernel_from_token_offset(%r12)
     movq iee_from_token_offset(%r12), %rsp
@@ -155,7 +155,7 @@ SYM_FUNC_START(iee_rwx_gate_inner)
     jz 2f
 
     /* switch to iee stack */
-    movq PER_CPU_VAR(pcpu_hot) + X86_current_task, %rax /* rax -> task_struct */
+    movq PER_CPU_VAR(pcpu_hot + X86_current_task), %rax /* rax -> task_struct */
     addq iee_offset(%rip), %rax
     movq %rsp, kernel_from_token_offset(%rax)
     movq iee_from_token_offset(%rax), %rsp
