@@ -2,13 +2,15 @@
 #include <asm/cpu_device_id.h>
 #include "uncore.h"
 
+static int uncore_enabled;
+
 static struct zhaoxin_uncore_type *empty_uncore[] = { NULL, };
 static struct zhaoxin_uncore_type **uncore_msr_uncores = empty_uncore;
 static struct zhaoxin_uncore_type **uncore_pci_uncores = empty_uncore;
 static struct zhaoxin_uncore_type **uncore_mmio_uncores = empty_uncore;
 
 static bool pcidrv_registered;
-static struct pci_driver *uncore_pci_driver;
+static const struct pci_device_id *uncore_pci_ids;
 
 /* mask of cpus that collect uncore events */
 static cpumask_t uncore_cpu_mask;
@@ -248,8 +250,6 @@ static void get_global_status_msr(void *status)
 /*topology number : get max packages/subnode/clusters number*/
 static void get_topology_number(void)
 {
-	int clusters;
-	int subnodes;
 	int dies;
 	int packages;
 	u64 data;
@@ -275,18 +275,10 @@ static void get_topology_number(void)
 		dies_per_socket = 1;
 
 	/* check subnodes_per_die */
-	subnodes = (data >> 32) & 0x3;
-	if (subnodes == 0x3)
-		subnodes_per_die = 2;
-	else
-		subnodes_per_die = 1;
+	subnodes_per_die = 2;
 
 	/* check clusters_per_subnode */
-	clusters = (data >> 6) & 0x3;
-	if (clusters == 0x3)
-		clusters_per_subnode = 2;
-	else
-		clusters_per_subnode = 1;
+	clusters_per_subnode = 2;
 
 	max_subnodes = max_packages * dies_per_socket * subnodes_per_die;
 	max_clusters = clusters_per_subnode * max_subnodes;
@@ -319,6 +311,8 @@ static int get_pcibus_limit(void)
 			kh40000_pcibus_limit[i++] = (val >> 24 & 0x1f) << 3 | 0x7;
 		}
 	}
+
+	pci_dev_put(dev);
 
 	return 0;
 }
@@ -427,16 +421,6 @@ static struct cpumask *topology_cluster_core_cpumask(int cpu)
 static struct cpumask *topology_subnode_core_cpumask(int cpu)
 {
 	return &per_cpu(zx_subnode_core_bits, cpu);
-}
-
-static void uncore_free_pcibus_map(void)
-{
-
-}
-
-static int kh40000_pci2node_map_init(void)
-{
-	return 0;
 }
 
 ssize_t zx_uncore_event_show(struct device *dev, struct device_attribute *attr,  char *buf)
@@ -854,7 +838,7 @@ static struct zhaoxin_uncore_type kh40000_uncore_mc1 = {
 static struct zhaoxin_uncore_type kh40000_uncore_pci = {
 	.name		= "pci",
 	.num_counters	= 4,
-	.num_boxes	= 10,
+	.num_boxes	= 2,
 	.perf_ctr_bits	= 48,
 	.event_descs	= kh40000_uncore_pci_events,
 	.perf_ctr	= KH40000_PCI_PMON_CTR0,
@@ -931,6 +915,25 @@ static const struct pci_device_id kh40000_uncore_pci_ids[] = {
 		PCI_DEVICE(0x1D17, 0x31b2),
 		.driver_data = UNCORE_PCI_DEV_DATA(KH40000_PCI_UNCORE_MC0, 0),
 	},
+	/*
+	 * PEXC_A: D2F0 D2F1 D3F0 D3F1 D3F2 all use D2F0 to access,
+	 * with different eventcode.
+	 */
+	{
+		/* PCIE D2F0 */
+		PCI_DEVICE(0x1D17, 0x0717),
+		.driver_data = UNCORE_PCI_DEV_DATA(KH40000_PCI_UNCORE_PCI, 0),
+	},
+
+	/*
+	 * PEXC_B: D4F0 D4F1 D5F0 D5F1 D5F2 all use D4F0 to access,
+	 * with different eventcode.
+	 */
+	{
+		/* PCIE D4F0 */
+		PCI_DEVICE(0x1D17, 0x071C),
+		.driver_data = UNCORE_PCI_DEV_DATA(KH40000_PCI_UNCORE_PCI, 1),
+	},
 
 	{ /* ZPI_DLL */
 		PCI_DEVICE(0x1D17, 0x91c1),
@@ -950,10 +953,6 @@ static const struct pci_device_id kh40000_uncore_pci_ids[] = {
 	{ /* end: all zeroes */ }
 };
 
-static struct pci_driver kh40000_uncore_pci_driver = {
-	.name		= "kh40000_uncore",
-	.id_table	= kh40000_uncore_pci_ids,
-};
 /*KH40000 pci ops end*/
 
 /*KX7000 msr ops start*/
@@ -1090,7 +1089,7 @@ static u64 kx7000_uncore_pci_mc_read_counter(struct zhaoxin_uncore_box *box,
 	struct hw_perf_event *hwc = &event->hw;
 	u64 count = 0;
 
-	pci_read_config_word(pdev, hwc->event_base, (u16 *)&count + 3);
+	pci_read_config_word(pdev, hwc->event_base, (u16 *)&count + 2);
 	pci_read_config_dword(pdev, hwc->event_base + kx7000_mc_ctr_lh_offsets[hwc->idx],
 			      (u32 *)&count);
 
@@ -1173,7 +1172,7 @@ static struct zhaoxin_uncore_type kx7000_uncore_mc_b1 = {
 static struct zhaoxin_uncore_type kx7000_uncore_pci = {
 	.name		= "pci",
 	.num_counters	= 4,
-	.num_boxes	= 17,
+	.num_boxes	= 2,
 	.perf_ctr_bits	= 48,
 	.perf_ctr	= KH40000_PCI_PMON_CTR0,
 	.event_ctl	= KH40000_PCI_PMON_CTL0,
@@ -1222,17 +1221,32 @@ static const struct pci_device_id kx7000_uncore_pci_ids[] = {
 		.driver_data = UNCORE_PCI_DEV_DATA(KX7000_PCI_UNCORE_MC_A0, 0),
 	},
 
+	/*
+	 * PEXC_A: D2F0 D2F1 D2F2 D2F3 D2F4 D3F0 D3F1 D3F2 D3F3 all
+	 * use D2F0 to access, with different eventcode
+	 */
+	{
+		/* PCIE D2F0 */
+		PCI_DEVICE(0x1D17, 0x0717),
+		.driver_data = UNCORE_PCI_DEV_DATA(KX7000_PCI_UNCORE_PCI, 0),
+	},
+
+	/*
+	 * PEXC_B: D4F0 D4F1 D4F2 D4F3 D4F4 D5F0 D5F1 D5F2 D5F3 all
+	 * use D4F0 to access, with different eventcode
+	 */
+	{
+		/* PCIE D4F0 */
+		PCI_DEVICE(0x1D17, 0x071B),
+		.driver_data = UNCORE_PCI_DEV_DATA(KX7000_PCI_UNCORE_PCI, 1),
+	},
+
 	{ /* PXPTRF */
 		PCI_DEVICE(0x1D17, 0x31B4),
 		.driver_data = UNCORE_PCI_DEV_DATA(KX7000_PCI_UNCORE_PXPTRF, 0),
 	},
 
 	{ /* end: all zeroes */ }
-};
-
-static struct pci_driver kx7000_uncore_pci_driver = {
-	.name = "kx7000_uncore",
-	.id_table = kx7000_uncore_pci_ids,
 };
 /*KX7000 pci ops end*/
 
@@ -1259,6 +1273,8 @@ static void kx7000_uncore_mmio_init_box(struct zhaoxin_uncore_box *box)
 
 	pci_read_config_dword(pdev, mmio_base_offset + 4, &pci_dword);
 	addr |= pci_dword & KX7000_ZDI_DL_MMIO_MEM0_MASK;
+
+	pci_dev_put(pdev);
 
 	box->io_addr = ioremap(addr, KX7000_ZDI_DL_MMIO_SIZE);
 	if (!box->io_addr)
@@ -2061,7 +2077,7 @@ static int __init uncore_types_init(struct zhaoxin_uncore_type **types, bool set
 /*
  * add a pci uncore device
  */
-static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
+static int uncore_pci_type_init(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct zhaoxin_uncore_type *type;
 	struct zhaoxin_uncore_pmu *pmu;
@@ -2069,7 +2085,7 @@ static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id
 	struct zhaoxin_uncore_box **boxes;
 	char mc_dev[10];
 	int loop = 1;
-	int i, j = 0;
+	int i;
 	int subnode_id = 0;
 	int ret = 0;
 
@@ -2092,15 +2108,11 @@ static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id
 	if (!boxes)
 		return -ENOMEM;
 
-	for (i = 0; i < loop; i++) {
-		type = uncore_pci_uncores[UNCORE_PCI_DEV_TYPE(id->driver_data) + j];
+	pci_set_drvdata(pdev, boxes);
 
-		if (!type)
-			continue;
-		/*
-		 * for performance monitoring unit with multiple boxes,
-		 * each box has a different function id.
-		 */
+	for (i = 0; i < loop; i++) {
+		type = uncore_pci_uncores[UNCORE_PCI_DEV_TYPE(id->driver_data) + i];
+
 		pmu = &type->pmus[UNCORE_PCI_DEV_IDX(id->driver_data)];
 
 		if (WARN_ON_ONCE(pmu->boxes[subnode_id] != NULL))
@@ -2122,91 +2134,116 @@ static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id
 		uncore_box_init(box);
 		boxes[i] = box;
 
-		pci_set_drvdata(pdev, boxes);
 		pmu->boxes[subnode_id] = box;
 		if (atomic_inc_return(&pmu->activeboxes) > 1) {
 			if (!strcmp(type->name, mc_dev))
-				goto next_loop;
+				continue;
 			else
 				return 0;
 		}
+
 		/* First active box registers the pmu */
 		ret = uncore_pmu_register(pmu);
-		if (ret) {
-			pci_set_drvdata(pdev, NULL);
-			pmu->boxes[subnode_id] = NULL;
-			uncore_box_exit(box);
-			kfree(box);
-		}
-next_loop:
-		j++;
+		if (ret)
+			return ret;
 	}
 
-	return ret;
+	return 0;
 }
 
-static void uncore_pci_remove(struct pci_dev *pdev)
+static void uncore_pci_type_exit(void)
 {
+	struct zhaoxin_uncore_type **types;
+	struct zhaoxin_uncore_type *type;
 	struct zhaoxin_uncore_box **boxes;
 	struct zhaoxin_uncore_box *box;
 	struct zhaoxin_uncore_pmu *pmu;
-	int subnode_id = 0;
-	int i = 0;
-	int loop = 1;
+	int i, j;
+	int max;
+	struct pci_dev *pdev = NULL;
 
-	boxes = pci_get_drvdata(pdev);
+	for (types = uncore_pci_uncores; *types; types++) {
+		type = *types;
+		pmu = type->pmus;
 
-	if (boot_cpu_data.x86_model == ZHAOXIN_FAM7_KH40000) {
-		if (!strcmp(boxes[0]->pmu->type->name, "mc0"))
-			loop = 2;
-		else
-			loop = 1;
-	} else if (boot_cpu_data.x86_model == ZHAOXIN_FAM7_KX7000) {
-		if (!strcmp(boxes[0]->pmu->type->name, "mc_a0"))
-			loop = 4;
-		else
-			loop = 1;
+		if (boot_cpu_data.x86_model == ZHAOXIN_FAM7_KH40000) {
+			if (!strcmp(type->name, "llc"))
+				max = max_clusters;
+			else
+				max = max_subnodes;
+		} else {
+			max = max_packages;
+		}
+
+		for (i = 0; i < type->num_boxes; i++, pmu++) {
+			if (atomic_dec_return(&pmu->activeboxes) == 0)
+				uncore_pmu_unregister(pmu);
+
+			for (j = 0; j < max; j++) {
+				box = pmu->boxes[j];
+				/* check if device exist */
+				if (!box)
+					continue;
+
+				pdev = box->pci_dev;
+
+				uncore_box_exit(box);
+				kfree(box);
+
+				/*
+				 * MC use one PCI device for mc0/mc1 mc_a0/mc_a1/mc_b0/mc_b1
+				 * So just put and free once: only put mc0 and mc_a0.
+				 */
+				if (boot_cpu_data.x86_model == ZHAOXIN_FAM7_KH40000)
+					if (strncmp(type->name, "mc", 2) == 0 &&
+					    strcmp(type->name, "mc0") != 0)
+						break;
+
+				if (boot_cpu_data.x86_model == ZHAOXIN_FAM7_KX7000)
+					if (strncmp(type->name, "mc", 2) == 0 &&
+					    strcmp(type->name, "mc_a0") != 0)
+						break;
+
+				boxes = pci_get_drvdata(pdev);
+				kfree(boxes);
+				pci_set_drvdata(pdev, NULL);
+				pci_dev_put(pdev);
+			}
+		}
 	}
-
-	for (i = 0; i < loop; i++) {
-		box = boxes[i];
-		pmu = box->pmu;
-		if (WARN_ON_ONCE(subnode_id != box->subnode_id))
-			return;
-
-		pci_set_drvdata(pdev, NULL);
-		pmu->boxes[subnode_id] = NULL;
-		if (atomic_dec_return(&pmu->activeboxes) == 0)
-			uncore_pmu_unregister(pmu);
-
-		uncore_box_exit(box);
-		kfree(box);
-	}
-
-	kfree(boxes);
 }
 
 static int __init uncore_pci_init(void)
 {
 	int ret;
+	const struct pci_device_id *id = uncore_pci_ids;
+	struct pci_dev *pdev = NULL;
 
 	ret = uncore_types_init(uncore_pci_uncores, false);
 	if (ret)
-		goto errtype;
+		goto err;
 
-	uncore_pci_driver->probe = uncore_pci_probe;
-	uncore_pci_driver->remove = uncore_pci_remove;
+	while (id && id->vendor) {
+		pdev = pci_get_device(id->vendor, id->device, NULL);
+		while (pdev) {
+			ret = uncore_pci_type_init(pdev, id);
+			if (ret) {
+				pci_dev_put(pdev);
+				goto err;
+			}
 
-	ret = pci_register_driver(uncore_pci_driver);
-	if (ret)
-		goto errtype;
+			pdev = pci_get_device(id->vendor, id->device, pdev);
+		}
+
+		id++;
+	}
 
 	pcidrv_registered = true;
 	return 0;
 
-errtype:
+err:
+	uncore_pci_type_exit();
 	uncore_types_exit(uncore_pci_uncores);
-	uncore_free_pcibus_map();
 	uncore_pci_uncores = empty_uncore;
 	return ret;
 }
@@ -2215,9 +2252,8 @@ static void uncore_pci_exit(void)
 {
 	if (pcidrv_registered) {
 		pcidrv_registered = false;
-		pci_unregister_driver(uncore_pci_driver);
+		uncore_pci_type_exit();
 		uncore_types_exit(uncore_pci_uncores);
-		uncore_free_pcibus_map();
 	}
 }
 
@@ -2676,12 +2712,11 @@ void kh40000_uncore_cpu_init(void)
 
 int kh40000_uncore_pci_init(void)
 {
-	int ret = kh40000_pci2node_map_init();/*pci_bus to package mapping, do nothing*/
-
-	if (ret)
-		return ret;
+	/* Register pci driver will conflict with other PCI device use pci_get_device instead */
 	uncore_pci_uncores = kh40000_pci_uncores;
-	uncore_pci_driver = &kh40000_uncore_pci_driver;
+
+	uncore_pci_ids = kh40000_uncore_pci_ids;
+
 	return 0;
 }
 
@@ -2707,8 +2742,10 @@ void kx7000_uncore_cpu_init(void)
 
 int kx7000_uncore_pci_init(void)
 {
+	/* Register pci driver will conflict with other PCI device use pci_get_device instead */
 	uncore_pci_uncores = kx7000_pci_uncores;
-	uncore_pci_driver = &kx7000_uncore_pci_driver;
+
+	uncore_pci_ids = kx7000_uncore_pci_ids;
 
 	return 0;
 }
@@ -2735,11 +2772,33 @@ static const struct x86_cpu_id zhaoxin_uncore_match[] __initconst = {
 };
 MODULE_DEVICE_TABLE(x86cpu, zhaoxin_uncore_match);
 
+/*
+ * Process kernel command-line parameter at boot time.
+ * zhaoxin_pmc_uncore={0|off} or zhaoxin_pmc_uncore={1|on}
+ */
+static int __init zhaoxin_uncore_enable(char *str)
+{
+	if (!strcasecmp(str, "off") || !strcmp(str, "0"))
+		uncore_enabled = 0;
+	else if (!strcasecmp(str, "on") || !strcmp(str, "1"))
+		uncore_enabled = 1;
+	else
+		pr_err("zhaoxin_pmc_uncore: invalid parameter value (%s)\n", str);
+
+	pr_info("Zhaoxin PMC uncore %s\n", uncore_enabled ? "enabled" : "disabled");
+
+	return 1;
+}
+__setup("zhaoxin_pmc_uncore=", zhaoxin_uncore_enable);
+
 static int __init zhaoxin_uncore_init(void)
 {
 	const struct x86_cpu_id *id = NULL;
 	struct zhaoxin_uncore_init_fun *uncore_init;
 	int pret = 0, cret = 0, mret = 0, ret;
+
+	if (!uncore_enabled)
+		return 0;
 
 	id = x86_match_cpu(zhaoxin_uncore_match);
 	if (!id)
