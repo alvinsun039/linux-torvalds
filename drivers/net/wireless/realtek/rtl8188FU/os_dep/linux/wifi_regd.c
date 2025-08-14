@@ -972,7 +972,11 @@ static void async_cac_change_work_hdl(_workitem *work)
 		evt = LIST_CONTAINOR(list, struct async_cac_change_evt, list);
 
 		rtnl_lock();
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		cfg80211_cac_event(evt->netdev, &evt->chandef, evt->event, GFP_KERNEL, 0);
+#else
 		cfg80211_cac_event(evt->netdev, &evt->chandef, evt->event, GFP_KERNEL);
+#endif
 		rtnl_unlock();
 
 		rtw_mfree(evt, sizeof(*evt));
@@ -1101,7 +1105,11 @@ void rtw_cfg80211_cac_finished_event(struct rf_ctl_t *rfctl, u8 band_idx
 		if (!iface || !(ifbmp & BIT(iface->iface_id)))
 			continue;
 		/* finish only for wdev with cac_started */
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (!iface->rtw_wdev || !iface->rtw_wdev->links[0].cac_started)
+#else
 		if (!iface->rtw_wdev || !iface->rtw_wdev->cac_started)
+#endif
 			ifbmp &= ~BIT(iface->iface_id);
 	}
 
@@ -1124,7 +1132,11 @@ void rtw_cfg80211_cac_aborted_event(struct rf_ctl_t *rfctl, u8 band_idx
 		if (!iface || !(ifbmp & BIT(iface->iface_id)))
 			continue;
 		/* abort only for wdev with cac_started */
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (!iface->rtw_wdev || !iface->rtw_wdev->links[0].cac_started)
+#else
 		if (!iface->rtw_wdev || !iface->rtw_wdev->cac_started)
+#endif
 			ifbmp &= ~BIT(iface->iface_id);
 	}
 
@@ -1210,9 +1222,17 @@ void rtw_cfg80211_cac_force_finished(struct rf_ctl_t *rfctl, u8 band_idx
 			finished_ifbmp &= ~BIT(iface->iface_id);
 			started_ifbmp &= ~BIT(iface->iface_id);
 		}
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (need_start && iface->rtw_wdev->links[0].cac_started)
+#else
 		if (need_start && iface->rtw_wdev->cac_started)
+#endif
 			started_ifbmp &= ~BIT(iface->iface_id);
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		else if (!need_start && !iface->rtw_wdev->links[0].cac_started)
+#else
 		else if (!need_start && !iface->rtw_wdev->cac_started)
+#endif
 			finished_ifbmp &= ~BIT(iface->iface_id);
 	}
 

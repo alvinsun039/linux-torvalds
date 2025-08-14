@@ -149,7 +149,9 @@ static void rtw_regd_schedule_dfs_chan_update(struct wiphy *wiphy)
 		rtw_regd_set_du_chdef(wiphy);
 	}
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) || defined(CONFIG_MLD_KERNEL_PATCH)
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef, 0);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)) || defined(CONFIG_MLD_KERNEL_PATCH)
 	/* ToDo CONFIG_RTW_MLD */
 	cfg80211_ch_switch_notify(wiphy_data->du_wdev->netdev, &wiphy_data->du_chdef, 0, 0);
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 2))
@@ -973,7 +975,11 @@ static void async_cac_change_work_hdl(_workitem *work)
 		evt = LIST_CONTAINOR(list, struct async_cac_change_evt, list);
 
 		rtnl_lock();
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		cfg80211_cac_event(evt->netdev, &evt->chandef, evt->event, GFP_KERNEL, 0);
+#else
 		cfg80211_cac_event(evt->netdev, &evt->chandef, evt->event, GFP_KERNEL);
+#endif
 		rtnl_unlock();
 
 		rtw_mfree(evt, sizeof(*evt));
@@ -1063,7 +1069,11 @@ static void rtw_cfg80211_cac_event(struct rf_ctl_t *rfctl, u8 band_idx
 		if (async)
 			cfg80211_cac_event_async(iface->pnetdev, &chdef, event);
 		else
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+			cfg80211_cac_event(iface->pnetdev, &chdef, event, GFP_KERNEL, 0);
+#else
 			cfg80211_cac_event(iface->pnetdev, &chdef, event, GFP_KERNEL);
+#endif
 	}
 }
 
@@ -1101,7 +1111,11 @@ void rtw_cfg80211_cac_finished_event(struct rf_ctl_t *rfctl, u8 band_idx
 		if (!iface || !(ifbmp & BIT(iface->iface_id)))
 			continue;
 		/* finish only for wdev with cac_started */
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (!iface->rtw_wdev || !iface->rtw_wdev->links[0].cac_started)
+#else
 		if (!iface->rtw_wdev || !iface->rtw_wdev->cac_started)
+#endif
 			ifbmp &= ~BIT(iface->iface_id);
 	}
 
@@ -1124,7 +1138,11 @@ void rtw_cfg80211_cac_aborted_event(struct rf_ctl_t *rfctl, u8 band_idx
 		if (!iface || !(ifbmp & BIT(iface->iface_id)))
 			continue;
 		/* abort only for wdev with cac_started */
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (!iface->rtw_wdev || !iface->rtw_wdev->links[0].cac_started)
+#else
 		if (!iface->rtw_wdev || !iface->rtw_wdev->cac_started)
+#endif
 			ifbmp &= ~BIT(iface->iface_id);
 	}
 
@@ -1211,9 +1229,17 @@ void rtw_cfg80211_cac_force_finished(struct rf_ctl_t *rfctl, u8 band_idx
 			started_ifbmp &= ~BIT(iface->iface_id);
 			continue;
 		}
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		if (need_start && iface->rtw_wdev->links[0].cac_started)
+#else
 		if (need_start && iface->rtw_wdev->cac_started)
+#endif
 			started_ifbmp &= ~BIT(iface->iface_id);
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		else if (!need_start && !iface->rtw_wdev->links[0].cac_started)
+#else
 		else if (!need_start && !iface->rtw_wdev->cac_started)
+#endif
 			finished_ifbmp &= ~BIT(iface->iface_id);
 	}
 
