@@ -2207,7 +2207,7 @@ static int nvme_wait_ready(struct nvme_ctrl *ctrl, u32 mask, u32 val,
 
 	/* Use user settings to reset timeout */
 	if (strcmp(op, "reset") && reset_timeout_enable) {
-		timeout = reset_timeout * HZ + jiffies;
+		timeout_jiffies = reset_timeout * HZ + jiffies;
 		dev_info(ctrl->device,
 			 "Reset timeout set to %u seconds\n",
 			 reset_timeout);
