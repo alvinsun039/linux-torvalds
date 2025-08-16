@@ -62,11 +62,21 @@ static u8 *rep_xcrypt(const u8 *input, u8 *output, void *key, u8 *iv,
 	else
 		rax |= 0x01;
 
+#ifdef CONFIG_X86_64
 	__asm__ __volatile__(
 		".byte 0xf3, 0x0f, 0xa7, 0xf0\n"
 		: "+S"(input), "+D"(output), "+c"(count)
 		: "a"(rax), "b"(key), "d"(iv)
 		: "memory");
+#else
+	u32 eax = (u32)rax;
+	u32 ecx = (u32)count;
+	__asm__ __volatile__(
+		".byte 0xf3, 0x0f, 0xa7, 0xf0\n"
+		: "+S"(input), "+D"(output), "+c"(ecx)
+		: "a"((u32)eax), "b"(key), "d"(iv)
+		: "memory");
+#endif
 
 	return iv;
 }
