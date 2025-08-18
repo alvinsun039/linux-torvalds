@@ -1360,6 +1360,7 @@ error:
 		ftrace_graph_active--;
 		gops->saved_func = NULL;
 		fgraph_lru_release_index(i);
+		unregister_pm_notifier(&ftrace_suspend_notifier);
 	}
 out:
 	mutex_unlock(&ftrace_lock);
