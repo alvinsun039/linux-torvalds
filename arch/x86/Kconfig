@@ -1535,15 +1535,15 @@ config IEE
 config IEE_SELINUX_P
 	depends on IEE
 	depends on SECURITY_SELINUX
-	def_bool y
+	def_bool n
 
 config CREDP
 	depends on IEE
-	def_bool y
+	def_bool n
 
 config KEYP
 	depends on IEE
-	def_bool y
+	def_bool n
 
 # Common NUMA Features
 config NUMA
