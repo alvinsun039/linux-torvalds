@@ -15,6 +15,7 @@
 #include <linux/pm.h>
 #include <linux/slab.h>
 
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_drv.h>
 #include <drm/drm_fbdev_generic.h>
 #include <drm/drm_gem_dma_helper.h>
@@ -189,7 +190,7 @@ static void shmob_drm_shutdown(struct platform_device *pdev)
 {
 	struct shmob_drm_device *sdev = platform_get_drvdata(pdev);
 
-	drm_atomic_helper_shutdown(&sdev->ddev);
+	drm_atomic_helper_shutdown(sdev->ddev);
 }
 
 static int shmob_drm_probe(struct platform_device *pdev)
