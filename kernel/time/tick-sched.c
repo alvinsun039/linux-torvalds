@@ -371,6 +371,12 @@ static void tick_nohz_kick_task(struct task_struct *tsk)
 	 *   smp_mb__after_spin_lock()
 	 *   tick_nohz_task_switch()
 	 *     LOAD p->tick_dep_mask
+	 *
+	 * XXX given a task picks up the dependency on schedule(), should we
+	 * only care about tasks that are currently on the CPU instead of all
+	 * that are on the runqueue?
+	 *
+	 * That is, does this want to be: task_on_cpu() / task_curr()?
 	 */
 	if (!sched_task_on_rq(tsk))
 		return;
@@ -795,7 +801,7 @@ static void tick_nohz_restart(struct tick_sched *ts, ktime_t now)
 
 static inline bool local_timer_softirq_pending(void)
 {
-	return local_softirq_pending() & BIT(TIMER_SOFTIRQ);
+	return local_timers_pending() & BIT(TIMER_SOFTIRQ);
 }
 
 static ktime_t tick_nohz_next_event(struct tick_sched *ts, int cpu)

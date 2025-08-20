@@ -91,6 +91,7 @@ void collect_procs_ksm(struct page *page, struct list_head *to_kill,
 
 #ifdef CONFIG_PROC_FS
 long ksm_process_profit(struct mm_struct *);
+bool ksm_process_mergeable(struct mm_struct *mm);
 #endif /* CONFIG_PROC_FS */
 
 #else  /* !CONFIG_KSM */

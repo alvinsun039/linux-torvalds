@@ -7,7 +7,6 @@
 
 /* Cgroup v1 and v2 common declarations */
 
-void mem_cgroup_charge_statistics(struct mem_cgroup *memcg, int nr_pages);
 int try_charge_memcg(struct mem_cgroup *memcg, gfp_t gfp_mask,
 		     unsigned int nr_pages);
 
@@ -56,8 +55,12 @@ enum mem_cgroup_events_target {
 	MEM_CGROUP_NTARGETS,
 };
 
-bool mem_cgroup_event_ratelimit(struct mem_cgroup *memcg,
-				enum mem_cgroup_events_target target);
+/* Cgroup1: threshold notifications & softlimit tree updates */
+struct memcg1_events_percpu {
+	unsigned long nr_page_events;
+	unsigned long targets[MEM_CGROUP_NTARGETS];
+};
+
 unsigned long mem_cgroup_usage(struct mem_cgroup *memcg, bool swap);
 
 void drain_all_stock(struct mem_cgroup *root_memcg);
@@ -69,8 +72,22 @@ unsigned long memcg_page_state_output(struct mem_cgroup *memcg, int item);
 unsigned long memcg_page_state_local_output(struct mem_cgroup *memcg, int item);
 int memory_stat_show(struct seq_file *m, void *v);
 
+static inline bool memcg1_alloc_events(struct mem_cgroup *memcg)
+{
+	memcg->events_percpu = alloc_percpu_gfp(struct memcg1_events_percpu,
+						GFP_KERNEL_ACCOUNT);
+	return !!memcg->events_percpu;
+}
+
+static inline void memcg1_free_events(struct mem_cgroup *memcg)
+{
+	if (memcg->events_percpu)
+		free_percpu(memcg->events_percpu);
+}
+
 /* Cgroup v1-specific declarations */
 #ifdef CONFIG_MEMCG_V1
+void memcg1_memcg_init(struct mem_cgroup *memcg);
 void memcg1_remove_from_trees(struct mem_cgroup *memcg);
 
 static inline void memcg1_soft_limit_reset(struct mem_cgroup *memcg)
@@ -78,12 +95,7 @@ static inline void memcg1_soft_limit_reset(struct mem_cgroup *memcg)
 	WRITE_ONCE(memcg->soft_limit, PAGE_COUNTER_MAX);
 }
 
-bool memcg1_wait_acct_move(struct mem_cgroup *memcg);
-
 struct cgroup_taskset;
-int memcg1_can_attach(struct cgroup_taskset *tset);
-void memcg1_cancel_attach(struct cgroup_taskset *tset);
-void memcg1_move_task(void);
 void memcg1_css_offline(struct mem_cgroup *memcg);
 
 /* for encoding cft->private value on file */
@@ -98,27 +110,55 @@ bool memcg1_oom_prepare(struct mem_cgroup *memcg, bool *locked);
 void memcg1_oom_finish(struct mem_cgroup *memcg, bool locked);
 void memcg1_oom_recover(struct mem_cgroup *memcg);
 
-void memcg1_check_events(struct mem_cgroup *memcg, int nid);
+void memcg1_commit_charge(struct folio *folio, struct mem_cgroup *memcg);
+void memcg1_swapout(struct folio *folio, struct mem_cgroup *memcg);
+void memcg1_uncharge_batch(struct mem_cgroup *memcg, unsigned long pgpgout,
+			   unsigned long nr_memory, int nid);
 
 void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s);
+
+void memcg1_account_kmem(struct mem_cgroup *memcg, int nr_pages);
+static inline bool memcg1_tcpmem_active(struct mem_cgroup *memcg)
+{
+	return memcg->tcpmem_active;
+}
+bool memcg1_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages,
+			 gfp_t gfp_mask);
+static inline void memcg1_uncharge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages)
+{
+	page_counter_uncharge(&memcg->tcpmem, nr_pages);
+}
 
 extern struct cftype memsw_files[];
 extern struct cftype mem_cgroup_legacy_files[];
 
 #else	/* CONFIG_MEMCG_V1 */
 
+static inline void memcg1_memcg_init(struct mem_cgroup *memcg) {}
 static inline void memcg1_remove_from_trees(struct mem_cgroup *memcg) {}
 static inline void memcg1_soft_limit_reset(struct mem_cgroup *memcg) {}
-static inline bool memcg1_wait_acct_move(struct mem_cgroup *memcg) { return false; }
 static inline void memcg1_css_offline(struct mem_cgroup *memcg) {}
 
 static inline bool memcg1_oom_prepare(struct mem_cgroup *memcg, bool *locked) { return true; }
 static inline void memcg1_oom_finish(struct mem_cgroup *memcg, bool locked) {}
 static inline void memcg1_oom_recover(struct mem_cgroup *memcg) {}
 
-static inline void memcg1_check_events(struct mem_cgroup *memcg, int nid) {}
+static inline void memcg1_commit_charge(struct folio *folio,
+					struct mem_cgroup *memcg) {}
+
+static inline void memcg1_swapout(struct folio *folio, struct mem_cgroup *memcg) {}
+
+static inline void memcg1_uncharge_batch(struct mem_cgroup *memcg,
+					 unsigned long pgpgout,
+					 unsigned long nr_memory, int nid) {}
 
 static inline void memcg1_stat_format(struct mem_cgroup *memcg, struct seq_buf *s) {}
+
+static inline void memcg1_account_kmem(struct mem_cgroup *memcg, int nr_pages) {}
+static inline bool memcg1_tcpmem_active(struct mem_cgroup *memcg) { return false; }
+static inline bool memcg1_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages,
+				       gfp_t gfp_mask) { return true; }
+static inline void memcg1_uncharge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages) {}
 
 extern struct cftype memsw_files[];
 extern struct cftype mem_cgroup_legacy_files[];

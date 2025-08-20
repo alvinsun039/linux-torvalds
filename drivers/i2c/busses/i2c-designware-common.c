@@ -63,6 +63,9 @@ static int dw_reg_read(void *context, unsigned int reg, unsigned int *val)
 {
 	struct dw_i2c_dev *dev = context;
 
+	if ((dev->flags & MODEL_MASK) == MODEL_SUNWAY)
+		reg = reg << 7;
+
 	*val = readl(dev->base + reg);
 
 	return 0;
@@ -71,6 +74,9 @@ static int dw_reg_read(void *context, unsigned int reg, unsigned int *val)
 static int dw_reg_write(void *context, unsigned int reg, unsigned int val)
 {
 	struct dw_i2c_dev *dev = context;
+
+	if ((dev->flags & MODEL_MASK) == MODEL_SUNWAY)
+		reg = reg << 7;
 
 	writel(val, dev->base + reg);
 
@@ -153,6 +159,9 @@ int i2c_dw_init_regmap(struct dw_i2c_dev *dev)
 
 	if ((dev->flags & MODEL_MASK) == MODEL_AMD_NAVI_GPU)
 		map_cfg.max_register = AMD_UCSI_INTR_REG;
+
+	if ((dev->flags & MODEL_MASK) == MODEL_SUNWAY)
+		reg = readl(dev->base + (DW_IC_COMP_TYPE << 7));
 
 	if (reg == swab32(DW_IC_COMP_TYPE_VALUE)) {
 		map_cfg.reg_read = dw_reg_read_swab;

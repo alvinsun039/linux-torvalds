@@ -3017,8 +3017,8 @@ static int hclge_mac_init(struct hclge_dev *hdev)
 	struct hclge_mac *mac = &hdev->hw.mac;
 	int ret;
 
-	hclge_roh_convert_mac_addr(hdev);
 	hclge_mac_type_init(hdev);
+	hclge_roh_convert_mac_addr(hdev);
 	hdev->support_sfp_query = true;
 
 	if (!test_bit(HCLGE_STATE_RST_HANDLING, &hdev->state))
@@ -5467,6 +5467,86 @@ static void hclge_flush_qb_config(struct hnae3_handle *handle)
 	struct hclge_vport *vport = hclge_get_vport(handle);
 
 	set_bit(HCLGE_VPORT_STATE_QB_CHANGE, &vport->state);
+}
+
+static int
+hclge_get_pfc_storm_prevent(struct hclge_dev *hdev, int dir, bool *enable)
+{
+	struct hclge_pfc_storm_para_cmd *para_cmd;
+	struct hclge_desc desc;
+	int ret;
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_CFG_PAUSE_STORM_PARA, true);
+	para_cmd = (struct hclge_pfc_storm_para_cmd *)desc.data;
+	para_cmd->dir = cpu_to_le32(dir);
+	ret = hclge_cmd_send(&hdev->hw, &desc, 1);
+	if (ret)
+		return ret;
+
+	*enable = !!le32_to_cpu(para_cmd->enable);
+	return 0;
+}
+
+static int hclge_get_pfc_storm_config(struct hnae3_handle *handle, bool *enable)
+{
+	struct hclge_vport *vport = hclge_get_vport(handle);
+	struct hclge_dev *hdev = vport->back;
+	bool enable_tx, enable_rx;
+	int ret;
+
+	ret = hclge_get_pfc_storm_prevent(hdev, HCLGE_DIR_TX, &enable_tx);
+	if (ret) {
+		dev_err(&hdev->pdev->dev, "failed to get tx pfc storm prevent, ret=%d\n",
+			ret);
+		return ret;
+	}
+	ret = hclge_get_pfc_storm_prevent(hdev, HCLGE_DIR_RX, &enable_rx);
+	if (ret) {
+		dev_err(&hdev->pdev->dev, "failed to get rx pfc storm prevent, ret=%d\n",
+			ret);
+		return ret;
+	}
+
+	*enable = enable_tx || enable_rx;
+	return 0;
+}
+
+static int
+hclge_enable_pfc_storm_prevent(struct hclge_dev *hdev, int dir, bool enable)
+{
+	struct hclge_pfc_storm_para_cmd *para_cmd;
+	struct hclge_desc desc;
+
+	hclge_cmd_setup_basic_desc(&desc, HCLGE_OPC_CFG_PAUSE_STORM_PARA,
+				   false);
+	para_cmd = (struct hclge_pfc_storm_para_cmd *)desc.data;
+	para_cmd->dir = cpu_to_le32(dir);
+	para_cmd->enable = cpu_to_le32(enable);
+
+	return hclge_cmd_send(&hdev->hw, &desc, 1);
+}
+
+static void
+hclge_request_pfc_storm_config(struct hnae3_handle *handle, bool enable)
+{
+	struct hclge_vport *vport = hclge_get_vport(handle);
+	struct hclge_dev *hdev = vport->back;
+	int ret;
+
+	ret = hclge_enable_pfc_storm_prevent(hdev, HCLGE_DIR_TX, enable);
+	if (ret) {
+		dev_err(&hdev->pdev->dev, "failed to %s tx pfc storm prevent, ret=%d\n",
+			enable ? "enable" : "disable", ret);
+		return;
+	}
+
+	ret = hclge_enable_pfc_storm_prevent(hdev, HCLGE_DIR_RX, enable);
+	if (ret)
+		dev_err(&hdev->pdev->dev, "failed to %s rx pfc storm prevent, ret=%d\n",
+			enable ? "enable" : "disable", ret);
+	else
+		dev_info(&hdev->pdev->dev, "pfc storm prevent %s\n",
+			 enable ? "enabled" : "disabled");
 }
 
 static void hclge_sync_fd_state(struct hclge_dev *hdev)
@@ -10174,33 +10254,35 @@ static bool hclge_need_enable_vport_vlan_filter(struct hclge_vport *vport)
 	return false;
 }
 
-int hclge_enable_vport_vlan_filter(struct hclge_vport *vport, bool request_en)
+static int __hclge_enable_vport_vlan_filter(struct hclge_vport *vport, bool request_en)
 {
-	struct hclge_dev *hdev = vport->back;
 	bool need_en;
 	int ret;
 
-	mutex_lock(&hdev->vport_lock);
-
-	vport->req_vlan_fltr_en = request_en;
-
 	need_en = hclge_need_enable_vport_vlan_filter(vport);
-	if (need_en == vport->cur_vlan_fltr_en) {
-		mutex_unlock(&hdev->vport_lock);
+	if (need_en == vport->cur_vlan_fltr_en)
 		return 0;
-	}
 
 	ret = hclge_set_vport_vlan_filter(vport, need_en);
-	if (ret) {
-		mutex_unlock(&hdev->vport_lock);
+	if (ret)
 		return ret;
-	}
 
 	vport->cur_vlan_fltr_en = need_en;
 
+	return 0;
+}
+
+int hclge_enable_vport_vlan_filter(struct hclge_vport *vport, bool request_en)
+{
+	struct hclge_dev *hdev = vport->back;
+	int ret;
+
+	mutex_lock(&hdev->vport_lock);
+	vport->req_vlan_fltr_en = request_en;
+	ret = __hclge_enable_vport_vlan_filter(vport, request_en);
 	mutex_unlock(&hdev->vport_lock);
 
-	return 0;
+	return ret;
 }
 
 static int hclge_enable_vlan_filter(struct hnae3_handle *handle, bool enable)
@@ -11222,16 +11304,19 @@ static void hclge_sync_vlan_fltr_state(struct hclge_dev *hdev)
 					&vport->state))
 			continue;
 
-		ret = hclge_enable_vport_vlan_filter(vport,
-						     vport->req_vlan_fltr_en);
+		mutex_lock(&hdev->vport_lock);
+		ret = __hclge_enable_vport_vlan_filter(vport,
+						       vport->req_vlan_fltr_en);
 		if (ret) {
 			dev_err(&hdev->pdev->dev,
 				"failed to sync vlan filter state for vport%u, ret = %d\n",
 				vport->vport_id, ret);
 			set_bit(HCLGE_VPORT_STATE_VLAN_FLTR_CHANGE,
 				&vport->state);
+			mutex_unlock(&hdev->vport_lock);
 			return;
 		}
+		mutex_unlock(&hdev->vport_lock);
 	}
 }
 
@@ -12099,7 +12184,7 @@ static int hclge_pci_init(struct hclge_dev *hdev)
 		ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 		if (ret) {
 			dev_err(&pdev->dev,
-				"can't set consistent PCI DMA");
+				"can't set consistent PCI DMA\n");
 			goto err_disable_device;
 		}
 		dev_warn(&pdev->dev, "set DMA mask to 32 bits\n");
@@ -13481,6 +13566,8 @@ struct hnae3_ae_ops hclge_ops = {
 	.set_promisc_mode = hclge_set_promisc_mode,
 	.request_update_promisc_mode = hclge_request_update_promisc_mode,
 	.request_flush_qb_config = hclge_flush_qb_config,
+	.request_pfc_storm_config = hclge_request_pfc_storm_config,
+	.get_pfc_storm_config = hclge_get_pfc_storm_config,
 	.query_fd_qb_state = hclge_query_fd_qb_state,
 	.set_loopback = hclge_set_loopback,
 	.start = hclge_ae_start,

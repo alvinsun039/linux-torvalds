@@ -27,13 +27,10 @@ config KVM
 	select KVM_GENERIC_MMU_NOTIFIER
 	select HAVE_KVM_IRQCHIP
 	select HAVE_KVM_PFNCACHE
-	select HAVE_KVM_IRQFD
 	select HAVE_KVM_DIRTY_RING_TSO
 	select HAVE_KVM_DIRTY_RING_ACQ_REL
-	select IRQ_BYPASS_MANAGER
 	select HAVE_KVM_IRQ_BYPASS
 	select HAVE_KVM_IRQ_ROUTING
-	select HAVE_KVM_EVENTFD
 	select KVM_ASYNC_PF
 	select USER_RETURN_NOTIFIER
 	select KVM_MMIO
@@ -176,5 +173,16 @@ config KVM_SUPPORTS_CSV_REUSE_ASID
 	  Provide support for reuse the same ASID for difference HYGON
 	  CSV guests, this allow the user to create more CSV guests on
 	  HYGON CPUs with limited ASIDs.
+
+config KVM_MAX_NR_VCPUS
+	int "Maximum number of vCPUs per KVM guest"
+	depends on KVM
+	range 1024 4096
+	default 4096 if MAXSMP
+	default 1024
+	help
+	  Set the maximum number of vCPUs per KVM guest. Larger values will increase
+	  the memory footprint of each KVM guest, regardless of how many vCPUs are
+	  created for a given VM.
 
 endif # VIRTUALIZATION

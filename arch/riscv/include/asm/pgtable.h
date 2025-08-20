@@ -670,6 +670,7 @@ static inline int pud_write(pud_t pud)
 	return pte_write(pud_pte(pud));
 }
 
+#define pmd_dirty pmd_dirty
 static inline int pmd_dirty(pmd_t pmd)
 {
 	return pte_dirty(pmd_pte(pmd));

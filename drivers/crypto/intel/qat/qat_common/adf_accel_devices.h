@@ -141,6 +141,40 @@ struct admin_info {
 	u32 mailbox_offset;
 };
 
+struct ring_config {
+	u64 base;
+	u32 config;
+	u32 head;
+	u32 tail;
+	u32 reserved0;
+};
+
+struct bank_state {
+	u32 ringstat0;
+	u32 ringstat1;
+	u32 ringuostat;
+	u32 ringestat;
+	u32 ringnestat;
+	u32 ringnfstat;
+	u32 ringfstat;
+	u32 ringcstat0;
+	u32 ringcstat1;
+	u32 ringcstat2;
+	u32 ringcstat3;
+	u32 iaintflagen;
+	u32 iaintflagreg;
+	u32 iaintflagsrcsel0;
+	u32 iaintflagsrcsel1;
+	u32 iaintcolen;
+	u32 iaintcolctl;
+	u32 iaintflagandcolen;
+	u32 ringexpstat;
+	u32 ringexpintenable;
+	u32 ringsrvarben;
+	u32 reserved0;
+	struct ring_config rings[ADF_ETR_MAX_RINGS_PER_BANK];
+};
+
 struct adf_hw_csr_ops {
 	u64 (*build_csr_ring_base_addr)(dma_addr_t addr, u32 size);
 	u32 (*read_csr_ring_head)(void __iomem *csr_base_addr, u32 bank,
@@ -151,22 +185,49 @@ struct adf_hw_csr_ops {
 				  u32 ring);
 	void (*write_csr_ring_tail)(void __iomem *csr_base_addr, u32 bank,
 				    u32 ring, u32 value);
+	u32 (*read_csr_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_uo_stat)(void __iomem *csr_base_addr, u32 bank);
 	u32 (*read_csr_e_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_ne_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_nf_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_f_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_c_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_exp_stat)(void __iomem *csr_base_addr, u32 bank);
+	u32 (*read_csr_exp_int_en)(void __iomem *csr_base_addr, u32 bank);
+	void (*write_csr_exp_int_en)(void __iomem *csr_base_addr, u32 bank,
+				     u32 value);
+	u32 (*read_csr_ring_config)(void __iomem *csr_base_addr, u32 bank,
+				    u32 ring);
 	void (*write_csr_ring_config)(void __iomem *csr_base_addr, u32 bank,
 				      u32 ring, u32 value);
+	dma_addr_t (*read_csr_ring_base)(void __iomem *csr_base_addr, u32 bank,
+					 u32 ring);
 	void (*write_csr_ring_base)(void __iomem *csr_base_addr, u32 bank,
 				    u32 ring, dma_addr_t addr);
+	u32 (*read_csr_int_en)(void __iomem *csr_base_addr, u32 bank);
+	void (*write_csr_int_en)(void __iomem *csr_base_addr, u32 bank,
+				 u32 value);
+	u32 (*read_csr_int_flag)(void __iomem *csr_base_addr, u32 bank);
 	void (*write_csr_int_flag)(void __iomem *csr_base_addr, u32 bank,
 				   u32 value);
+	u32 (*read_csr_int_srcsel)(void __iomem *csr_base_addr, u32 bank);
 	void (*write_csr_int_srcsel)(void __iomem *csr_base_addr, u32 bank);
+	void (*write_csr_int_srcsel_w_val)(void __iomem *csr_base_addr,
+					   u32 bank, u32 value);
+	u32 (*read_csr_int_col_en)(void __iomem *csr_base_addr, u32 bank);
 	void (*write_csr_int_col_en)(void __iomem *csr_base_addr, u32 bank,
 				     u32 value);
+	u32 (*read_csr_int_col_ctl)(void __iomem *csr_base_addr, u32 bank);
 	void (*write_csr_int_col_ctl)(void __iomem *csr_base_addr, u32 bank,
 				      u32 value);
+	u32 (*read_csr_int_flag_and_col)(void __iomem *csr_base_addr,
+					 u32 bank);
 	void (*write_csr_int_flag_and_col)(void __iomem *csr_base_addr,
 					   u32 bank, u32 value);
+	u32 (*read_csr_ring_srv_arb_en)(void __iomem *csr_base_addr, u32 bank);
 	void (*write_csr_ring_srv_arb_en)(void __iomem *csr_base_addr, u32 bank,
 					  u32 value);
+	u32 (*get_int_col_ctl_enable_mask)(void);
 };
 
 struct adf_cfg_device_data;
@@ -259,6 +320,10 @@ struct adf_hw_device_data {
 	void (*enable_ints)(struct adf_accel_dev *accel_dev);
 	void (*set_ssm_wdtimer)(struct adf_accel_dev *accel_dev);
 	int (*ring_pair_reset)(struct adf_accel_dev *accel_dev, u32 bank_nr);
+	int (*bank_state_save)(struct adf_accel_dev *accel_dev, u32 bank_number,
+			       struct bank_state *state);
+	int (*bank_state_restore)(struct adf_accel_dev *accel_dev,
+				  u32 bank_number, struct bank_state *state);
 	void (*reset_device)(struct adf_accel_dev *accel_dev);
 	void (*set_msix_rttable)(struct adf_accel_dev *accel_dev);
 	const char *(*uof_get_name)(struct adf_accel_dev *accel_dev, u32 obj_num);
@@ -347,11 +412,17 @@ struct adf_fw_loader_data {
 struct adf_accel_vf_info {
 	struct adf_accel_dev *accel_dev;
 	struct mutex pf2vf_lock; /* protect CSR access for PF2VF messages */
+	struct mutex pfvf_mig_lock; /* protects PFVF state for migration */
 	struct ratelimit_state vf2pf_ratelimit;
 	u32 vf_nr;
 	bool init;
 	bool restarting;
 	u8 vf_compat_ver;
+	/*
+	 * Private area used for device migration.
+	 * Memory allocation and free is managed by migration driver.
+	 */
+	void *mig_priv;
 };
 
 struct adf_dc_data {

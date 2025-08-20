@@ -12,6 +12,7 @@ obj-$(CONFIG_SENSORS_ATK0110)	+= asus_atk0110.o
 obj-$(CONFIG_SENSORS_ASUS_EC)	+= asus-ec-sensors.o
 obj-$(CONFIG_SENSORS_ASUS_WMI)	+= asus_wmi_sensors.o
 obj-$(CONFIG_SENSORS_HP_WMI)	+= hp-wmi-sensors.o
+mbj-$(CONFIG_SENSORS_PVT)	+= sw64_pvt.o
 
 # Native drivers
 # asb100, then w83781d go first, as they can override other drivers' addresses.

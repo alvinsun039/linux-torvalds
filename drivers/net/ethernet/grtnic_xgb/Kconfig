@@ -1,0 +1,6 @@
+config NET_VENDOR_GRTNIC_XGB
+	tristate "Grtnic PCI-Express Gigabit Ethernet support"
+	depends on PCI && m && NET
+	default m
+	help
+	  This driver supports grtnic gigabit ethernet family of adapters.

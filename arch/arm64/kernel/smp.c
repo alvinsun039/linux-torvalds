@@ -532,37 +532,6 @@ int arch_register_cpu(int cpu)
 	return register_cpu(c, cpu);
 }
 
-/*
- * On phytium S2500 server, the vmcore cannot be saved because the storage
- * device and the cpu brought up by the kdump kernel are on two different
- * sockets(for example, SAS controller and disks where vmcore will save is
- * installed on socket1 and second kernel brings up 2 CPUs both on socket0).
- *
- * To avoid this problem, need to ensure that the kdump kernel can bring up
- * cpu on each socket. Bypass other non-cpu0 to ensure that each cpu0 on each
- * socket can bootup and handle interrupt when booting the second kernel.
- */
-static bool __init is_kump_bypass_cpu(u64 hwid)
-{
-	/* Prevent nr_cpus=2 is not work well on some S2500 server(kdump),
-	 * and can still use nr_cpus=65 at this time.
-	 */
-	if (!is_cpu_ft2500() || nr_cpu_ids != 2)
-		return false;
-
-	/* Ensure kdump kernel can bring up each cpu0 on each socket,
-	 * so bypass other non-cpu0 when booting kdump kernel
-	 */
-	if (is_kdump_kernel() &&
-	    (hwid & 0xffff) != (cpu_logical_map(0) & 0xffff)) {
-		pr_info("2500 kdump hwid = 0x%llx\n", hwid);
-
-		return true;
-	}
-
-	return false;
-}
-
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 void arch_unregister_cpu(int cpu)
 {
@@ -598,6 +567,37 @@ struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu)
 	return &cpu_madt_gicc[cpu];
 }
 EXPORT_SYMBOL_GPL(acpi_cpu_get_madt_gicc);
+
+/*
+ * On phytium S2500 server, the vmcore cannot be saved because the storage
+ * device and the cpu brought up by the kdump kernel are on two different
+ * sockets(for example, SAS controller and disks where vmcore will save is
+ * installed on socket1 and second kernel brings up 2 CPUs both on socket0).
+ *
+ * To avoid this problem, need to ensure that the kdump kernel can bring up
+ * cpu on each socket. Bypass other non-cpu0 to ensure that each cpu0 on each
+ * socket can bootup and handle interrupt when booting the second kernel.
+ */
+static bool __init is_kump_bypass_cpu(u64 hwid)
+{
+	/* Prevent nr_cpus=2 is not work well on some S2500 server(kdump),
+	 * and can still use nr_cpus=65 at this time.
+	 */
+	if (!is_cpu_ft2500() || nr_cpu_ids != 2)
+		return false;
+
+	/* Ensure kdump kernel can bring up each cpu0 on each socket,
+	 * so bypass other non-cpu0 when booting kdump kernel
+	 */
+	if (is_kdump_kernel() &&
+	    (hwid & 0xffff) != (cpu_logical_map(0) & 0xffff)) {
+		pr_info("2500 kdump hwid = 0x%llx\n", hwid);
+
+		return true;
+	}
+
+	return false;
+}
 
 /*
  * acpi_map_gic_cpu_interface - parse processor MADT entry

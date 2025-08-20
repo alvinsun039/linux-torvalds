@@ -37,6 +37,8 @@ static LIST_HEAD(other_pmus);
 static bool read_sysfs_core_pmus;
 static bool read_sysfs_all_pmus;
 
+static void pmu_read_sysfs(bool core_only);
+
 int pmu_name_len_no_suffix(const char *str, unsigned long *num)
 {
 	int orig_len, len;
@@ -124,6 +126,14 @@ struct perf_pmu *perf_pmus__find(const char *name)
 	pmu = perf_pmu__lookup(core_pmu ? &core_pmus : &other_pmus, dirfd, name);
 	close(dirfd);
 
+	if (!pmu) {
+		/*
+		 * Looking up an inidividual PMU failed. This may mean name is
+		 * an alias, so read the PMUs from sysfs and try to find again.
+		 */
+		pmu_read_sysfs(core_pmu);
+		pmu = pmu_find(name);
+	}
 	return pmu;
 }
 
@@ -587,11 +597,25 @@ char *perf_pmus__default_pmu_name(void)
 struct perf_pmu *evsel__find_pmu(const struct evsel *evsel)
 {
 	struct perf_pmu *pmu = evsel->pmu;
+	bool legacy_core_type;
 
-	if (!pmu) {
-		pmu = perf_pmus__find_by_type(evsel->core.attr.type);
-		((struct evsel *)evsel)->pmu = pmu;
+	if (pmu)
+		return pmu;
+
+	pmu = perf_pmus__find_by_type(evsel->core.attr.type);
+	legacy_core_type =
+		evsel->core.attr.type == PERF_TYPE_HARDWARE ||
+		evsel->core.attr.type == PERF_TYPE_HW_CACHE;
+	if (!pmu && legacy_core_type) {
+		if (perf_pmus__supports_extended_type()) {
+			u32 type = evsel->core.attr.config >> PERF_PMU_TYPE_SHIFT;
+
+			pmu = perf_pmus__find_by_type(type);
+		} else {
+			pmu = perf_pmus__find_core_pmu();
+		}
 	}
+	((struct evsel *)evsel)->pmu = pmu;
 	return pmu;
 }
 

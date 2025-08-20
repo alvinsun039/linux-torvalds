@@ -237,6 +237,14 @@ enum hns_roce_opcode_type {
 	HNS_ROCE_OPC_CHANGE_ACTIVE_PORT			= 0x8603,
 };
 
+#define HNS_ROCE_OPC_POST_MB_TIMEOUT 35000
+#define HNS_ROCE_OPC_POST_MB_TRY_CNT 8
+#define HNS_ROCE_OPC_POST_MB_RETRY_GAP_MSEC 5
+struct hns_roce_cmdq_tx_timeout_map {
+	u16 opcode;
+	u32 tx_timeout;
+};
+
 enum {
 	TYPE_CRQ,
 	TYPE_CSQ,
@@ -288,6 +296,10 @@ struct hns_roce_v2_cq_context {
 	__le32 cqe_report_timer;
 	__le32 byte_64_se_cqe_idx;
 };
+
+#define CQC_CQE_BA_L_S 3
+#define CQC_CQE_BA_H_S (32 + CQC_CQE_BA_L_S)
+#define CQC_CQE_DB_RECORD_ADDR_H_S 32
 
 #define HNS_ROCE_V2_CQ_DEFAULT_BURST_NUM 0x0
 #define HNS_ROCE_V2_CQ_DEFAULT_INTERVAL	0x0
@@ -459,6 +471,12 @@ struct hns_roce_v2_qp_context {
 
 	struct hns_roce_v2_qp_context_ex ext;
 };
+
+#define QPC_TRRL_BA_L_S 4
+#define QPC_TRRL_BA_M_S (16 + QPC_TRRL_BA_L_S)
+#define QPC_TRRL_BA_H_S (32 + QPC_TRRL_BA_M_S)
+#define QPC_IRRL_BA_L_S 6
+#define QPC_IRRL_BA_H_S (32 + QPC_IRRL_BA_L_S)
 
 #define QPC_FIELD_LOC(h, l) FIELD_LOC(struct hns_roce_v2_qp_context, h, l)
 
@@ -728,6 +746,9 @@ struct hns_roce_v2_mpt_entry {
 	__le32	pa1_l;
 	__le32	byte_64_buf_pa1;
 };
+
+#define MPT_PBL_BUF_ADDR_S 6
+#define MPT_PBL_BA_ADDR_S 3
 
 #define MPT_FIELD_LOC(h, l) FIELD_LOC(struct hns_roce_v2_mpt_entry, h, l)
 
@@ -1346,7 +1367,7 @@ struct hns_roce_v2_priv {
 struct hns_roce_dip {
 	u8 dgid[GID_LEN_V2];
 	u32 dip_idx;
-	struct list_head node; /* all dips are on a list */
+	u32 qp_cnt;
 };
 
 struct fmea_ram_ecc {
