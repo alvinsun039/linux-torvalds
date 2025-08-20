@@ -2272,13 +2272,13 @@ static int snd_pcm_link(struct snd_pcm_substream *substream, int fd)
 	bool nonatomic = substream->pcm->nonatomic;
 	struct fd f = fdget(fd);
 
-	if (!f.file)
+	if (!fd_file(f))
 		return -EBADFD;
-	if (!is_pcm_file(f.file)) {
+	if (!is_pcm_file(fd_file(f))) {
 		res = -EBADFD;
 		goto _badf;
 	}
-	pcm_file = f.file->private_data;
+	pcm_file = fd_file(f)->private_data;
 	substream1 = pcm_file->substream;
 
 	if (substream == substream1) {

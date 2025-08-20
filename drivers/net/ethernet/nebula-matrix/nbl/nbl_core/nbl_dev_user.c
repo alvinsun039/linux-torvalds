@@ -451,12 +451,12 @@ static long nbl_userdev_set_eventfd(struct nbl_adapter *adapter, unsigned long a
 	}
 
 	eventfd = fdget(fd);
-	if (!eventfd.file) {
+	if (!fd_file(eventfd)) {
 		dev_err(NBL_ADAPTER_TO_DEV(adapter), "get eventfd failed\n");
 		return -EBADF;
 	}
 
-	ctx = eventfd_ctx_fileget(eventfd.file);
+	ctx = eventfd_ctx_fileget(fd_file(eventfd));
 	if (IS_ERR(ctx)) {
 		ret = PTR_ERR(ctx);
 		dev_err(NBL_ADAPTER_TO_DEV(adapter), "get eventfd ctx failed\n");
