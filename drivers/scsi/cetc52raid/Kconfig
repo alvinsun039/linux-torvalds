@@ -1,0 +1,14 @@
+#
+# Kernel configuration file for the CETC52RAID
+#
+
+config SCSI_CETC52RAID
+	tristate "Cetc52 RAID Adapter"
+	depends on PCI && SCSI
+	select SCSI_SAS_ATTRS
+	select RAID_ATTRS
+	select IRQ_POLL
+	help
+	This driver supports CETC52 RAID controller, which supports PCI Express Gen4 interface
+	and supports SAS/SATA HDD/SSD.
+	To compile this driver as a module, choose M here.

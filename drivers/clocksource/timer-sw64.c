@@ -18,7 +18,7 @@
 #if defined(CONFIG_SUBARCH_C4)
 static u64 read_longtime(struct clocksource *cs)
 {
-	return read_csr(CSR_SHTCLOCK);
+	return sw64_read_csr(CSR_SHTCLOCK);
 }
 
 static struct clocksource clocksource_longtime = {
@@ -33,7 +33,7 @@ static struct clocksource clocksource_longtime = {
 
 static u64 notrace read_sched_clock(void)
 {
-	return read_csr(CSR_SHTCLOCK);
+	return sw64_read_csr(CSR_SHTCLOCK);
 }
 
 static int override_mclk_khz;
