@@ -1,6 +1,5 @@
 config RTL8188FU
 	tristate "Realtek 8188F USB WiFi"
-	default m
 	depends on USB
 	depends on m
 	depends on RTL8XXXU = n
