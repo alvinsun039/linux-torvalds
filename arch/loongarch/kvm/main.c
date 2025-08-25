@@ -9,7 +9,6 @@
 #include <asm/cacheflush.h>
 #include <asm/cpufeature.h>
 #include <asm/kvm_csr.h>
-#include <asm/kvm_eiointc.h>
 #include <asm/kvm_extioi.h>
 #include <asm/kvm_pch_pic.h>
 #include "trace.h"
@@ -396,9 +395,6 @@ static int kvm_loongarch_env_init(void)
 	ret = kvm_loongarch_register_ipi_device();
 	if (ret)
 		return ret;
-
-	/* Register LoongArch EIOINTC interrupt controller interface. */
-	ret = kvm_loongarch_register_eiointc_device();
 
 	/* Register loongarch extioi interrupt controller interface. */
 	ret = kvm_loongarch_register_extioi_device();

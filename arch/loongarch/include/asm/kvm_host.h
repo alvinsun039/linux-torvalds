@@ -20,7 +20,6 @@
 #include <asm/kvm_mmu.h>
 #include <asm/loongarch.h>
 #include <asm/kvm_ipi.h>
-#include <asm/kvm_eiointc.h>
 #include <asm/kvm_extioi.h>
 #include <asm/kvm_pch_pic.h>
 
@@ -34,6 +33,7 @@
 #define KVM_HALT_POLL_NS_DEFAULT	500000
 #define KVM_REQ_TLB_FLUSH_GPA		KVM_ARCH_REQ(0)
 #define KVM_REQ_STEAL_UPDATE		KVM_ARCH_REQ(1)
+#define KVM_REQ_PMU                    KVM_ARCH_REQ(2)
 
 #define KVM_LOONGARCH_IRQ_NUM_MASK      0xffff
 
@@ -51,8 +51,6 @@ struct kvm_vm_stat {
 	u64 hugepages;
 	u64 ipi_read_exits;
 	u64 ipi_write_exits;
-	u64 eiointc_read_exits;
-	u64 eiointc_write_exits;
 	u64 extioi_read_exits;
 	u64 extioi_write_exits;
 	u64 pch_pic_read_exits;
@@ -74,9 +72,13 @@ struct kvm_arch_memory_slot {
 	unsigned long flags;
 };
 
+#define HOST_MAX_PMNUM			16
 struct kvm_context {
 	unsigned long vpid_cache;
 	struct kvm_vcpu *last_vcpu;
+	/* Host PMU CSR */
+	u64 perf_ctrl[HOST_MAX_PMNUM];
+	u64 perf_cntr[HOST_MAX_PMNUM];
 };
 
 struct kvm_world_switch {
@@ -93,7 +95,7 @@ struct kvm_world_switch {
  *
  *  For LOONGARCH_CSR_CPUID register, max CPUID size if 512
  *  For IPI hardware, max destination CPUID size 1024
- *  For eiointc interrupt controller, max destination CPUID size is 256
+ *  For extioi interrupt controller, max destination CPUID size is 256
  *  For msgint interrupt controller, max supported CPUID size is 65536
  *
  * Currently max CPUID is defined as 256 for KVM hypervisor, in future
@@ -127,7 +129,6 @@ struct kvm_arch {
 	s64 time_offset;
 	struct kvm_context __percpu *vmcs;
 	struct loongarch_ipi *ipi;
-	struct loongarch_eiointc *eiointc;
 	struct loongarch_extioi *extioi;
 	struct loongarch_pch_pic *pch_pic;
 };
@@ -199,6 +200,9 @@ struct kvm_vcpu_arch {
 
 	/* CSR state */
 	struct loongarch_csrs *csr;
+
+	/* Guest max PMU CSR id */
+	int max_pmu_csrid;
 
 	/* GPR used as IO source/target */
 	u32 io_gpr;
@@ -272,6 +276,16 @@ static inline bool kvm_guest_has_lasx(struct kvm_vcpu_arch *arch)
 static inline bool kvm_guest_has_lbt(struct kvm_vcpu_arch *arch)
 {
 	return arch->cpucfg[2] & (CPUCFG2_X86BT | CPUCFG2_ARMBT | CPUCFG2_MIPSBT);
+}
+
+static inline bool kvm_guest_has_pmu(struct kvm_vcpu_arch *arch)
+{
+	return arch->cpucfg[6] & CPUCFG6_PMP;
+}
+
+static inline int kvm_get_pmu_num(struct kvm_vcpu_arch *arch)
+{
+	return (arch->cpucfg[6] & CPUCFG6_PMNUM) >> CPUCFG6_PMNUM_SHIFT;
 }
 
 /* Debug: dump vcpu state */
