@@ -20,7 +20,6 @@
 #include <asm/kvm_mmu.h>
 #include <asm/loongarch.h>
 #include <asm/kvm_ipi.h>
-#include <asm/kvm_eiointc.h>
 #include <asm/kvm_extioi.h>
 #include <asm/kvm_pch_pic.h>
 
@@ -91,7 +90,7 @@ struct kvm_world_switch {
  *
  *  For LOONGARCH_CSR_CPUID register, max CPUID size if 512
  *  For IPI hardware, max destination CPUID size 1024
- *  For eiointc interrupt controller, max destination CPUID size is 256
+ *  For extioi interrupt controller, max destination CPUID size is 256
  *  For msgint interrupt controller, max supported CPUID size is 65536
  *
  * Currently max CPUID is defined as 256 for KVM hypervisor, in future
@@ -125,7 +124,6 @@ struct kvm_arch {
 	s64 time_offset;
 	struct kvm_context __percpu *vmcs;
 	struct loongarch_ipi *ipi;
-	struct loongarch_eiointc *eiointc;
 	struct loongarch_extioi *extioi;
 	struct loongarch_pch_pic *pch_pic;
 };
