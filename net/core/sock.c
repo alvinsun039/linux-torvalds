@@ -487,13 +487,13 @@ int __sock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	struct sk_buff_head *list = &sk->sk_receive_queue;
 
 	if (atomic_read(&sk->sk_rmem_alloc) >= READ_ONCE(sk->sk_rcvbuf)) {
-		atomic_inc(&sk->sk_drops);
+		sk_drops_inc(sk);
 		trace_sock_rcvqueue_full(sk, skb);
 		return -ENOMEM;
 	}
 
 	if (!sk_rmem_schedule(sk, skb, skb->truesize)) {
-		atomic_inc(&sk->sk_drops);
+		sk_drops_inc(sk);
 		return -ENOBUFS;
 	}
 
@@ -557,7 +557,7 @@ int __sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 	skb->dev = NULL;
 
 	if (sk_rcvqueues_full(sk, READ_ONCE(sk->sk_rcvbuf))) {
-		atomic_inc(&sk->sk_drops);
+		sk_drops_inc(sk);
 		goto discard_and_relse;
 	}
 	if (nested)
@@ -575,7 +575,7 @@ int __sk_receive_skb(struct sock *sk, struct sk_buff *skb,
 		mutex_release(&sk->sk_lock.dep_map, _RET_IP_);
 	} else if (sk_add_backlog(sk, skb, READ_ONCE(sk->sk_rcvbuf))) {
 		bh_unlock_sock(sk);
-		atomic_inc(&sk->sk_drops);
+		sk_drops_inc(sk);
 		goto discard_and_relse;
 	}
 
@@ -2365,7 +2365,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 	newsk->sk_wmem_queued	= 0;
 	newsk->sk_forward_alloc = 0;
 	newsk->sk_reserved_mem  = 0;
-	atomic_set(&newsk->sk_drops, 0);
+	sk_drops_reset(newsk);
 	newsk->sk_send_head	= NULL;
 	newsk->sk_userlocks	= sk->sk_userlocks & ~SOCK_BINDPORT_LOCK;
 	atomic_set(&newsk->sk_zckey, 0);
@@ -3542,7 +3542,7 @@ void sock_init_data_uid(struct socket *sock, struct sock *sk, kuid_t uid)
 	 */
 	smp_wmb();
 	refcount_set(&sk->sk_refcnt, 1);
-	atomic_set(&sk->sk_drops, 0);
+	sk_drops_reset(sk);
 }
 EXPORT_SYMBOL(sock_init_data_uid);
 
@@ -3804,7 +3804,7 @@ void sk_get_meminfo(const struct sock *sk, u32 *mem)
 	mem[SK_MEMINFO_WMEM_QUEUED] = READ_ONCE(sk->sk_wmem_queued);
 	mem[SK_MEMINFO_OPTMEM] = atomic_read(&sk->sk_omem_alloc);
 	mem[SK_MEMINFO_BACKLOG] = READ_ONCE(sk->sk_backlog.len);
-	mem[SK_MEMINFO_DROPS] = atomic_read(&sk->sk_drops);
+	mem[SK_MEMINFO_DROPS] = sk_drops_read(sk);
 }
 
 #ifdef CONFIG_PROC_FS
