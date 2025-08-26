@@ -1767,7 +1767,10 @@ static void __init spectre_v2_select_rsb_mitigation(enum spectre_v2_mitigation m
 	case SPECTRE_V2_EIBRS:
 	case SPECTRE_V2_EIBRS_LFENCE:
 	case SPECTRE_V2_EIBRS_RETPOLINE:
-		if (boot_cpu_has_bug(X86_BUG_EIBRS_PBRSB)) {
+		if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+			setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT);
+			pr_info("Spectre v2 / SpectreRSB : Filling RSB on VMEXIT for Hygon\n");
+		} else if (boot_cpu_has_bug(X86_BUG_EIBRS_PBRSB)) {
 			pr_info("Spectre v2 / PBRSB-eIBRS: Retire a single CALL on VMEXIT\n");
 			setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT_LITE);
 		}
@@ -3324,6 +3327,11 @@ static ssize_t srbds_show_state(char *buf)
 	return sysfs_emit(buf, "%s\n", srbds_strings[srbds_mitigation]);
 }
 
+static inline bool spectre_v2_in_eibrs_mode_hygon(void)
+{
+	return is_vendor_hygon() ? spectre_v2_in_eibrs_mode(spectre_v2_enabled) : false;
+}
+
 static ssize_t retbleed_show_state(char *buf)
 {
 	if (retbleed_mitigation == RETBLEED_MITIGATION_UNRET ||
@@ -3334,6 +3342,7 @@ static ssize_t retbleed_show_state(char *buf)
 
 		return sysfs_emit(buf, "%s; SMT %s\n", retbleed_strings[retbleed_mitigation],
 				  !sched_smt_active() ? "disabled" :
+				  spectre_v2_in_eibrs_mode_hygon() ||
 				  spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT ||
 				  spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT_PREFERRED ?
 				  "enabled with STIBP protection" : "vulnerable");
