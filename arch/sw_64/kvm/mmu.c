@@ -1496,23 +1496,6 @@ bool kvm_test_age_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
 	return kvm_apt_test_clear_young(kvm, gpa, size, NULL);
 }
 
-bool kvm_set_spte_gfn(struct kvm *kvm, struct kvm_gfn_range *range)
-{
-	gpa_t gpa = range->start << PAGE_SHIFT;
-	pte_t apt_pte = range->arg.pte;
-	if (!kvm->arch.pgd)
-		return false;
-
-	WARN_ON(range->end - range->start != 1);
-
-	apt_pte = pte_wrprotect(apt_pte);
-
-	apt_set_pte(kvm, NULL, gpa, &apt_pte, 0);
-
-	return false;
-}
-
-
 /*
  * kvm_arch_mmu_enable_log_dirty_pt_masked - enable dirty logging for selected pages.
  * @kvm:	The KVM pointer
