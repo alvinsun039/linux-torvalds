@@ -958,8 +958,7 @@ struct _kc_ethtool_pauseparam {
  */
 #endif /* LINUX_VERSION_CODE == KERNEL_VERSION(x,y,z) */
 #endif
-#elif (defined(CONFIG_UOS_KERNEL) || defined(CONFIG_EULER_KERNEL) || \
-       defined(CONFIG_KYLIN_KERNEL))
+#elif (defined(CONFIG_UOS_KERNEL) || defined(CONFIG_EULER_KERNEL))
 #include "kcompat_chn_os.h"
 #endif /* CONFIG_SUSE_KERNEL */
 #ifndef SLE_VERSION_CODE

@@ -1275,11 +1275,25 @@ define filechk_version.h
 	echo \#define LINUX_VERSION_MAJOR $(VERSION);                    \
 	echo \#define LINUX_VERSION_PATCHLEVEL $(PATCHLEVEL);            \
 	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL);		 \
+	echo '/* KYLIN version and range checking macros */';		 \
 	echo \#define KYLIN_VERSION_MAJOR $(KYLIN_VERSION_MAJOR);	 \
 	echo \#define KYLIN_VERSION_MINOR $(KYLIN_VERSION_MINOR);	 \
 	echo '#define KYLIN_RELEASE_VERSION(a,b) (((a) << 8) + (b))';	 \
 	echo \#define KYLIN_RELEASE_CODE $(shell			 \
-	expr $(KYLIN_VERSION_MAJOR) \* 256 + $(KYLIN_VERSION_MINOR)) \
+	expr $(KYLIN_VERSION_MAJOR) \* 256 + $(KYLIN_VERSION_MINOR));		\
+	echo '#define KYLIN_VERSION_GE(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_GT(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE > KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_LE(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE <= KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_LT(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE < KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_EQ(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE == KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_RANGE(major1, minor1, major2, minor2) \';	\
+	echo '	(KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(major1, minor1) && \'; \
+	echo '	 KYLIN_RELEASE_CODE <= KYLIN_RELEASE_VERSION(major2, minor2))'	\
 
 endef
 

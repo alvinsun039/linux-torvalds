@@ -24,6 +24,7 @@ it.
    printk-index
    symbol-namespaces
    asm-annotations
+   kylin-version-macros
 
 Data structures and low-level utilities
 =======================================
