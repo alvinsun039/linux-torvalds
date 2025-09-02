@@ -1628,7 +1628,7 @@ static bool kvm_is_immutable_feature_msr(u32 msr)
 	 ARCH_CAP_PSCHANGE_MC_NO | ARCH_CAP_TSX_CTRL_MSR | ARCH_CAP_TAA_NO | \
 	 ARCH_CAP_SBDR_SSDP_NO | ARCH_CAP_FBSDP_NO | ARCH_CAP_PSDP_NO | \
 	 ARCH_CAP_FB_CLEAR | ARCH_CAP_RRSBA | ARCH_CAP_PBRSB_NO | ARCH_CAP_GDS_NO | \
-	 ARCH_CAP_RFDS_NO | ARCH_CAP_RFDS_CLEAR | ARCH_CAP_BHI_NO)
+	 ARCH_CAP_RFDS_NO | ARCH_CAP_RFDS_CLEAR | ARCH_CAP_BHI_NO | ARCH_CAP_ITS_NO)
 
 static u64 kvm_get_arch_capabilities(void)
 {
@@ -1662,6 +1662,8 @@ static u64 kvm_get_arch_capabilities(void)
 		data |= ARCH_CAP_MDS_NO;
 	if (!boot_cpu_has_bug(X86_BUG_RFDS))
 		data |= ARCH_CAP_RFDS_NO;
+	if (!boot_cpu_has_bug(X86_BUG_ITS))
+		data |= ARCH_CAP_ITS_NO;
 
 	if (!boot_cpu_has(X86_FEATURE_RTM)) {
 		/*
@@ -10053,8 +10055,11 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		a3 &= 0xFFFFFFFF;
 	}
 
-	if (static_call(kvm_x86_get_cpl)(vcpu) != 0 &&
-	    !(is_vendor_hygon() && (nr == KVM_HC_VM_ATTESTATION || nr == KVM_HC_PSP_OP))) {
+	if (static_call(kvm_x86_get_cpl)(vcpu) != 0 && !(is_vendor_hygon() &&
+	    (nr == KVM_HC_VM_ATTESTATION ||
+	     nr == KVM_HC_PSP_OP_OBSOLETE ||
+	     nr == KVM_HC_PSP_COPY_FORWARD_OP ||
+	     nr == KVM_HC_PSP_FORWARD_OP))) {
 		ret = -KVM_EPERM;
 		goto out;
 	}
@@ -10091,7 +10096,9 @@ int kvm_emulate_hypercall(struct kvm_vcpu *vcpu)
 		kvm_sched_yield(vcpu, a0);
 		ret = 0;
 		break;
-	case KVM_HC_PSP_OP:
+	case KVM_HC_PSP_OP_OBSOLETE:
+	case KVM_HC_PSP_COPY_FORWARD_OP:
+	case KVM_HC_PSP_FORWARD_OP:
 		ret = -KVM_ENOSYS;
 		if (kvm_arch_hypercall)
 			ret = kvm_arch_hypercall(vcpu->kvm, nr, a0, a1, a2, a3);
@@ -10968,6 +10975,9 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		set_debugreg(vcpu->arch.eff_db[1], 1);
 		set_debugreg(vcpu->arch.eff_db[2], 2);
 		set_debugreg(vcpu->arch.eff_db[3], 3);
+		/* When KVM_DEBUGREG_WONT_EXIT, dr6 is accessible in guest. */
+		if (unlikely(vcpu->arch.switch_db_regs & KVM_DEBUGREG_WONT_EXIT))
+			static_call(kvm_x86_set_dr6)(vcpu, vcpu->arch.dr6);
 	} else if (unlikely(hw_breakpoint_active())) {
 		set_debugreg(0, 7);
 	}

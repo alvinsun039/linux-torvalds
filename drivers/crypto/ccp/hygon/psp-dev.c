@@ -15,11 +15,11 @@
 #include <linux/psp-hygon.h>
 #include <linux/bitfield.h>
 #include <linux/delay.h>
-#include <linux/sort.h>
-#include <linux/bsearch.h>
 #include <linux/rwlock.h>
+#include <linux/pgtable.h>
 
 #include "psp-dev.h"
+#include "vpsp.h"
 
 /* Function and variable pointers for hooks */
 struct hygon_psp_hooks_table hygon_psp_hooks;
@@ -35,30 +35,25 @@ int fixup_hygon_psp_caps(struct psp_device *psp)
 	return 0;
 }
 
+struct kmem_cache *vpsp_cmd_ctx_slab;
+static struct workqueue_struct *vpsp_wq;
+static struct work_struct vpsp_work;
+
 static struct psp_misc_dev *psp_misc;
 #define HYGON_PSP_IOC_TYPE 'H'
 enum HYGON_PSP_OPCODE {
 	HYGON_PSP_MUTEX_ENABLE = 1,
 	HYGON_PSP_MUTEX_DISABLE,
 	HYGON_VPSP_CTRL_OPT,
+	HYGON_PSP_OP_PIN_USER_PAGE,
+	HYGON_PSP_OP_UNPIN_USER_PAGE,
 	HYGON_PSP_OPCODE_MAX_NR,
 };
 
-enum VPSP_DEV_CTRL_OPCODE {
-	VPSP_OP_VID_ADD,
-	VPSP_OP_VID_DEL,
-	VPSP_OP_SET_DEFAULT_VID_PERMISSION,
-	VPSP_OP_GET_DEFAULT_VID_PERMISSION,
-};
-
-struct vpsp_dev_ctrl {
-	unsigned char op;
-	union {
-		unsigned int vid;
-		// Set or check the permissions for the default VID
-		unsigned int def_vid_perm;
-		unsigned char reserved[128];
-	} data;
+#define HYGON_RESOURCE2_IOC_TYPE 'R'
+enum HYGON_PSP_RESOURCE2_OPCODE {
+	HYGON_RESOURCE2_OP_GET_PCI_BAR_RANGE = 1,
+	HYGON_RESOURCE2_OPCODE_MAX_NR,
 };
 
 uint64_t atomic64_exchange(volatile uint64_t *dst, uint64_t val)
@@ -106,7 +101,6 @@ int psp_mutex_lock_timeout(struct psp_mutex *mutex, uint64_t ms)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(psp_mutex_lock_timeout);
 
 int psp_mutex_unlock(struct psp_mutex *mutex)
 {
@@ -116,7 +110,6 @@ int psp_mutex_unlock(struct psp_mutex *mutex)
 	atomic64_exchange(&mutex->locked, 0);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(psp_mutex_unlock);
 
 static int mmap_psp(struct file *filp, struct vm_area_struct *vma)
 {
@@ -171,159 +164,66 @@ static ssize_t write_psp(struct file *file, const char __user *buf, size_t count
 
 	return written;
 }
-DEFINE_RWLOCK(vpsp_rwlock);
-
-/* VPSP_VID_MAX_ENTRIES determines the maximum number of vms that can set vid.
- * but, the performance of finding vid is determined by g_vpsp_vid_num,
- * so VPSP_VID_MAX_ENTRIES can be set larger.
- */
-#define VPSP_VID_MAX_ENTRIES    2048
-#define VPSP_VID_NUM_MAX        64
-
-struct vpsp_vid_entry {
-	uint32_t vid;
-	pid_t pid;
-};
-static struct vpsp_vid_entry g_vpsp_vid_array[VPSP_VID_MAX_ENTRIES];
-static uint32_t g_vpsp_vid_num;
-static int compare_vid_entries(const void *a, const void *b)
-{
-	return ((struct vpsp_vid_entry *)a)->pid - ((struct vpsp_vid_entry *)b)->pid;
-}
-static void swap_vid_entries(void *a, void *b, int size)
-{
-	struct vpsp_vid_entry entry;
-
-	memcpy(&entry, a, size);
-	memcpy(a, b, size);
-	memcpy(b, &entry, size);
-}
 
 /**
- * When 'allow_default_vid' is set to 1,
- * QEMU is allowed to use 'vid 0' by default
- * in the absence of a valid 'vid' setting.
+ * Try to pin a page
+ *
+ * @vaddr: the userspace virtual address, must be aligned to PAGE_SIZE
  */
-uint32_t allow_default_vid = 1;
-void vpsp_set_default_vid_permission(uint32_t is_allow)
+static int psp_pin_user_page(u64 vaddr)
 {
-	allow_default_vid = is_allow;
-}
+	struct page *page;
+	long npinned = 0;
+	int ref_count = 0;
 
-int vpsp_get_default_vid_permission(void)
-{
-	return allow_default_vid;
-}
-EXPORT_SYMBOL_GPL(vpsp_get_default_vid_permission);
-
-/**
- * When the virtual machine executes the 'tkm' command,
- * it needs to retrieve the corresponding 'vid'
- * by performing a binary search using 'kvm->userspace_pid'.
- */
-int vpsp_get_vid(uint32_t *vid, pid_t pid)
-{
-	struct vpsp_vid_entry new_entry = {.pid = pid};
-	struct vpsp_vid_entry *existing_entry = NULL;
-
-	read_lock(&vpsp_rwlock);
-	existing_entry = bsearch(&new_entry, g_vpsp_vid_array, g_vpsp_vid_num,
-				sizeof(struct vpsp_vid_entry), compare_vid_entries);
-	read_unlock(&vpsp_rwlock);
-
-	if (!existing_entry)
-		return -ENOENT;
-	if (vid) {
-		*vid = existing_entry->vid;
-		pr_debug("PSP: %s %d, by pid %d\n", __func__, *vid, pid);
+	// check must be aligned to PAGE_SIZE
+	if (vaddr & (PAGE_SIZE - 1)) {
+		pr_err("vaddr %llx not aligned to 0x%lx\n", vaddr, PAGE_SIZE);
+		return -EFAULT;
 	}
-	return 0;
-}
-EXPORT_SYMBOL_GPL(vpsp_get_vid);
 
-/**
- * Upon qemu startup, this section checks whether
- * the '-device psp,vid' parameter is specified.
- * If set, it utilizes the 'vpsp_add_vid' function
- * to insert the 'vid' and 'pid' values into the 'g_vpsp_vid_array'.
- * The insertion is done in ascending order of 'pid'.
- */
-static int vpsp_add_vid(uint32_t vid)
-{
-	pid_t cur_pid = task_pid_nr(current);
-	struct vpsp_vid_entry new_entry = {.vid = vid, .pid = cur_pid};
-
-	if (vpsp_get_vid(NULL, cur_pid) == 0)
-		return -EEXIST;
-	if (g_vpsp_vid_num == VPSP_VID_MAX_ENTRIES)
+	npinned = pin_user_pages_fast(vaddr, 1, FOLL_WRITE, &page);
+	if (npinned != 1) {
+		pr_err("PSP: pin_user_pages_fast fail\n");
 		return -ENOMEM;
-	if (vid >= VPSP_VID_NUM_MAX)
-		return -EINVAL;
+	}
 
-	write_lock(&vpsp_rwlock);
-	memcpy(&g_vpsp_vid_array[g_vpsp_vid_num++], &new_entry, sizeof(struct vpsp_vid_entry));
-	sort(g_vpsp_vid_array, g_vpsp_vid_num, sizeof(struct vpsp_vid_entry),
-				compare_vid_entries, swap_vid_entries);
-	pr_info("PSP: add vid %d, by pid %d, total vid num is %d\n", vid, cur_pid, g_vpsp_vid_num);
-	write_unlock(&vpsp_rwlock);
+	ref_count = page_ref_count(page);
+	pr_debug("pin user page with address %llx, page ref_count %d\n", vaddr, ref_count);
 	return 0;
 }
 
 /**
- * Upon the virtual machine is shut down,
- * the 'vpsp_del_vid' function is employed to remove
- * the 'vid' associated with the current 'pid'.
+ * Try to unpin a page
+ *
+ * @vaddr: the userspace virtual address, must be aligned to PAGE_SIZE
  */
-static int vpsp_del_vid(void)
+static int psp_unpin_user_page(u64 vaddr)
 {
-	pid_t cur_pid = task_pid_nr(current);
-	int i, ret = -ENOENT;
+	struct page *page;
+	long npinned = 0;
+	int ref_count = 0;
 
-	write_lock(&vpsp_rwlock);
-	for (i = 0; i < g_vpsp_vid_num; ++i) {
-		if (g_vpsp_vid_array[i].pid == cur_pid) {
-			--g_vpsp_vid_num;
-			pr_info("PSP: delete vid %d, by pid %d, total vid num is %d\n",
-				g_vpsp_vid_array[i].vid, cur_pid, g_vpsp_vid_num);
-			memcpy(&g_vpsp_vid_array[i], &g_vpsp_vid_array[i + 1],
-				sizeof(struct vpsp_vid_entry) * (g_vpsp_vid_num - i));
-			ret = 0;
-			goto end;
-		}
+	// check must be aligned to PAGE_SIZE
+	if (vaddr & (PAGE_SIZE - 1)) {
+		pr_err("vaddr %llx not aligned to 0x%lx\n", vaddr, PAGE_SIZE);
+		return -EFAULT;
 	}
 
-end:
-	write_unlock(&vpsp_rwlock);
-	return ret;
-}
-
-static int do_vpsp_op_ioctl(struct vpsp_dev_ctrl *ctrl)
-{
-	int ret = 0;
-	unsigned char op = ctrl->op;
-
-	switch (op) {
-	case VPSP_OP_VID_ADD:
-		ret = vpsp_add_vid(ctrl->data.vid);
-		break;
-
-	case VPSP_OP_VID_DEL:
-		ret = vpsp_del_vid();
-		break;
-
-	case VPSP_OP_SET_DEFAULT_VID_PERMISSION:
-		vpsp_set_default_vid_permission(ctrl->data.def_vid_perm);
-		break;
-
-	case VPSP_OP_GET_DEFAULT_VID_PERMISSION:
-		ctrl->data.def_vid_perm = vpsp_get_default_vid_permission();
-		break;
-
-	default:
-		ret = -EINVAL;
-		break;
+	// page reference count increment by 1
+	npinned = get_user_pages_fast(vaddr, 1, FOLL_WRITE, &page);
+	if (npinned != 1) {
+		pr_err("PSP: pin_user_pages_fast fail\n");
+		return -ENOMEM;
 	}
-	return ret;
+
+	// page reference count decrement by 2
+	put_page(page);
+	put_page(page);
+
+	ref_count = page_ref_count(page);
+	pr_debug("unpin user page with address %llx, page ref_count %d\n", vaddr, ref_count);
+	return 0;
 }
 
 static long ioctl_psp(struct file *file, unsigned int ioctl, unsigned long arg)
@@ -375,12 +275,77 @@ static long ioctl_psp(struct file *file, unsigned int ioctl, unsigned long arg)
 			return -EFAULT;
 		break;
 
+	case HYGON_PSP_OP_PIN_USER_PAGE:
+		ret = psp_pin_user_page((u64)arg);
+		break;
+
+	case HYGON_PSP_OP_UNPIN_USER_PAGE:
+		ret = psp_unpin_user_page((u64)arg);
+		break;
+
 	default:
 		printk(KERN_INFO "%s: invalid ioctl number: %d\n", __func__, opcode);
 		return -EINVAL;
 	}
 	return ret;
 }
+
+static resource_size_t get_master_psp_bar_size(void)
+{
+	struct psp_device *psp = psp_master;
+	struct pci_dev *pdev = to_pci_dev(psp->dev);
+
+	return pci_resource_len(pdev, 2);
+}
+
+static long ioctl_psp_resource2(struct file *file, unsigned int ioctl, unsigned long arg)
+{
+	unsigned int opcode = 0;
+	resource_size_t bar_size = 0;
+	int ret = -EFAULT;
+
+	if (_IOC_TYPE(ioctl) != HYGON_RESOURCE2_IOC_TYPE) {
+		pr_err("%s: invalid ioctl type: 0x%x\n", __func__, _IOC_TYPE(ioctl));
+		return -EINVAL;
+	}
+
+	opcode = _IOC_NR(ioctl);
+	switch (opcode) {
+	case HYGON_RESOURCE2_OP_GET_PCI_BAR_RANGE:
+		bar_size = get_master_psp_bar_size();
+
+		if (copy_to_user((void __user *)arg, &bar_size,
+				sizeof(unsigned long)))
+			return -EFAULT;
+		ret = 0;
+		break;
+
+	default:
+		pr_err("%s: invalid ioctl number: %d\n", __func__, opcode);
+		return -EINVAL;
+	}
+	return ret;
+}
+
+static int mmap_psp_resource2(struct file *filp, struct vm_area_struct *vma)
+{
+	struct psp_device *psp = psp_master;
+	struct pci_dev *pdev = to_pci_dev(psp->dev);
+	int bar = 2;
+
+	vma->vm_page_prot = pgprot_device(vma->vm_page_prot);
+	vma->vm_pgoff += (pci_resource_start(pdev, bar) >> PAGE_SHIFT);
+
+	return io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+				  vma->vm_end - vma->vm_start,
+				  vma->vm_page_prot);
+}
+
+static const struct file_operations psp_source2_fops = {
+	.owner          = THIS_MODULE,
+	.mmap		= mmap_psp_resource2,
+	.unlocked_ioctl = ioctl_psp_resource2,
+};
 
 static const struct file_operations psp_fops = {
 	.owner          = THIS_MODULE,
@@ -401,6 +366,17 @@ int hygon_psp_additional_setup(struct sp_device *sp)
 	if (!psp_misc) {
 		struct miscdevice *misc;
 
+		vpsp_wq = create_singlethread_workqueue("vpsp_workqueue");
+		if (!vpsp_wq)
+			return -ENOMEM;
+
+		INIT_WORK(&vpsp_work, vpsp_worker_handler);
+
+		vpsp_cmd_ctx_slab = kmem_cache_create("vpsp_cmd_ctx",
+				sizeof(struct vpsp_cmd_ctx), 0, SLAB_HWCACHE_ALIGN, NULL);
+		if (!vpsp_cmd_ctx_slab)
+			return -ENOMEM;
+
 		psp_misc = devm_kzalloc(dev, sizeof(*psp_misc), GFP_KERNEL);
 		if (!psp_misc)
 			return -ENOMEM;
@@ -415,10 +391,19 @@ int hygon_psp_additional_setup(struct sp_device *sp)
 		psp_mutex_init(&psp_misc->data_pg_aligned->mb_mutex);
 
 		*(uint32_t *)((void *)psp_misc->data_pg_aligned + 8) = 0xdeadbeef;
-		misc = &psp_misc->misc;
+		misc = &psp_misc->dev_misc;
 		misc->minor = MISC_DYNAMIC_MINOR;
 		misc->name = "hygon_psp_config";
 		misc->fops = &psp_fops;
+
+		ret = misc_register(misc);
+		if (ret)
+			return ret;
+
+		misc = &psp_misc->resource2_misc;
+		misc->minor = MISC_DYNAMIC_MINOR;
+		misc->name = "hygon_psp_resource2";
+		misc->fops = &psp_source2_fops;
 
 		ret = misc_register(misc);
 		if (ret)
@@ -431,19 +416,21 @@ int hygon_psp_additional_setup(struct sp_device *sp)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(hygon_psp_additional_setup);
 
 void hygon_psp_exit(struct kref *ref)
 {
 	struct psp_misc_dev *misc_dev = container_of(ref, struct psp_misc_dev, refcount);
 
-	misc_deregister(&misc_dev->misc);
+	misc_deregister(&misc_dev->dev_misc);
+	misc_deregister(&misc_dev->resource2_misc);
 	ClearPageReserved(virt_to_page(misc_dev->data_pg_aligned));
 	free_page((unsigned long)misc_dev->data_pg_aligned);
 	psp_misc = NULL;
 	hygon_psp_hooks.psp_misc = NULL;
+	kmem_cache_destroy(vpsp_cmd_ctx_slab);
+	flush_workqueue(vpsp_wq);
+	destroy_workqueue(vpsp_wq);
 }
-EXPORT_SYMBOL_GPL(hygon_psp_exit);
 
 static int __psp_do_cmd_locked(int cmd, void *data, int *psp_ret)
 {
@@ -505,97 +492,6 @@ static int __psp_do_cmd_locked(int cmd, void *data, int *psp_ret)
 			     hygon_psp_hooks.sev_cmd_buffer_len(cmd), false);
 
 	return ret;
-}
-
-int __vpsp_do_cmd_locked(uint32_t vid, int cmd, void *data, int *psp_ret)
-{
-	struct psp_device *psp = psp_master;
-	struct sev_device *sev;
-	phys_addr_t phys_addr;
-	unsigned int phys_lsb, phys_msb;
-	unsigned int reg, ret = 0;
-
-	if (!psp || !psp->sev_data)
-		return -ENODEV;
-
-	if (*hygon_psp_hooks.psp_dead)
-		return -EBUSY;
-
-	sev = psp->sev_data;
-
-	if (data && WARN_ON_ONCE(!virt_addr_valid(data)))
-		return -EINVAL;
-
-	/* Get the physical address of the command buffer */
-	phys_addr = PUT_PSP_VID(__psp_pa(data), vid);
-	phys_lsb = data ? lower_32_bits(phys_addr) : 0;
-	phys_msb = data ? upper_32_bits(phys_addr) : 0;
-
-	dev_dbg(sev->dev, "sev command id %#x buffer 0x%08x%08x timeout %us\n",
-		cmd, phys_msb, phys_lsb, *hygon_psp_hooks.psp_timeout);
-
-	print_hex_dump_debug("(in):  ", DUMP_PREFIX_OFFSET, 16, 2, data,
-			     hygon_psp_hooks.sev_cmd_buffer_len(cmd), false);
-
-	iowrite32(phys_lsb, sev->io_regs + sev->vdata->cmdbuff_addr_lo_reg);
-	iowrite32(phys_msb, sev->io_regs + sev->vdata->cmdbuff_addr_hi_reg);
-
-	sev->int_rcvd = 0;
-
-	reg = FIELD_PREP(SEV_CMDRESP_CMD, cmd) | SEV_CMDRESP_IOC;
-	iowrite32(reg, sev->io_regs + sev->vdata->cmdresp_reg);
-
-	/* wait for command completion */
-	ret = hygon_psp_hooks.sev_wait_cmd_ioc(sev, &reg, *hygon_psp_hooks.psp_timeout);
-	if (ret) {
-		if (psp_ret)
-			*psp_ret = 0;
-
-		dev_err(sev->dev, "sev command %#x timed out, disabling PSP\n", cmd);
-		*hygon_psp_hooks.psp_dead = true;
-
-		return ret;
-	}
-
-	*hygon_psp_hooks.psp_timeout = *hygon_psp_hooks.psp_cmd_timeout;
-
-	if (psp_ret)
-		*psp_ret = FIELD_GET(PSP_CMDRESP_STS, reg);
-
-	if (FIELD_GET(PSP_CMDRESP_STS, reg)) {
-		dev_dbg(sev->dev, "sev command %#x failed (%#010lx)\n",
-			cmd, FIELD_GET(PSP_CMDRESP_STS, reg));
-		ret = -EIO;
-	}
-
-	print_hex_dump_debug("(out): ", DUMP_PREFIX_OFFSET, 16, 2, data,
-			     hygon_psp_hooks.sev_cmd_buffer_len(cmd), false);
-
-	return ret;
-}
-
-int vpsp_do_cmd(uint32_t vid, int cmd, void *data, int *psp_ret)
-{
-	int rc;
-	int mutex_enabled = READ_ONCE(hygon_psp_hooks.psp_mutex_enabled);
-
-	if (is_vendor_hygon() && mutex_enabled) {
-		if (psp_mutex_lock_timeout(&psp_misc->data_pg_aligned->mb_mutex,
-					PSP_MUTEX_TIMEOUT) != 1) {
-			return -EBUSY;
-		}
-	} else {
-		mutex_lock(hygon_psp_hooks.sev_cmd_mutex);
-	}
-
-	rc = __vpsp_do_cmd_locked(vid, cmd, data, psp_ret);
-
-	if (is_vendor_hygon() && mutex_enabled)
-		psp_mutex_unlock(&psp_misc->data_pg_aligned->mb_mutex);
-	else
-		mutex_unlock(hygon_psp_hooks.sev_cmd_mutex);
-
-	return rc;
 }
 
 int psp_do_cmd(int cmd, void *data, int *psp_ret)
@@ -691,8 +587,12 @@ static irqreturn_t psp_irq_handler_hygon(int irq, void *data)
 			/* Check if it is SEV command completion: */
 			reg = ioread32(psp->io_regs + psp->vdata->sev->cmdresp_reg);
 			if (reg & PSP_CMDRESP_RESP) {
-				sev->int_rcvd = 1;
-				wake_up(&sev->int_queue);
+				if (vpsp_in_ringbuffer_mode) {
+					queue_work(vpsp_wq, &vpsp_work);
+				} else {
+					sev->int_rcvd = 1;
+					wake_up(&sev->int_queue);
+				}
 			}
 		}
 

@@ -17,6 +17,7 @@
 #include <linux/irqchip.h>
 #include <linux/seq_file.h>
 
+#include <asm/cpu.h>
 #include <asm/irq_impl.h>
 
 volatile unsigned long irq_err_count;
@@ -98,9 +99,7 @@ handle_irq(int irq)
 		return;
 	}
 
-	irq_enter();
 	generic_handle_irq_desc(desc);
-	irq_exit();
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
@@ -116,9 +115,20 @@ void __init init_IRQ(void)
 	 * Just in case the platform init_irq() causes interrupts/mchecks
 	 * (as is the case with RAWHIDE, at least).
 	 */
-	wrent(entInt, 0);
+	struct page __maybe_unused *nmi_stack_page = alloc_pages_node(
+		cpu_to_node(smp_processor_id()),
+		THREADINFO_GFP, THREAD_SIZE_ORDER);
+	unsigned long nmi_stack __maybe_unused = nmi_stack_page ?
+		(unsigned long)page_address(nmi_stack_page) : 0;
 
-	sw64_init_irq();
+	wrent(entInt, 0);
+	if (IS_ENABLED(CONFIG_SUBARCH_C4) && is_in_host()) {
+		sw64_write_csr_imb(nmi_stack + THREAD_SIZE, CSR_NMI_STACK);
+		wrent(entNMI, 6);
+		set_nmi(INT_PC);
+	}
+
+	sunway_init_pci_intx();
 	irqchip_init();
 }
 

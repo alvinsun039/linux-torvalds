@@ -1262,7 +1262,7 @@ static int mt7615_suspend(struct ieee80211_hw *hw,
 					    phy->mt76);
 
 	if (!mt7615_dev_running(dev))
-		err = mt76_connac_mcu_set_hif_suspend(&dev->mt76, true);
+		err = mt76_connac_mcu_set_hif_suspend(&dev->mt76, true, true);
 
 	mt7615_mutex_release(dev);
 
@@ -1284,7 +1284,7 @@ static int mt7615_resume(struct ieee80211_hw *hw)
 	if (!running) {
 		int err;
 
-		err = mt76_connac_mcu_set_hif_suspend(&dev->mt76, false);
+		err = mt76_connac_mcu_set_hif_suspend(&dev->mt76, false, true);
 		if (err < 0) {
 			mt7615_mutex_release(dev);
 			return err;
@@ -1326,6 +1326,10 @@ static void mt7615_set_rekey_data(struct ieee80211_hw *hw,
 #endif /* CONFIG_PM */
 
 const struct ieee80211_ops mt7615_ops = {
+	.add_chanctx = ieee80211_emulate_add_chanctx,
+	.remove_chanctx = ieee80211_emulate_remove_chanctx,
+	.change_chanctx = ieee80211_emulate_change_chanctx,
+	.switch_vif_chanctx = ieee80211_emulate_switch_vif_chanctx,
 	.tx = mt7615_tx,
 	.start = mt7615_start,
 	.stop = mt7615_stop,
@@ -1375,4 +1379,5 @@ const struct ieee80211_ops mt7615_ops = {
 };
 EXPORT_SYMBOL_GPL(mt7615_ops);
 
+MODULE_DESCRIPTION("MediaTek MT7615E and MT7663E wireless driver");
 MODULE_LICENSE("Dual BSD/GPL");

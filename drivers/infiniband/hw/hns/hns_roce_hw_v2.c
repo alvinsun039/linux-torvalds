@@ -43,7 +43,6 @@
 #include <rdma/uverbs_ioctl.h>
 #include <rdma/ib_verbs.h>
 
-#include "hnae3.h"
 #include "hclge_main.h"
 #include "hns_roce_common.h"
 #include "hns_roce_device.h"

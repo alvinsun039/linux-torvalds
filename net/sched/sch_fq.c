@@ -607,7 +607,7 @@ begin:
 	 */
 	if (!skb->tstamp) {
 		if (skb->sk)
-			rate = min(skb->sk->sk_pacing_rate, rate);
+			rate = min(READ_ONCE(skb->sk->sk_pacing_rate), rate);
 
 		if (rate <= q->low_rate_threshold) {
 			f->credit = 0;
@@ -901,7 +901,7 @@ static int fq_change(struct Qdisc *sch, struct nlattr *opt,
 		sch_tree_lock(sch);
 	}
 	while (sch->q.qlen > sch->limit) {
-		struct sk_buff *skb = fq_dequeue(sch);
+		struct sk_buff *skb = qdisc_dequeue_internal(sch, false);
 
 		if (!skb)
 			break;

@@ -18,8 +18,8 @@ extern struct cpu_topology cpu_topology[NR_CPUS];
 #define topology_llc_cpumask(cpu)		(&cpu_topology[cpu].llc_sibling)
 
 void init_cpu_topology(void);
-void store_cpu_topology(int cpuid);
-void remove_cpu_topology(int cpuid);
+void store_cpu_topology(unsigned int cpuid);
+void remove_cpu_topology(unsigned int cpuid);
 const struct cpumask *cpu_coregroup_mask(int cpu);
 
 static inline int rcid_to_thread_id(int rcid)
@@ -61,8 +61,6 @@ static inline void numa_add_cpu(unsigned int cpu) { }
 static inline void numa_remove_cpu(unsigned int cpu) { }
 static inline void numa_store_cpu_info(unsigned int cpu) { }
 #endif /* CONFIG_NUMA */
-
-extern void get_vt_smp_info(void);
 
 #include <asm-generic/topology.h>
 

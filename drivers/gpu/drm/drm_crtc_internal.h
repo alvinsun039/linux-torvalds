@@ -32,6 +32,10 @@
  * and are not exported to drivers.
  */
 
+#ifndef __DRM_CRTC_INTERNAL_H__
+#define __DRM_CRTC_INTERNAL_H__
+
+#include <linux/err.h>
 #include <linux/types.h>
 
 enum drm_color_encoding;
@@ -54,6 +58,7 @@ struct drm_mode_object;
 struct drm_mode_set;
 struct drm_plane;
 struct drm_plane_state;
+struct drm_printer;
 struct drm_property;
 struct edid;
 struct fwnode_handle;
@@ -301,3 +306,12 @@ drm_edid_load_firmware(struct drm_connector *connector)
 	return ERR_PTR(-ENOENT);
 }
 #endif
+
+/* drm_panic.c */
+#ifdef CONFIG_DRM_PANIC
+bool drm_panic_is_enabled(struct drm_device *dev);
+#else
+static inline bool drm_panic_is_enabled(struct drm_device *dev) { return false; }
+#endif
+
+#endif /* __DRM_CRTC_INTERNAL_H__ */

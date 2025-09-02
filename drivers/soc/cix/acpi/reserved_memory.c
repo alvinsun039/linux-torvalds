@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/memblock.h>
 
 enum {
 	RESERVED_MEM_NOMAP = 0,

@@ -21,6 +21,7 @@ config ALIENWARE_WMI
 	depends on LEDS_CLASS
 	depends on NEW_LEDS
 	depends on ACPI_WMI
+	select ACPI_PLATFORM_PROFILE
 	help
 	 This is a driver for controlling Alienware BIOS driven
 	 features.  It exposes an interface for controlling the AlienFX
@@ -57,8 +58,6 @@ config DELL_LAPTOP
 	select POWER_SUPPLY
 	select LEDS_CLASS
 	select NEW_LEDS
-	select LEDS_TRIGGERS
-	select LEDS_TRIGGER_AUDIO
 	help
 	This driver adds support for rfkill and backlight control to Dell
 	laptops (except for some models covered by the Compal driver).
@@ -92,6 +91,19 @@ config DELL_RBTN
 
 	  To compile this driver as a module, choose M here: the module will
 	  be called dell-rbtn.
+
+config DELL_PC
+	tristate "Dell PC Extras"
+	default m
+	depends on ACPI
+	depends on DMI
+	depends on DELL_SMBIOS
+	select ACPI_PLATFORM_PROFILE
+	help
+	This driver adds support for controlling the fan modes via platform_profile
+	on supported Dell systems regardless of formfactor.
+	Module will simply do nothing if thermal management commands are not
+	supported.
 
 #
 # The DELL_SMBIOS driver depends on ACPI_WMI and/or DCDBAS if those
@@ -165,7 +177,6 @@ config DELL_WMI
 
 config DELL_WMI_PRIVACY
 	bool "Dell WMI Hardware Privacy Support"
-	depends on LEDS_TRIGGER_AUDIO = y || DELL_WMI = LEDS_TRIGGER_AUDIO
 	depends on DELL_WMI
 	help
 	  This option adds integration with the "Dell Hardware Privacy"

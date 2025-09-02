@@ -4,15 +4,19 @@
 
 #include <linux/export.h>
 
-extern void *____memcpy_hw_una(void *dest, const void *src, size_t n);
-extern void *____memcpy_sw_una(void *dest, const void *src, size_t n);
+extern void *____memcpy_sisd(void *dest, const void *src, size_t n);
+extern void *____memcpy_simd(void *dest, const void *src, size_t n);
+extern void *____memcpy_simd_align(void *dest, const void *src, size_t n);
 
 static inline void *____memcpy(void *dest, const void *src, size_t n)
 {
-	if (static_branch_likely(&core_hw_una_enabled))
-		return ____memcpy_hw_una(dest, src, n);
+	if (!IS_ENABLED(CONFIG_DEEP_MEMCPY))
+		return ____memcpy_sisd(dest, src, n);
+
+	if (static_branch_likely(&hw_una_enabled))
+		return ____memcpy_simd(dest, src, n);
 	else
-		return ____memcpy_sw_una(dest, src, n);
+		return ____memcpy_simd_align(dest, src, n);
 }
 
 void *memcpy(void *dest, const void *src, size_t n)
@@ -28,15 +32,19 @@ void *__memcpy(void *dest, const void *src, size_t n)
 }
 EXPORT_SYMBOL(__memcpy);
 
-extern void *____constant_c_memset_hw_una(void *s, unsigned long c, size_t n);
-extern void *____constant_c_memset_sw_una(void *s, unsigned long c, size_t n);
+extern void *____constant_c_memset_sisd(void *s, unsigned long c, size_t n);
+extern void *____constant_c_memset_simd(void *s, unsigned long c, size_t n);
+extern void *____constant_c_memset_simd_align(void *s, unsigned long c, size_t n);
 
 static inline void *____constant_c_memset(void *s, unsigned long c, size_t n)
 {
-	if (static_branch_likely(&core_hw_una_enabled))
-		return ____constant_c_memset_hw_una(s, c, n);
+	if (!IS_ENABLED(CONFIG_DEEP_MEMSET))
+		return ____constant_c_memset_sisd(s, c, n);
+
+	if (static_branch_likely(&hw_una_enabled))
+		return ____constant_c_memset_simd(s, c, n);
 	else
-		return ____constant_c_memset_sw_una(s, c, n);
+		return ____constant_c_memset_simd_align(s, c, n);
 }
 
 void *__constant_c_memset(void *s, unsigned long c, size_t n)

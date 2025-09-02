@@ -83,6 +83,8 @@
 #define AES_KEY_BYTES	AES_KEYSIZE_128
 #define AES_KEY_BITS	(AES_KEY_BYTES*8)
 
+extern int device_type;
+
 /*
  * This is the structure that carries all the auth information (like
  * session handle, nonces, session key and auth) from use to use it is
@@ -599,6 +601,11 @@ void tpm_buf_fill_hmac_session(struct tpm_chip *chip, struct tpm_buf *buf)
 	u8 cphash[SHA256_DIGEST_SIZE];
 	struct sha256_state sctx;
 
+	if (device_type) {
+		dev_dbg(&chip->dev, "detected TCM device, just return\n");
+		return;
+	}
+
 	if (!auth)
 		return;
 
@@ -759,6 +766,11 @@ int tpm_buf_check_hmac_response(struct tpm_chip *chip, struct tpm_buf *buf,
 	u16 tag = be16_to_cpu(head->tag);
 	int parm_len, len, i, handles;
 
+	if (device_type) {
+		dev_dbg(&chip->dev, "detected TCM device, just return\n");
+		return rc;
+	}
+
 	if (!auth)
 		return rc;
 
@@ -887,6 +899,11 @@ void tpm2_end_auth_session(struct tpm_chip *chip)
 {
 	struct tpm2_auth *auth = chip->auth;
 
+	if (device_type) {
+		dev_dbg(&chip->dev, "detected TCM device, just return\n");
+		return;
+	}
+
 	if (!auth)
 		return;
 
@@ -980,6 +997,11 @@ int tpm2_start_auth_session(struct tpm_chip *chip)
 	struct tpm_buf buf;
 	u32 null_key;
 	int rc;
+
+	if (device_type) {
+		dev_dbg(&chip->dev, "detected TCM device, just return\n");
+		return 0;
+	}
 
 	if (chip->auth) {
 		dev_warn_once(&chip->dev, "auth session is active\n");
@@ -1381,6 +1403,22 @@ static int tpm2_create_null_primary(struct tpm_chip *chip)
 int tpm2_sessions_init(struct tpm_chip *chip)
 {
 	int rc;
+	int dev_type = -256;
+
+	rc = tpm2_check_dev_type(chip, &dev_type);
+	if (rc || -1 == dev_type) {
+		dev_err(&chip->dev, "detected device type failed with %d\n", rc);
+		return rc;
+	}
+
+	if (dev_type == 0) {
+		dev_dbg(&chip->dev, "detected TPM device\n");
+		device_type = DEVICE_TYPE_TPM;
+	} else if (dev_type == 1) {
+		dev_dbg(&chip->dev, "detected TCM device\n");
+		device_type = DEVICE_TYPE_TCM;
+		return rc;
+	}
 
 	rc = tpm2_create_null_primary(chip);
 	if (rc) {

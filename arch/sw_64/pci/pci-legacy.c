@@ -9,17 +9,21 @@
 #include <asm/sw64_init.h>
 #include <asm/pci_impl.h>
 
+#define OFFSET_DEVINT_WKEN	0x1500UL
+#define OFFSET_DEVINTWK_INTEN	0x1600UL
+
+bool sunway_legacy_pci;
+
 /*
  * The PCI controller list.
  */
 
 struct pci_controller *hose_head, **hose_tail = &hose_head;
-static void __init pcibios_reserve_legacy_regions(struct pci_bus *bus);
 
 static int __init
 pcibios_init(void)
 {
-	if (acpi_disabled)
+	if (sunway_legacy_pci)
 		sw64_init_pci();
 	return 0;
 }
@@ -65,6 +69,12 @@ int __weak chip_pcie_configure(struct pci_controller *hose)
 	return 0;
 }
 
+static struct pci_ops sunway_pci_ops = {
+	.map_bus = sunway_pci_map_bus,
+	.read    = sunway_pci_config_read,
+	.write   = sunway_pci_config_write,
+};
+
 unsigned char last_bus = PCI0_BUS;
 void __init common_init_pci(void)
 {
@@ -84,7 +94,7 @@ void __init common_init_pci(void)
 			continue;
 		hose->busn_space->start = last_bus;
 		init_busnr = (0xff << 16) + ((last_bus + 1) << 8) + (last_bus);
-		write_rc_conf(hose->node, hose->index, RC_PRIMARY_BUS, init_busnr);
+		writel(init_busnr, (hose->rc_config_space_base + RC_PRIMARY_BUS));
 		offset = hose->mem_space->start - PCI_32BIT_MEMIO;
 		if (is_in_host())
 			hose->first_busno = last_bus + 1;
@@ -97,9 +107,9 @@ void __init common_init_pci(void)
 		bridge->dev.parent = NULL;
 		bridge->sysdata = hose;
 		bridge->busnr = hose->busn_space->start;
-		bridge->ops = &sw64_pci_ops;
+		bridge->ops = &sunway_pci_ops;
 		bridge->swizzle_irq = pci_common_swizzle;
-		bridge->map_irq = sw64_map_irq;
+		bridge->map_irq = sunway_pci_map_irq;
 
 		ret = pci_scan_root_bus_bridge(bridge);
 		if (ret) {
@@ -117,23 +127,17 @@ void __init common_init_pci(void)
 				last_bus++;
 
 		hose->last_busno = hose->busn_space->end = last_bus;
-		init_busnr = read_rc_conf(hose->node, hose->index, RC_PRIMARY_BUS);
+		init_busnr = readl(hose->rc_config_space_base + RC_PRIMARY_BUS);
 		init_busnr &= ~(0xff << 16);
 		init_busnr |= last_bus << 16;
-		write_rc_conf(hose->node, hose->index, RC_PRIMARY_BUS, init_busnr);
+		writel(init_busnr, (hose->rc_config_space_base + RC_PRIMARY_BUS));
 		pci_bus_update_busn_res_end(bus, last_bus);
 		last_bus++;
 	}
 
 	pcibios_claim_console_setup();
 
-	if (is_in_host()) {
-		list_for_each_entry(bus, &pci_root_buses, node)
-			pcibios_reserve_legacy_regions(bus);
-	}
-
 	pr_info("SW arch assign unassigned resources.\n");
-
 	pci_assign_unassigned_resources();
 
 	for (hose = hose_head; hose; hose = hose->next) {
@@ -166,45 +170,7 @@ alloc_resource(void)
 	return res;
 }
 
-static void __init pcibios_reserve_legacy_regions(struct pci_bus *bus)
-{
-	struct pci_controller *hose = pci_bus_to_pci_controller(bus);
-	resource_size_t offset;
-	struct resource *res;
-
-	pr_debug("Reserving legacy ranges for domain %04x\n", pci_domain_nr(bus));
-
-	/* Check for IO */
-	if (!(hose->io_space->flags & IORESOURCE_IO))
-		goto no_io;
-	offset = (unsigned long)hose->io_space->start;
-	res = kzalloc(sizeof(struct resource), GFP_KERNEL);
-	BUG_ON(res == NULL);
-	res->name = "Legacy IO";
-	res->flags = IORESOURCE_IO;
-	res->start = offset;
-	res->end = (offset + 0xfff) & 0xfffffffffffffffful;
-	pr_debug("Candidate legacy IO: %pR\n", res);
-	if (request_resource(hose->io_space, res)) {
-		pr_debug("PCI %04x:%02x Cannot reserve Legacy IO %pR\n",
-				pci_domain_nr(bus), bus->number, res);
-		kfree(res);
-	}
-
-no_io:
-	return;
-}
-
-struct pci_ops sw64_pci_ops = {
-	.map_bus = sw64_pcie_map_bus,
-	.read    = sw64_pcie_config_read,
-	.write   = sw64_pcie_config_write,
-};
-
-int sw64_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-{
-	return sw64_chip_init->pci_init.map_irq(dev, slot, pin);
-}
+static bool rc_linkup[MAX_NUMNODES][MAX_NR_RCS_PER_NODE];
 
 static void __init
 sw64_init_host(unsigned long node, unsigned long index)
@@ -228,26 +194,49 @@ sw64_init_host(unsigned long node, unsigned long index)
 	sw64_chip_init->pci_init.hose_init(hose);
 
 	if (sw64_chip_init->pci_init.set_rc_piu)
-		sw64_chip_init->pci_init.set_rc_piu(node, index);
+		sw64_chip_init->pci_init.set_rc_piu(hose);
 
-	ret = sw64_chip_init->pci_init.check_pci_linkup(node, index);
+	ret = sw64_chip_init->pci_init.check_pci_linkup(hose);
 	if (ret == 0) {
 		/* Root Complex downstream port is link up */
-		pci_mark_rc_linkup(node, index); // 8-bit per node
+		pci_mark_rc_linkup(hose); // 8-bit per node
+		rc_linkup[node][index] = true;
 	}
 }
 
-void __weak set_devint_wken(int node) {}
-void __weak set_adr_int(int node) {}
+static void set_devint_wken(int node)
+{
+	unsigned long val;
+	void __iomem *intpu_base = misc_platform_get_intpu_base(node);
+
+	/* enable INTD wakeup */
+	val = 0x80;
+	writeq(val, intpu_base + OFFSET_DEVINT_WKEN);
+	writeq(val, intpu_base + OFFSET_DEVINTWK_INTEN);
+}
 
 static bool __init is_any_rc_linkup_one_node(unsigned long node)
 {
 	int i;
 
-	for (i = 0; i < 8; ++i) {
-		if (pci_get_rc_linkup(node, i))
+	for (i = 0; i < MAX_NR_RCS_PER_NODE; ++i) {
+		if (rc_linkup[node][i])
 			return true;
 	}
+
+	return false;
+}
+
+static bool __init is_sunway_legacy_pci(void)
+{
+	if (IS_ENABLED(CONFIG_SUBARCH_C3B))
+		return true;
+
+	if (sunway_machine_is_compatible("sunway,chip4"))
+		return true;
+
+	if (is_in_host() && sunway_machine_is_compatible("sunway,junzhang"))
+		return true;
 
 	return false;
 }
@@ -260,17 +249,20 @@ void __init sw64_init_arch(void)
 		char id[8], msg[64];
 		int i;
 
+		if (!acpi_disabled)
+			return;
+
+		if (!is_sunway_legacy_pci())
+			return;
+
+		sunway_legacy_pci = true;
+
 		cpu_num = sw64_chip->get_cpu_num();
 
 		for (node = 0; node < cpu_num; node++) {
-			if (is_in_host()) {
+			if (is_in_host())
 				set_devint_wken(node);
-				set_adr_int(node);
-			}
 		}
-
-		if (!acpi_disabled)
-			return;
 
 		pr_info("SW arch PCI initialize!\n");
 		for (node = 0; node < cpu_num; node++) {
@@ -279,15 +271,15 @@ void __init sw64_init_arch(void)
 				pr_notice("PCIe is disabled on node %ld\n", node);
 				continue;
 			}
-			for (i = 0; i < MAX_NR_RCS; i++) {
+			for (i = 0; i < MAX_NR_RCS_PER_NODE; i++) {
 				if ((rc_enable >> i) & 0x1)
 					sw64_init_host(node, i);
 			}
 			if (is_any_rc_linkup_one_node(node)) {
 				memset(msg, 0, 64);
 				sprintf(msg, "Node %ld: RC [ ", node);
-				for (i = 0; i < MAX_NR_RCS; i++) {
-					if (pci_get_rc_linkup(node, i)) {
+				for (i = 0; i < MAX_NR_RCS_PER_NODE; i++) {
+					if (rc_linkup[node][i]) {
 						memset(id, 0, 8);
 						sprintf(id, "%d ", i);
 						strcat(msg, id);
@@ -303,47 +295,6 @@ void __init sw64_init_arch(void)
 }
 
 void __weak set_pcieport_service_irq(int node, int index) {}
-
-static void __init sw64_init_intx(struct pci_controller *hose)
-{
-	unsigned long int_conf, node, val_node;
-	unsigned long index, irq;
-	int rcid;
-
-	node = hose->node;
-	index = hose->index;
-
-	if (!node_online(node))
-		val_node = next_node_in(node, node_online_map);
-	else
-		val_node = node;
-	irq = irq_alloc_descs_from(NR_IRQS_LEGACY, 2, val_node);
-	WARN_ON(irq < 0);
-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_level_irq);
-	irq_set_status_flags(irq, IRQ_LEVEL);
-	hose->int_irq = irq;
-	irq_set_chip_and_handler(irq + 1, &dummy_irq_chip, handle_level_irq);
-	hose->service_irq = irq + 1;
-	rcid = cpu_to_rcid(0);
-
-	pr_info_once("INTx are directed to node %d core %d.\n",
-			((rcid >> 6) & 0x3), (rcid & 0x1f));
-	int_conf = 1UL << 62 | rcid; /* rebase all intx on the first logical cpu */
-	if (sw64_chip_init->pci_init.set_intx)
-		sw64_chip_init->pci_init.set_intx(node, index, int_conf);
-
-	set_pcieport_service_irq(node, index);
-}
-
-void __init sw64_init_irq(void)
-{
-	struct pci_controller *hose;
-
-	/* Scan all of the recorded PCI controllers. */
-	hose = hose_head;
-	for (hose = hose_head; hose; hose = hose->next)
-		sw64_init_intx(hose);
-}
 
 void __init
 sw64_init_pci(void)

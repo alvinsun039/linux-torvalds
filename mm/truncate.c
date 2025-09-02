@@ -201,7 +201,8 @@ bool truncate_inode_partial_folio(struct folio *folio, loff_t start, loff_t end)
 	 * doing a complex calculation here, and then doing the zeroing
 	 * anyway if the page split fails.
 	 */
-	folio_zero_range(folio, offset, length);
+	if (!mapping_inaccessible(folio->mapping))
+		folio_zero_range(folio, offset, length);
 
 	if (folio_needs_release(folio))
 		folio_invalidate(folio, offset, length);
@@ -234,9 +235,22 @@ int generic_error_remove_page(struct address_space *mapping, struct page *page)
 }
 EXPORT_SYMBOL(generic_error_remove_page);
 
-static long mapping_evict_folio(struct address_space *mapping,
-		struct folio *folio)
+/**
+ * mapping_evict_folio() - Remove an unused folio from the page-cache.
+ * @mapping: The mapping this folio belongs to.
+ * @folio: The folio to remove.
+ *
+ * Safely remove one folio from the page cache.
+ * It only drops clean, unused folios.
+ *
+ * Context: Folio must be locked.
+ * Return: The number of pages successfully removed.
+ */
+long mapping_evict_folio(struct address_space *mapping, struct folio *folio)
 {
+	/* The page may have been truncated before it was locked */
+	if (!mapping)
+		return 0;
 	if (folio_test_dirty(folio) || folio_test_writeback(folio))
 		return 0;
 	/* The refcount will be elevated if any page in the folio is mapped */
@@ -247,27 +261,6 @@ static long mapping_evict_folio(struct address_space *mapping,
 		return 0;
 
 	return remove_mapping(mapping, folio);
-}
-
-/**
- * invalidate_inode_page() - Remove an unused page from the pagecache.
- * @page: The page to remove.
- *
- * Safely invalidate one page from its pagecache mapping.
- * It only drops clean, unused pages.
- *
- * Context: Page must be locked.
- * Return: The number of pages successfully removed.
- */
-long invalidate_inode_page(struct page *page)
-{
-	struct folio *folio = page_folio(page);
-	struct address_space *mapping = folio_mapping(folio);
-
-	/* The page may have been truncated before it was locked */
-	if (!mapping)
-		return 0;
-	return mapping_evict_folio(mapping, folio);
 }
 
 /**
@@ -535,9 +528,9 @@ unsigned long invalidate_mapping_pages(struct address_space *mapping,
 EXPORT_SYMBOL(invalidate_mapping_pages);
 
 /*
- * This is like invalidate_inode_page(), except it ignores the page's
+ * This is like mapping_evict_folio(), except it ignores the folio's
  * refcount.  We do this because invalidate_inode_pages2() needs stronger
- * invalidation guarantees, and cannot afford to leave pages behind because
+ * invalidation guarantees, and cannot afford to leave folios behind because
  * shrink_page_list() has a temp ref on them, or because they're transiently
  * sitting in the folio_add_lru() caches.
  */

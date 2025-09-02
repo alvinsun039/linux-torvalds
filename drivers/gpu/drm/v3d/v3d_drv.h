@@ -59,7 +59,13 @@ struct v3d_perfmon {
 	 * values can't be reset, but you can fake a reset by
 	 * destroying the perfmon and creating a new one.
 	 */
-	u64 values[];
+	u64 values[] __counted_by(ncounters);
+};
+
+enum v3d_irq {
+	V3D_CORE_IRQ,
+	V3D_HUB_IRQ,
+	V3D_MAX_IRQS,
 };
 
 struct v3d_dev {
@@ -70,6 +76,8 @@ struct v3d_dev {
 	 */
 	int ver;
 	bool single_irq_line;
+
+	int irq[V3D_MAX_IRQS];
 
 	void __iomem *hub_regs;
 	void __iomem *core_regs[3];

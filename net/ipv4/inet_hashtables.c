@@ -29,6 +29,7 @@
 #include <net/sock_reuseport.h>
 
 bool sysctl_local_port_allocation;
+bool sysctl_bind_port_unified;
 
 u32 inet_ehashfn(const struct net *net, const __be32 laddr,
 		 const __u16 lport, const __be32 faddr,
@@ -318,7 +319,7 @@ inet_lhash2_bucket_sk(struct inet_hashinfo *h, struct sock *sk)
 	return inet_lhash2_bucket(h, hash);
 }
 
-static inline int compute_score(struct sock *sk, struct net *net,
+static inline int compute_score(struct sock *sk, const struct net *net,
 				const unsigned short hnum, const __be32 daddr,
 				const int dif, const int sdif)
 {
@@ -356,7 +357,7 @@ static inline int compute_score(struct sock *sk, struct net *net,
  * Return: NULL if sk doesn't have SO_REUSEPORT set, otherwise a pointer to
  *         the selected sock or an error.
  */
-struct sock *inet_lookup_reuseport(struct net *net, struct sock *sk,
+struct sock *inet_lookup_reuseport(const struct net *net, struct sock *sk,
 				   struct sk_buff *skb, int doff,
 				   __be32 saddr, __be16 sport,
 				   __be32 daddr, unsigned short hnum,
@@ -382,7 +383,7 @@ EXPORT_SYMBOL_GPL(inet_lookup_reuseport);
  */
 
 /* called with rcu_read_lock() : No refcount taken on the socket */
-static struct sock *inet_lhash2_lookup(struct net *net,
+static struct sock *inet_lhash2_lookup(const struct net *net,
 				struct inet_listen_hashbucket *ilb2,
 				struct sk_buff *skb, int doff,
 				const __be32 saddr, __be16 sport,
@@ -409,7 +410,7 @@ static struct sock *inet_lhash2_lookup(struct net *net,
 	return result;
 }
 
-struct sock *inet_lookup_run_sk_lookup(struct net *net,
+struct sock *inet_lookup_run_sk_lookup(const struct net *net,
 				       int protocol,
 				       struct sk_buff *skb, int doff,
 				       __be32 saddr, __be16 sport,
@@ -431,7 +432,7 @@ struct sock *inet_lookup_run_sk_lookup(struct net *net,
 	return sk;
 }
 
-struct sock *__inet_lookup_listener(struct net *net,
+struct sock *__inet_lookup_listener(const struct net *net,
 				    struct inet_hashinfo *hashinfo,
 				    struct sk_buff *skb, int doff,
 				    const __be32 saddr, __be16 sport,
@@ -496,7 +497,7 @@ void sock_edemux(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(sock_edemux);
 
-struct sock *__inet_lookup_established(struct net *net,
+struct sock *__inet_lookup_established(const struct net *net,
 				  struct inet_hashinfo *hashinfo,
 				  const __be32 saddr, const __be16 sport,
 				  const __be32 daddr, const u16 hnum,
@@ -1243,22 +1244,37 @@ int inet_ehash_locks_alloc(struct inet_hashinfo *hashinfo)
 {
 	unsigned int locksz = sizeof(spinlock_t);
 	unsigned int i, nblocks = 1;
+	spinlock_t *ptr = NULL;
 
-	if (locksz != 0) {
-		/* allocate 2 cache lines or at least one spinlock per cpu */
-		nblocks = max(2U * L1_CACHE_BYTES / locksz, 1U);
-		nblocks = roundup_pow_of_two(nblocks * num_possible_cpus());
+	if (locksz == 0)
+		goto set_mask;
 
-		/* no more locks than number of hash buckets */
-		nblocks = min(nblocks, hashinfo->ehash_mask + 1);
+	/* Allocate 2 cache lines or at least one spinlock per cpu. */
+	nblocks = max(2U * L1_CACHE_BYTES / locksz, 1U) * num_possible_cpus();
 
-		hashinfo->ehash_locks = kvmalloc_array(nblocks, locksz, GFP_KERNEL);
-		if (!hashinfo->ehash_locks)
-			return -ENOMEM;
+	/* At least one page per NUMA node. */
+	nblocks = max(nblocks, num_online_nodes() * PAGE_SIZE / locksz);
 
-		for (i = 0; i < nblocks; i++)
-			spin_lock_init(&hashinfo->ehash_locks[i]);
+	nblocks = roundup_pow_of_two(nblocks);
+
+	/* No more locks than number of hash buckets. */
+	nblocks = min(nblocks, hashinfo->ehash_mask + 1);
+
+	if (num_online_nodes() > 1) {
+		/* Use vmalloc() to allow NUMA policy to spread pages
+		 * on all available nodes if desired.
+		 */
+		ptr = vmalloc_array(nblocks, locksz);
 	}
+	if (!ptr) {
+		ptr = kvmalloc_array(nblocks, locksz, GFP_KERNEL);
+		if (!ptr)
+			return -ENOMEM;
+	}
+	for (i = 0; i < nblocks; i++)
+		spin_lock_init(&ptr[i]);
+	hashinfo->ehash_locks = ptr;
+set_mask:
 	hashinfo->ehash_locks_mask = nblocks - 1;
 	return 0;
 }

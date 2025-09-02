@@ -40,12 +40,13 @@ K2CI-Arch: All
 # Fixes: 12-char SHA ("fixed-patch title")
 #
 # If patch need cherry-pick to stable tree, please add:
-# Cc: kernel-stable-team #SP1+
+# Cc: kernel-stable-team #2503
+# or
+# Cc: kernel-stable-team #2503+
 #
 # Explain:
-#  * SP1+ = SP1 + SP2 + SP3
-#  * SP2+ = SP2 + SP3
-#  * SP3+ = SP3
+#  * 2409+ = 2409 + 2503
+#  * 2503+ = 2503
 #
 # Signed-off-by: Your name <your-email-address@kylinos.cn>
 #
@@ -72,7 +73,7 @@ K2CI-Arch: All
 #    |  Signed-off-by: Michael S. Tsirkin <mst@redhat.com>                                   |
 #    |  Reviewed-by: Stefan Hajnoczi <stefanha@redhat.com>                                   |
 #    |                                                                                       |
-#    |  Cc: kernel-stable-team #SP1+                                                         |
-#    |  Signed-off-by: Zhengyuan Liu <liuzhengyuan@kylinos.cn>                            |
+#    |  Cc: kernel-stable-team #2503+                                                        |
+#    |  Signed-off-by: Zhengyuan Liu <liuzhengyuan@kylinos.cn>                               |
 #    |                                                                                       |
 #    +---------------------------------------------------------------------------------------+

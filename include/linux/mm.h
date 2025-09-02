@@ -1776,6 +1776,8 @@ static inline void vma_set_access_pid_bit(struct vm_area_struct *vma)
 		__set_bit(pid_bit, &vma->numab_state->pids_active[1]);
 	}
 }
+
+bool folio_use_access_time(struct folio *folio);
 #else /* !CONFIG_NUMA_BALANCING */
 static inline int folio_xchg_last_cpupid(struct folio *folio, int cpupid)
 {
@@ -1828,6 +1830,10 @@ static inline bool cpupid_match_pid(struct task_struct *task, int cpupid)
 
 static inline void vma_set_access_pid_bit(struct vm_area_struct *vma)
 {
+}
+static inline bool folio_use_access_time(struct folio *folio)
+{
+	return false;
 }
 #endif /* CONFIG_NUMA_BALANCING */
 
@@ -2644,6 +2650,11 @@ static inline bool get_user_page_fast_only(unsigned long addr,
 static inline unsigned long get_mm_counter(struct mm_struct *mm, int member)
 {
 	return percpu_counter_read_positive(&mm->rss_stat[member]);
+}
+
+static inline unsigned long get_mm_counter_sum(struct mm_struct *mm, int member)
+{
+	return percpu_counter_sum_positive(&mm->rss_stat[member]);
 }
 
 void mm_trace_rss_stat(struct mm_struct *mm, int member);
@@ -4011,7 +4022,6 @@ int mf_dax_kill_procs(struct address_space *mapping, pgoff_t index,
 extern int memory_failure(unsigned long pfn, int flags);
 extern void memory_failure_queue_kick(int cpu);
 extern int unpoison_memory(unsigned long pfn);
-extern void shake_page(struct page *p);
 extern atomic_long_t num_poisoned_pages __read_mostly;
 extern int soft_offline_page(unsigned long pfn, int flags);
 extern int soft_online_page(unsigned long pfn);
@@ -4025,7 +4035,6 @@ extern int __get_huge_page_for_hwpoison(unsigned long pfn, int flags,
 					bool *migratable_cleared);
 void num_poisoned_pages_inc(unsigned long pfn);
 void num_poisoned_pages_sub(unsigned long pfn, long i);
-struct task_struct *task_early_kill(struct task_struct *tsk, int force_early);
 #else
 static inline void memory_failure_queue(unsigned long pfn, int flags)
 {
@@ -4044,12 +4053,6 @@ static inline void num_poisoned_pages_inc(unsigned long pfn)
 static inline void num_poisoned_pages_sub(unsigned long pfn, long i)
 {
 }
-#endif
-
-#if defined(CONFIG_MEMORY_FAILURE) && defined(CONFIG_KSM)
-void add_to_kill_ksm(struct task_struct *tsk, struct page *p,
-		     struct vm_area_struct *vma, struct list_head *to_kill,
-		     unsigned long ksm_addr);
 #endif
 
 #if defined(CONFIG_MEMORY_FAILURE) && defined(CONFIG_MEMORY_HOTPLUG)
@@ -4092,7 +4095,6 @@ enum mf_result {
 enum mf_action_page_type {
 	MF_MSG_KERNEL,
 	MF_MSG_KERNEL_HIGH_ORDER,
-	MF_MSG_SLAB,
 	MF_MSG_DIFFERENT_COMPOUND,
 	MF_MSG_HUGE,
 	MF_MSG_FREE_HUGE,
@@ -4167,12 +4169,6 @@ unsigned long wp_shared_mapping_range(struct address_space *mapping,
 #endif
 
 extern int sysctl_nr_trim_pages;
-
-#ifdef CONFIG_PRINTK
-void mem_dump_obj(void *object);
-#else
-static inline void mem_dump_obj(void *object) {}
-#endif
 
 /**
  * seal_check_write - Check for F_SEAL_WRITE or F_SEAL_FUTURE_WRITE flags and
@@ -4249,6 +4245,7 @@ void vma_pgtable_walk_begin(struct vm_area_struct *vma);
 void vma_pgtable_walk_end(struct vm_area_struct *vma);
 
 int reserve_mem_find_by_name(const char *name, phys_addr_t *start, phys_addr_t *size);
+int reserve_mem_release_by_name(const char *name);
 
 #ifdef CONFIG_MEM_ALLOC_PROFILING
 static inline void pgalloc_tag_split(struct folio *folio, int old_order, int new_order)
@@ -4260,7 +4257,7 @@ static inline void pgalloc_tag_split(struct folio *folio, int old_order, int new
 	if (!mem_alloc_profiling_enabled())
 		return;
 
-	tag = pgalloc_tag_get(&folio->page);
+	tag = __pgalloc_tag_get(&folio->page);
 	if (!tag)
 		return;
 
@@ -4275,34 +4272,47 @@ static inline void pgalloc_tag_split(struct folio *folio, int old_order, int new
 	}
 }
 
-static inline void pgalloc_tag_copy(struct folio *new, struct folio *old)
+static inline void pgalloc_tag_swap(struct folio *new, struct folio *old)
 {
-	struct alloc_tag *tag;
-	union codetag_ref *ref;
+	union codetag_ref *ref_old, *ref_new;
+	struct alloc_tag *tag_old, *tag_new;
 
-	tag = pgalloc_tag_get(&old->page);
-	if (!tag)
+	if (!mem_alloc_profiling_enabled())
 		return;
 
-	ref = get_page_tag_ref(&new->page);
-	if (!ref)
+	tag_old = __pgalloc_tag_get(&old->page);
+	if (!tag_old)
+		return;
+	tag_new = __pgalloc_tag_get(&new->page);
+	if (!tag_new)
 		return;
 
-	/* Clear the old ref to the original allocation tag. */
-	clear_page_tag_ref(&old->page);
-	/* Decrement the counters of the tag on get_new_folio. */
-	alloc_tag_sub(ref, folio_nr_pages(new));
+	ref_old = get_page_tag_ref(&old->page);
+	if (!ref_old)
+		return;
+	ref_new = get_page_tag_ref(&new->page);
+	if (!ref_new)
+		return;
 
-	__alloc_tag_ref_set(ref, tag);
+	/*
+	 * Clear tag references to avoid debug warning when using
+	 * __alloc_tag_ref_set() with non-empty reference.
+	 */
+	set_codetag_empty(ref_old);
+	set_codetag_empty(ref_new);
 
-	put_page_tag_ref(ref);
+	/* swap tags */
+	__alloc_tag_ref_set(ref_old, tag_new);
+	__alloc_tag_ref_set(ref_new, tag_old);
+	put_page_tag_ref(ref_old);
+	put_page_tag_ref(ref_new);
 }
 #else /* !CONFIG_MEM_ALLOC_PROFILING */
 static inline void pgalloc_tag_split(struct folio *folio, int old_order, int new_order)
 {
 }
 
-static inline void pgalloc_tag_copy(struct folio *new, struct folio *old)
+static inline void pgalloc_tag_swap(struct folio *new, struct folio *old)
 {
 }
 #endif /* CONFIG_MEM_ALLOC_PROFILING */

@@ -9,22 +9,15 @@
 #include <asm/insn.h>
 
 #define JUMP_LABEL_NOP_SIZE		SW64_INSN_SIZE
-#define JUMP_TABLE_ENTRY(key, label)                    \
-	"1: nop\n\t"                                    \
-	".pushsection __jump_table,  \"aw\"\n\t"        \
-		".align 3\n\t"                          \
-		".quad 1b, %l[l_yes], %0\n\t"           \
-		".popsection\n\t"                       \
-		:  :  "i"(&((char *)key)[branch]) :  : l_yes
-
 static __always_inline bool arch_static_branch(struct static_key *key, bool branch)
 {
-	 char *k = &((char *)key)[branch];
-
-	 asm goto(
-	 	"1:     nop                                     \n\t"
-		JUMP_TABLE_ENTRY(k, l_yes)
-		);
+	asm goto(
+		"1:     nop                                     \n\t"
+		".pushsection __jump_table,  \"aw\"\n\t"
+		".align 3\n\t"
+		".quad 1b, %l[l_yes], %0\n\t"
+		".popsection\n\t"
+		:  :  "i"(&((char *)key)[branch]) :  : l_yes);
 
 	return false;
 l_yes:
@@ -33,10 +26,14 @@ l_yes:
 
 static __always_inline bool arch_static_branch_jump(struct static_key *key, bool branch)
 {
-	char *k = &((char *)key)[branch];
-	asm goto("1: br %l[l_yes]\n\t"
-		JUMP_TABLE_ENTRY(k, l_yes)
-		);
+	asm goto(
+		"1: br %l[l_yes]\n\t"
+		".pushsection __jump_table,  \"aw\"\n\t"
+		".align 3\n\t"
+		".quad 1b, %l[l_yes], %0\n\t"
+		".popsection\n\t"
+		:  :  "i"(&((char *)key)[branch]) :  : l_yes);
+
 	return false;
 l_yes:
 	return true;

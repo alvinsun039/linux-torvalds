@@ -178,7 +178,7 @@ static struct cpu_mode_desc arm64_cpu_desc[] = {
 	{ MIDR_FT_E2000_LITTLE, "Phytium,FT-E2000/Little" },
 	{ MIDR_FT_D3000, "Phytium,FT-D3000" },
 	{ MIDR_HISI_TSV110, "HUAWEI,Kunpeng 920" },
-	{ MIDR_HISI_TSV200, "Kunpeng-920" },
+	{ MIDR_HISI_HIP09, "Kunpeng-920" },
 	{}
 };
 

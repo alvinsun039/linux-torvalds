@@ -45,6 +45,7 @@
 #include <linux/slab.h>
 #include <linux/rw_hint.h>
 #include <linux/maple_tree.h>
+#include <linux/file_ref.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -998,7 +999,6 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
 
 /*
  * struct file - Represents a file
- * @f_count: reference count
  * @f_lock: Protects f_ep, f_flags. Must not be taken from IRQ context.
  * @f_mode: FMODE_* flags often used in hotpaths
  * @f_op: file operations
@@ -1008,12 +1008,12 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
  * @f_flags: file flags
  * @f_iocb_flags: iocb flags
  * @f_cred: stashed credentials of creator/opener
+ * @f_owner: file owner
  * @f_path: path of the file
  * @f_pos_lock: lock protecting file position
+ * @f_pipe: specific to pipes
  * @f_pos: file position
- * @f_version: file version
  * @f_security: LSM security context of this file
- * @f_owner: file owner
  * @f_wb_err: writeback error
  * @f_sb_err: per sb writeback errors
  * @f_ep: link of all epoll hooks for this file
@@ -1021,9 +1021,9 @@ static inline int ra_has_index(struct file_ra_state *ra, pgoff_t index)
  * @f_llist: work queue entrypoint
  * @f_ra: file's readahead state
  * @f_freeptr: Pointer used by SLAB_TYPESAFE_BY_RCU file cache (don't touch.)
+ * @f_ref: reference count
  */
 struct file {
-	atomic_long_t			f_count;
 	spinlock_t			f_lock;
 	fmode_t				f_mode;
 	const struct file_operations	*f_op;
@@ -1033,16 +1033,20 @@ struct file {
 	unsigned int			f_flags;
 	unsigned int			f_iocb_flags;
 	const struct cred		*f_cred;
+	struct fown_struct		*f_owner;
 	/* --- cacheline 1 boundary (64 bytes) --- */
 	struct path			f_path;
-	struct mutex			f_pos_lock;
+	union {
+		/* regular files (with FMODE_ATOMIC_POS) and directories */
+		struct mutex		f_pos_lock;
+		/* pipes */
+		u64			f_pipe;
+	};
 	loff_t				f_pos;
-	u64				f_version;
-	/* --- cacheline 2 boundary (128 bytes) --- */
 #ifdef CONFIG_SECURITY
 	void				*f_security;
 #endif
-	struct fown_struct		*f_owner;
+	/* --- cacheline 2 boundary (128 bytes) --- */
 	errseq_t			f_wb_err;
 	errseq_t			f_sb_err;
 #ifdef CONFIG_EPOLL
@@ -1056,6 +1060,7 @@ struct file {
 		struct file_ra_state	f_ra;
 		freeptr_t		f_freeptr;
 	};
+	file_ref_t			f_ref;
 	/* --- cacheline 3 boundary (192 bytes) --- */
 } __randomize_layout
   __attribute__((aligned(4)));	/* lest something weird decides that 2 is OK */
@@ -1069,15 +1074,14 @@ struct file_handle {
 
 static inline struct file *get_file(struct file *f)
 {
-	long prior = atomic_long_fetch_inc_relaxed(&f->f_count);
-	WARN_ONCE(!prior, "struct file::f_count incremented from zero; use-after-free condition present!\n");
+	file_ref_inc(&f->f_ref);
 	return f;
 }
 
 struct file *get_file_rcu(struct file __rcu **f);
 struct file *get_file_active(struct file **f);
 
-#define file_count(x)	atomic_long_read(&(x)->f_count)
+#define file_count(f)	file_ref_read(&(f)->f_ref)
 
 #define	MAX_NON_LFS	((1UL<<31) - 1)
 
@@ -2944,7 +2948,12 @@ extern struct inode *inode_insert5(struct inode *inode, unsigned long hashval,
 		int (*test)(struct inode *, void *),
 		int (*set)(struct inode *, void *),
 		void *data);
-extern struct inode * iget5_locked(struct super_block *, unsigned long, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *);
+struct inode *iget5_locked(struct super_block *, unsigned long,
+			   int (*test)(struct inode *, void *),
+			   int (*set)(struct inode *, void *), void *);
+struct inode *iget5_locked_rcu(struct super_block *, unsigned long,
+			       int (*test)(struct inode *, void *),
+			       int (*set)(struct inode *, void *), void *);
 extern struct inode * iget_locked(struct super_block *, unsigned long);
 extern struct inode *find_inode_nowait(struct super_block *,
 				       unsigned long,
@@ -3074,6 +3083,8 @@ extern loff_t vfs_setpos(struct file *file, loff_t offset, loff_t maxsize);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int whence);
 extern loff_t generic_file_llseek_size(struct file *file, loff_t offset,
 		int whence, loff_t maxsize, loff_t eof);
+loff_t generic_llseek_cookie(struct file *file, loff_t offset, int whence,
+			     u64 *cookie);
 extern loff_t fixed_size_llseek(struct file *file, loff_t offset,
 		int whence, loff_t size);
 extern loff_t no_seek_end_llseek_size(struct file *, loff_t, int, loff_t);
@@ -3232,6 +3243,8 @@ extern int simple_write_begin(struct file *file, struct address_space *mapping,
 extern const struct address_space_operations ram_aops;
 extern int always_delete_dentry(const struct dentry *);
 extern struct inode *alloc_anon_inode(struct super_block *);
+struct inode *anon_inode_make_secure_inode(struct super_block *sb, const char *name,
+					   const struct inode *context_inode);
 extern int simple_nosetlease(struct file *, int, struct file_lease **, void **);
 extern const struct dentry_operations simple_dentry_operations;
 

@@ -8,5 +8,3 @@ fexit_test/fexit_many_args                       # fexit_many_args:FAIL:fexit_ma
 fill_link_info/kprobe_multi_link_info            # bpf_program__attach_kprobe_multi_opts unexpected error: -95
 fill_link_info/kretprobe_multi_link_info         # bpf_program__attach_kprobe_multi_opts unexpected error: -95
 fill_link_info/kprobe_multi_invalid_ubuff        # bpf_program__attach_kprobe_multi_opts unexpected error: -95
-verifier_arena                                   # JIT does not support arena
-arena_htab                                       # JIT does not support arena

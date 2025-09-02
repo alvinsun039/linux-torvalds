@@ -106,7 +106,7 @@
 #define HPRE_SHAPER_TYPE_RATE		640
 #define HPRE_VIA_MSI_DSM		1
 #define HPRE_SQE_MASK_OFFSET		8
-#define HPRE_SQE_MASK_LEN		24
+#define HPRE_SQE_MASK_LEN		44
 #define HPRE_CTX_Q_NUM_DEF		1
 
 #define HPRE_DFX_BASE		0x301000
@@ -428,7 +428,7 @@ static int pf_q_num_set(const char *val, const struct kernel_param *kp)
 {
 	pf_q_num_flag = true;
 
-	return q_num_set(val, kp, PCI_DEVICE_ID_HUAWEI_HPRE_PF);
+	return hisi_qm_q_num_set(val, kp, PCI_DEVICE_ID_HUAWEI_HPRE_PF);
 }
 
 static const struct kernel_param_ops hpre_pf_q_num_ops = {
@@ -609,6 +609,8 @@ static void hpre_close_sva_prefetch(struct hisi_qm *qm)
 
 static void hpre_enable_clock_gate(struct hisi_qm *qm)
 {
+	unsigned long offset;
+	u8 clusters_num, i;
 	u32 val;
 
 	if (qm->ver < QM_HW_V3)
@@ -622,17 +624,23 @@ static void hpre_enable_clock_gate(struct hisi_qm *qm)
 	val |= HPRE_PEH_CFG_AUTO_GATE_EN;
 	writel(val, qm->io_base + HPRE_PEH_CFG_AUTO_GATE);
 
-	val = readl(qm->io_base + HPRE_CLUSTER_DYN_CTL);
-	val |= HPRE_CLUSTER_DYN_CTL_EN;
-	writel(val, qm->io_base + HPRE_CLUSTER_DYN_CTL);
+	clusters_num = qm->cap_tables.dev_cap_table[HPRE_CLUSTER_NUM_CAP_IDX].cap_val;
+	for (i = 0; i < clusters_num; i++) {
+		offset = (unsigned long)i * HPRE_CLSTR_ADDR_INTRVL;
+		val = readl(qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
+		val |= HPRE_CLUSTER_DYN_CTL_EN;
+		writel(val, qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
 
-	val = readl_relaxed(qm->io_base + HPRE_CORE_SHB_CFG);
-	val |= HPRE_CORE_GATE_EN;
-	writel(val, qm->io_base + HPRE_CORE_SHB_CFG);
+		val = readl(qm->io_base + offset + HPRE_CORE_SHB_CFG);
+		val |= HPRE_CORE_GATE_EN;
+		writel(val, qm->io_base + offset + HPRE_CORE_SHB_CFG);
+	}
 }
 
 static void hpre_disable_clock_gate(struct hisi_qm *qm)
 {
+	unsigned long offset;
+	u8 clusters_num, i;
 	u32 val;
 
 	if (qm->ver < QM_HW_V3)
@@ -646,13 +654,17 @@ static void hpre_disable_clock_gate(struct hisi_qm *qm)
 	val &= ~HPRE_PEH_CFG_AUTO_GATE_EN;
 	writel(val, qm->io_base + HPRE_PEH_CFG_AUTO_GATE);
 
-	val = readl(qm->io_base + HPRE_CLUSTER_DYN_CTL);
-	val &= ~HPRE_CLUSTER_DYN_CTL_EN;
-	writel(val, qm->io_base + HPRE_CLUSTER_DYN_CTL);
+	clusters_num = qm->cap_tables.dev_cap_table[HPRE_CLUSTER_NUM_CAP_IDX].cap_val;
+	for (i = 0; i < clusters_num; i++) {
+		offset = (unsigned long)i * HPRE_CLSTR_ADDR_INTRVL;
+		val = readl(qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
+		val &= ~HPRE_CLUSTER_DYN_CTL_EN;
+		writel(val, qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
 
-	val = readl_relaxed(qm->io_base + HPRE_CORE_SHB_CFG);
-	val &= ~HPRE_CORE_GATE_EN;
-	writel(val, qm->io_base + HPRE_CORE_SHB_CFG);
+		val = readl(qm->io_base + offset + HPRE_CORE_SHB_CFG);
+		val &= ~HPRE_CORE_GATE_EN;
+		writel(val, qm->io_base + offset + HPRE_CORE_SHB_CFG);
+	}
 }
 
 static int hpre_set_user_domain_and_cache(struct hisi_qm *qm)
@@ -1387,6 +1399,17 @@ static enum acc_err_result hpre_get_err_result(struct hisi_qm *qm)
 	return ACC_ERR_RECOVERED;
 }
 
+static bool hpre_dev_is_abnormal(struct hisi_qm *qm)
+{
+	u32 err_status;
+
+	err_status = hpre_get_hw_err_status(qm);
+	if (err_status & qm->err_info.dev_shutdown_mask)
+		return true;
+
+	return false;
+}
+
 static void hpre_err_info_init(struct hisi_qm *qm)
 {
 	struct hisi_qm_err_info *err_info = &qm->err_info;
@@ -1419,6 +1442,7 @@ static const struct hisi_qm_err_ini hpre_err_ini = {
 	.show_last_dfx_regs	= hpre_show_last_dfx_regs,
 	.err_info_init		= hpre_err_info_init,
 	.get_err_result		= hpre_get_err_result,
+	.dev_is_abnormal	= hpre_dev_is_abnormal,
 };
 
 static void hpre_probe_uninit(struct hisi_qm *qm)

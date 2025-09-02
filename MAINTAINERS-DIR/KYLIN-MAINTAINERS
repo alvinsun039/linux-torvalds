@@ -333,10 +333,10 @@ F:	include/net/bluetooth/
 F:	net/bluetooth/
 
 BPF AND eBPF SUBSYSTEM
-M:	Xiao Linkui <xiaolinkui@kylinos.cn>
+M:	Lu Yun <luyun@kylinos.cn>
 M:	Chen Zhang <chenzhang@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
-M:	Lu Yun <luyun@kylinos.cn>
+M:	Xiao Linkui <xiaolinkui@kylinos.cn>
 M:	Zhang Duo <zhangduo@kylinos.cn>
 M:	Geliang Tang <tanggeliang@kylinos.cn>
 S:	Supported
@@ -374,11 +374,11 @@ F:	net/can/
 FILESYSTEM DRIVER
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Hu Hai <huhai@kylinos.cn>
-M:	Shida Zhang <zhangshida@kylinos.cn>
-R:	liubaolin <liubaolin@kylinos.cn>
-R:	pengyu <pengyu@kylinos.cn>
-R:	Jiangshan Yi <yijiangshan@kylinos.cn>
-R:	pengcan <pengcan@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+M:	Youling Tang <tangyouling@kylinos.cn>
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
 S:	Supported
 F:	net/ceph/
 F:	include/linux/ceph/
@@ -390,11 +390,91 @@ F:	include/linux/dax.h
 F:	include/trace/events/fs_dax.h
 F:	include/uapi/linux/fuse.h
 F:	include/uapi/linux/gfs2_ondisk.h
+X:	Documentation/filesystems/xfs.txt
+X:	fs/xfs/
+X:	fs/ext4/
+X:	fs/jbd2/
+X:	fs/nfs/
+X:	fs/nfs_common/
+X:	fs/nfsd/
+X:	fs/smb/
+X:	fs/btrfs
+X:	fs/f2fs
+X:	fs/gfs2
+X:	fs/jfs
+X:	fs/ocfs2
+X:	fs/bcachefs
+
+XFS FILESYSTEM
+M:	Zhang Shida <zhangshida@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+R:	Youling Tang <tangyouling@kylinos.cn>
+S:	Supported
+F:	Documentation/filesystems/xfs.txt
+F:	fs/xfs/
+
+EXT4 FILESYSTEM
+M:	liubaolin <liubaolin@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+S:	Supported
+F:	Documentation/filesystems/ext4/
+F:	fs/ext4/
+F:	fs/jbd2/
+
+NFS FILESYSTEM
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+R:	dingpenglong <dingpenglong@kylinos.cn>
+S:	Supported
+F:	fs/nfs/
+F:	fs/nfs_common/
+F:	fs/nfsd/
+
+SMB FILESYSTEM
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+R:	dingpenglong <dingpenglong@kylinos.cn>
+S:	Supported
+F:	fs/smb/
+
+BTRFS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+M:	ChenXiaoSong <chenxiaosong@kylinos.cn>
+S:	Supported
+F:	fs/btrfs
+
+F2FS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	chizhiling <chizhiling@kylinos.cn>
+S:	Supported
+F:	fs/f2fs
+
+GFS2 FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	Zhang Shida <zhangshida@kylinos.cn>
+S:	Supported
+F:	fs/gfs2
+
+JFS FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+S:	Supported
+F:	fs/jfs
+
+OCFS2 FILESYSTEM
+M:	huhai <huhai@kylinos.cn>
+M:	liubaolin <liubaolin@kylinos.cn>
+S:	Supported
+F:	fs/ocfs2
+
+BCACHEFS FILESYSTEM
+M:	Youling Tang <tangyouling@kylinos.cn>
+R:	huhai <huhai@kylinos.cn>
+S:	Supported
+F:	fs/bcachefs
 
 CHAR and MISC DRIVERS
 M:	Liu Yun <liuyun01@kylinos.cn>
 M:	Xiong Xin <xiongxin@kylinos.cn>
-M:	Hu Hai <huhai@kylinos.cn>
 R:	Luo xueqin <luoxueqin@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 R:	i Chao <aichao@kylinos.cn>
@@ -598,7 +678,7 @@ M:	Xie Ming <xieming@kylinos.cn>
 M:	Sun Liming <sunliming@kylinos.cn>
 R:	Li Weishi <liweishi@kylinos.cn>
 R:	Xia Jidong <xiajidong@kylinos.cn>
-R:	Liu Cong <liucong2@kylinos.cn>
+R:	Feng Jiang <jiangfeng@kylinos.cn>
 R:	Yu Jun <yujun@kylinos.cn>
 R:	Zhang Hao <zhanghao1@kylinos.cn>
 R:	Tang Longjun <tanglongjun@kylinos.cn>
@@ -671,8 +751,6 @@ F:	tools/testing/selftests/livepatch/
 MEDIA INPUT INFRASTRUCTURE (V4L/DVB)
 M:	Wang Yongjun <wangyongjun@kylinos.cn>
 M:	Zhou Lei <zhoulei@kylinos.cn>
-M:	Liu Yihu <liuyihu@kylinos.cn>
-M:	Li Zhenneng <lizhenneng@kylinos.cn>
 R:	lihongtao <lihongtao@kylinos.cn>
 S:	Supported
 F:	drivers/media/
@@ -923,11 +1001,11 @@ F:	samples/vfio-mdev/
 VIDEO DRIVERS
 M:	Wang Yongjun <wangyongjun@kylinos.cn>
 M:	Zhou Lei <zhoulei@kylinos.cn>
-M:	Liu Yihu <liuyihu@kylinos.cn>
-M:	Li Zhenneng <lizhenneng@kylinos.cn>
-R:	Yang Deyi <yangdeyi@kylinos.cn>
-R:	pengfuyuan <pengfuyuan@kylinos.cn >
 R:	lihongtao <lihongtao@kylinos.cn>
+R:	yangdacheng <yangdacheng@kylinos.cn>
+R:	yaolu <yaolu@kylinos.cn>
+R:	lihaojie <lihaojie@kylinos.cn>
+R:	JiangWang <jiangwang@kylinos.cn>
 R:	oushixiong <oushixiong@kylinos.cn>
 R:	xurui <xurui@kylinos.cn>
 R:	sunzhigang <sunzhigang1@kylinos.cn>
@@ -940,7 +1018,7 @@ F:	kylin/gpu/
 VIRTIO AND VHOST VSOCK DRIVER
 M:	Jiang Feng <jiangfeng@kylinos.cn>
 M:	Xie Ming <xieming@kylinos.cn>
-R:	Liu Cong <liucong2@kylinos.cn>
+M:	Li Weishi <liweishi@kylinos.cn>
 R:	Yu Jun <yujun@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
 R:	He Minhong <heminhong@kylinos.cn>
@@ -982,6 +1060,18 @@ F:	include/uapi/linux/vhost.h
 F:	drivers/virtio/virtio_input.c
 F:	include/uapi/linux/virtio_input.h
 F:	virt/lib/
+
+VIRTUAL GPU DRIVER
+M:	Feng Jiang <jiangfeng@kylinos.cn>
+M:	Weishi Li <liweishi@kylinos.cn>
+R:	Qiang Liu <liuqiang@kylinos.cn>
+S:	Supported
+F:	drivers/gpu/drm/qxl/
+F:	include/uapi/drm/qxl_drm.h
+F:	drivers/gpu/drm/vmwgfx/
+F:	include/uapi/drm/vmwgfx_drm.h
+F:	drivers/gpu/drm/vboxvideo/
+F:	include/uapi/linux/vbox*.h
 
 WATCHDOG
 M:	Xiong Xin <xiongxin@kylinos.cn>
@@ -1091,13 +1181,6 @@ F:	include/xen/
 F:	arch/x86/include/asm/xen/
 F:	arch/x86/pci/xen.c
 F:	arch/x86/xen/
-
-XFS FILESYSTEM
-M:	Zhang Shida <zhangshida@kylinos.cn>
-M:	Hu Hai <huhai@kylinos.cn>
-S:	Supported
-F:	Documentation/filesystems/xfs.txt
-F:	fs/xfs/
 
 BACKPORT TOOLS
 M:	Liu Yun <liuyun01@kylinos.cn>

@@ -124,6 +124,7 @@
 #define QM_SQC_VFT_BASE_MASK_V2		GENMASK(15, 0)
 #define QM_SQC_VFT_NUM_SHIFT_V2		45
 #define QM_SQC_VFT_NUM_MASK_V2		GENMASK(9, 0)
+#define QM_MAX_QC_TYPE                  2
 
 #define QM_ABNORMAL_INT_SOURCE		0x100000
 #define QM_ABNORMAL_INT_MASK		0x100004
@@ -338,6 +339,7 @@ static const struct hisi_qm_cap_info qm_cap_info_comm[] = {
 	{QM_SUPPORT_STOP_FUNC,     0x3100, 0, BIT(10), 0x0, 0x0, 0x1},
 	{QM_SUPPORT_MB_COMMAND,   0x3100, 0, BIT(11), 0x0, 0x0, 0x1},
 	{QM_SUPPORT_SVA_PREFETCH, 0x3100, 0, BIT(14), 0x0, 0x0, 0x1},
+	{QM_SUPPORT_DAE,          0x3100, 0, BIT(15), 0x0, 0x0, 0x0},
 };
 
 static const struct hisi_qm_cap_info qm_cap_info_pf[] = {
@@ -461,6 +463,37 @@ static struct qm_typical_qos_table shaper_cbs_s[] = {
 
 static void qm_irqs_unregister(struct hisi_qm *qm);
 static int qm_reset_device(struct hisi_qm *qm);
+int hisi_qm_q_num_set(const char *val, const struct kernel_param *kp,
+		      unsigned int device)
+{
+	struct pci_dev *pdev;
+	u32 n, q_num;
+	int ret;
+
+	if (!val)
+		return -EINVAL;
+
+	pdev = pci_get_device(PCI_VENDOR_ID_HUAWEI, device, NULL);
+	if (!pdev) {
+		q_num = min_t(u32, QM_QNUM_V1, QM_QNUM_V2);
+		pr_info("No device found currently, suppose queue number is %u\n",
+			q_num);
+	} else {
+		if (pdev->revision == QM_HW_V1)
+			q_num = QM_QNUM_V1;
+		else
+			q_num = QM_QNUM_V2;
+
+		pci_dev_put(pdev);
+	}
+
+	ret = kstrtou32(val, 10, &n);
+	if (ret || n < QM_MIN_QNUM || n > q_num)
+		return -EINVAL;
+
+	return param_set_int(val, kp);
+}
+EXPORT_SYMBOL_GPL(hisi_qm_q_num_set);
 
 static u32 qm_get_hw_error_status(struct hisi_qm *qm)
 {
@@ -476,7 +509,7 @@ static u32 qm_get_dev_err_status(struct hisi_qm *qm)
 static bool qm_check_dev_error(struct hisi_qm *qm)
 {
 	struct hisi_qm *pf_qm = pci_get_drvdata(pci_physfn(qm->pdev));
-	u32 hw_status, dev_status;
+	u32 err_status;
 
 	if (test_bit(QM_DEVICE_DOWN, &qm->misc_ctl))
 		return true;
@@ -485,12 +518,12 @@ static bool qm_check_dev_error(struct hisi_qm *qm)
 	if (pf_qm->fun_type == QM_HW_VF)
 		return false;
 
-	hw_status = qm_get_hw_error_status(pf_qm) &
-		pf_qm->err_info.qm_shutdown_mask;
-	dev_status = qm_get_dev_err_status(pf_qm) &
-		pf_qm->err_info.dev_shutdown_mask;
-	if (hw_status || dev_status)
+	err_status = qm_get_hw_error_status(pf_qm);
+	if (err_status & pf_qm->err_info.qm_shutdown_mask)
 		return true;
+
+	if (pf_qm->err_ini->dev_is_abnormal)
+		return pf_qm->err_ini->dev_is_abnormal(pf_qm);
 
 	return false;
 }
@@ -911,10 +944,10 @@ int hisi_qm_set_algs(struct hisi_qm *qm, u64 alg_msk, const struct qm_dev_alg *d
 			strcat(algs, dev_algs[i].alg);
 
 	ptr = strrchr(algs, '\n');
-	if (ptr) {
+	if (ptr)
 		*ptr = '\0';
-		qm->uacce->algs = algs;
-	}
+
+	qm->uacce->algs = algs;
 
 	return 0;
 }
@@ -2528,7 +2561,7 @@ static long hisi_qm_uacce_ioctl(struct uacce_queue *q, unsigned int cmd,
 				   sizeof(struct hisi_qp_ctx)))
 			return -EFAULT;
 
-		if (qp_ctx.qc_type != 0 && qp_ctx.qc_type != 1)
+		if (qp_ctx.qc_type > QM_MAX_QC_TYPE)
 			return -EINVAL;
 
 		qm_set_sqctype(q, qp_ctx.qc_type);
@@ -3942,14 +3975,13 @@ int hisi_qm_sriov_enable(struct pci_dev *pdev, int max_vfs)
 		goto err_put_sync;
 	}
 
-	qm->vfs_num = num_vfs;
-
 	ret = pci_enable_sriov(pdev, num_vfs);
 	if (ret) {
 		pci_err(pdev, "Can't enable VF!\n");
 		qm_clear_vft_config(qm);
 		goto err_put_sync;
 	}
+	qm->vfs_num = num_vfs;
 
 	pci_info(pdev, "VF enabled, vfs_num(=%d)!\n", num_vfs);
 
@@ -3971,7 +4003,6 @@ EXPORT_SYMBOL_GPL(hisi_qm_sriov_enable);
 int hisi_qm_sriov_disable(struct pci_dev *pdev, bool is_frozen)
 {
 	struct hisi_qm *qm = pci_get_drvdata(pdev);
-	int ret;
 
 	if (pci_vfs_assigned(pdev)) {
 		pci_err(pdev, "Failed to disable VFs as VFs are assigned!\n");
@@ -3986,13 +4017,10 @@ int hisi_qm_sriov_disable(struct pci_dev *pdev, bool is_frozen)
 
 	pci_disable_sriov(pdev);
 
-	ret = qm_clear_vft_config(qm);
-	if (ret)
-		return ret;
-
+	qm->vfs_num = 0;
 	qm_pm_put_sync(qm);
 
-	return 0;
+	return qm_clear_vft_config(qm);
 }
 EXPORT_SYMBOL_GPL(hisi_qm_sriov_disable);
 
@@ -4229,6 +4257,12 @@ static int qm_controller_reset_prepare(struct hisi_qm *qm)
 {
 	struct pci_dev *pdev = qm->pdev;
 	int ret;
+
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret)
+			return ret;
+	}
 
 	ret = qm_reset_prepare_ready(qm);
 	if (ret) {
@@ -5456,6 +5490,14 @@ static int qm_clear_device(struct hisi_qm *qm)
 		return ret;
 	}
 
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret) {
+			writel(0x0, qm->io_base + ACC_MASTER_GLOBAL_CTRL);
+			return ret;
+		}
+	}
+
 	return qm_reset_device(qm);
 }
 
@@ -5766,6 +5808,12 @@ static int qm_prepare_for_suspend(struct hisi_qm *qm)
 	ret = qm_master_ooo_check(qm);
 	if (ret)
 		return ret;
+
+	if (qm->err_ini->set_priv_status) {
+		ret = qm->err_ini->set_priv_status(qm);
+		if (ret)
+			return ret;
+	}
 
 	ret = qm_set_pf_mse(qm, false);
 	if (ret)

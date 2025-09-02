@@ -857,7 +857,7 @@ static inline __poll_t do_pollfd(struct pollfd *pollfd, poll_table *pwait,
 	__poll_t mask = 0, filter;
 	struct fd f;
 
-	if (fd < 0)
+	if (unlikely(fd < 0))
 		goto out;
 	mask = EPOLLNVAL;
 	f = fdget(fd);

@@ -107,7 +107,7 @@ bool is_cpu_kunpeng920(void)
 	if (!IS_BUILTIN(CONFIG_ARCH_HISI))
 		return false;
 
-	return is_part(MIDR_HISI_TSV110) || is_part(MIDR_HISI_TSV200);
+	return is_part(MIDR_HISI_TSV110) || is_part(MIDR_HISI_HIP09);
 }
 
 bool is_vendor_phytium(void)

@@ -9,6 +9,7 @@
 #include <linux/slab.h>
 #include <linux/random.h>
 
+#include <asm/asm-offsets.h>
 #include <asm/fpu.h>
 #include <asm/switch_to.h>
 #include <asm/syscall.h>
@@ -81,7 +82,7 @@ int copy_thread(struct task_struct *p, const struct kernel_clone_args *args)
 	extern void ret_from_fork(void);
 	extern void ret_from_kernel_thread(void);
 
-	p->thread.sp = (unsigned long) childregs;
+	p->thread.sp = (unsigned long) childregs - STACKFRAME_SIZE;
 
 	if (unlikely(args->fn)) {
 		/* kernel thread */

@@ -1568,6 +1568,12 @@ static inline void ahci_gtf_filter_workaround(struct ata_host *host)
 {}
 #endif
 
+static void ahci_sw64_workaround(struct ata_host *host)
+{
+	if (IS_ENABLED(CONFIG_SW64))
+		host->flags &= ~ATA_HOST_PARALLEL_SCAN;
+}
+
 /*
  * On the Acer Aspire Switch Alpha 12, sometimes all SATA ports are detected
  * as DUMMY, or detected but eventually get a "link down" and never get up
@@ -2034,6 +2040,9 @@ static int ahci_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* apply gtf filter quirk */
 	ahci_gtf_filter_workaround(host);
+
+	/* apply workaround for SW64 mainboard */
+	ahci_sw64_workaround(host);
 
 	/* initialize adapter */
 	rc = ahci_configure_dma_masks(pdev, hpriv);

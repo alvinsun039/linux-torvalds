@@ -138,16 +138,37 @@ fib_sync_mem - UNSIGNED INTEGER
 	Default: 512kB   Minimum: 64kB   Maximum: 64MB
 
 local_port_allocation - BOOLEAN
-	Enable all odd and even ports to use for connect(), 0 means even and odd
-	port allocation strategy will be applied, otherwise sequential allocation
-	will be used.
+	Allow all even and odd ports to be used in sequence in connect(),
+	0 means using even ports first and then odd ports. Otherwise, no
+	priority is given to even ports, and ports will be allocated in
+	sequence.
+
+	Please note that the odd/even property mentioned above are based on the
+	starting number of ip_local_port_range being even. If it is odd, the
+	situation will be reversed.
 
 	Default: 0
 
 	Possible values:
 
-	- 0 - Use even ports for connect()
-	- 1 - Use all odd and even ports for connect()
+	- 0 - Use even ports first in connect().
+	- 1 - Use all ports in sequence in connect().
+
+bind_port_unified - BOOLEAN
+	Allow all odd and even ports to be used in sequence in bind(), 0 means
+	using odd ports first and then even ports. Otherwise, no priority is
+	given to odd ports, and ports will be allocated in sequence.
+
+	Please note that the odd/even property mentioned above are based on the
+	starting number of ip_local_port_range being even. If it is odd, the
+	situation will be reversed.
+
+	Default: 0
+
+	Possible values:
+
+	- 0 - Use odd ports first in bind().
+	- 1 - Use all ports in sequence in bind().
 
 ip_forward_update_priority - INTEGER
 	Whether to update SKB priority from "TOS" field in IPv4 header after it
@@ -731,7 +752,7 @@ tcp_rmem - vector of 3 INTEGERs: min, default, max
 	net.core.rmem_max.  Calling setsockopt() with SO_RCVBUF disables
 	automatic tuning of that socket's receive buffer size, in which
 	case this value is ignored.
-	Default: between 131072 and 6MB, depending on RAM size.
+	Default: between 131072 and 32MB, depending on RAM size.
 
 tcp_sack - BOOLEAN
 	Enable select acknowledgments (SACKS).
@@ -998,6 +1019,20 @@ tcp_tw_reuse - INTEGER
 
 	Default: 2
 
+tcp_tw_reuse_delay - UNSIGNED INTEGER
+        The delay in milliseconds before a TIME-WAIT socket can be reused by a
+        new connection, if TIME-WAIT socket reuse is enabled. The actual reuse
+        threshold is within [N, N+1] range, where N is the requested delay in
+        milliseconds, to ensure the delay interval is never shorter than the
+        configured value.
+
+        This setting contains an assumption about the other TCP timestamp clock
+        tick interval. It should not be set to a value lower than the peer's
+        clock tick for PAWS (Protection Against Wrapped Sequence numbers)
+        mechanism work correctly for the reused connection.
+
+        Default: 1000 (milliseconds)
+
 tcp_window_scaling - BOOLEAN
 	Enable window scaling as defined in RFC1323.
 
@@ -1081,7 +1116,7 @@ tcp_limit_output_bytes - INTEGER
 	limits the number of bytes on qdisc or device to reduce artificial
 	RTT/cwnd and reduce bufferbloat.
 
-	Default: 1048576 (16 * 65536)
+	Default: 4194304 (4 MB)
 
 tcp_challenge_ack_limit - INTEGER
 	Limits number of Challenge ACK sent per second, as recommended

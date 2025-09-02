@@ -102,7 +102,10 @@ union otx2_cpt_eng_caps {
 		u64 kasumi:1;
 		u64 des:1;
 		u64 crc:1;
-		u64 reserved_14_63:50;
+		u64 mmul:1;
+		u64 reserved_15_33:19;
+		u64 pdcp_chain:1;
+		u64 reserved_35_63:29;
 	};
 };
 
@@ -145,6 +148,35 @@ static inline bool is_dev_otx2(struct pci_dev *pdev)
 	return false;
 }
 
+static inline bool is_dev_cn10ka(struct pci_dev *pdev)
+{
+	return pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A;
+}
+
+static inline bool is_dev_cn10ka_ax(struct pci_dev *pdev)
+{
+	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A &&
+	    ((pdev->revision & 0xFF) == 4 || (pdev->revision & 0xFF) == 0x50 ||
+	     (pdev->revision & 0xff) == 0x51))
+		return true;
+
+	return false;
+}
+
+static inline bool is_dev_cn10kb(struct pci_dev *pdev)
+{
+	return pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_B;
+}
+
+static inline bool is_dev_cn10ka_b0(struct pci_dev *pdev)
+{
+	if (pdev->subsystem_device == CPT_PCI_SUBSYS_DEVID_CN10K_A &&
+	    (pdev->revision & 0xFF) == 0x54)
+		return true;
+
+	return false;
+}
+
 static inline void otx2_cpt_set_hw_caps(struct pci_dev *pdev,
 					unsigned long *cap_flag)
 {
@@ -154,6 +186,14 @@ static inline void otx2_cpt_set_hw_caps(struct pci_dev *pdev,
 	}
 }
 
+
+static inline bool cpt_feature_sgv2(struct pci_dev *pdev)
+{
+	if (!is_dev_otx2(pdev) && !is_dev_cn10ka_ax(pdev))
+		return true;
+
+	return false;
+}
 
 int otx2_cpt_send_ready_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);
 int otx2_cpt_send_mbox_msg(struct otx2_mbox *mbox, struct pci_dev *pdev);

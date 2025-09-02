@@ -1,3 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/*
+ *  Linux driver for C*Core IOP based controllers
+ *
+ *  Copyright (c) 2023-2024 C*Core Technology Co.,Ltd.
+ *  Copyright (c) 2023-2024 VolansComputer S&T Co.,Ltd.
+ */
 #ifndef _CCUSR_H_
 #define _CCUSR_H_
 
@@ -11,17 +18,17 @@ typedef void irqreturn_t;
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 20)
-#define IRQF_SHARED		SA_SHIRQ
+#define IRQF_SHARED SA_SHIRQ
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 23)
 #define scsi_bufflen(srb) ((srb)->request_bufflen)
-#define scsi_set_resid(srb, n) do { (srb)->resid = (n); } while (0)
+#define scsi_set_resid(srb, n) ((srb)->resid = (n))
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 24)
-#define sg_page(sg)		   ((sg)->page)
-#define scsi_sglist(srb)   ((struct scatterlist *)(srb)->request_buffer)
+#define sg_page(sg) ((sg)->page)
+#define scsi_sglist(srb) ((struct scatterlist *)(srb)->request_buffer)
 #define scsi_sg_count(srb) ((srb)->use_sg)
 #endif
 
@@ -40,8 +47,11 @@ struct ccusr_cmd_priv {
 	dma_addr_t dma_handle;
 	int dmamap_cnt;
 };
-#define srb_dma_handle(srb) (((struct ccusr_cmd_priv *)scsi_cmd_priv(srb))->dma_handle)
-#define srb_dmamap_cnt(srb) (((struct ccusr_cmd_priv *)scsi_cmd_priv(srb))->dmamap_cnt)
+
+#define srb_dma_handle(srb) \
+	(((struct ccusr_cmd_priv *)scsi_cmd_priv(srb))->dma_handle)
+#define srb_dmamap_cnt(srb) \
+	(((struct ccusr_cmd_priv *)scsi_cmd_priv(srb))->dmamap_cnt)
 #else
 #define srb_dma_handle(srb) ((srb)->SCp.dma_handle)
 #define srb_dmamap_cnt(srb) ((srb)->SCp.this_residual)
@@ -62,7 +72,7 @@ typedef __le16 VRC_LE16;
 #include "cciop.h"
 
 #define CCUSR_SENSE_LENGTH 32
-#define CCUSR_INTCTL_REG   0x24004
+#define CCUSR_INTCTL_REG 0x24004
 
 struct ccusr_req_tracker {
 	struct ccusr_req_tracker *next;
@@ -76,12 +86,11 @@ struct ccusr_req_tracker {
 struct ccusr_hba {
 	struct pci_dev *pcidev;
 	volatile struct cciop_if_regs __iomem *regs;
+	volatile struct cciop_if_ext __iomem *ext_regs;
 	void __iomem *ctl_regs;
 
 	struct Scsi_Host *host;
 
-	u16 iop_version;
-	u16 iop_state;
 	u32 max_requests;
 	u32 max_sg_count;
 	u32 dataxfer_length;
@@ -92,8 +101,11 @@ struct ccusr_hba {
 	struct dma_pool *req_pool;
 	struct dma_pool *sense_pool;
 	struct ccusr_req_tracker *req_list;
+	atomic_t outstanding_reqs;
 
-	u8 msg_status;
+	spinlock_t req_list_lock;
+	spinlock_t inbound_lock;
+
 	wait_queue_head_t msg_wq;
 	wait_queue_head_t ioctl_wq;
 	struct mutex ioctl_lock;
@@ -103,7 +115,8 @@ struct ccusr_hba {
 	printk(level KBUILD_MODNAME ": " fmt, ##args)
 
 #ifdef DEBUG
-#define dprintk(fmt, args...) ccusr_printk(KERN_DEBUG, fmt, ##args)
+#define dprintk(fmt, args...) \
+	ccusr_printk(KERN_DEBUG, __func__ ": " fmt, ##args)
 #else
 #define dprintk(fmt, args...)
 #endif

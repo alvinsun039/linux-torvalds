@@ -659,6 +659,7 @@ struct mlx5_ib_mkey {
 	/* Cacheable user Mkey must hold either a rb_key or a cache_ent. */
 	struct mlx5r_cache_rb_key rb_key;
 	struct mlx5_cache_ent *cache_ent;
+	u8 cacheable : 1;
 };
 
 #define MLX5_IB_MTT_PRESENT (MLX5_IB_MTT_READ | MLX5_IB_MTT_WRITE)
@@ -766,10 +767,25 @@ struct umr_common {
 	unsigned int state;
 };
 
+#define NUM_MKEYS_PER_PAGE \
+	((PAGE_SIZE - sizeof(struct list_head)) / sizeof(u32))
+
+struct mlx5_mkeys_page {
+	u32 mkeys[NUM_MKEYS_PER_PAGE];
+	struct list_head list;
+};
+static_assert(sizeof(struct mlx5_mkeys_page) == PAGE_SIZE);
+
+struct mlx5_mkeys_queue {
+	struct list_head pages_list;
+	u32 num_pages;
+	unsigned long ci;
+	spinlock_t lock; /* sync list ops */
+};
+
 struct mlx5_cache_ent {
-	struct xarray		mkeys;
-	unsigned long		stored;
-	unsigned long		reserved;
+	struct mlx5_mkeys_queue	mkeys_queue;
+	u32			pending;
 
 	char                    name[4];
 
@@ -779,6 +795,7 @@ struct mlx5_cache_ent {
 	u8 is_tmp:1;
 	u8 disabled:1;
 	u8 fill_to_high_water:1;
+	u8 tmp_cleanup_scheduled:1;
 
 	/*
 	 * - limit is the low water mark for stored mkeys, 2* limit is the
@@ -810,7 +827,6 @@ struct mlx5_mkey_cache {
 	struct mutex		rb_lock;
 	struct dentry		*fs_root;
 	unsigned long		last_add;
-	struct delayed_work	remove_ent_dwork;
 };
 
 struct mlx5_ib_port_resources {
@@ -868,8 +884,6 @@ struct mlx5_roce {
 	/* Protect mlx5_ib_get_netdev from invoking dev_hold() with a NULL
 	 * netdev pointer
 	 */
-	rwlock_t		netdev_lock;
-	struct net_device	*netdev;
 	struct notifier_block	nb;
 	struct netdev_net_notifier nn;
 	struct notifier_block	mdev_nb;
@@ -1115,6 +1129,7 @@ struct mlx5_ib_dev {
 	struct ib_device		ib_dev;
 	struct mlx5_core_dev		*mdev;
 	struct notifier_block		mdev_events;
+	struct notifier_block           lag_events;
 	int				num_ports;
 	/* serialize update of capability mask
 	 */
@@ -1174,6 +1189,10 @@ struct mlx5_ib_dev {
 #ifdef CONFIG_MLX5_MACSEC
 	struct mlx5_macsec macsec;
 #endif
+
+	u8 num_plane;
+	struct mlx5_ib_dev *smi_dev;
+	const char *sub_dev_name;
 };
 
 static inline struct mlx5_ib_cq *to_mibcq(struct mlx5_core_cq *mcq)
@@ -1313,7 +1332,7 @@ int mlx5_ib_read_wqe_rq(struct mlx5_ib_qp *qp, int wqe_index, void *buffer,
 int mlx5_ib_read_wqe_srq(struct mlx5_ib_srq *srq, int wqe_index, void *buffer,
 			 size_t buflen, size_t *bc);
 int mlx5_ib_create_cq(struct ib_cq *ibcq, const struct ib_cq_init_attr *attr,
-		      struct ib_udata *udata);
+		      struct uverbs_attr_bundle *attrs);
 int mlx5_ib_destroy_cq(struct ib_cq *cq, struct ib_udata *udata);
 int mlx5_ib_poll_cq(struct ib_cq *ibcq, int num_entries, struct ib_wc *wc);
 int mlx5_ib_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags flags);
@@ -1682,4 +1701,10 @@ static inline bool mlx5_umem_needs_ats(struct mlx5_ib_dev *dev,
 int set_roce_addr(struct mlx5_ib_dev *dev, u32 port_num,
 		  unsigned int index, const union ib_gid *gid,
 		  const struct ib_gid_attr *attr);
+
+static inline u32 smi_to_native_portnum(struct mlx5_ib_dev *dev, u32 port)
+{
+	return (port - 1) / dev->num_ports + 1;
+}
+
 #endif /* MLX5_IB_H */

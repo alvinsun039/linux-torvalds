@@ -39,6 +39,7 @@
 #include <linux/reset.h>
 #include <linux/kernel.h>
 #include <linux/clk-provider.h>
+#include <linux/irq.h>
 
 #include "trilin_dptx_reg.h"
 #include "trilin_host_tmr.h"

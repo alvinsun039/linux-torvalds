@@ -26,6 +26,7 @@
  * Authors: Dave Airlie <airlied@redhat.com>
  */
 
+#include <linux/of.h>
 #include <linux/pci.h>
 
 #include <drm/drm_atomic_helper.h>
@@ -439,10 +440,6 @@ struct ast_device *ast_device_create(const struct drm_driver *drv,
 	dev = &ast->base;
 
 	pci_set_drvdata(pdev, dev);
-
-	ret = drmm_mutex_init(dev, &ast->ioregs_lock);
-	if (ret)
-		return ERR_PTR(ret);
 
 	ast->regs = pcim_iomap(pdev, 1, 0);
 	if (!ast->regs)

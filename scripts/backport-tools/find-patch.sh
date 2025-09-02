@@ -68,16 +68,17 @@ echo "Analyze patch: ${SCID}(${CTAG}) ${CTITLE}"
 #find the patch for every upstream stables
 if [ "$STABLE_ONLY" = "true" ]; then
 	for BRANCH in ${STABLE_BRANCH}; do
+		SP=$(printf "%-14s" "stable-${BRANCH}:")
 		if [ "$(git merge-base $CID v$BRANCH)" = "$CID" ]; then
-			echo -e "stable-${BRANCH}:\t primitive included"
+			echo -e "${SP}     primitive included"
 		else
 			STABLE_LATEST_TAG=$(git tag --list "v${BRANCH}.*" --sort="-taggerdate" | head -n1)
 			STABLE_HEAD=$(git log --oneline v${BRANCH}..${STABLE_LATEST_TAG} | grep "${CTITLE}$" | awk '{print $1}')
 			if [ -z $STABLE_HEAD ]; then
-				echo -e "stable-${BRANCH}:\t not included"
+				echo -e "${SP}     not included"
 			else
 				STABLE_FIX_TAG=$(gdct $STABLE_HEAD)
-				echo -e "stable-${BRANCH}:\t ${STABLE_HEAD}(${STABLE_FIX_TAG:0:12}) ${CTITLE}"
+				echo -e "${SP}     ${STABLE_HEAD}(${STABLE_FIX_TAG:0:12}) ${CTITLE}"
 			fi
 		fi
 
@@ -87,16 +88,16 @@ fi
 #find the patch for each branch in klinux-4.19
 if [ "$KYLIN_ONLY" = "true" ]; then
 	for BRANCH in ${KYLIN_BRANCH}; do
-		SP=$(branch2name ${BRANCH})
+		SP=$(printf "%-14s" "$(branch2name ${BRANCH}):")
 		if [ "$(git merge-base $CID origin/$BRANCH)" = "$CID" ]; then
-			echo -e "${SP}:\tprimitive included"
+			echo -e "${SP}     primitive included"
 		else
 			KYLIN_HEAD=$(git log --oneline ${STABLE_BRANCH_ID}..origin/${BRANCH} | grep "${CTITLE}$" | awk '{print $1}')
 			if [ -z $KYLIN_HEAD ]; then
-				echo -e "${SP}:\tnot included"
+				echo -e "${SP}     not included"
 			else
 				KYLIN_FIX_TAG=$(better_gdct $KYLIN_HEAD)
-				echo -e "$SP:\t${GREEN}${KYLIN_HEAD} (${KYLIN_FIX_TAG})\t${CTITLE}${NC}"
+				echo -e "${SP}     ${GREEN}${KYLIN_HEAD} (${KYLIN_FIX_TAG})\t${CTITLE}${NC}"
 			fi
 		fi
 	done

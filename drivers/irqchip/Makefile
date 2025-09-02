@@ -125,12 +125,8 @@ obj-$(CONFIG_SUNPLUS_SP7021_INTC)	+= irq-sp7021-intc.o
 obj-$(CONFIG_PHYTIUM_IXIC)		+= irq-phytium-ixic.o
 obj-$(CONFIG_SW64_PINTC)		+= irq-sunway-pintc.o
 obj-$(CONFIG_SW64_LPC_INTC)		+= irq-sunway-lpc-intc.o
+obj-$(CONFIG_SW64_PCI_INTX)		+= irq-sunway-pci-intx.o
 obj-$(CONFIG_SW64_IRQ_CPU)		+= irq-sunway-cpu.o
-
-ifeq ($(CONFIG_UNCORE_XUELANG),y)
 obj-$(CONFIG_SW64_IRQ_MSI)		+= irq-sunway-msi.o
-else
-obj-$(CONFIG_SW64_IRQ_MSI)		+= irq-sunway-msi-v2.o
-endif
-
+obj-$(CONFIG_SW64_IRQ_MSI_V2)		+= irq-sunway-msi-v2.o
 obj-$(CONFIG_SW64_IRQ_MSI_VT)		+= irq-sunway-msi-vt.o

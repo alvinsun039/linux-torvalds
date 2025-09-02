@@ -782,7 +782,7 @@ struct mlx5_ifc_ads_bits {
 	u8         reserved_at_2[0xe];
 	u8         pkey_index[0x10];
 
-	u8         reserved_at_20[0x8];
+	u8         plane_index[0x8];
 	u8         grh[0x1];
 	u8         mlid[0x7];
 	u8         rlid[0x10];
@@ -1949,7 +1949,14 @@ struct mlx5_ifc_cmd_hca_cap_2_bits {
 	u8	   reserved_at_c0[0x8];
 	u8	   migration_multi_load[0x1];
 	u8	   migration_tracking_state[0x1];
-	u8	   reserved_at_ca[0x16];
+	u8	   multiplane_qp_ud[0x1];
+	u8	   reserved_at_cb[0x5];
+	u8	   migration_in_chunks[0x1];
+	u8	   reserved_at_d1[0x1];
+	u8	   sf_eq_usage[0x1];
+	u8	   reserved_at_d3[0x5];
+	u8	   multiplane[0x1];
+	u8	   reserved_at_d9[0x7];
 
 	u8	   reserved_at_e0[0xc0];
 
@@ -4101,7 +4108,8 @@ struct mlx5_ifc_hca_vport_context_bits {
 	u8         has_smi[0x1];
 	u8         has_raw[0x1];
 	u8         grh_required[0x1];
-	u8         reserved_at_104[0xc];
+	u8         reserved_at_104[0x4];
+	u8         num_port_plane[0x8];
 	u8         port_physical_state[0x4];
 	u8         vport_state_policy[0x4];
 	u8         port_state[0x4];
@@ -7580,7 +7588,7 @@ struct mlx5_ifc_mad_ifc_in_bits {
 	u8         op_mod[0x10];
 
 	u8         remote_lid[0x10];
-	u8         reserved_at_50[0x8];
+	u8         plane_index[0x8];
 	u8         port[0x8];
 
 	u8         reserved_at_60[0x20];
@@ -9509,7 +9517,9 @@ struct mlx5_ifc_ptys_reg_bits {
 	u8         an_disable_cap[0x1];
 	u8         reserved_at_3[0x5];
 	u8         local_port[0x8];
-	u8         reserved_at_10[0xd];
+	u8         reserved_at_10[0x8];
+	u8         plane_ind[0x4];
+	u8         reserved_at_1c[0x1];
 	u8         proto_mask[0x3];
 
 	u8         an_status[0x4];
@@ -12409,7 +12419,8 @@ struct mlx5_ifc_query_vhca_migration_state_in_bits {
 	u8         op_mod[0x10];
 
 	u8         incremental[0x1];
-	u8         reserved_at_41[0xf];
+	u8         chunk[0x1];
+	u8         reserved_at_42[0xe];
 	u8         vhca_id[0x10];
 
 	u8         reserved_at_60[0x20];
@@ -12425,7 +12436,11 @@ struct mlx5_ifc_query_vhca_migration_state_out_bits {
 
 	u8         required_umem_size[0x20];
 
-	u8         reserved_at_a0[0x160];
+	u8         reserved_at_a0[0x20];
+
+	u8         remaining_total_size[0x40];
+
+	u8         reserved_at_100[0x100];
 };
 
 struct mlx5_ifc_save_vhca_state_in_bits {
@@ -12457,7 +12472,7 @@ struct mlx5_ifc_save_vhca_state_out_bits {
 
 	u8         actual_image_size[0x20];
 
-	u8         reserved_at_60[0x20];
+	u8         next_required_umem_size[0x20];
 };
 
 struct mlx5_ifc_load_vhca_state_in_bits {

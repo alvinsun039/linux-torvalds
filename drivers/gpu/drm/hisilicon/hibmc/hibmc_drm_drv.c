@@ -27,6 +27,8 @@
 #include "hibmc_drm_drv.h"
 #include "hibmc_drm_regs.h"
 
+#include "dp/dp_reg.h"
+
 DEFINE_DRM_GEM_FOPS(hibmc_fops);
 
 static irqreturn_t hibmc_interrupt(int irq, void *arg)
@@ -114,6 +116,17 @@ static int hibmc_kms_init(struct hibmc_drm_private *priv)
 	if (ret) {
 		drm_err(dev, "failed to init de: %d\n", ret);
 		return ret;
+	}
+
+	/*
+	 * If the serdes reg is readable and is not equal to 0,
+	 * DP block exists and initializes it.
+	 */
+	ret = readl(priv->mmio + HIBMC_DP_HOST_SERDES_CTRL);
+	if (ret) {
+		ret = hibmc_dp_init(priv);
+		if (ret)
+			drm_err(dev, "failed to init dp: %d\n", ret);
 	}
 
 	ret = hibmc_vdac_init(priv);
@@ -325,6 +338,8 @@ static int hibmc_pci_probe(struct pci_dev *pdev,
 		drm_err(dev, "failed to enable pci device: %d\n", ret);
 		goto err_return;
 	}
+
+	pci_set_master(pdev);
 
 	ret = hibmc_load(dev);
 	if (ret) {

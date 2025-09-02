@@ -85,27 +85,49 @@ pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root)
 	return cfg;
 }
 
+static int ep_32bits_memio_base(struct acpi_device *adev, u64 *memh)
+{
+	int status = 0;
+	u64 val;
+	const char *prop = "sunway,ep-mem-32-base";
+	const char *legacy_prop = "sw64,ep_mem_32_base";
+
+	status = fwnode_property_read_u64(&adev->fwnode, prop, &val);
+
+	/* Fallback to legacy property name and try again */
+	if (status)
+		status = fwnode_property_read_u64(&adev->fwnode,
+			legacy_prop, &val);
+
+	/* This property is necessary */
+	if (status) {
+		dev_err(&adev->dev, "failed to retrieve %s or %s\n",
+				prop, legacy_prop);
+		return status;
+	}
+
+	*memh = upper_32_bits(val);
+	*memh <<= 32;
+
+	return 0;
+}
+
 static int pci_acpi_prepare_root_resources(struct acpi_pci_root_info *ci)
 {
 	int status = 0;
-	acpi_status rc;
-	unsigned long long memh = 0;
+	u64 memh;
 	struct resource_entry *entry = NULL, *tmp = NULL;
 	struct acpi_device *device = ci->bridge;
 
 	/**
 	 * To distinguish between mem and pre_mem, firmware
-	 * only pass the lower 32bits of mem via acpi and
-	 * use vendor specific "MEMH" to record the upper
-	 * 32 bits of mem.
+	 * only pass the lower 32bits of mem via _CRS method.
 	 *
 	 * Get the upper 32 bits here.
 	 */
-	rc = acpi_evaluate_integer(ci->bridge->handle, "MEMH", NULL, &memh);
-	if (rc != AE_OK) {
-		dev_err(&device->dev, "unable to retrieve MEMH\n");
-		return -EEXIST;
-	}
+	status = ep_32bits_memio_base(device, &memh);
+	if (status)
+		return status;
 
 	/**
 	 * Get host bridge resources via _CRS method, the return value
@@ -129,10 +151,10 @@ static int pci_acpi_prepare_root_resources(struct acpi_pci_root_info *ci)
 
 	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
 		if (entry->res->flags & IORESOURCE_MEM) {
-			if (!(entry->res->end & 0xFFFFFFFF00000000ULL)) {
+			if (!upper_32_bits(entry->res->end)) {
 				/* Patch mem res with upper 32 bits */
-				entry->res->start |= (memh << 32);
-				entry->res->end   |= (memh << 32);
+				entry->res->start |= memh;
+				entry->res->end   |= memh;
 			} else {
 				/**
 				 * Add PREFETCH and MEM_64 flags for
@@ -197,11 +219,8 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
 		if (!bus)
 			return NULL;
 
-		/**
-		 *  Some quirks for pci controller of Sunway
-		 *  after scanning Root Complex
-		 */
-		sw64_pci_root_bridge_scan_finish_up(pci_find_host_bridge(bus));
+		/* Some quirks for Sunway PCIe controller after scanning */
+		sunway_pci_root_bridge_scan_finish(pci_find_host_bridge(bus));
 
 		pci_bus_size_bridges(bus);
 		pci_bus_assign_resources(bus);
@@ -221,27 +240,6 @@ out_of_mem_0:
 			domain, busnum);
 
 	return NULL;
-}
-
-int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-{
-	if (!acpi_disabled) {
-		struct pci_config_window *cfg = bridge->sysdata;
-		struct acpi_device *adev = to_acpi_device(cfg->parent);
-		struct pci_controller *hose = cfg->priv;
-		struct device *bus_dev = &bridge->bus->dev;
-
-		ACPI_COMPANION_SET(&bridge->dev, adev);
-		set_dev_node(bus_dev, hose->node);
-
-		/**
-		 * Some quirks for pci controller of Sunway
-		 * before scanning Root Complex
-		 */
-		sw64_pci_root_bridge_prepare(bridge);
-	}
-
-	return 0;
 }
 
 void pcibios_add_bus(struct pci_bus *bus)

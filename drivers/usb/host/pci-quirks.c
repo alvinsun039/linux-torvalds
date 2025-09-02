@@ -1295,6 +1295,7 @@ DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
 
 #ifdef CONFIG_SW64
 #include <asm/sw64io.h>
+#define CMD_RESET	(1 << 1)
 #define XHCI_STS_FATAL	(1 << 2)
 #define XHCI_STS_EINT	(1 << 3)
 #define XHCI_STS_PORT	(1 << 4)

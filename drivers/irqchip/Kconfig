@@ -281,7 +281,7 @@ config SUNXI_NMI_INTC
 	bool
 	select GENERIC_IRQ_CHIP
 
-config SW64_INTC_V2
+config SW64_PINTC
 	bool "SW64 Interrupt Controller V2"
 	depends on UNCORE_XUELANG
 	default y
@@ -306,15 +306,26 @@ config SW64_IRQ_CPU
 	bool
 	depends on SW64
 	default y
+	select SW64_PINTC
+
+config SW64_PCI_INTX
+	bool
+	depends on SW64 && PCI
+	default y
 
 config SW64_IRQ_MSI
 	bool
-	depends on SW64 && PCI_MSI
+	depends on SW64 && PCI_MSI && SUBARCH_C3B
+	default y
+
+config SW64_IRQ_MSI_V2
+	bool
+	depends on SW64 && PCI_MSI && SUBARCH_C4
 	default y
 
 config SW64_IRQ_MSI_VT
 	bool
-	depends on SW64_IRQ_MSI
+	depends on SW64_IRQ_MSI || SW64_IRQ_MSI_V2
 	default y
 
 config TB10X_IRQC
