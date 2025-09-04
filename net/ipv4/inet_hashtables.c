@@ -30,6 +30,7 @@
 
 bool sysctl_local_port_allocation;
 bool sysctl_bind_port_unified;
+bool sysctl_connect_port_randomization = true;
 
 u32 inet_ehashfn(const struct net *net, const __be32 laddr,
 		 const __u16 lport, const __be32 faddr,
@@ -1015,7 +1016,7 @@ int __inet_hash_connect(struct inet_timewait_death_row *death_row,
 	bool tb_created = false;
 	u32 remaining, offset;
 	int ret, i, low, high;
-	bool local_ports;
+	bool local_ports, port_random;
 	int step, l3mdev;
 	u32 index;
 
@@ -1117,12 +1118,15 @@ ok:
 			goto error;
 	}
 
-	/* Here we want to add a little bit of randomness to the next source
-	 * port that will be chosen. We use a max() with a random here so that
-	 * on low contention the randomness is maximal and on high contention
-	 * it may be inexistent.
-	 */
-	i = max_t(int, i, get_random_u32_below(8) * step);
+	port_random = READ_ONCE(sysctl_connect_port_randomization);
+	if (port_random) {
+		/* Here we want to add a little bit of randomness to the next source
+		 * port that will be chosen. We use a max() with a random here so that
+		 * on low contention the randomness is maximal and on high contention
+		 * it may be inexistent.
+		 */
+		i = max_t(int, i, get_random_u32_below(8) * step);
+	}
 	WRITE_ONCE(table_perturb[index], READ_ONCE(table_perturb[index]) + i + step);
 
 	/* Head lock still held and bh's disabled */

@@ -272,6 +272,7 @@ extern struct percpu_counter tcp_sockets_allocated;
 extern unsigned long tcp_memory_pressure;
 extern bool sysctl_local_port_allocation;
 extern bool sysctl_bind_port_unified;
+extern bool sysctl_connect_port_randomization;
 
 /* optimized version of sk_under_memory_pressure() for TCP sockets */
 static inline bool tcp_under_memory_pressure(const struct sock *sk)

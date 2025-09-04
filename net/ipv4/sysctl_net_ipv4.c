@@ -593,6 +593,13 @@ static struct ctl_table ipv4_table[] = {
 		.mode           = 0644,
 		.proc_handler   = proc_dobool,
 	},
+	{
+		.procname       = "connect_port_randomization",
+		.data           = &sysctl_connect_port_randomization,
+		.maxlen         = sizeof(sysctl_connect_port_randomization),
+		.mode           = 0644,
+		.proc_handler   = proc_dobool,
+	},
 };
 
 static struct ctl_table ipv4_net_table[] = {
