@@ -1,3 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Copyright(C) 2025 UltraRISC Technology (Shanghai) Co., Ltd.
+ */
 #include <dt-bindings/pinctrl/ur-dp1000-pinctrl.h>
 
 / {
