@@ -24,6 +24,16 @@ MODULE_PARM_DESC(force_legacy,
 		 "Force legacy mode for transitional virtio 1 devices");
 #endif
 
+bool vp_is_avq(struct virtio_device *vdev, unsigned int index)
+{
+	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+
+	if (!virtio_has_feature(vdev, VIRTIO_F_ADMIN_VQ))
+		return false;
+
+	return index == vp_dev->admin_vq.vq_index;
+}
+
 /* wait for pending irq handlers */
 void vp_synchronize_vectors(struct virtio_device *vdev)
 {
@@ -234,10 +244,9 @@ out_info:
 	return vq;
 }
 
-static void vp_del_vq(struct virtqueue *vq)
+static void vp_del_vq(struct virtqueue *vq, struct virtio_pci_vq_info *info)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vq->vdev);
-	struct virtio_pci_vq_info *info = vp_dev->vqs[vq->index];
 	unsigned long flags;
 
 	/*
@@ -258,16 +267,16 @@ static void vp_del_vq(struct virtqueue *vq)
 void vp_del_vqs(struct virtio_device *vdev)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	struct virtio_pci_vq_info *info;
 	struct virtqueue *vq, *n;
 	int i;
 
 	list_for_each_entry_safe(vq, n, &vdev->vqs, list) {
-		if (vp_dev->is_avq && vp_dev->is_avq(vdev, vq->index))
-			continue;
+		info = vp_is_avq(vdev, vq->index) ? vp_dev->admin_vq.info :
+						    vp_dev->vqs[vq->index];
 
 		if (vp_dev->per_vq_vectors) {
-			int v = vp_dev->vqs[vq->index]->msix_vector;
-
+			int v = info->msix_vector;
 			if (v != VIRTIO_MSI_NO_VECTOR &&
 			    !vp_is_slow_path_vector(v)) {
 				int irq = pci_irq_vector(vp_dev->pci_dev, v);
@@ -276,7 +285,7 @@ void vp_del_vqs(struct virtio_device *vdev)
 				free_irq(irq, vq);
 			}
 		}
-		vp_del_vq(vq);
+		vp_del_vq(vq, info);
 	}
 	vp_dev->per_vq_vectors = false;
 
@@ -357,7 +366,7 @@ vp_find_one_vq_msix(struct virtio_device *vdev, int queue_idx,
 			  vring_interrupt, 0,
 			  vp_dev->msix_names[msix_vec], vq);
 	if (err) {
-		vp_del_vq(vq);
+		vp_del_vq(vq, *p_info);
 		return ERR_PTR(err);
 	}
 
@@ -371,13 +380,22 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned int nvqs,
 			    struct irq_affinity *desc)
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	struct virtio_pci_admin_vq *avq = &vp_dev->admin_vq;
 	struct virtqueue_info *vqi;
 	int i, err, nvectors, allocated_vectors, queue_idx = 0;
+	struct virtqueue *vq;
 	bool per_vq_vectors;
+	u16 avq_num = 0;
 
 	vp_dev->vqs = kcalloc(nvqs, sizeof(*vp_dev->vqs), GFP_KERNEL);
 	if (!vp_dev->vqs)
 		return -ENOMEM;
+
+	if (vp_dev->avq_index) {
+		err = vp_dev->avq_index(vdev, &avq->vq_index, &avq_num);
+		if (err)
+			goto error_find;
+	}
 
 	per_vq_vectors = vector_policy != VP_VQ_VECTOR_POLICY_SHARED;
 
@@ -389,6 +407,8 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned int nvqs,
 			if (vqi->name && vqi->callback)
 				++nvectors;
 		}
+		if (avq_num && vector_policy == VP_VQ_VECTOR_POLICY_EACH)
+			++nvectors;
 	} else {
 		/* Second best: one for change, shared for all vqs. */
 		nvectors = 2;
@@ -415,6 +435,18 @@ static int vp_find_vqs_msix(struct virtio_device *vdev, unsigned int nvqs,
 			goto error_find;
 		}
 	}
+
+	if (!avq_num)
+		return 0;
+	sprintf(avq->name, "avq.%u", avq->vq_index);
+	vq = vp_find_one_vq_msix(vdev, avq->vq_index, vp_modern_avq_done,
+				 avq->name, false, true, &allocated_vectors,
+				 vector_policy, &vp_dev->admin_vq.info);
+	if (IS_ERR(vq)) {
+		err = PTR_ERR(vq);
+		goto error_find;
+	}
+
 	return 0;
 
 error_find:
@@ -427,11 +459,20 @@ static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned int nvqs,
 			    struct virtqueue_info vqs_info[])
 {
 	struct virtio_pci_device *vp_dev = to_vp_device(vdev);
+	struct virtio_pci_admin_vq *avq = &vp_dev->admin_vq;
 	int i, err, queue_idx = 0;
+	struct virtqueue *vq;
+	u16 avq_num = 0;
 
 	vp_dev->vqs = kcalloc(nvqs, sizeof(*vp_dev->vqs), GFP_KERNEL);
 	if (!vp_dev->vqs)
 		return -ENOMEM;
+
+	if (vp_dev->avq_index) {
+		err = vp_dev->avq_index(vdev, &avq->vq_index, &avq_num);
+		if (err)
+			goto out_del_vqs;
+	}
 
 	err = request_irq(vp_dev->pci_dev->irq, vp_interrupt, IRQF_SHARED,
 			dev_name(&vdev->dev), vp_dev);
@@ -454,6 +495,17 @@ static int vp_find_vqs_intx(struct virtio_device *vdev, unsigned int nvqs,
 			err = PTR_ERR(vqs[i]);
 			goto out_del_vqs;
 		}
+	}
+
+	if (!avq_num)
+		return 0;
+	sprintf(avq->name, "avq.%u", avq->vq_index);
+	vq = vp_setup_vq(vdev, queue_idx++, vp_modern_avq_done, avq->name,
+			 false, VIRTIO_MSI_NO_VECTOR,
+			 &vp_dev->admin_vq.info);
+	if (IS_ERR(vq)) {
+		err = PTR_ERR(vq);
+		goto out_del_vqs;
 	}
 
 	return 0;
