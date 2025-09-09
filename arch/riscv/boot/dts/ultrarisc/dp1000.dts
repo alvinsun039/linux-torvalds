@@ -1,9 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
-* SPDX-License-Identifier: GPL-2.0+
-*
-* Copyright (c) 2019-2022 UltraRisc,Inc
-*
-*/
+ * Copyright (c) 2019-2022 UltraRISC Technology (Shanghai) Co., Ltd.
+ *
+ */
 
 /dts-v1/;
 
@@ -187,8 +186,8 @@
 		};
 		
 		plic: plic@9000000 {
-			#interrupt-cells = <0x01>;
-			#address-cells = <0x02>;
+			#interrupt-cells = <1>;
+			#address-cells = <0>;
 			phandle = <0x01>;
 			compatible = "ultrarisc,dp1000-plic";
 			interrupt-controller;
