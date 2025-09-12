@@ -21,8 +21,14 @@
 #include <linux/spi/spi-mem.h>
 #include <linux/mtd/spi-nor.h>
 
+#define DRIVER_VERSION	"1.0.2"
+
+#define PHYTIUM_CPU_PART_FTC862		0x862
+
+#define MIDR_PHYTIUM_FTC862 MIDR_CPU_MODEL(ARM_CPU_IMP_PHYTIUM, PHYTIUM_CPU_PART_FTC862)
 
 #define QSPI_FLASH_CAP_REG		0x00
+#define	 QSPI_FLASH_CAP_NUM_SHIFT_NEW	16
 #define  QSPI_FLASH_CAP_NUM_SHIFT	3
 #define  QSPI_FLASH_CAP_NUM_MASK	(0x3 << QSPI_FLASH_CAP_NUM_SHIFT)
 #define  QSPI_FLASH_CAP_CAP_SHIFT	0
@@ -146,6 +152,10 @@
 #define XFER_PROTO_2_2_2		0x5
 #define XFER_PROTO_4_4_4		0x6
 
+#define WR_CFG_NODIR_VALUE		0x5000000
+
+#define QSPI_DEFAULT_CLK		500000000
+
 struct phytium_qspi_flash {
 	u32 cs;
 	u32 clk_div;
@@ -170,6 +180,10 @@ struct phytium_qspi {
 	struct phytium_qspi_flash flash[PHYTIUM_QSPI_MAX_NORCHIP];
 	u8 fnum;
 	bool nodirmap;
+
+	u32 wr_cfg_reg;
+	u32 rd_cfg_reg;
+	u32 flash_cap;
 };
 
 static bool phytium_qspi_check_buswidth(u8 width)
@@ -246,6 +260,44 @@ static int phytium_spi_nor_protocol_encode(const struct spi_mem_op *op, u32 *cod
 	return ret;
 }
 
+static int phytium_qspi_flash_capacity_encode_new(u32 size,
+		u32 *cap, int i)
+{
+	int ret = 0;
+
+	switch (size) {
+	case SZ_4M:
+		*cap |= (0x0 >> (4 * i));
+		break;
+	case SZ_8M:
+		*cap |= (0x1 >> (4 * i));
+		break;
+	case SZ_16M:
+		*cap |= (0x2 >> (4 * i));
+		break;
+	case SZ_32M:
+		*cap |= (0x3 >> (4 * i));
+		break;
+	case SZ_64M:
+		*cap |= (0x4 >> (4 * i));
+		break;
+	case SZ_128M:
+		*cap |= (0x5 >> (4 * i));
+		break;
+	case SZ_256M:
+		*cap |= (0x6 >> (4 * i));
+		break;
+	case SZ_512M:
+		*cap |= (0x7 >> (4 * i));
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 static int phytium_qspi_flash_capacity_encode(u32 size, u32 *cap)
 {
 	int ret = 0;
@@ -281,6 +333,22 @@ static int phytium_qspi_flash_capacity_encode(u32 size, u32 *cap)
 	}
 
 	return ret;
+}
+
+static void phytium_qspi_clear_wr(struct phytium_qspi *qspi,
+		struct phytium_qspi_flash *flash)
+{
+	u32 cmd = 0;
+
+	cmd |= 0x05 << QSPI_CMD_PORT_CMD_SHIFT;
+	cmd |= BIT(QSPI_CMD_PORT_TRANSFER_SHIFT);
+	cmd |= flash->cs << QSPI_CMD_PORT_CS_SHIFT;
+
+	writel_relaxed(cmd, qspi->io_base + QSPI_CMD_PORT_REG);
+	readl_relaxed(qspi->io_base + QSPI_LD_PORT_REG);
+
+	/* clear wr_cfg */
+	writel_relaxed(0, qspi->io_base + QSPI_WR_CFG_REG);
 }
 
 static int phytium_qspi_write_port(struct phytium_qspi *qspi,
@@ -470,6 +538,7 @@ static int phytium_qspi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 		cmd |= flash->clk_div & QSPI_RD_CFG_RD_SCK_SEL_MASK;
 
 		writel_relaxed(cmd, qspi->io_base + QSPI_RD_CFG_REG);
+		qspi->rd_cfg_reg = cmd;
 
 		dev_dbg(qspi->dev, "Create read dirmap and setup RD_CFG_REG [%#x].\n", cmd);
 	} else if (desc->info.op_tmpl.data.dir == SPI_MEM_DATA_OUT) {
@@ -486,10 +555,7 @@ static int phytium_qspi_dirmap_create(struct spi_mem_dirmap_desc *desc)
 
 		cmd |= QSPI_WR_CFG_WR_MODE_MASK;
 		cmd |= flash->clk_div & QSPI_WR_CFG_WR_SCK_SEL_MASK;
-
-		writel_relaxed(cmd, qspi->io_base + QSPI_WR_CFG_REG);
-
-		dev_dbg(qspi->dev, "Create write dirmap and setup WR_CFG_REG [%#x].\n", cmd);
+		qspi->wr_cfg_reg = cmd;
 	} else {
 		ret = -EINVAL;
 	}
@@ -526,6 +592,9 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 	size_t mask = 0x03;
 	u_char tmp[4] = {0};
 
+	/* set wr_cfg for drimap write */
+	writel_relaxed(qspi->wr_cfg_reg, qspi->io_base + QSPI_WR_CFG_REG);
+
 	if (offs & 0x03) {
 		dev_err(qspi->dev, "Addr not four-byte aligned!\n");
 		return -EINVAL;
@@ -542,6 +611,8 @@ static ssize_t phytium_qspi_dirmap_write(struct spi_mem_dirmap_desc *desc,
 
 	//write cache data to flash
 	writel_relaxed(QSPI_FLUSH_EN, qspi->io_base + QSPI_FLUSH_REG);
+
+	phytium_qspi_clear_wr(qspi, flash);
 
 	return len;
 }
@@ -616,10 +687,11 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct phytium_qspi *qspi;
 	int i, ret;
-	u32 flash_cap;
 	struct spi_mem *mem;
 	struct spi_nor *nor;
 	const char **reg_name_array;
+	bool new_capacity = false;
+	u32 clk_rate = QSPI_DEFAULT_CLK;
 
 	ctrl = spi_alloc_master(dev, sizeof(*qspi));
 	if (!ctrl)
@@ -699,12 +771,18 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 			goto probe_clk_failed;
 		}
 	} else if (has_acpi_companion(dev)) {
-		qspi->clk_rate = 50000000;
+		fwnode_property_read_u32(dev->fwnode, "spi-clock", &clk_rate);
+		qspi->clk_rate = clk_rate;
 	}
 	qspi->nodirmap = device_property_present(dev, "no-direct-mapping");
 	ctrl->mem_ops = qspi->nodirmap ?
 			&phytium_qspi_mem_ops_nodirmap :
 			&phytium_qspi_mem_ops;
+
+	if ((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_PHYTIUM_FTC862) {
+		dev_warn(dev, "capacity register(0x00) is the latest design\n");
+		new_capacity = true;
+	}
 
 	qspi->dev = dev;
 	platform_set_drvdata(pdev, qspi);
@@ -732,25 +810,38 @@ static int phytium_qspi_probe(struct platform_device *pdev)
 				}
 			}
 		}
+		if (!new_capacity) {
+			for (i = 1; qspi->fnum > i && i < PHYTIUM_QSPI_MAX_NORCHIP; i++) {
+				if (qspi->flash[i].size != qspi->flash[0].size) {
+					dev_err(dev, "Flashes are of different sizes.\n");
+					ret = -EINVAL;
+					goto probe_setup_failed;
+				}
+			}
 
-		for (i = 1; qspi->fnum > i && i < PHYTIUM_QSPI_MAX_NORCHIP; i++) {
-			if (qspi->flash[i].size != qspi->flash[0].size) {
-				dev_err(dev, "Flashes are of different sizes.\n");
-				ret = -EINVAL;
+			ret = phytium_qspi_flash_capacity_encode(qspi->flash[0].size,
+								 &qspi->flash_cap);
+			if (ret) {
+				dev_err(dev, "Flash size is invalid.\n");
 				goto probe_setup_failed;
 			}
+
+			qspi->flash_cap |= (qspi->fnum - 1) << QSPI_FLASH_CAP_NUM_SHIFT;
+		} else {
+			for (i = 0; qspi->fnum > i && i < PHYTIUM_QSPI_MAX_NORCHIP; i++) {
+				ret = phytium_qspi_flash_capacity_encode_new(qspi->flash[i].size,
+					&qspi->flash_cap, i);
+				if (ret) {
+					dev_err(dev, "Flash size is invalid.\n");
+					goto probe_setup_failed;
+				}
+			}
+			qspi->flash_cap |= (qspi->fnum - 1) << QSPI_FLASH_CAP_NUM_SHIFT_NEW;
 		}
 
-		ret = phytium_qspi_flash_capacity_encode(qspi->flash[0].size,
-							 &flash_cap);
-		if (ret) {
-			dev_err(dev, "Flash size is invalid.\n");
-			goto probe_setup_failed;
-		}
-
-		flash_cap |= qspi->fnum << QSPI_FLASH_CAP_NUM_SHIFT;
-
-		writel_relaxed(flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
+		writel_relaxed(qspi->flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
+	} else {
+		writel_relaxed(WR_CFG_NODIR_VALUE, qspi->io_base + QSPI_WR_CFG_REG);
 	}
 
 	return 0;
@@ -794,6 +885,16 @@ static int __maybe_unused phytium_qspi_suspend(struct device *dev)
 
 static int __maybe_unused phytium_qspi_resume(struct device *dev)
 {
+	struct phytium_qspi *qspi = dev_get_drvdata(dev);
+
+	if (!qspi->nodirmap) {
+		/* set rd_cfg reg and flash_capacity reg after resume */
+		writel_relaxed(qspi->rd_cfg_reg, qspi->io_base + QSPI_RD_CFG_REG);
+		writel_relaxed(qspi->flash_cap, qspi->io_base + QSPI_FLASH_CAP_REG);
+	} else {
+		writel_relaxed(WR_CFG_NODIR_VALUE, qspi->io_base + QSPI_WR_CFG_REG);
+	}
+
 	return pm_runtime_force_resume(dev);
 }
 
@@ -828,3 +929,4 @@ module_platform_driver(phytium_qspi_driver);
 MODULE_AUTHOR("Chen Baozi <chenbaozi@phytium.com.cn>");
 MODULE_DESCRIPTION("Phytium Quad SPI driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRIVER_VERSION);

@@ -29,6 +29,9 @@
 #include "spi-phytium.h"
 
 #define DRIVER_NAME "phytium_spi"
+#define DRIVER_VERSION	"1.0.0"
+
+#define SPI_PHYTIUM_DEFAULT_CLK_RATE	50000000
 
 struct phytium_spi_clk {
 	struct phytium_spi  fts;
@@ -37,12 +40,14 @@ struct phytium_spi_clk {
 
 static int phytium_spi_probe(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
 	struct phytium_spi_clk *ftsc;
 	struct phytium_spi *fts;
 	struct resource *mem;
 	int ret;
 	int num_cs;
-	int global_cs;
+	int global_cs = 0;
+	u32 clk_rate = SPI_PHYTIUM_DEFAULT_CLK_RATE;
 
 	ftsc = devm_kzalloc(&pdev->dev, sizeof(struct phytium_spi_clk),
 			GFP_KERNEL);
@@ -81,7 +86,8 @@ static int phytium_spi_probe(struct platform_device *pdev)
 
 		fts->max_freq = clk_get_rate(ftsc->clk);
 	} else if (has_acpi_companion(&pdev->dev)) {
-		fts->max_freq = 48000000;
+		fwnode_property_read_u32(dev->fwnode, "spi-clock", &clk_rate);
+		fts->max_freq = clk_rate;
 	}
 
 	fts->bus_num = pdev->id;
@@ -169,3 +175,4 @@ module_platform_driver(phytium_spi_driver);
 MODULE_AUTHOR("Yiqun Zhang <zhangyiqun@phytium.com.cn>");
 MODULE_DESCRIPTION("Platform Driver for Phytium SPI controller core");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(DRIVER_VERSION);
