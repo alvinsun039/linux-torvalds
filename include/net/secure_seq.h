@@ -21,4 +21,6 @@ u64 secure_dccp_sequence_number(__be32 saddr, __be32 daddr,
 u64 secure_dccpv6_sequence_number(__be32 *saddr, __be32 *daddr,
 				  __be16 sport, __be16 dport);
 
+extern int ephemeral_port_shuffle_period;
+
 #endif /* _NET_SECURE_SEQ */
