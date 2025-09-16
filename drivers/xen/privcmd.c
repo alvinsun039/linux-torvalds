@@ -1160,7 +1160,7 @@ static irqreturn_t ioeventfd_interrupt(int irq, void *dev_id)
 		if (ioreq->addr == kioeventfd->addr + VIRTIO_MMIO_QUEUE_NOTIFY &&
 		    ioreq->size == kioeventfd->addr_len &&
 		    (ioreq->data & QUEUE_NOTIFY_VQ_MASK) == kioeventfd->vq) {
-			eventfd_signal(kioeventfd->eventfd, 1);
+			eventfd_signal(kioeventfd->eventfd);
 			state = STATE_IORESP_READY;
 			break;
 		}
@@ -1349,12 +1349,12 @@ static int privcmd_ioeventfd_assign(struct privcmd_ioeventfd *ioeventfd)
 		return -ENOMEM;
 
 	f = fdget(ioeventfd->event_fd);
-	if (!f.file) {
+	if (!fd_file(f)) {
 		ret = -EBADF;
 		goto error_kfree;
 	}
 
-	kioeventfd->eventfd = eventfd_ctx_fileget(f.file);
+	kioeventfd->eventfd = eventfd_ctx_fileget(fd_file(f));
 	fdput(f);
 
 	if (IS_ERR(kioeventfd->eventfd)) {
