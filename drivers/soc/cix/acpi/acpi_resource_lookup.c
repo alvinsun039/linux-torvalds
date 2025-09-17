@@ -14,6 +14,7 @@
 
 #include <linux/../../mm/cma.h>
 #include <linux/memblock.h>
+#include <linux/soc/cix/cpu.h>
 
 extern int dma_declare_coherent_memory(struct device *dev,
 		phys_addr_t phys_addr, dma_addr_t device_addr, size_t size);
@@ -464,6 +465,9 @@ static struct platform_driver acpi_resource_lookup_driver = {
 
 static int __init acpi_resource_lookup_init(void)
 {
+	if (!cpu_is_cix_p1_family())
+		return 0;
+
 	if (acpi_disabled)
 		return -ENODEV;
 
