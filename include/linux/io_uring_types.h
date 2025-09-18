@@ -410,8 +410,6 @@ struct io_ring_ctx {
 	struct list_head		defer_list;
 	unsigned			sq_thread_idle;
 
-	struct io_alloc_cache		msg_cache;
-	spinlock_t			msg_lock;
 	/* protected by ->completion_lock */
 	unsigned			evfd_last_cq_tail;
 
