@@ -3253,6 +3253,13 @@ static int arm_smmu_insert_master(struct arm_smmu_device *smmu,
 			if (existing_master == master)
 				continue;
 
+			if (existing_master->dev != master->dev &&
+				dev_is_pci(existing_master->dev) && dev_is_pci(master->dev) &&
+				to_pci_dev(existing_master->dev)->bus == to_pci_dev(master->dev)->bus &&
+				pci_devs_are_dma_aliases(to_pci_dev(existing_master->dev), to_pci_dev(master->dev))) {
+				continue;
+			}
+
 			dev_warn(master->dev,
 				 "stream %u already in tree from dev %s\n", sid,
 				 dev_name(existing_master->dev));
