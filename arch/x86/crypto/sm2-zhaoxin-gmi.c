@@ -38,15 +38,14 @@ static int zhaoxin_gmi_available(void)
 
 /* Zhaoxin sm2 verify function */
 static inline size_t zhaoxin_gmi_sm2_verify(unsigned char *key, unsigned char *hash,
-				unsigned char *sig, unsigned char *scratch)
+					    unsigned char *sig, unsigned char *scratch)
 {
 	size_t result;
 
-	asm volatile(
-		".byte 0xf2, 0x0f, 0xa6, 0xc0"
-		: "=c"(result)
-		: "a"(hash), "b"(key), "d"(SM2_CWORD_VERIFY), "S"(scratch), "D"(sig)
-		: "memory");
+	asm volatile(".byte 0xf2, 0x0f, 0xa6, 0xc0"
+		     : "=c"(result)
+		     : "a"(hash), "b"(key), "d"(SM2_CWORD_VERIFY), "S"(scratch), "D"(sig)
+		     : "memory");
 
 	return result;
 }
@@ -88,7 +87,7 @@ static int zhaoxin_sm2_verify(struct akcipher_request *req)
 }
 
 static int zhaoxin_sm2_set_pub_key(struct crypto_akcipher *tfm, const void *key,
-				unsigned int keylen)
+				   unsigned int keylen)
 {
 	struct sm2_cipher_data *ec = akcipher_tfm_ctx(tfm);
 
@@ -131,7 +130,8 @@ static struct akcipher_alg zhaoxin_sm2 = {
 };
 
 static const struct x86_cpu_id zhaoxin_sm2_cpu_ids[] = {
-	X86_MATCH_FEATURE(X86_FEATURE_SM2, NULL),
+	X86_MATCH_VENDOR_FAM_FEATURE(ZHAOXIN, 7, X86_FEATURE_SM2, NULL),
+	X86_MATCH_VENDOR_FAM_FEATURE(CENTAUR, 7, X86_FEATURE_SM2, NULL),
 	{}
 };
 MODULE_DEVICE_TABLE(x86cpu, zhaoxin_sm2_cpu_ids);
