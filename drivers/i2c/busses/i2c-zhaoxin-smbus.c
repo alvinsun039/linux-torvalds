@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 /*
- * i2c-zhaoxin-smbus.c - Zhaoxin SMBus controller driver
+ *  i2c-zhaoxin-smbus.c - Zhaoxin SMBus controller driver
  *
- * Copyright(c) 2023 Shanghai Zhaoxin Semiconductor Corporation.
+ *  Copyright(c) 2023 Shanghai Zhaoxin Semiconductor Corporation.
  *                    All rights reserved.
  */
 
@@ -20,61 +20,43 @@
 #define ZXSMB_NAME "smbus_zhaoxin"
 
 /*
-* registers
-*/
+ * registers
+ */
 /* SMBus MMIO address offsets */
-#define	ZXSMB_STS			0x00
-#define	ZXSMB_BUSY			BIT(0)
-#define	ZXSMB_CMD_CMPLET	BIT(1)
-#define	ZXSMB_DEV_ERR		BIT(2)
-#define	ZXSMB_BUS_CLSI		BIT(3)
-#define	ZXSMB_FAIL_TRANS	BIT(4)
-#define	ZXSMB_STS_MASK 		GENMASK(4, 0)
-#define	ZXSMB_NSMBSRST		BIT(5)
-#define	ZXSMB_CTL			0x02
-#define	ZXSMB_CMPLT_EN		BIT(0)
-#define	ZXSMB_KILL_PRG		BIT(1)
-#define	ZXSMB_START			BIT(6)
-#define	ZXSMB_PEC_EN		BIT(7)
-#define	ZXSMB_CMD			0x03
-#define	ZXSMB_ADD			0x04
-#define	ZXSMB_DAT0			0x05
-#define	ZXSMB_DAT1			0x06
-#define	ZXSMB_BLKDAT		0x07
-#define ZXSMB_STS	0x00
-#define   ZXSMB_BUSY		BIT(0)
-#define   ZXSMB_CMD_CMPLET	BIT(1)
-#define   ZXSMB_DEV_ERR		BIT(2)
-#define   ZXSMB_BUS_CLSI	BIT(3)
-#define   ZXSMB_FAIL_TRANS	BIT(4)
-#define   ZXSMB_STS_MASK 	GENMASK(4, 0)
-#define   ZXSMB_NSMBSRST	BIT(5)
-#define ZXSMB_CTL	0x02
-#define   ZXSMB_CMPLT_EN	BIT(0)
-#define   ZXSMB_KILL_PRG	BIT(1)
-#define   ZXSMB_START		BIT(6)
-#define   ZXSMB_PEC_EN		BIT(7)
-#define ZXSMB_CMD	0x03
-#define ZXSMB_ADD	0x04
-#define ZXSMB_DAT0	0x05
-#define ZXSMB_DAT1	0x06
-#define ZXSMB_BLKDAT	0x07
+#define ZXSMB_STS 0x00
+#define ZXSMB_BUSY BIT(0)
+#define ZXSMB_CMD_CMPLET BIT(1)
+#define ZXSMB_DEV_ERR BIT(2)
+#define ZXSMB_BUS_CLSI BIT(3)
+#define ZXSMB_FAIL_TRANS BIT(4)
+#define ZXSMB_STS_MASK GENMASK(4, 0)
+#define ZXSMB_NSMBSRST BIT(5)
+#define ZXSMB_CTL 0x02
+#define ZXSMB_CMPLT_EN BIT(0)
+#define ZXSMB_KILL_PRG BIT(1)
+#define ZXSMB_START BIT(6)
+#define ZXSMB_PEC_EN BIT(7)
+#define ZXSMB_CMD 0x03
+#define ZXSMB_ADD 0x04
+#define ZXSMB_DAT0 0x05
+#define ZXSMB_DAT1 0x06
+#define ZXSMB_BLKDAT 0x07
 
 /*
-* platform related informations
-*/
+ * platform related informations
+ */
 /* protocol cmd constants */
-#define ZXSMB_QUICK		0x00
-#define ZXSMB_BYTE		0x04
-#define ZXSMB_BYTE_DATA		0x08
-#define ZXSMB_WORD_DATA		0x0C
-#define ZXSMB_PROC_CALL		0x10
-#define ZXSMB_BLOCK_DATA	0x14
-#define ZXSMB_I2C_10_BIT_ADDR	0x18
-#define ZXSMB_I2C_PROC_CALL	0x30
-#define ZXSMB_I2C_BLOCK_DATA	0x34
-#define ZXSMB_I2C_7_BIT_ADDR	0x38
-#define ZXSMB_UNIVERSAL		0x3C
+#define ZXSMB_QUICK 0x00
+#define ZXSMB_BYTE 0x04
+#define ZXSMB_BYTE_DATA 0x08
+#define ZXSMB_WORD_DATA 0x0C
+#define ZXSMB_PROC_CALL 0x10
+#define ZXSMB_BLOCK_DATA 0x14
+#define ZXSMB_I2C_10_BIT_ADDR 0x18
+#define ZXSMB_I2C_PROC_CALL 0x30
+#define ZXSMB_I2C_BLOCK_DATA 0x34
+#define ZXSMB_I2C_7_BIT_ADDR 0x38
+#define ZXSMB_UNIVERSAL 0x3C
 
 #define ZXSMB_TIMEOUT 500
 
@@ -87,7 +69,6 @@ struct zxsmb {
 	u8 status;
 	int size;
 	u8 pec;
-	u8 addr;
 };
 
 static irqreturn_t zxsmb_irq_handle(int irq, void *dev_id)
@@ -96,13 +77,12 @@ static irqreturn_t zxsmb_irq_handle(int irq, void *dev_id)
 	u8 status;
 
 	status = inb(smb->base + ZXSMB_STS);
-	if (!(status & ZXSMB_STS_MASK) || (status & ZXSMB_BUSY))
+	if ((status & ZXSMB_STS_MASK) == 0 || (status & ZXSMB_BUSY))
 		return IRQ_NONE;
 
 	smb->status = status;
 	/* clear status */
 	outb(smb->status, smb->base + ZXSMB_STS);
-	outb(0, smb->base + ZXSMB_CTL);
 	complete(&smb->complete);
 
 	return IRQ_HANDLED;
@@ -114,15 +94,12 @@ static int zxsmb_status_check(struct zxsmb *smb)
 		return 0;
 
 	if (smb->status & ZXSMB_BUS_CLSI) {
-		dev_err(smb->dev, "[%02x] Lost arbitration\n", smb->addr);
+		dev_err(smb->dev, "Lost arbitration\n");
 		outb(ZXSMB_KILL_PRG, smb->base + ZXSMB_CTL);
 		return -EAGAIN;
 	}
 
-	if (smb->status & ZXSMB_FAIL_TRANS)
-		dev_err(smb->dev, "[%02x] Trans failed, sts: %X\n", smb->addr, smb->status);
-
-	dev_dbg(smb->dev, "[%02x] Nack. sts: %X\n", smb->addr, smb->status);
+	dev_dbg(smb->dev, "Trans failed, status = 0x%X\n", smb->status);
 
 	return -EIO;
 }
@@ -167,7 +144,7 @@ static int zxsmb_wait_polling_finish(struct zxsmb *smb)
 			/* kill process and try again */
 			outb(ZXSMB_KILL_PRG, smb->base + ZXSMB_CTL);
 			outb(status, smb->base + ZXSMB_STS);
-			dev_err(smb->dev, "[%02x] timeout and Bus still busy\n", smb->addr);
+			dev_err(smb->dev, "timeout and Bus still busy\n");
 			return -EAGAIN;
 		}
 		dev_err(smb->dev, "polling timeout\n");
@@ -227,6 +204,7 @@ static int zxsmb_transaction(struct zxsmb *smb)
 	else
 		err = zxsmb_wait_polling_finish(smb);
 
+	outb(0, smb->base + ZXSMB_CTL);
 	return err;
 }
 
@@ -263,8 +241,7 @@ static int zxsmb_smbus_xfer(struct i2c_adapter *adap, u16 addr, u16 flags, char 
 			outb(data->word & 0xff, base + ZXSMB_DAT0);
 			outb((data->word & 0xff00) >> 8, base + ZXSMB_DAT1);
 		}
-		size = (size == I2C_SMBUS_PROC_CALL) ?
-			ZXSMB_PROC_CALL : ZXSMB_WORD_DATA;
+		size = (size == I2C_SMBUS_PROC_CALL) ? ZXSMB_PROC_CALL : ZXSMB_WORD_DATA;
 		break;
 	case I2C_SMBUS_I2C_BLOCK_DATA:
 	case I2C_SMBUS_BLOCK_DATA:
@@ -277,14 +254,12 @@ static int zxsmb_smbus_xfer(struct i2c_adapter *adap, u16 addr, u16 flags, char 
 			for (i = 1; i <= len; i++)
 				outb(data->block[i], base + ZXSMB_BLKDAT);
 		}
-		size = (size == I2C_SMBUS_I2C_BLOCK_DATA) ?
-			ZXSMB_I2C_BLOCK_DATA : ZXSMB_BLOCK_DATA;
+		size = (size == I2C_SMBUS_I2C_BLOCK_DATA) ? ZXSMB_I2C_BLOCK_DATA : ZXSMB_BLOCK_DATA;
 		break;
 	default:
 		goto exit_unsupported;
 	}
 
-	smb->addr = addr;
 	outb(((addr & 0x7f) << 1) | read, base + ZXSMB_ADD);
 	smb->size = size;
 	smb->pec = flags & I2C_CLIENT_PEC;
@@ -339,7 +314,7 @@ static u32 zxsmb_func(struct i2c_adapter *adapter)
 
 static const struct i2c_algorithm smbus_algorithm = {
 	.smbus_xfer = zxsmb_smbus_xfer,
-	.functionality  = zxsmb_func,
+	.functionality = zxsmb_func,
 };
 
 static int zxsmb_probe(struct platform_device *pdev)
@@ -364,7 +339,7 @@ static int zxsmb_probe(struct platform_device *pdev)
 
 	smb->irq = platform_get_irq(pdev, 0);
 	if (smb->irq < 0 || devm_request_irq(&pdev->dev, smb->irq, zxsmb_irq_handle, IRQF_SHARED,
-			pdev->name, smb)) {
+					     pdev->name, smb)) {
 		dev_warn(&pdev->dev, "failed to request irq %d\n", smb->irq);
 		smb->irq = 0;
 	} else {
@@ -422,6 +397,6 @@ static struct platform_driver zxsmb_driver = {
 module_platform_driver(zxsmb_driver);
 
 MODULE_AUTHOR("hanshu@zhaoxin.com");
-MODULE_DESCRIPTION("Zhaoxin SMBus driver");
+MODULE_DESCRIPTION("ZHAOXIN SMBus driver");
 MODULE_VERSION(DRIVER_VERSION);
 MODULE_LICENSE("GPL");
