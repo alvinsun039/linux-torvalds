@@ -52,37 +52,27 @@ struct sm4_cipher_data {
 };
 
 static u8 *rep_xcrypt(const u8 *input, u8 *output, void *key, u8 *iv,
-		      struct sm4_cipher_data *sm4_data, u64 count)
+		      struct sm4_cipher_data *sm4_data, size_t count)
 {
-	u64 rax = sm4_data->cword.pad;
+	size_t pad = sm4_data->cword.pad;
 
 	/* Set the flag for encryption or decryption */
 	if (sm4_data->cword.b.encdec == 1)
-		rax &= ~0x01;
+		pad &= ~0x01;
 	else
-		rax |= 0x01;
+		pad |= 0x01;
 
-#ifdef CONFIG_X86_64
 	__asm__ __volatile__(
 		".byte 0xf3, 0x0f, 0xa7, 0xf0\n"
 		: "+S"(input), "+D"(output), "+c"(count)
-		: "a"(rax), "b"(key), "d"(iv)
+		: "a"(pad), "b"(key), "d"(iv)
 		: "memory");
-#else
-	u32 eax = (u32)rax;
-	u32 ecx = (u32)count;
-	__asm__ __volatile__(
-		".byte 0xf3, 0x0f, 0xa7, 0xf0\n"
-		: "+S"(input), "+D"(output), "+c"(ecx)
-		: "a"((u32)eax), "b"(key), "d"(iv)
-		: "memory");
-#endif
 
 	return iv;
 }
 
 static u8 *rep_xcrypt_ctr(const u8 *input, u8 *output, void *key, u8 *iv,
-			  struct sm4_cipher_data *sm4_data, u64 count)
+			  struct sm4_cipher_data *sm4_data, size_t count)
 {
 	u8 oiv[SM4_BLOCK_SIZE] = {0};
 	u16 cnt_tmp;
@@ -99,9 +89,7 @@ static u8 *rep_xcrypt_ctr(const u8 *input, u8 *output, void *key, u8 *iv,
 	/* Get the available counter space before overflow. */
 	cnt_tmp = 0x10000 - cnt_tmp;
 
-	/*
-	 * Check there is enough counter space for the required blocks.
-	 */
+	/* Check there is enough counter space for the required blocks. */
 	if (cnt_tmp < count) {
 		/* Process the first part of data blocks. */
 		rep_xcrypt(in_tmp, out_tmp, key, iv, sm4_data, cnt_tmp);
@@ -130,8 +118,7 @@ static u8 *rep_xcrypt_ctr(const u8 *input, u8 *output, void *key, u8 *iv,
 	return iv;
 }
 
-static u8 *rep_xcrypt_ecb_ONE(const u8 *input, u8 *output, void *key, u8 *iv,
-			      struct sm4_cipher_data *sm4_data, u64 count)
+static u8 *rep_xcrypt_ecb_one(const u8 *input, u8 *output, void *key, u8 *iv)
 {
 	struct sm4_cipher_data cw;
 
@@ -271,7 +258,7 @@ static int sm4_cipher_ctr(struct skcipher_request *req, struct sm4_cipher_data *
 		}
 
 		if (walk.nbytes == walk.total && nbytes > 0) {
-			rep_xcrypt_ecb_ONE(walk.iv, keystream, ctx->rkey_enc, walk.iv, cw, 1);
+			rep_xcrypt_ecb_one(walk.iv, keystream, ctx->rkey_enc, walk.iv);
 			crypto_inc(walk.iv, SM4_BLOCK_SIZE);
 			crypto_xor_cpy(dst, keystream, src, nbytes);
 			dst += nbytes;
@@ -338,8 +325,8 @@ static int sm4_cipher_ofb(struct skcipher_request *req, struct sm4_cipher_data *
 
 		while (nbytes >= SM4_BLOCK_SIZE) {
 			blocks = nbytes / SM4_BLOCK_SIZE;
-			rep_xcrypt(walk.src.virt.addr, walk.dst.virt.addr, ctx->rkey_enc, walk.iv, cw,
-				   blocks);
+			rep_xcrypt(walk.src.virt.addr, walk.dst.virt.addr, ctx->rkey_enc, walk.iv,
+				   cw, blocks);
 
 			dst += blocks * SM4_BLOCK_SIZE;
 			src += blocks * SM4_BLOCK_SIZE;
@@ -347,7 +334,7 @@ static int sm4_cipher_ofb(struct skcipher_request *req, struct sm4_cipher_data *
 		}
 
 		if (walk.nbytes == walk.total && nbytes > 0) {
-			rep_xcrypt_ecb_ONE(walk.iv, walk.iv, ctx->rkey_enc, walk.iv, cw, 1);
+			rep_xcrypt_ecb_one(walk.iv, walk.iv, ctx->rkey_enc, walk.iv);
 			crypto_xor_cpy(dst, src, walk.iv, nbytes);
 			dst += nbytes;
 			src += nbytes;
@@ -423,12 +410,13 @@ static int sm4_cipher_cfb(struct skcipher_request *req, struct sm4_cipher_data *
 
 		if (walk.nbytes == walk.total && nbytes > 0) {
 			u8 keystream[SM4_BLOCK_SIZE];
+
 			if (cw->cword.b.encdec) {
-				rep_xcrypt_ecb_ONE(walk.iv, walk.iv, ctx->rkey_enc, walk.iv, cw, 1);
+				rep_xcrypt_ecb_one(walk.iv, walk.iv, ctx->rkey_enc, walk.iv);
 				crypto_xor_cpy(keystream, walk.iv, src, nbytes);
 				memcpy(dst, keystream, nbytes);
 			} else {
-				rep_xcrypt_ecb_ONE(walk.iv, walk.iv, ctx->rkey_enc, walk.iv, cw, 1);
+				rep_xcrypt_ecb_one(walk.iv, walk.iv, ctx->rkey_enc, walk.iv);
 				crypto_xor_cpy(dst, src, walk.iv, nbytes);
 				memcpy(walk.iv, src, nbytes);
 			}
@@ -445,8 +433,8 @@ static int sm4_cipher_cfb(struct skcipher_request *req, struct sm4_cipher_data *
 }
 
 /*
- * cfb_encrypt is used for ZX-E and newer.
- */
+* cfb_encrypt is used for ZX-E and newer.
+*/
 static int cfb_encrypt(struct skcipher_request *req)
 {
 	int err;
@@ -462,8 +450,9 @@ static int cfb_encrypt(struct skcipher_request *req)
 }
 
 /*
- * cfb_decrypt is used for ZX-E and newer.
- */
+* cfb_decrypt is used for ZX-E and newer.
+*/
+
 static int cfb_decrypt(struct skcipher_request *req)
 {
 	int err;
@@ -615,8 +604,7 @@ static int __init gmi_sm4_init(void)
 		algname = sm4_algs[i].base.cra_name + 2;
 		drvname = sm4_algs[i].base.cra_driver_name + 2;
 		basename = sm4_algs[i].base.cra_driver_name;
-		simd = simd_skcipher_create_compat(sm4_algs + i, algname,
-						   drvname, basename);
+		simd = simd_skcipher_create_compat(sm4_algs + i, algname, drvname, basename);
 		err = PTR_ERR(simd);
 		if (IS_ERR(simd))
 			goto unregister_simds;
@@ -637,3 +625,4 @@ module_exit(gmi_sm4_exit);
 MODULE_DESCRIPTION("SM4-ECB/CBC/CTR/CFB/OFB using Zhaoxin GMI");
 MODULE_AUTHOR("GRX");
 MODULE_LICENSE("GPL");
+MODULE_VERSION("2.0.1");

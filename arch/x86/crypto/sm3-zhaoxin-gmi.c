@@ -74,6 +74,7 @@ static inline int zx_sm3_base_finish(struct shash_desc *desc, u8 *out)
 	memcpy(digest, sctx->state, SM3_DIGEST_SIZE);
 
 	memzero_explicit(sctx, sizeof(*sctx));
+
 	return 0;
 }
 
@@ -98,17 +99,17 @@ static int zx_sm3_finup(struct shash_desc *desc, const u8 *data, unsigned int le
 
 static struct shash_alg zx_sm3_alg = {
 	.digestsize = SM3_DIGEST_SIZE,
-	.init     = zx_sm3_init,
-	.update   = zx_sm3_update,
-	.final    = zx_sm3_final,
-	.finup    = zx_sm3_finup,
+	.init = zx_sm3_init,
+	.update = zx_sm3_update,
+	.final = zx_sm3_final,
+	.finup = zx_sm3_finup,
 	.descsize = sizeof(struct sm3_state),
-	.base   = {
-		.cra_name        =  "sm3",
-		.cra_driver_name =  "sm3-zhaoxin-gmi",
-		.cra_priority    =  GMI_SM3_CRA_PRIORITY,
-		.cra_blocksize   =  SM3_BLOCK_SIZE,
-		.cra_module      =  THIS_MODULE,
+	.base = {
+		.cra_name = "sm3",
+		.cra_driver_name = "sm3-zhaoxin-gmi",
+		.cra_priority = GMI_SM3_CRA_PRIORITY,
+		.cra_blocksize = SM3_BLOCK_SIZE,
+		.cra_module = THIS_MODULE,
 	}
 };
 
@@ -140,4 +141,4 @@ MODULE_DESCRIPTION("SM3 Secure Hash Algorithm");
 
 MODULE_ALIAS_CRYPTO("sm3-zhaoxin");
 MODULE_ALIAS_CRYPTO("sm3-zhaoxin-gmi");
-MODULE_VERSION("2.0.0");
+MODULE_VERSION("2.0.1");
