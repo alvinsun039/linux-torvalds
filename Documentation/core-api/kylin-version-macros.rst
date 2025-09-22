@@ -4,259 +4,517 @@
 KYLIN Version Checking Macros
 ==========================================
 
-Overview
-========
+.. contents:: :depth: 2
 
-This document describes the KYLIN version checking macros that provide compile-time
-and runtime version comparison capabilities for the KYLIN kernel. These macros are
-automatically generated during the kernel build process and are available in
-``include/generated/uapi/linux/version.h``.
+Introduction
+============
 
-Version Encoding Scheme
-=======================
+The KYLIN version checking macros provide a comprehensive set of compile-time and
+runtime version comparison facilities for the KYLIN kernel. These macros enable
+developers to write version-aware code that can adapt to different KYLIN kernel
+releases while maintaining optimal performance through compile-time optimization.
 
-KYLIN versions use a compact encoding scheme for efficient comparison:
+The macros are automatically generated during the kernel build process and are
+available through the standard kernel header ``include/generated/uapi/linux/version.h``.
+
+Architecture Overview
+=====================
+
+The version checking system is built around a compact encoding scheme that allows
+efficient comparison operations. Version numbers are encoded as single integer
+values, enabling both compile-time constant folding and runtime comparison
+operations with minimal overhead.
+
+Version Encoding
+================
+
+KYLIN versions use a compact binary encoding scheme optimized for efficient
+comparison operations:
 
 .. code-block:: text
 
-    Version Code = (Major Version * 256) + Minor Version
+   Version Code = (Major Version * 256) + Minor Version
 
-Available Macros
-================
+This encoding provides:
 
-Core Version Information
-------------------------
+- Single integer comparison operations
+- Efficient compile-time constant evaluation
+- Minimal memory footprint
+- Backward compatibility with existing version schemes
+
+API Reference
+=============
+
+Core Version Macros
+-------------------
+
+The following macros provide access to the current kernel version information:
+
+.. c:macro:: KYLIN_VERSION_MAJOR
+
+   Expands to the current major version number of the KYLIN kernel.
+
+   **Type**: Integer constant
+
+   **Example**:
+
+   .. code-block:: c
+
+       #if KYLIN_VERSION_MAJOR >= 11
+       /* Code for KYLIN 11.x series */
+       #endif
+
+.. c:macro:: KYLIN_VERSION_MINOR
+
+   Expands to the current minor version number of the KYLIN kernel.
+
+   **Type**: Integer constant
+
+   **Example**:
+
+   .. code-block:: c
+
+       pr_info("Running KYLIN %d.%d\n", KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR);
+
+.. c:macro:: KYLIN_RELEASE_CODE
+
+   Expands to the encoded version code of the current KYLIN kernel release.
+
+   **Type**: Integer constant
+
+   **Example**:
+
+   .. code-block:: c
+
+       if (KYLIN_RELEASE_CODE >= 2816) { /* KYLIN 11.0 */
+               /* Use 11.0+ features */
+       }
+
+.. c:macro:: KYLIN_RELEASE_VERSION(major, minor)
+
+   Converts a major and minor version pair into the corresponding version code.
+
+   **Parameters**:
+
+   * ``major`` - Major version number
+   * ``minor`` - Minor version number
+
+   **Returns**: Encoded version code
+
+   **Example**:
 
 .. code-block:: c
 
-    #define KYLIN_VERSION_MAJOR              // Current major version number
-    #define KYLIN_VERSION_MINOR              // Current minor version number
-    #define KYLIN_RELEASE_CODE               // Current version code
-    #define KYLIN_RELEASE_VERSION(a, b)      // Convert version to code: ((a) << 8) + (b)
+       #define KYLIN_11_0_CODE KYLIN_RELEASE_VERSION(11, 0)
 
 Version Comparison Macros
 -------------------------
 
+The comparison macros provide both compile-time and runtime version checking
+capabilities. All macros expand to integer constants that evaluate to 1 (true)
+or 0 (false).
+
+.. c:macro:: KYLIN_VERSION_GE(major, minor)
+
+   Checks if the current kernel version is greater than or equal to the specified version.
+
+   **Parameters**:
+
+   * ``major`` - Major version to compare against
+   * ``minor`` - Minor version to compare against
+
+   **Returns**: 1 if current version >= specified version, 0 otherwise
+
+   **Example**:
+
+   .. code-block:: c
+
+       #if KYLIN_VERSION_GE(11, 0)
+       /* Code for KYLIN 11.0 and later */
+       #endif
+
+.. c:macro:: KYLIN_VERSION_GT(major, minor)
+
+   Checks if the current kernel version is greater than the specified version.
+
+   **Parameters**:
+
+   * ``major`` - Major version to compare against
+   * ``minor`` - Minor version to compare against
+
+   **Returns**: 1 if current version > specified version, 0 otherwise
+
+.. c:macro:: KYLIN_VERSION_LE(major, minor)
+
+   Checks if the current kernel version is less than or equal to the specified version.
+
+   **Parameters**:
+
+   * ``major`` - Major version to compare against
+   * ``minor`` - Minor version to compare against
+
+   **Returns**: 1 if current version <= specified version, 0 otherwise
+
+.. c:macro:: KYLIN_VERSION_LT(major, minor)
+
+   Checks if the current kernel version is less than the specified version.
+
+   **Parameters**:
+
+   * ``major`` - Major version to compare against
+   * ``minor`` - Minor version to compare against
+
+   **Returns**: 1 if current version < specified version, 0 otherwise
+
+.. c:macro:: KYLIN_VERSION_EQ(major, minor)
+
+   Checks if the current kernel version equals the specified version.
+
+   **Parameters**:
+
+   * ``major`` - Major version to compare against
+   * ``minor`` - Minor version to compare against
+
+   **Returns**: 1 if current version == specified version, 0 otherwise
+
+.. c:macro:: KYLIN_VERSION_RANGE(major1, minor1, major2, minor2)
+
+   Checks if the current kernel version falls within the specified range (inclusive).
+
+   **Parameters**:
+
+   * ``major1`` - Lower bound major version
+   * ``minor1`` - Lower bound minor version
+   * ``major2`` - Upper bound major version
+   * ``minor2`` - Upper bound minor version
+
+   **Returns**: 1 if current version is within range, 0 otherwise
+
+   **Example**:
+
 .. code-block:: c
 
-    #define KYLIN_VERSION_GE(major, minor)   // Greater than or equal to
-    #define KYLIN_VERSION_GT(major, minor)   // Greater than
-    #define KYLIN_VERSION_LE(major, minor)   // Less than or equal to
-    #define KYLIN_VERSION_LT(major, minor)   // Less than
-    #define KYLIN_VERSION_EQ(major, minor)   // Equal to
-    #define KYLIN_VERSION_RANGE(major1, minor1, major2, minor2)  // Version range check
+       #if KYLIN_VERSION_RANGE(10, 5, 11, 5)
+       /* Code for KYLIN 10.5 through 11.5 */
+       #endif
 
-Usage Examples
-==============
+Programming Guidelines
+=======================
 
-Runtime Version Checking
-------------------------
+Use compile-time version checking for optimal performance and code clarity.
+All macros expand to integer constants enabling both compile-time and runtime usage.
+
+Basic Usage
+-----------
 
 .. code-block:: c
 
     #include <linux/version.h>
 
-    void check_kylin_version(void)
-    {
-        /* Check if current version is 11.0 or higher */
-        if (KYLIN_VERSION_GE(11, 0)) {
-            pr_info("KYLIN 11.0+ features available\n");
-        }
-
-        /* Check version range */
-        if (KYLIN_VERSION_RANGE(10, 5, 11, 5)) {
-            pr_info("Version is within supported range 10.5-11.5\n");
-        }
-
-        /* Print current version information */
-        pr_info("Current KYLIN version: %d.%d (code: %d)\n",
-                KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR, KYLIN_RELEASE_CODE);
-    }
-
-Compile-Time Conditional Compilation
-------------------------------------
-
-.. code-block:: c
-
-    /* Conditional compilation based on version */
+    /* Feature selection */
     #if KYLIN_VERSION_GE(11, 0)
-        /* Code compiled only for KYLIN 11.0+ */
-        static void kylin_11_0_feature(void)
-        {
-            /* New feature implementation */
-        }
+    static void modern_feature(void) { /* KYLIN 11.0+ implementation */ }
+    #else
+    static void legacy_feature(void) { /* Fallback implementation */ }
     #endif
 
+    /* API compatibility */
+    static int device_operation(struct device *dev)
+    {
+    #if KYLIN_VERSION_GE(11, 0)
+            return dev->modern_op(dev);
+    #else
+            return legacy_device_operation(dev);
+    #endif
+    }
+
+    /* Version ranges and multiple tiers */
     #if KYLIN_VERSION_RANGE(10, 5, 11, 0)
-        /* Code compiled only for versions 10.5-11.0 */
-        static void legacy_compatibility_feature(void)
-        {
-            /* Compatibility implementation */
-        }
+    static void transitional_feature(void) { /* 10.5-11.0 implementation */ }
     #endif
 
-Feature Availability Checking
------------------------------
+    #if KYLIN_VERSION_GE(11, 2)
+    static void latest_feature(void) { /* Latest implementation */ }
+    #elif KYLIN_VERSION_GE(11, 0)
+    static void intermediate_feature(void) { /* Intermediate implementation */ }
+    #else
+    static void basic_feature(void) { /* Basic implementation */ }
+    #endif
+
+Runtime Usage
+-------------
+
+Use runtime checks only for debugging, user-space interfaces, or dynamic configuration:
 
 .. code-block:: c
 
-    bool is_feature_supported(int feature_id)
+    /* Debug output */
+    pr_info("KYLIN version: %d.%d (code: %d)\n",
+            KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR, KYLIN_RELEASE_CODE);
+
+    /* User-space interface */
+    static long device_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
     {
-        switch (feature_id) {
-        case FEATURE_A:
-            return KYLIN_VERSION_GE(11, 0);  /* Requires 11.0+ */
-        case FEATURE_B:
-            return KYLIN_VERSION_GE(11, 2);  /* Requires 11.2+ */
-        case FEATURE_C:
-            return KYLIN_VERSION_RANGE(10, 5, 11, 5);  /* Requires 10.5-11.5 */
+            switch (cmd) {
+            case KYLIN_VERSION_QUERY:
+                    return put_user(KYLIN_RELEASE_CODE, (int __user *)arg);
         default:
-            return false;
-        }
+                    return -ENOTTY;
+            }
     }
 
-Driver Module Implementation
-----------------------------
+Driver Development Examples
+============================
+
+Module Initialization
+---------------------
 
 .. code-block:: c
 
     #include <linux/version.h>
     #include <linux/module.h>
 
-    static int __init my_driver_init(void)
-    {
-        /* Check minimum version requirement */
-        if (KYLIN_VERSION_LT(10, 0)) {
-            pr_err("This driver requires KYLIN 10.0 or higher\n");
-            return -ENOTSUPP;
-        }
+    /* Version requirement enforcement */
+    #if KYLIN_VERSION_LT(10, 0)
+    #error "This driver requires KYLIN 10.0 or higher"
+    #endif
 
-        /* Select implementation based on version */
-        if (KYLIN_VERSION_GE(11, 0)) {
-            pr_info("Using KYLIN 11.0+ optimized implementation\n");
-            /* New version implementation */
-        } else {
-            pr_info("Using compatibility implementation\n");
-            /* Compatibility implementation */
-        }
+    /* Version-specific implementations */
+    #if KYLIN_VERSION_GE(11, 0)
+    static int init(void) { return register_new_features(); }
+    static void cleanup(void) { unregister_new_features(); }
+    #else
+    static int init(void) { return register_legacy_features(); }
+    static void cleanup(void) { unregister_legacy_features(); }
+    #endif
 
-        return 0;
-    }
+    static int __init my_driver_init(void) { return init(); }
+    static void __exit my_driver_exit(void) { cleanup(); }
 
     module_init(my_driver_init);
+    module_exit(my_driver_exit);
+    MODULE_LICENSE("GPL");
 
-API Compatibility Layer
------------------------
+API Compatibility
+-----------------
 
 .. code-block:: c
 
-    /* API compatibility layer example */
-    static inline int kylin_specific_api_call(void)
+    /* Multi-version API compatibility */
+    static int device_register_compat(struct device *dev)
     {
     #if KYLIN_VERSION_GE(11, 2)
-        /* Use new API for 11.2+ */
-        return new_api_function();
+            return device_register_advanced(dev, DEVICE_FLAGS_11_2);
+    #elif KYLIN_VERSION_GE(11, 0)
+            return device_register_modern(dev, DEVICE_FLAGS_11_0);
     #else
-        /* Use legacy API for older versions */
-        return legacy_api_function();
+            return device_register_legacy(dev);
     #endif
     }
 
+    /* Conditional structure members */
+    struct device_context {
+            int common_field;
+    #if KYLIN_VERSION_GE(11, 0)
+            struct new_api_context *new_ctx;
+    #endif
+    #if KYLIN_VERSION_GE(11, 2)
+            struct advanced_features *advanced;
+    #endif
+    };
+
+    /* Version-specific features */
+    static int process_request(struct device_context *ctx, int request_type)
+    {
+            switch (request_type) {
+            case REQUEST_BASIC:
+                    return handle_basic_request(ctx);
+    #if KYLIN_VERSION_GE(11, 0)
+            case REQUEST_ADVANCED:
+                    return handle_advanced_request(ctx);
+    #endif
+    #if KYLIN_VERSION_GE(11, 2)
+            case REQUEST_EXPERIMENTAL:
+                    return handle_experimental_request(ctx);
+    #endif
+            default:
+                    return -EINVAL;
+            }
+    }
+
+Third-Party Driver Compatibility
+=================================
+
+For cross-platform drivers, create a compatibility header:
+
+.. code-block:: c
+
+    /*
+     * kylin_compat.h - Compatibility header for third-party drivers
+     */
+    #ifndef __KYLIN_COMPAT_H
+    #define __KYLIN_COMPAT_H
+
+    #include <linux/version.h>
+
+    #ifndef CONFIG_KYLIN_KERNEL
+        #define KYLIN_VERSION_MAJOR                 0
+        #define KYLIN_VERSION_MINOR                 0
+        #define KYLIN_RELEASE_CODE                  0
+        #define KYLIN_RELEASE_VERSION(a, b)         (((a) << 8) + (b))
+        #define KYLIN_VERSION_GE(major, minor)      0
+        #define KYLIN_VERSION_GT(major, minor)      0
+        #define KYLIN_VERSION_LE(major, minor)      0
+        #define KYLIN_VERSION_LT(major, minor)      0
+        #define KYLIN_VERSION_EQ(major, minor)      0
+        #define KYLIN_VERSION_RANGE(m1, m2, m3, m4) 0
+    #endif
+
+    #endif /* __KYLIN_COMPAT_H */
+
+Usage in driver:
+
+.. code-block:: c
+
+    #include <linux/module.h>
+    #include "kylin_compat.h"
+
+    /* Version requirement (KYLIN systems only) */
+    #if KYLIN_VERSION_LT(10, 0)
+    #error "Driver requires KYLIN 10.0 or higher"
+    #endif
+
+    /* Version-specific initialization */
+    #if KYLIN_VERSION_GE(11, 0)
+    static int init(void) { return register_kylin_features(); }
+    #else
+    static int init(void) { return register_generic_features(); }
+    #endif
+
+    static int __init my_driver_init(void) { return init(); }
+    module_init(my_driver_init);
+
 Version Code Reference
-========================
+======================
+
+The following table provides a reference for common KYLIN version codes:
 
 .. list-table::
-   :widths: 10 15 20
+   :widths: 12 15 25
    :header-rows: 1
 
    * - Version
      - Version Code
-     - Calculation
+     - Binary Calculation
    * - 10.0
      - 2560
-     - 10\*256+0
+     - 0x0A00 (10 << 8 + 0)
    * - 10.5
      - 2565
-     - 10\*256+5
+     - 0x0A05 (10 << 8 + 5)
    * - 11.0
      - 2816
-     - 11\*256+0
+     - 0x0B00 (11 << 8 + 0)
    * - 11.1
      - 2817
-     - 11\*256+1
+     - 0x0B01 (11 << 8 + 1)
    * - 11.2
      - 2818
-     - 11\*256+2
+     - 0x0B02 (11 << 8 + 2)
    * - 12.0
      - 3072
-     - 12\*256+0
+     - 0x0C00 (12 << 8 + 0)
 
 Best Practices
 ==============
 
-Compile-Time vs Runtime Checks
-------------------------------
+**Version Design**:
 
-- **Use ``#if`` for compile-time checks**: When you need different code paths
-  that cannot coexist
-- **Use ``if`` for runtime checks**: When you need dynamic behavior based on
-  version
+- Use clear version boundaries
+- Avoid complex conditions
+- Prefer range macros for complex ranges
 
-Version Design
---------------------
+**Error Handling**:
 
 .. code-block:: c
 
-    /* Good: Clear version requirements */
-    if (KYLIN_VERSION_GE(11, 0)) {
-        /* Feature available from 11.0 onwards */
-    }
+    /* Compile-time requirement enforcement */
+    #if KYLIN_VERSION_LT(10, 0)
+    #error "Driver requires KYLIN 10.0 or higher"
+    #endif
 
-    /* Good: Specific version range */
-    if (KYLIN_VERSION_RANGE(10, 5, 11, 5)) {
-        /* Feature available in specific range */
-    }
-
-    /* Avoid: Overly complex conditions */
-    if (KYLIN_VERSION_GE(10, 0) && KYLIN_VERSION_LT(12, 0) && !KYLIN_VERSION_EQ(11, 3)) {
-        /* Too complex - consider using KYLIN_VERSION_RANGE */
-    }
-
-Error Handling
---------------
-
-.. code-block:: c
-
-    static int check_version_compatibility(void)
+    /* Runtime debugging */
+    static void debug_version_info(void)
     {
-        if (KYLIN_VERSION_LT(MIN_REQUIRED_MAJOR, MIN_REQUIRED_MINOR)) {
-            pr_err("Incompatible KYLIN version: %d.%d (required: %d.%d+)\n",
-                   KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR,
-                   MIN_REQUIRED_MAJOR, MIN_REQUIRED_MINOR);
-            return -ENOTSUPP;
-        }
-
-        return 0;
+            pr_info("Version: %d.%d (code: %d)\n",
+                    KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR, KYLIN_RELEASE_CODE);
     }
 
-Performance Considerations
-==========================
+Troubleshooting
+===============
 
-- **Zero runtime overhead**: All macros expand to simple integer comparisons
-- **Compile-time optimization**: Unreachable code paths are eliminated by the
-  compiler
-- **Cache-friendly**: Version codes fit in a single integer, enabling efficient
-  comparisons
+**Common Issues**:
+
+1. **Macro not found**: Include ``#include <linux/version.h>``
+2. **Build errors on non-KYLIN**: Use compatibility header (see above)
+3. **Incorrect comparisons**: Use specific macros, not raw version codes
+4. **Performance issues**: Use compile-time checks in hot paths
+
+**Debugging**:
+
+.. code-block:: c
+
+    static void dump_version_info(void)
+    {
+            pr_info("Version: %d.%d (code: %d)\n",
+                    KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR, KYLIN_RELEASE_CODE);
+            pr_info("GE(11,0): %d, RANGE(10,5,11,5): %d\n",
+                    KYLIN_VERSION_GE(11, 0), KYLIN_VERSION_RANGE(10, 5, 11, 5));
+    }
 
 Implementation Details
 ======================
 
-The version macros are generated during the kernel build process in the
-``filechk_version.h`` function of the main Makefile. The generation process:
+The KYLIN version checking macros are automatically generated during the kernel
+build process. The implementation follows the standard Linux kernel build system
+patterns.
 
-1. Reads ``KYLIN_VERSION_MAJOR`` and ``KYLIN_VERSION_MINOR`` from
-   ``Makefile.kylin``
-2. Calculates ``KYLIN_RELEASE_CODE`` using the encoding formula
-3. Generates all comparison macros in ``include/generated/uapi/linux/version.h``
+Build System Integration
+------------------------
+
+The version macros are generated by the kernel build system using the following
+process:
+
+1. **Version Source**: Version information is read from ``Makefile.kylin``
+   containing ``KYLIN_VERSION_MAJOR`` and ``KYLIN_VERSION_MINOR``
+
+2. **Code Generation**: The build system calculates ``KYLIN_RELEASE_CODE`` using
+   the encoding formula and generates all comparison macros
+
+3. **Header Generation**: All macros are written to
+   ``include/generated/uapi/linux/version.h``
+
+4. **Build Integration**: The generated header is automatically included in the
+   kernel build process
+
+Generated Macro Structure
+-------------------------
+
+The generated macros follow this pattern:
+
+.. code-block:: c
+
+    /* Core version information */
+    #define KYLIN_VERSION_MAJOR             11
+    #define KYLIN_VERSION_MINOR             2
+    #define KYLIN_RELEASE_CODE              2818
+
+    /* Comparison macros */
+    #define KYLIN_VERSION_GE(major, minor) \
+            (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(major, minor))
+    #define KYLIN_VERSION_GT(major, minor) \
+            (KYLIN_RELEASE_CODE > KYLIN_RELEASE_VERSION(major, minor))
+    /* ... other comparison macros ... */
 
 Migration Guide
 ===============
@@ -264,236 +522,74 @@ Migration Guide
 From Manual Version Checking
 ----------------------------
 
+**Legacy Approach**: Manual major/minor comparison
+
 .. code-block:: c
 
-    /* Old approach 1: Manual major/minor comparison */
+    /* Old approach: Manual version checking */
     if (KYLIN_VERSION_MAJOR > 11 ||
         (KYLIN_VERSION_MAJOR == 11 && KYLIN_VERSION_MINOR >= 2)) {
         /* Use new feature */
     }
 
-    /* Old approach 2: Direct version code comparison */
-    if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 2)) {
-        /* Use new feature */
-    }
-
-    /* New approach: Use convenience macros */
-    if (KYLIN_VERSION_GE(11, 2)) {
-        /* Use new feature */
-    }
-
-Adding New Version Checks
--------------------------
-
-1. **Define version requirements** in your module/driver
-2. **Use appropriate macro** for the comparison type
-3. **Test with different versions** to ensure correctness
-4. **Document version dependencies** in your code
-
-Troubleshooting
-===============
-
-Common Issues
--------------
-
-1. **Macro not found**: Ensure ``#include <linux/version.h>`` is present
-2. **Incorrect comparisons**: Verify version code calculations
-3. **Build errors**: Check that version macros are properly generated
-
-Debug Information
------------------
+**Modern Approach**: Use convenience macros
 
 .. code-block:: c
 
-    /* Print version information for debugging */
-    pr_info("KYLIN Version Debug Info:\n");
-    pr_info("  Major: %d\n", KYLIN_VERSION_MAJOR);
-    pr_info("  Minor: %d\n", KYLIN_VERSION_MINOR);
-    pr_info("  Code: %d\n", KYLIN_RELEASE_CODE);
-    pr_info("  GE(11,0): %d\n", KYLIN_VERSION_GE(11, 0));
-    pr_info("  RANGE(10,5,11,5): %d\n", KYLIN_VERSION_RANGE(10, 5, 11, 5));
-
-Cross-Platform Compatibility
-============================
-
-Third-Party Driver Support
---------------------------
-
-When developing third-party drivers that need to work across different operating
-systems, you may encounter compilation warnings about undefined KYLIN macros on
-non-KYLIN systems. Here are several approaches to handle this:
-
-Method 1: Conditional Compilation with Fallback
------------------------------------------------
-
-.. code-block:: c
-
-    #include <linux/version.h>
-
-    /* Define fallback macros for non-KYLIN systems */
-    #ifndef CONFIG_KYLIN_KERNEL
-        #define KYLIN_VERSION_MAJOR            0
-        #define KYLIN_VERSION_MINOR            0
-        #define KYLIN_RELEASE_CODE             0
-        #define KYLIN_RELEASE_VERSION(a, b)    (((a) << 8) + (b))
-        #define KYLIN_VERSION_GE(major, minor) 0
-        #define KYLIN_VERSION_GT(major, minor) 0
-        #define KYLIN_VERSION_LE(major, minor) 0
-        #define KYLIN_VERSION_LT(major, minor) 0
-        #define KYLIN_VERSION_EQ(major, minor) 0
-        #define KYLIN_VERSION_RANGE(major1, minor1, major2, minor2) 0
+    /* New approach: Use version comparison macros */
+    #if KYLIN_VERSION_GE(11, 2)
+    /* Use new feature */
     #endif
 
-    /* Use KYLIN-specific features only when available */
-    static void my_driver_feature(void)
-    {
-        if (KYLIN_VERSION_GE(11, 0)) {
-            /* KYLIN 11.0+ specific implementation */
-            pr_info("Using KYLIN 11.0+ features\n");
-        } else {
-            /* Generic implementation for other systems */
-            pr_info("Using generic implementation\n");
-        }
-    }
+**Benefits of Migration**:
 
-Method 2: Header File Wrapper
------------------------------
+- Cleaner, more readable code
+- Reduced chance of errors
+- Better compiler optimization
+- Consistent version checking patterns
 
-Create a header file ``kylin_compat.h`` for your driver:
+Adding Version Dependencies
+---------------------------
 
-.. code-block:: c
+When adding new version-dependent features:
 
-    /* kylin_compat.h - KYLIN compatibility header */
-    #ifndef __KYLIN_COMPAT_H
-    #define __KYLIN_COMPAT_H
+1. **Define Clear Requirements**: Specify exact version requirements
+2. **Use Appropriate Macros**: Choose the right comparison macro for your needs
+3. **Test Across Versions**: Verify behavior on different KYLIN versions
+4. **Document Dependencies**: Clearly document version requirements in code
+5. **Provide Fallbacks**: Always provide fallback implementations for older versions
 
-    #include <linux/version.h>
+Summary
+=======
 
-    #ifndef CONFIG_KYLIN_KERNEL
-        /* Fallback for non-KYLIN systems */
-        #define KYLIN_VERSION_MAJOR                 0
-        #define KYLIN_VERSION_MINOR                 0
-        #define KYLIN_RELEASE_CODE                  0
-        #define KYLIN_RELEASE_VERSION(a, b)         (((a) << 8) + (b))
-        #define KYLIN_VERSION_GE(major, minor)      0
-        #define KYLIN_VERSION_GT(major, minor)      0
-        #define KYLIN_VERSION_LE(major, minor)      0
-        #define KYLIN_VERSION_LT(major, minor)      0
-        #define KYLIN_VERSION_EQ(major, minor)      0
-        #define KYLIN_VERSION_RANGE(m1, m2, m3, m4) 0
-    #endif
+The KYLIN version checking macros provide a comprehensive solution for writing
+version-aware kernel code. Key takeaways:
 
-    #endif /* __KYLIN_COMPAT_H */
+**For KYLIN Kernel Development**:
 
-Then use it in your driver:
+- Use compile-time version checking for optimal performance
+- Leverage the full range of comparison macros for precise version control
+- Implement proper error handling with compile-time checks
 
-.. code-block:: c
+**For Third-Party Driver Development**:
 
-    #include "kylin_compat.h"
+- Use the compatibility header approach for cross-platform support
+- Always provide fallback implementations for non-KYLIN systems
+- Test thoroughly across different kernel versions
 
-    static void my_driver_feature(void)
-    {
-        if (KYLIN_VERSION_GE(11, 0)) {
-            /* This will work on KYLIN 11.0+ and be safely ignored on other systems */
-            pr_info("KYLIN 11.0+ feature enabled\n");
-        }
-    }
+**Performance Considerations**:
 
-Best Practices for Third-Party Drivers
---------------------------------------
+- Compile-time checks provide zero runtime overhead
+- Runtime checks should be limited to debugging and user-space interfaces
+- Choose the appropriate checking method based on your use case
 
-1. **Always provide fallbacks**: Ensure your driver works on non-KYLIN systems
-2. **Use feature detection**: Check for macro availability before using
-3. **Document dependencies**: Clearly state KYLIN version requirements
-4. **Test on multiple systems**: Verify compatibility across different OS versions
-5. **Graceful degradation**: Provide alternative implementations when KYLIN features are unavailable
+**Best Practices**:
 
-Example Driver Template
------------------------
+- Prefer compile-time version checking over runtime checking
+- Use clear version boundaries and avoid complex conditions
+- Document version dependencies clearly
+- Provide graceful fallbacks for older versions
 
-First, create a compatibility header file ``kylin_compat.h``:
-
-.. code-block:: c
-
-    /*
-     * kylin_compat.h - KYLIN compatibility header for third-party drivers
-     */
-    #ifndef __KYLIN_COMPAT_H
-    #define __KYLIN_COMPAT_H
-
-    #include <linux/version.h>
-
-    #ifndef CONFIG_KYLIN_KERNEL
-        /* Fallback macros for non-KYLIN systems */
-        #define KYLIN_VERSION_MAJOR                 0
-        #define KYLIN_VERSION_MINOR                 0
-        #define KYLIN_RELEASE_CODE                  0
-        #define KYLIN_RELEASE_VERSION(a, b)         (((a) << 8) + (b))
-        #define KYLIN_VERSION_GE(major, minor)      0
-        #define KYLIN_VERSION_GT(major, minor)      0
-        #define KYLIN_VERSION_LE(major, minor)      0
-        #define KYLIN_VERSION_LT(major, minor)      0
-        #define KYLIN_VERSION_EQ(major, minor)      0
-        #define KYLIN_VERSION_RANGE(m1, m2, m3, m4) 0
-    #endif
-
-    #endif /* __KYLIN_COMPAT_H */
-
-Then use it in your driver:
-
-.. code-block:: c
-
-    /*
-     * Example third-party driver with KYLIN compatibility
-     */
-    #include <linux/module.h>
-    #include "kylin_compat.h"
-
-    static int __init my_driver_init(void)
-    {
-        /* Check system compatibility */
-        #ifdef CONFIG_KYLIN_KERNEL
-        if (KYLIN_VERSION_LT(10, 0)) {
-            pr_err("This driver requires KYLIN 10.0 or higher\n");
-            return -ENOTSUPP;
-        }
-        pr_info("Running on KYLIN %d.%d\n",
-                KYLIN_VERSION_MAJOR, KYLIN_VERSION_MINOR);
-        #else
-        pr_info("Running on non-KYLIN system\n");
-        #endif
-
-        /* Initialize driver features */
-        if (KYLIN_VERSION_GE(11, 0)) {
-            /* Use KYLIN 11.0+ optimized features */
-            pr_info("Using KYLIN 11.0+ optimizations\n");
-        } else {
-            /* Use generic implementation */
-            pr_info("Using generic implementation\n");
-        }
-
-        return 0;
-    }
-
-    static void __exit my_driver_exit(void)
-    {
-        pr_info("Driver unloaded\n");
-    }
-
-    module_init(my_driver_init);
-    module_exit(my_driver_exit);
-
-    MODULE_LICENSE("GPL");
-    MODULE_DESCRIPTION("Example driver with KYLIN compatibility");
-    MODULE_AUTHOR("Your Name");
-
-Future Extensions
-=================
-
-Potential enhancements for future versions:
-
-1. **Semantic versioning support**: Handle patch versions and pre-release
-   identifiers
-2. **Version compatibility matrix**: Predefined compatibility rules
-3. **Version upgrade validation**: Check upgrade path validity
-4. **Extended range operators**: Support for open-ended ranges and exclusions
+The KYLIN version checking system enables developers to write robust, efficient,
+and maintainable kernel code that adapts to different KYLIN kernel releases
+while maintaining optimal performance characteristics.
