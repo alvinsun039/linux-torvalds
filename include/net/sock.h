@@ -553,7 +553,7 @@ struct sock {
 	struct hlist_node	sk_bind2_node;
 
 #if IS_ENABLED(CONFIG_PROVE_LOCKING) && IS_ENABLED(CONFIG_MODULES)
-	struct module		*sk_owner
+	struct module		*sk_owner;
 #endif
 
 	KY_KABI_RESERVE(1)
