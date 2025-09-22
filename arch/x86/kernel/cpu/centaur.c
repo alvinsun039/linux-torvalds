@@ -91,8 +91,13 @@ enum {
 		EAMD3D		= 1<<20,
 };
 
+#define ZX_PATCH_VERSION "v6.0.6"
+
 static void early_init_centaur(struct cpuinfo_x86 *c)
 {
+	pr_info_once("Linux Patch Version is %s\n", ZX_PATCH_VERSION);
+	pr_info_once("With CPU patch V2.0.0\n");
+
 #ifdef CONFIG_X86_32
 	/* Emulate MTRRs using Centaur's MCR. */
 	if (c->x86 == 5)
@@ -141,6 +146,7 @@ static void init_centaur(struct cpuinfo_x86 *c)
 #endif
 	early_init_centaur(c);
 	detect_extended_topology(c);
+	pr_info_once("Got CPU topology from cpuid B leaf, 4 leaf patch V1.0.0\n");
 	init_intel_cacheinfo(c);
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		detect_num_cpu_cores(c);

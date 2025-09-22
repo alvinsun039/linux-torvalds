@@ -54,8 +54,13 @@ static void init_zhaoxin_cap(struct cpuinfo_x86 *c)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 }
 
+#define ZX_PATCH_VERSION "v6.0.6"
+
 static void early_init_zhaoxin(struct cpuinfo_x86 *c)
 {
+	pr_info_once("Linux Patch Version is %s\n", ZX_PATCH_VERSION);
+	pr_info_once("With CPU patch V2.0.0\n");
+
 	if (c->x86 >= 0x6)
 		set_cpu_cap(c, X86_FEATURE_CONSTANT_TSC);
 #ifdef CONFIG_X86_64
@@ -85,6 +90,7 @@ static void init_zhaoxin(struct cpuinfo_x86 *c)
 	early_init_zhaoxin(c);
 	detect_extended_topology(c);
 	init_intel_cacheinfo(c);
+	pr_info_once("Got CPU topology from cpuid B leaf, 4 leaf patch V1.0.0\n");
 	if (!cpu_has(c, X86_FEATURE_XTOPOLOGY)) {
 		detect_num_cpu_cores(c);
 #ifdef CONFIG_X86_32
