@@ -29,6 +29,10 @@
 
 #define DRV_NAME "i2c-phytium-pci"
 
+static int i2c_msi_enable;
+module_param(i2c_msi_enable, int, 0644);
+MODULE_PARM_DESC(i2c_msi_enable, "Enable I2C msi interrupt (0-disabled; 1-enabled; default-0)");
+
 enum phytium_pci_ctl_id_t {
 	octopus_i2c,
 };
@@ -162,6 +166,16 @@ static int i2c_phytium_pci_probe(struct pci_dev *pdev,
 		goto out;
 	}
 
+	if (i2c_msi_enable) {
+		pci_set_master(pdev);
+
+		ret = pci_enable_msi(pdev);
+		if (ret) {
+			dev_dbg(&pdev->dev, "Error enabling MSI. ret = %d\n", ret);
+			goto out;
+		}
+	}
+
 	dev->controller = controller;
 	dev->get_clk_rate_khz = i2c_phytium_get_clk_rate_khz;
 	dev->base = pcim_iomap_table(pdev)[0];
@@ -169,6 +183,10 @@ static int i2c_phytium_pci_probe(struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 	dev->flags |= controller->flags;
 
+#if IS_ENABLED(CONFIG_I2C_SLAVE)
+	dev->slave_state = SLAVE_STATE_IDLE;
+#endif
+	spin_lock_init(&dev->i2c_lock);
 	dev->functionality = controller->functionality | IC_DEFAULT_FUNCTIONALITY;
 	dev->master_cfg = controller->bus_cfg;
 	if (controller->scl_sda_cfg) {
@@ -191,6 +209,8 @@ static int i2c_phytium_pci_probe(struct pci_dev *pdev,
 	ACPI_COMPANION_SET(&adapter->dev, ACPI_COMPANION(&pdev->dev));
 	adapter->nr = controller->bus_num;
 
+	dev->capability = 0;
+	dev->first_time_init_master = true;
 	ret = i2c_phytium_probe(dev);
 	if (ret)
 		goto out;
