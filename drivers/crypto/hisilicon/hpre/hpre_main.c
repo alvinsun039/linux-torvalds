@@ -611,6 +611,7 @@ static void hpre_enable_clock_gate(struct hisi_qm *qm)
 {
 	unsigned long offset;
 	u8 clusters_num, i;
+	u32 hpre_core_info;
 	u32 val;
 
 	if (qm->ver < QM_HW_V3)
@@ -624,7 +625,9 @@ static void hpre_enable_clock_gate(struct hisi_qm *qm)
 	val |= HPRE_PEH_CFG_AUTO_GATE_EN;
 	writel(val, qm->io_base + HPRE_PEH_CFG_AUTO_GATE);
 
-	clusters_num = qm->cap_tables.dev_cap_table[HPRE_CLUSTER_NUM_CAP_IDX].cap_val;
+	hpre_core_info = qm->cap_tables.dev_cap_table[HPRE_CORE_INFO].cap_val;
+	clusters_num = (hpre_core_info >> hpre_basic_info[HPRE_CLUSTER_NUM_CAP].shift) &
+			hpre_basic_info[HPRE_CLUSTER_NUM_CAP].mask;
 	for (i = 0; i < clusters_num; i++) {
 		offset = (unsigned long)i * HPRE_CLSTR_ADDR_INTRVL;
 		val = readl(qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
@@ -641,6 +644,7 @@ static void hpre_disable_clock_gate(struct hisi_qm *qm)
 {
 	unsigned long offset;
 	u8 clusters_num, i;
+	u32 hpre_core_info;
 	u32 val;
 
 	if (qm->ver < QM_HW_V3)
@@ -654,7 +658,9 @@ static void hpre_disable_clock_gate(struct hisi_qm *qm)
 	val &= ~HPRE_PEH_CFG_AUTO_GATE_EN;
 	writel(val, qm->io_base + HPRE_PEH_CFG_AUTO_GATE);
 
-	clusters_num = qm->cap_tables.dev_cap_table[HPRE_CLUSTER_NUM_CAP_IDX].cap_val;
+	hpre_core_info = qm->cap_tables.dev_cap_table[HPRE_CORE_INFO].cap_val;
+	clusters_num = (hpre_core_info >> hpre_basic_info[HPRE_CLUSTER_NUM_CAP].shift) &
+			hpre_basic_info[HPRE_CLUSTER_NUM_CAP].mask;
 	for (i = 0; i < clusters_num; i++) {
 		offset = (unsigned long)i * HPRE_CLSTR_ADDR_INTRVL;
 		val = readl(qm->io_base + offset + HPRE_CLUSTER_DYN_CTL);
