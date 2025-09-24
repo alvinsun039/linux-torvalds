@@ -297,8 +297,9 @@ net_led_remove(struct platform_device *pdev)
 		gpiod_put(phytnet_led->act);
 	}
 
-	if (&pdev->dev)
-		devm_kfree(&pdev->dev, phytnet_led);
+	if (!pdev)
+		return -EINVAL;
+	devm_kfree(&pdev->dev, phytnet_led);
 
 	return 0;
 }
