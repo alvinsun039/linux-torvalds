@@ -3223,7 +3223,7 @@ static int prism2_ioctl_siwencodeext(struct net_device *dev,
 	local_info_t *local = iface->local;
 	struct iw_encode_ext *ext = (struct iw_encode_ext *) extra;
 	int i, ret = 0;
-	struct lib80211_crypto_ops *ops;
+	const struct lib80211_crypto_ops *ops;
 	struct lib80211_crypt_data **crypt;
 	void *sta_ptr;
 	u8 *addr;
@@ -3464,7 +3464,7 @@ static int prism2_ioctl_set_encryption(local_info_t *local,
 				       int param_len)
 {
 	int ret = 0;
-	struct lib80211_crypto_ops *ops;
+	const struct lib80211_crypto_ops *ops;
 	struct lib80211_crypt_data **crypt;
 	void *sta_ptr;
 

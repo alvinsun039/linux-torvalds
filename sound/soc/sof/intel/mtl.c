@@ -698,7 +698,7 @@ static int mtl_dsp_core_put(struct snd_sof_dev *sdev, int core)
 
 /* Meteorlake ops */
 struct snd_sof_dsp_ops sof_mtl_ops;
-EXPORT_SYMBOL_NS(sof_mtl_ops, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_mtl_ops, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 int sof_mtl_ops_init(struct snd_sof_dev *sdev)
 {
@@ -756,7 +756,7 @@ int sof_mtl_ops_init(struct snd_sof_dev *sdev)
 
 	return 0;
 };
-EXPORT_SYMBOL_NS(sof_mtl_ops_init, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_mtl_ops_init, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 const struct sof_intel_dsp_desc mtl_chip_info = {
 	.cores_num = 3,
@@ -784,7 +784,7 @@ const struct sof_intel_dsp_desc mtl_chip_info = {
 	.disable_interrupts = mtl_dsp_disable_interrupts,
 	.hw_ip_version = SOF_INTEL_ACE_1_0,
 };
-EXPORT_SYMBOL_NS(mtl_chip_info, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(mtl_chip_info, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 const struct sof_intel_dsp_desc arl_s_chip_info = {
 	.cores_num = 2,
@@ -812,4 +812,4 @@ const struct sof_intel_dsp_desc arl_s_chip_info = {
 	.disable_interrupts = mtl_dsp_disable_interrupts,
 	.hw_ip_version = SOF_INTEL_ACE_1_0,
 };
-EXPORT_SYMBOL_NS(arl_s_chip_info, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(arl_s_chip_info, "SND_SOC_SOF_INTEL_HDA_COMMON");

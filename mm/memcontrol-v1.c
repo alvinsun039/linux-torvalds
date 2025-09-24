@@ -988,26 +988,26 @@ static ssize_t memcg_write_event_control(struct kernfs_open_file *of,
 	INIT_WORK(&event->remove, memcg_event_remove);
 
 	efile = fdget(efd);
-	if (!efile.file) {
+	if (!fd_file(efile)) {
 		ret = -EBADF;
 		goto out_kfree;
 	}
 
-	event->eventfd = eventfd_ctx_fileget(efile.file);
+	event->eventfd = eventfd_ctx_fileget(fd_file(efile));
 	if (IS_ERR(event->eventfd)) {
 		ret = PTR_ERR(event->eventfd);
 		goto out_put_efile;
 	}
 
 	cfile = fdget(cfd);
-	if (!cfile.file) {
+	if (!fd_file(cfile)) {
 		ret = -EBADF;
 		goto out_put_eventfd;
 	}
 
 	/* the process need read permission on control file */
 	/* AV: shouldn't we check that it's been opened for read instead? */
-	ret = file_permission(cfile.file, MAY_READ);
+	ret = file_permission(fd_file(cfile), MAY_READ);
 	if (ret < 0)
 		goto out_put_cfile;
 
@@ -1015,7 +1015,7 @@ static ssize_t memcg_write_event_control(struct kernfs_open_file *of,
 	 * The control file must be a regular cgroup1 file. As a regular cgroup
 	 * file can't be renamed, it's safe to access its name afterwards.
 	 */
-	cdentry = cfile.file->f_path.dentry;
+	cdentry = fd_file(cfile)->f_path.dentry;
 	if (cdentry->d_sb->s_type != &cgroup_fs_type || !d_is_reg(cdentry)) {
 		ret = -EINVAL;
 		goto out_put_cfile;
@@ -1067,7 +1067,7 @@ static ssize_t memcg_write_event_control(struct kernfs_open_file *of,
 	if (ret)
 		goto out_put_css;
 
-	vfs_poll(efile.file, &event->pt);
+	vfs_poll(fd_file(efile), &event->pt);
 
 	spin_lock_irq(&memcg->event_list_lock);
 	list_add(&event->list, &memcg->event_list);
@@ -1380,7 +1380,7 @@ static int mem_cgroup_resize_max(struct mem_cgroup *memcg,
 		}
 
 		if (!try_to_free_mem_cgroup_pages(memcg, 1, GFP_KERNEL,
-					memsw ? 0 : MEMCG_RECLAIM_MAY_SWAP)) {
+				memsw ? 0 : MEMCG_RECLAIM_MAY_SWAP, NULL)) {
 			ret = -EBUSY;
 			break;
 		}
@@ -1412,7 +1412,7 @@ static int mem_cgroup_force_empty(struct mem_cgroup *memcg)
 			return -EINTR;
 
 		if (!try_to_free_mem_cgroup_pages(memcg, 1, GFP_KERNEL,
-						  MEMCG_RECLAIM_MAY_SWAP))
+						  MEMCG_RECLAIM_MAY_SWAP, NULL))
 			nr_retries--;
 	}
 
@@ -1848,7 +1848,7 @@ static int mem_cgroup_swappiness_write(struct cgroup_subsys_state *css,
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(css);
 
-	if (val > 200)
+	if (val > MAX_SWAPPINESS)
 		return -EINVAL;
 
 	if (!mem_cgroup_is_root(memcg))

@@ -70,7 +70,7 @@ const struct iio_event_spec ad7091r_events[] = {
 		.mask_separate = BIT(IIO_EV_INFO_HYSTERESIS),
 	},
 };
-EXPORT_SYMBOL_NS_GPL(ad7091r_events, IIO_AD7091R);
+EXPORT_SYMBOL_NS_GPL(ad7091r_events, "IIO_AD7091R");
 
 static int ad7091r_set_mode(struct ad7091r_state *st, enum ad7091r_mode mode)
 {
@@ -429,7 +429,7 @@ int ad7091r_probe(struct device *dev, const char *name,
 
 	return devm_iio_device_register(dev, iio_dev);
 }
-EXPORT_SYMBOL_NS_GPL(ad7091r_probe, IIO_AD7091R);
+EXPORT_SYMBOL_NS_GPL(ad7091r_probe, "IIO_AD7091R");
 
 static bool ad7091r_writeable_reg(struct device *dev, unsigned int reg)
 {
@@ -459,7 +459,7 @@ const struct regmap_config ad7091r_regmap_config = {
 	.writeable_reg = ad7091r_writeable_reg,
 	.volatile_reg = ad7091r_volatile_reg,
 };
-EXPORT_SYMBOL_NS_GPL(ad7091r_regmap_config, IIO_AD7091R);
+EXPORT_SYMBOL_NS_GPL(ad7091r_regmap_config, "IIO_AD7091R");
 
 MODULE_AUTHOR("Beniamin Bia <beniamin.bia@analog.com>");
 MODULE_DESCRIPTION("Analog Devices AD7091Rx multi-channel converters");

@@ -5,6 +5,7 @@
 #include "tailcall_bpf2bpf_hierarchy3.skel.h"
 #include "tailcall_freplace.skel.h"
 #include "tc_bpf2bpf.skel.h"
+#include "tailcall_fail.skel.h"
 
 /* test_tailcall_1 checks basic functionality by patching multiple locations
  * in a single program for a single tail call slot with nop->jmp, jmp->nop
@@ -1565,6 +1566,11 @@ out:
 	tc_bpf2bpf__destroy(tc_skel);
 }
 
+static void test_tailcall_failure()
+{
+	RUN_TESTS(tailcall_fail);
+}
+
 void test_tailcalls(void)
 {
 	if (test__start_subtest("tailcall_1"))
@@ -1615,4 +1621,6 @@ void test_tailcalls(void)
 		test_tailcall_freplace();
 	if (test__start_subtest("tailcall_bpf2bpf_freplace"))
 		test_tailcall_bpf2bpf_freplace();
+	if (test__start_subtest("tailcall_failure"))
+		test_tailcall_failure();
 }

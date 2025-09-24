@@ -31,7 +31,7 @@
 #include "qaic_debugfs.h"
 #include "qaic_timesync.h"
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 
 #define PCI_DEV_AIC100			0xa100
 #define QAIC_NAME			"qaic"

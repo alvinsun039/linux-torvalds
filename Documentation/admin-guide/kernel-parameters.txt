@@ -2248,6 +2248,8 @@
 			no_x2apic_optout
 				BIOS x2APIC opt-out request will be ignored
 			nopost	disable Interrupt Posting
+			posted_msi
+				enable MSIs delivered as posted interrupts
 
 	iomem=		Disable strict checking of access to MMIO memory
 		strict	regions from userspace.
@@ -6738,6 +6740,13 @@
 			Format: [always|within_size|advise|never|deny|force]
 			Can be used to control the hugepage allocation policy for
 			the internal shmem mount.
+			See Documentation/admin-guide/mm/transhuge.rst
+			for more details.
+
+	transparent_hugepage_tmpfs= [KNL]
+			Format: [always|within_size|advise|never]
+			Can be used to control the default hugepage allocation policy
+			for the tmpfs mount.
 			See Documentation/admin-guide/mm/transhuge.rst
 			for more details.
 

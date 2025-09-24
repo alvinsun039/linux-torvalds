@@ -203,5 +203,5 @@ static struct cxl_driver cxl_port_driver = {
 
 module_cxl_driver(cxl_port_driver);
 MODULE_LICENSE("GPL v2");
-MODULE_IMPORT_NS(CXL);
+MODULE_IMPORT_NS("CXL");
 MODULE_ALIAS_CXL(CXL_DEVICE_PORT);

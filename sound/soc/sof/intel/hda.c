@@ -46,42 +46,81 @@
 #define EXCEPT_MAX_HDR_SIZE	0x400
 #define HDA_EXT_ROM_STATUS_SIZE 8
 
-static u32 hda_get_interface_mask(struct snd_sof_dev *sdev)
+static void hda_get_interfaces(struct snd_sof_dev *sdev, u32 *interface_mask)
 {
 	const struct sof_intel_dsp_desc *chip;
-	u32 interface_mask[2] = { 0 };
 
 	chip = get_chip_info(sdev->pdata);
 	switch (chip->hw_ip_version) {
 	case SOF_INTEL_TANGIER:
 	case SOF_INTEL_BAYTRAIL:
 	case SOF_INTEL_BROADWELL:
-		interface_mask[0] =  BIT(SOF_DAI_INTEL_SSP);
+		interface_mask[SOF_DAI_DSP_ACCESS] =  BIT(SOF_DAI_INTEL_SSP);
 		break;
 	case SOF_INTEL_CAVS_1_5:
 	case SOF_INTEL_CAVS_1_5_PLUS:
-		interface_mask[0] = BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) |
-				    BIT(SOF_DAI_INTEL_HDA);
-		interface_mask[1] = BIT(SOF_DAI_INTEL_HDA);
+		interface_mask[SOF_DAI_DSP_ACCESS] =
+			BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) | BIT(SOF_DAI_INTEL_HDA);
+		interface_mask[SOF_DAI_HOST_ACCESS] = BIT(SOF_DAI_INTEL_HDA);
 		break;
 	case SOF_INTEL_CAVS_1_8:
 	case SOF_INTEL_CAVS_2_0:
 	case SOF_INTEL_CAVS_2_5:
 	case SOF_INTEL_ACE_1_0:
-		interface_mask[0] = BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) |
-				    BIT(SOF_DAI_INTEL_HDA) | BIT(SOF_DAI_INTEL_ALH);
-		interface_mask[1] = BIT(SOF_DAI_INTEL_HDA);
+		interface_mask[SOF_DAI_DSP_ACCESS] =
+			BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) |
+			BIT(SOF_DAI_INTEL_HDA) | BIT(SOF_DAI_INTEL_ALH);
+		interface_mask[SOF_DAI_HOST_ACCESS] = BIT(SOF_DAI_INTEL_HDA);
 		break;
 	case SOF_INTEL_ACE_2_0:
-		interface_mask[0] = BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) |
-				    BIT(SOF_DAI_INTEL_HDA) | BIT(SOF_DAI_INTEL_ALH);
-		interface_mask[1] = interface_mask[0]; /* all interfaces accessible without DSP */
+		interface_mask[SOF_DAI_DSP_ACCESS] =
+			BIT(SOF_DAI_INTEL_SSP) | BIT(SOF_DAI_INTEL_DMIC) |
+			BIT(SOF_DAI_INTEL_HDA) | BIT(SOF_DAI_INTEL_ALH);
+		 /* all interfaces accessible without DSP */
+		interface_mask[SOF_DAI_HOST_ACCESS] =
+			interface_mask[SOF_DAI_DSP_ACCESS];
 		break;
 	default:
 		break;
 	}
+}
+
+static u32 hda_get_interface_mask(struct snd_sof_dev *sdev)
+{
+	u32 interface_mask[SOF_DAI_ACCESS_NUM] = { 0 };
+
+	hda_get_interfaces(sdev, interface_mask);
 
 	return interface_mask[sdev->dspless_mode_selected];
+}
+
+bool hda_is_chain_dma_supported(struct snd_sof_dev *sdev, u32 dai_type)
+{
+	u32 interface_mask[SOF_DAI_ACCESS_NUM] = { 0 };
+	const struct sof_intel_dsp_desc *chip;
+
+	if (sdev->dspless_mode_selected)
+		return false;
+
+	hda_get_interfaces(sdev, interface_mask);
+
+	if (!(interface_mask[SOF_DAI_DSP_ACCESS] & BIT(dai_type)))
+		return false;
+
+	if (dai_type == SOF_DAI_INTEL_HDA)
+		return true;
+
+	switch (dai_type) {
+	case SOF_DAI_INTEL_SSP:
+	case SOF_DAI_INTEL_DMIC:
+	case SOF_DAI_INTEL_ALH:
+		chip = get_chip_info(sdev->pdata);
+		if (chip->hw_ip_version < SOF_INTEL_ACE_2_0)
+			return false;
+		return true;
+	default:
+		return false;
+	}
 }
 
 #if IS_ENABLED(CONFIG_SND_SOC_SOF_INTEL_SOUNDWIRE)
@@ -1298,12 +1337,28 @@ skip_dsp_setup:
 		INIT_DELAYED_WORK(&hdev->d0i3_work, hda_dsp_d0i3_work);
 	}
 
+	chip = get_chip_info(sdev->pdata);
+	if (chip && chip->hw_ip_version >= SOF_INTEL_ACE_2_0) {
+		ret = hda_sdw_startup(sdev);
+		if (ret < 0) {
+			dev_err(sdev->dev, "could not startup SoundWire links\n");
+			goto disable_pp_cap;
+		}
+
+		hda_sdw_int_enable(sdev, true);
+	}
+
 	init_waitqueue_head(&hdev->waitq);
 
 	hdev->nhlt = intel_nhlt_init(sdev->dev);
 
 	return 0;
 
+disable_pp_cap:
+	if (!sdev->dspless_mode_selected) {
+		hda_dsp_ctrl_ppcap_int_enable(sdev, false);
+		hda_dsp_ctrl_ppcap_enable(sdev, false);
+	}
 free_ipc_irq:
 	free_irq(sdev->ipc_irq, sdev);
 free_irq_vector:
@@ -1762,7 +1817,7 @@ int hda_pci_intel_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 
 	return sof_pci_probe(pci, pci_id);
 }
-EXPORT_SYMBOL_NS(hda_pci_intel_probe, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(hda_pci_intel_probe, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 int hda_register_clients(struct snd_sof_dev *sdev)
 {
@@ -1775,11 +1830,11 @@ void hda_unregister_clients(struct snd_sof_dev *sdev)
 }
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_IMPORT_NS(SND_SOC_SOF_PCI_DEV);
-MODULE_IMPORT_NS(SND_SOC_SOF_HDA_AUDIO_CODEC);
-MODULE_IMPORT_NS(SND_SOC_SOF_HDA_AUDIO_CODEC_I915);
-MODULE_IMPORT_NS(SND_SOC_SOF_XTENSA);
-MODULE_IMPORT_NS(SND_INTEL_SOUNDWIRE_ACPI);
-MODULE_IMPORT_NS(SOUNDWIRE_INTEL_INIT);
-MODULE_IMPORT_NS(SOUNDWIRE_INTEL);
-MODULE_IMPORT_NS(SND_SOC_SOF_HDA_MLINK);
+MODULE_IMPORT_NS("SND_SOC_SOF_PCI_DEV");
+MODULE_IMPORT_NS("SND_SOC_SOF_HDA_AUDIO_CODEC");
+MODULE_IMPORT_NS("SND_SOC_SOF_HDA_AUDIO_CODEC_I915");
+MODULE_IMPORT_NS("SND_SOC_SOF_XTENSA");
+MODULE_IMPORT_NS("SND_INTEL_SOUNDWIRE_ACPI");
+MODULE_IMPORT_NS("SOUNDWIRE_INTEL_INIT");
+MODULE_IMPORT_NS("SOUNDWIRE_INTEL");
+MODULE_IMPORT_NS("SND_SOC_SOF_HDA_MLINK");

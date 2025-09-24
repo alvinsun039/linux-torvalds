@@ -539,10 +539,14 @@ struct bpf_kprobe_multi_opts {
 	size_t cnt;
 	/* create return kprobes */
 	bool retprobe;
+	/* create session kprobes */
+	bool session;
+	/* enforce unique match */
+	bool unique_match;
 	size_t :0;
 };
 
-#define bpf_kprobe_multi_opts__last_field retprobe
+#define bpf_kprobe_multi_opts__last_field unique_match
 
 LIBBPF_API struct bpf_link *
 bpf_program__attach_kprobe_multi_opts(const struct bpf_program *prog,
@@ -795,6 +799,8 @@ bpf_program__attach_cgroup(const struct bpf_program *prog, int cgroup_fd);
 LIBBPF_API struct bpf_link *
 bpf_program__attach_netns(const struct bpf_program *prog, int netns_fd);
 LIBBPF_API struct bpf_link *
+bpf_program__attach_sockmap(const struct bpf_program *prog, int map_fd);
+LIBBPF_API struct bpf_link *
 bpf_program__attach_xdp(const struct bpf_program *prog, int ifindex);
 LIBBPF_API struct bpf_link *
 bpf_program__attach_freplace(const struct bpf_program *prog,
@@ -970,6 +976,23 @@ bpf_object__prev_map(const struct bpf_object *obj, const struct bpf_map *map);
  */
 LIBBPF_API int bpf_map__set_autocreate(struct bpf_map *map, bool autocreate);
 LIBBPF_API bool bpf_map__autocreate(const struct bpf_map *map);
+
+/**
+ * @brief **bpf_map__set_autoattach()** sets whether libbpf has to auto-attach
+ * map during BPF skeleton attach phase.
+ * @param map the BPF map instance
+ * @param autoattach whether to attach map during BPF skeleton attach phase
+ * @return 0 on success; negative error code, otherwise
+ */
+LIBBPF_API int bpf_map__set_autoattach(struct bpf_map *map, bool autoattach);
+
+/**
+ * @brief **bpf_map__autoattach()** returns whether BPF map is configured to
+ * auto-attach during BPF skeleton attach phase.
+ * @param map the BPF map instance
+ * @return true if map is set to auto-attach during skeleton attach phase; false, otherwise
+ */
+LIBBPF_API bool bpf_map__autoattach(const struct bpf_map *map);
 
 /**
  * @brief **bpf_map__fd()** gets the file descriptor of the passed
@@ -1234,6 +1257,7 @@ enum bpf_tc_attach_point {
 	BPF_TC_INGRESS = 1 << 0,
 	BPF_TC_EGRESS  = 1 << 1,
 	BPF_TC_CUSTOM  = 1 << 2,
+	BPF_TC_QDISC   = 1 << 3,
 };
 
 #define BPF_TC_PARENT(a, b) 	\
@@ -1248,9 +1272,11 @@ struct bpf_tc_hook {
 	int ifindex;
 	enum bpf_tc_attach_point attach_point;
 	__u32 parent;
+	__u32 handle;
+	const char *qdisc;
 	size_t :0;
 };
-#define bpf_tc_hook__last_field parent
+#define bpf_tc_hook__last_field qdisc
 
 struct bpf_tc_opts {
 	size_t sz;
@@ -1274,6 +1300,7 @@ LIBBPF_API int bpf_tc_query(const struct bpf_tc_hook *hook,
 
 /* Ring buffer APIs */
 struct ring_buffer;
+struct ring;
 struct user_ring_buffer;
 
 typedef int (*ring_buffer_sample_fn)(void *ctx, void *data, size_t size);
@@ -1292,7 +1319,91 @@ LIBBPF_API int ring_buffer__add(struct ring_buffer *rb, int map_fd,
 				ring_buffer_sample_fn sample_cb, void *ctx);
 LIBBPF_API int ring_buffer__poll(struct ring_buffer *rb, int timeout_ms);
 LIBBPF_API int ring_buffer__consume(struct ring_buffer *rb);
+LIBBPF_API int ring_buffer__consume_n(struct ring_buffer *rb, size_t n);
 LIBBPF_API int ring_buffer__epoll_fd(const struct ring_buffer *rb);
+
+/**
+ * @brief **ring_buffer__ring()** returns the ringbuffer object inside a given
+ * ringbuffer manager representing a single BPF_MAP_TYPE_RINGBUF map instance.
+ *
+ * @param rb A ringbuffer manager object.
+ * @param idx An index into the ringbuffers contained within the ringbuffer
+ * manager object. The index is 0-based and corresponds to the order in which
+ * ring_buffer__add was called.
+ * @return A ringbuffer object on success; NULL and errno set if the index is
+ * invalid.
+ */
+LIBBPF_API struct ring *ring_buffer__ring(struct ring_buffer *rb,
+					  unsigned int idx);
+
+/**
+ * @brief **ring__consumer_pos()** returns the current consumer position in the
+ * given ringbuffer.
+ *
+ * @param r A ringbuffer object.
+ * @return The current consumer position.
+ */
+LIBBPF_API unsigned long ring__consumer_pos(const struct ring *r);
+
+/**
+ * @brief **ring__producer_pos()** returns the current producer position in the
+ * given ringbuffer.
+ *
+ * @param r A ringbuffer object.
+ * @return The current producer position.
+ */
+LIBBPF_API unsigned long ring__producer_pos(const struct ring *r);
+
+/**
+ * @brief **ring__avail_data_size()** returns the number of bytes in the
+ * ringbuffer not yet consumed. This has no locking associated with it, so it
+ * can be inaccurate if operations are ongoing while this is called. However, it
+ * should still show the correct trend over the long-term.
+ *
+ * @param r A ringbuffer object.
+ * @return The number of bytes not yet consumed.
+ */
+LIBBPF_API size_t ring__avail_data_size(const struct ring *r);
+
+/**
+ * @brief **ring__size()** returns the total size of the ringbuffer's map data
+ * area (excluding special producer/consumer pages). Effectively this gives the
+ * amount of usable bytes of data inside the ringbuffer.
+ *
+ * @param r A ringbuffer object.
+ * @return The total size of the ringbuffer map data area.
+ */
+LIBBPF_API size_t ring__size(const struct ring *r);
+
+/**
+ * @brief **ring__map_fd()** returns the file descriptor underlying the given
+ * ringbuffer.
+ *
+ * @param r A ringbuffer object.
+ * @return The underlying ringbuffer file descriptor
+ */
+LIBBPF_API int ring__map_fd(const struct ring *r);
+
+/**
+ * @brief **ring__consume()** consumes available ringbuffer data without event
+ * polling.
+ *
+ * @param r A ringbuffer object.
+ * @return The number of records consumed (or INT_MAX, whichever is less), or
+ * a negative number if any of the callbacks return an error.
+ */
+LIBBPF_API int ring__consume(struct ring *r);
+
+/**
+ * @brief **ring__consume_n()** consumes up to a requested amount of items from
+ * a ringbuffer without event polling.
+ *
+ * @param r A ringbuffer object.
+ * @param n Maximum amount of items to consume.
+ * @return The number of items consumed, or a negative number if any of the
+ * callbacks return an error.
+ */
+LIBBPF_API int ring__consume_n(struct ring *r, size_t n);
 
 struct user_ring_buffer_opts {
 	size_t sz; /* size of this struct, for forward/backward compatibility */
@@ -1580,6 +1691,7 @@ struct bpf_map_skeleton {
 	const char *name;
 	struct bpf_map **map;
 	void **mmaped;
+	struct bpf_link **link;
 };
 
 struct bpf_prog_skeleton {
@@ -1676,9 +1788,14 @@ struct bpf_linker_file_opts {
 struct bpf_linker;
 
 LIBBPF_API struct bpf_linker *bpf_linker__new(const char *filename, struct bpf_linker_opts *opts);
+LIBBPF_API struct bpf_linker *bpf_linker__new_fd(int fd, struct bpf_linker_opts *opts);
 LIBBPF_API int bpf_linker__add_file(struct bpf_linker *linker,
 				    const char *filename,
 				    const struct bpf_linker_file_opts *opts);
+LIBBPF_API int bpf_linker__add_fd(struct bpf_linker *linker, int fd,
+				  const struct bpf_linker_file_opts *opts);
+LIBBPF_API int bpf_linker__add_buf(struct bpf_linker *linker, void *buf, size_t buf_sz,
+				   const struct bpf_linker_file_opts *opts);
 LIBBPF_API int bpf_linker__finalize(struct bpf_linker *linker);
 LIBBPF_API void bpf_linker__free(struct bpf_linker *linker);
 

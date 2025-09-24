@@ -147,6 +147,11 @@ void *__vmalloc_noprof(unsigned long size, gfp_t gfp_mask)
 }
 EXPORT_SYMBOL(__vmalloc_noprof);
 
+void *vrealloc_noprof(const void *p, size_t size, gfp_t flags)
+{
+	return krealloc_noprof(p, size, (flags | __GFP_COMP) & ~__GFP_HIGHMEM);
+}
+
 void *__vmalloc_node_range_noprof(unsigned long size, unsigned long align,
 		unsigned long start, unsigned long end, gfp_t gfp_mask,
 		pgprot_t prot, unsigned long vm_flags, int node,
@@ -1727,6 +1732,85 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 	return len;
 }
 EXPORT_SYMBOL_GPL(access_process_vm);
+
+#ifdef CONFIG_BPF_SYSCALL
+/*
+ * Copy a string from another process's address space as given in mm.
+ * If there is any error return -EFAULT.
+ */
+static int __copy_remote_vm_str(struct mm_struct *mm, unsigned long addr,
+				void *buf, int len)
+{
+	unsigned long addr_end;
+	struct vm_area_struct *vma;
+	int ret = -EFAULT;
+
+	*(char *)buf = '\0';
+
+	if (mmap_read_lock_killable(mm))
+		return ret;
+
+	/* the access must start within one of the target process's mappings */
+	vma = find_vma(mm, addr);
+	if (!vma)
+		goto out;
+
+	if (check_add_overflow(addr, len, &addr_end))
+		goto out;
+
+	/* don't overrun this mapping */
+	if (addr_end > vma->vm_end)
+		len = vma->vm_end - addr;
+
+	/* only read mappings where it is permitted */
+	if (vma->vm_flags & VM_MAYREAD) {
+		ret = strscpy(buf, (char *)addr, len);
+		if (ret < 0)
+			ret = len - 1;
+	}
+
+out:
+	mmap_read_unlock(mm);
+	return ret;
+}
+
+/**
+ * copy_remote_vm_str - copy a string from another process's address space.
+ * @tsk:	the task of the target address space
+ * @addr:	start address to read from
+ * @buf:	destination buffer
+ * @len:	number of bytes to copy
+ * @gup_flags:	flags modifying lookup behaviour (unused)
+ *
+ * The caller must hold a reference on @mm.
+ *
+ * Return: number of bytes copied from @addr (source) to @buf (destination);
+ * not including the trailing NUL. Always guaranteed to leave NUL-terminated
+ * buffer. On any error, return -EFAULT.
+ */
+int copy_remote_vm_str(struct task_struct *tsk, unsigned long addr,
+		       void *buf, int len, unsigned int gup_flags)
+{
+	struct mm_struct *mm;
+	int ret;
+
+	if (unlikely(len == 0))
+		return 0;
+
+	mm = get_task_mm(tsk);
+	if (!mm) {
+		*(char *)buf = '\0';
+		return -EFAULT;
+	}
+
+	ret = __copy_remote_vm_str(mm, addr, buf, len);
+
+	mmput(mm);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(copy_remote_vm_str);
+#endif /* CONFIG_BPF_SYSCALL */
 
 /**
  * nommu_shrink_inode_mappings - Shrink the shared mappings on an inode

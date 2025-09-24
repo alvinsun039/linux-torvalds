@@ -461,17 +461,17 @@ static void ghes_clear_estatus(struct ghes *ghes,
 		ghes_ack_error(ghes->generic_v2);
 }
 
-/*
- * struct sync_task_work - for synchronous RAS event
+/**
+ * struct ghes_task_work - for synchronous RAS event
  *
  * @twork:                callback_head for task work
  * @pfn:                  page frame number of corrupted page
- * @flags:                fine tune action taken
+ * @flags:                work control flags
  *
  * Structure to pass task work to be handled before
- * ret_to_user via task_work_add().
+ * returning to user-space via task_work_add().
  */
-struct sync_task_work {
+struct ghes_task_work {
 	struct callback_head twork;
 	u64 pfn;
 	int flags;
@@ -479,9 +479,8 @@ struct sync_task_work {
 
 static void memory_failure_cb(struct callback_head *twork)
 {
+	struct ghes_task_work *twcb = container_of(twork, struct ghes_task_work, twork);
 	int ret;
-	struct sync_task_work *twcb =
-		container_of(twork, struct sync_task_work, twork);
 
 	ret = memory_failure(twcb->pfn, twcb->flags);
 	gen_pool_free(ghes_estatus_pool, (unsigned long)twcb, sizeof(*twcb));
@@ -489,14 +488,15 @@ static void memory_failure_cb(struct callback_head *twork)
 	if (!ret || ret == -EHWPOISON || ret == -EOPNOTSUPP)
 		return;
 
-	pr_err("Sending SIGBUS to current task due to memory error not recovered");
+	pr_err("%#llx: Sending SIGBUS to %s:%d due to hardware memory corruption\n",
+			twcb->pfn, current->comm, task_pid_nr(current));
 	force_sig(SIGBUS);
 }
 
 static bool ghes_do_memory_failure(u64 physical_addr, int flags)
 {
+	struct ghes_task_work *twcb;
 	unsigned long pfn;
-	struct sync_task_work *twcb;
 
 	if (!IS_ENABLED(CONFIG_ACPI_APEI_MEMORY_FAILURE))
 		return false;
@@ -751,7 +751,9 @@ static void ghes_do_proc(struct ghes *ghes,
 	 * errors, do a force kill.
 	 */
 	if (sync && !queued) {
-		pr_err("Sending SIGBUS to current task due to memory error not recovered");
+		dev_err(ghes->dev,
+			HW_ERR GHES_PFX "%s:%d: synchronous unrecoverable error (SIGBUS)\n",
+			current->comm, task_pid_nr(current));
 		force_sig(SIGBUS);
 	}
 }
@@ -938,6 +940,8 @@ static void __ghes_panic(struct ghes *ghes,
 	const char *msg = GHES_PFX "Fatal hardware error";
 
 	__ghes_print_estatus(KERN_EMERG, ghes->generic, estatus);
+
+	add_taint(TAINT_MACHINE_CHECK, LOCKDEP_STILL_OK);
 
 	ghes_clear_estatus(ghes, estatus, buf_paddr, fixmap_idx);
 

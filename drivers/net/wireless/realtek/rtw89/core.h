@@ -640,12 +640,29 @@ enum rtw89_rate_section {
 	RTW89_RS_TX_SHAPE_NUM = RTW89_RS_OFDM + 1,
 };
 
+enum rtw89_rate_offset_indexes {
+	RTW89_RATE_OFFSET_HE,
+	RTW89_RATE_OFFSET_VHT,
+	RTW89_RATE_OFFSET_HT,
+	RTW89_RATE_OFFSET_OFDM,
+	RTW89_RATE_OFFSET_CCK,
+	RTW89_RATE_OFFSET_DLRU_EHT,
+	RTW89_RATE_OFFSET_DLRU_HE,
+	RTW89_RATE_OFFSET_EHT,
+	__RTW89_RATE_OFFSET_NUM,
+
+	RTW89_RATE_OFFSET_NUM_AX = RTW89_RATE_OFFSET_CCK + 1,
+	RTW89_RATE_OFFSET_NUM_BE = RTW89_RATE_OFFSET_EHT + 1,
+};
+
 enum rtw89_rate_num {
 	RTW89_RATE_CCK_NUM	= 4,
 	RTW89_RATE_OFDM_NUM	= 8,
-	RTW89_RATE_MCS_NUM	= 12,
 	RTW89_RATE_HEDCM_NUM	= 4, /* for HEDCM MCS0/1/3/4 */
-	RTW89_RATE_OFFSET_NUM	= 5, /* for HE(HEDCM)/VHT/HT/OFDM/CCK offset */
+
+	RTW89_RATE_MCS_NUM_AX	= 12,
+	RTW89_RATE_MCS_NUM_BE	= 16,
+	__RTW89_RATE_MCS_NUM	= 16,
 };
 
 enum rtw89_nss {
@@ -668,6 +685,12 @@ enum rtw89_beamforming_type {
 	RTW89_NONBF	= 0,
 	RTW89_BF	= 1,
 	RTW89_BF_NUM,
+};
+
+enum rtw89_ofdma_type {
+	RTW89_NON_OFDMA	= 0,
+	RTW89_OFDMA	= 1,
+	RTW89_OFDMA_NUM,
 };
 
 enum rtw89_regulation_type {
@@ -715,9 +738,10 @@ enum rtw89_fw_pkt_ofld_type {
 struct rtw89_txpwr_byrate {
 	s8 cck[RTW89_RATE_CCK_NUM];
 	s8 ofdm[RTW89_RATE_OFDM_NUM];
-	s8 mcs[RTW89_NSS_NUM][RTW89_RATE_MCS_NUM];
-	s8 hedcm[RTW89_NSS_HEDCM_NUM][RTW89_RATE_HEDCM_NUM];
-	s8 offset[RTW89_RATE_OFFSET_NUM];
+	s8 mcs[RTW89_OFDMA_NUM][RTW89_NSS_NUM][__RTW89_RATE_MCS_NUM];
+	s8 hedcm[RTW89_OFDMA_NUM][RTW89_NSS_HEDCM_NUM][RTW89_RATE_HEDCM_NUM];
+	s8 offset[__RTW89_RATE_OFFSET_NUM];
+	s8 trap;
 };
 
 enum rtw89_bandwidth_section_num {
@@ -753,6 +777,7 @@ struct rtw89_txpwr_limit_ru {
 struct rtw89_rate_desc {
 	enum rtw89_nss nss;
 	enum rtw89_rate_section rs;
+	enum rtw89_ofdma_type ofdma;
 	u8 idx;
 };
 
@@ -841,9 +866,14 @@ enum rtw89_bandwidth {
 	RTW89_CHANNEL_WIDTH_40	= 1,
 	RTW89_CHANNEL_WIDTH_80	= 2,
 	RTW89_CHANNEL_WIDTH_160	= 3,
-	RTW89_CHANNEL_WIDTH_80_80	= 4,
-	RTW89_CHANNEL_WIDTH_5	= 5,
-	RTW89_CHANNEL_WIDTH_10	= 6,
+	RTW89_CHANNEL_WIDTH_320	= 4,
+
+	/* keep index order above */
+	RTW89_CHANNEL_WIDTH_ORDINARY_NUM = 5,
+
+	RTW89_CHANNEL_WIDTH_80_80 = 5,
+	RTW89_CHANNEL_WIDTH_5 = 6,
+	RTW89_CHANNEL_WIDTH_10 = 7,
 };
 
 enum rtw89_ps_mode {
@@ -855,13 +885,16 @@ enum rtw89_ps_mode {
 
 #define RTW89_2G_BW_NUM (RTW89_CHANNEL_WIDTH_40 + 1)
 #define RTW89_5G_BW_NUM (RTW89_CHANNEL_WIDTH_160 + 1)
-#define RTW89_6G_BW_NUM (RTW89_CHANNEL_WIDTH_160 + 1)
-#define RTW89_PPE_BW_NUM (RTW89_CHANNEL_WIDTH_160 + 1)
+#define RTW89_6G_BW_NUM (RTW89_CHANNEL_WIDTH_320 + 1)
+#define RTW89_BYR_BW_NUM (RTW89_CHANNEL_WIDTH_320 + 1)
+#define RTW89_PPE_BW_NUM (RTW89_CHANNEL_WIDTH_320 + 1)
 
 enum rtw89_ru_bandwidth {
 	RTW89_RU26 = 0,
 	RTW89_RU52 = 1,
 	RTW89_RU106 = 2,
+	RTW89_RU52_26 = 3,
+	RTW89_RU106_26 = 4,
 	RTW89_RU_NUM,
 };
 
@@ -898,6 +931,7 @@ struct rtw89_chan {
 	u32 freq;
 	enum rtw89_subband subband_type;
 	enum rtw89_sc_offset pri_ch_idx;
+	u8 pri_sb_idx;
 };
 
 struct rtw89_chan_rcd {
@@ -926,6 +960,12 @@ struct rtw89_port_reg {
 	u32 bcn_cnt_tmr;
 	u32 tsftr_l;
 	u32 tsftr_h;
+	u32 md_tsft;
+	u32 bss_color;
+	u32 mbssid;
+	u32 mbssid_drop;
+	u32 tsf_sync;
+	u32 hiq_win[RTW89_PORT_NUM];
 };
 
 struct rtw89_txwd_body {
@@ -3289,10 +3329,16 @@ struct rtw89_txpwr_rule_6ghz {
 			  [RTW89_6G_CH_NUM];
 };
 
+struct rtw89_tx_shape {
+	const u8 (*lmt)[RTW89_BAND_NUM][RTW89_RS_TX_SHAPE_NUM][RTW89_REGD_NUM];
+	const u8 (*lmt_ru)[RTW89_BAND_NUM][RTW89_REGD_NUM];
+};
+
 struct rtw89_rfe_parms {
 	struct rtw89_txpwr_rule_2ghz rule_2ghz;
 	struct rtw89_txpwr_rule_5ghz rule_5ghz;
 	struct rtw89_txpwr_rule_6ghz rule_6ghz;
+	struct rtw89_tx_shape tx_shape;
 };
 
 struct rtw89_rfe_parms_conf {
@@ -4420,7 +4466,7 @@ struct rtw89_dev {
 	bool is_bt_iqk_timeout;
 
 	struct rtw89_fem_info fem;
-	struct rtw89_txpwr_byrate byr[RTW89_BAND_NUM];
+	struct rtw89_txpwr_byrate byr[RTW89_BAND_NUM][RTW89_BYR_BW_NUM];
 	struct rtw89_tssi_info tssi;
 	struct rtw89_power_trim_info pwr_trim;
 

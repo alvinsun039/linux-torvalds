@@ -13,6 +13,8 @@
 #include "tcp_ca_write_sk_pacing.skel.h"
 #include "tcp_ca_incompl_cong_ops.skel.h"
 #include "tcp_ca_unsupp_cong_op.skel.h"
+#include "tcp_ca_kfunc.skel.h"
+#include "bpf_cc_cubic.skel.h"
 
 #ifndef ENOTSUPP
 #define ENOTSUPP 524
@@ -228,7 +230,7 @@ static void test_rel_setsockopt(void)
 	struct bpf_dctcp_release *rel_skel;
 	libbpf_print_fn_t old_print_fn;
 
-	err_str = "unknown func bpf_setsockopt";
+	err_str = "program of this type cannot use helper bpf_setsockopt";
 	found = false;
 
 	old_print_fn = libbpf_set_print(libbpf_debug_print);
@@ -450,6 +452,36 @@ out:
 	tcp_ca_update__destroy(skel);
 }
 
+static void test_tcp_ca_kfunc(void)
+{
+	struct tcp_ca_kfunc *skel;
+
+	skel = tcp_ca_kfunc__open_and_load();
+	ASSERT_OK_PTR(skel, "tcp_ca_kfunc__open_and_load");
+	tcp_ca_kfunc__destroy(skel);
+}
+
+static void test_cc_cubic(void)
+{
+	struct bpf_cc_cubic *cc_cubic_skel;
+	struct bpf_link *link;
+
+	cc_cubic_skel = bpf_cc_cubic__open_and_load();
+	if (!ASSERT_OK_PTR(cc_cubic_skel, "bpf_cc_cubic__open_and_load"))
+		return;
+
+	link = bpf_map__attach_struct_ops(cc_cubic_skel->maps.cc_cubic);
+	if (!ASSERT_OK_PTR(link, "bpf_map__attach_struct_ops")) {
+		bpf_cc_cubic__destroy(cc_cubic_skel);
+		return;
+	}
+
+	do_test("bpf_cc_cubic", NULL);
+
+	bpf_link__destroy(link);
+	bpf_cc_cubic__destroy(cc_cubic_skel);
+}
+
 void test_bpf_tcp_ca(void)
 {
 	if (test__start_subtest("dctcp"))
@@ -478,4 +510,8 @@ void test_bpf_tcp_ca(void)
 		test_multi_links();
 	if (test__start_subtest("link_replace"))
 		test_link_replace();
+	if (test__start_subtest("tcp_ca_kfunc"))
+		test_tcp_ca_kfunc();
+	if (test__start_subtest("cc_cubic"))
+		test_cc_cubic();
 }

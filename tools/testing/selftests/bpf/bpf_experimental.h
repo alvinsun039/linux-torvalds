@@ -163,7 +163,7 @@ struct bpf_iter_task_vma;
 
 extern int bpf_iter_task_vma_new(struct bpf_iter_task_vma *it,
 				 struct task_struct *task,
-				 unsigned long addr) __ksym;
+				 __u64 addr) __ksym;
 extern struct vm_area_struct *bpf_iter_task_vma_next(struct bpf_iter_task_vma *it) __ksym;
 extern void bpf_iter_task_vma_destroy(struct bpf_iter_task_vma *it) __ksym;
 
@@ -408,6 +408,28 @@ extern int bpf_path_d_path(struct path *path, char *buf, size_t buf__sz) __ksym;
 		     , [as]"i"((dst_as << 16) | src_as));
 #endif
 
+void bpf_preempt_disable(void) __weak __ksym;
+void bpf_preempt_enable(void) __weak __ksym;
+
+typedef struct {
+} __bpf_preempt_t;
+
+static inline __bpf_preempt_t __bpf_preempt_constructor(void)
+{
+	__bpf_preempt_t ret = {};
+
+	bpf_preempt_disable();
+	return ret;
+}
+static inline void __bpf_preempt_destructor(__bpf_preempt_t *t)
+{
+	bpf_preempt_enable();
+}
+#define bpf_guard_preempt() \
+	__bpf_preempt_t ___bpf_apply(preempt, __COUNTER__)			\
+	__attribute__((__unused__, __cleanup__(__bpf_preempt_destructor))) =	\
+	__bpf_preempt_constructor()
+
 /* Description
  *	Assert that a conditional expression is true.
  * Returns
@@ -630,5 +652,18 @@ extern int bpf_iter_css_new(struct bpf_iter_css *it,
 				struct cgroup_subsys_state *start, unsigned int flags) __weak __ksym;
 extern struct cgroup_subsys_state *bpf_iter_css_next(struct bpf_iter_css *it) __weak __ksym;
 extern void bpf_iter_css_destroy(struct bpf_iter_css *it) __weak __ksym;
+
+extern int bpf_wq_init(struct bpf_wq *wq, void *p__map, unsigned int flags) __weak __ksym;
+extern int bpf_wq_start(struct bpf_wq *wq, unsigned int flags) __weak __ksym;
+extern int bpf_wq_set_callback_impl(struct bpf_wq *wq,
+		int (callback_fn)(void *map, int *key, void *value),
+		unsigned int flags__k, void *aux__ign) __ksym;
+#define bpf_wq_set_callback(timer, cb, flags) \
+	bpf_wq_set_callback_impl(timer, cb, flags, NULL)
+
+struct bpf_iter_kmem_cache;
+extern int bpf_iter_kmem_cache_new(struct bpf_iter_kmem_cache *it) __weak __ksym;
+extern struct kmem_cache *bpf_iter_kmem_cache_next(struct bpf_iter_kmem_cache *it) __weak __ksym;
+extern void bpf_iter_kmem_cache_destroy(struct bpf_iter_kmem_cache *it) __weak __ksym;
 
 #endif

@@ -154,4 +154,4 @@ module_auxiliary_driver(mpfs_reset_driver);
 
 MODULE_DESCRIPTION("Microchip PolarFire SoC Reset Driver");
 MODULE_AUTHOR("Conor Dooley <conor.dooley@microchip.com>");
-MODULE_IMPORT_NS(MCHP_CLK_MPFS);
+MODULE_IMPORT_NS("MCHP_CLK_MPFS");

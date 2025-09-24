@@ -273,7 +273,7 @@ static int mt7921_start(struct ieee80211_hw *hw)
 	return err;
 }
 
-static void mt7921_stop(struct ieee80211_hw *hw)
+static void mt7921_stop(struct ieee80211_hw *hw, bool suspend)
 {
 	struct mt792x_dev *dev = mt792x_hw_dev(hw);
 	int err = 0;
@@ -286,7 +286,7 @@ static void mt7921_stop(struct ieee80211_hw *hw)
 			return;
 	}
 
-	mt792x_stop(hw);
+	mt792x_stop(hw, false);
 }
 
 static int
@@ -1181,6 +1181,9 @@ static void mt7921_sta_set_decap_offload(struct ieee80211_hw *hw,
 	struct mt792x_sta *msta = (struct mt792x_sta *)sta->drv_priv;
 	struct mt792x_dev *dev = mt792x_hw_dev(hw);
 
+	if (!msta->deflink.wcid.sta)
+		return;
+
 	mt792x_mutex_acquire(dev);
 
 	if (enabled)
@@ -1477,7 +1480,8 @@ static void mt7921_channel_switch(struct ieee80211_hw *hw,
 }
 
 static void mt7921_abort_channel_switch(struct ieee80211_hw *hw,
-					struct ieee80211_vif *vif)
+					struct ieee80211_vif *vif,
+					struct ieee80211_bss_conf *link_conf)
 {
 	struct mt792x_vif *mvif = (struct mt792x_vif *)vif->drv_priv;
 

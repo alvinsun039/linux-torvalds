@@ -248,7 +248,7 @@ uncore_unlock:
 
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(uncore_freq_add_entry, INTEL_UNCORE_FREQUENCY);
+EXPORT_SYMBOL_NS_GPL(uncore_freq_add_entry, "INTEL_UNCORE_FREQUENCY");
 
 void uncore_freq_remove_die_entry(struct uncore_data *data)
 {
@@ -261,7 +261,7 @@ void uncore_freq_remove_die_entry(struct uncore_data *data)
 
 	mutex_unlock(&uncore_lock);
 }
-EXPORT_SYMBOL_NS_GPL(uncore_freq_remove_die_entry, INTEL_UNCORE_FREQUENCY);
+EXPORT_SYMBOL_NS_GPL(uncore_freq_remove_die_entry, "INTEL_UNCORE_FREQUENCY");
 
 int uncore_freq_common_init(int (*read)(struct uncore_data *data, unsigned int *value,
 					enum uncore_index index),
@@ -288,7 +288,7 @@ int uncore_freq_common_init(int (*read)(struct uncore_data *data, unsigned int *
 
 	return uncore_root_kobj ? 0 : -ENOMEM;
 }
-EXPORT_SYMBOL_NS_GPL(uncore_freq_common_init, INTEL_UNCORE_FREQUENCY);
+EXPORT_SYMBOL_NS_GPL(uncore_freq_common_init, "INTEL_UNCORE_FREQUENCY");
 
 void uncore_freq_common_exit(void)
 {
@@ -300,7 +300,7 @@ void uncore_freq_common_exit(void)
 	}
 	mutex_unlock(&uncore_lock);
 }
-EXPORT_SYMBOL_NS_GPL(uncore_freq_common_exit, INTEL_UNCORE_FREQUENCY);
+EXPORT_SYMBOL_NS_GPL(uncore_freq_common_exit, "INTEL_UNCORE_FREQUENCY");
 
 
 MODULE_LICENSE("GPL v2");

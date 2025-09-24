@@ -17,6 +17,7 @@ struct fs_context;
 struct pipe_inode_info;
 struct iov_iter;
 struct mnt_idmap;
+struct ns_common;
 
 /*
  * block/bdev.c
@@ -82,6 +83,8 @@ extern bool may_mount(void);
 int path_mount(const char *dev_name, struct path *path,
 		const char *type_page, unsigned long flags, void *data_page);
 int path_umount(struct path *path, int flags);
+
+int show_path(struct seq_file *m, struct dentry *root);
 
 /*
  * fs_struct.c
@@ -314,6 +317,7 @@ struct stashed_operations {
 int path_from_stashed(struct dentry **stashed, struct vfsmount *mnt, void *data,
 		      struct path *path);
 void stashed_dentry_prune(struct dentry *dentry);
+int open_namespace(struct ns_common *ns);
 /**
  * path_mounted - check whether path is mounted
  * @path: path to check

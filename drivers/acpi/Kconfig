@@ -13,6 +13,7 @@ menuconfig ACPI
 	select NLS
 	select FT_LPC if ARCH_PHYTIUM
 	select CRC32
+	select FIRMWARE_TABLE
 	default y if X86
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 

@@ -16,6 +16,7 @@
 #include <linux/arm_sdei.h>
 #include <linux/kprobes.h>
 #include <linux/nmi.h>
+#include <linux/kexec.h>
 
 /* We use the secure physical timer as SDEI NMI watchdog timer */
 #define SDEI_NMI_WATCHDOG_HWIRQ		29
@@ -24,6 +25,17 @@ static int sdei_watchdog_event_num;
 bool disable_sdei_nmi_watchdog;
 static bool sdei_watchdog_registered;
 static DEFINE_PER_CPU(ktime_t, last_check_time);
+
+void __noreturn nmi_panic_self_stop(struct pt_regs *regs)
+{
+	int cpu = raw_smp_processor_id();
+
+	crash_save_cpu(regs, cpu);
+
+	while (1)
+		cpu_relax();
+
+}
 
 void watchdog_hardlockup_enable(unsigned int cpu)
 {

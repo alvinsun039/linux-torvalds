@@ -3441,7 +3441,7 @@ userspace_pm_chk_dump_addr()
 
 	print_check "dump addrs ${check}"
 
-	if false && mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
+	if mptcp_lib_kallsyms_has "mptcp_userspace_pm_dump_addr$"; then
 		check_output "userspace_pm_dump ${ns}" "${exp}"
 	else
 		print_skip
@@ -3456,7 +3456,7 @@ userspace_pm_chk_get_addr()
 
 	print_check "get id ${id} addr"
 
-	if false && mptcp_lib_kallsyms_has "mptcp_userspace_pm_get_addr$"; then
+	if mptcp_lib_kallsyms_has "mptcp_userspace_pm_get_addr$"; then
 		check_output "userspace_pm_get_addr ${ns} ${id}" "${exp}"
 	else
 		print_skip

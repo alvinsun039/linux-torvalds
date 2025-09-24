@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 6
 PATCHLEVEL = 6
-SUBLEVEL = 99
+SUBLEVEL = 105
 EXTRAVERSION =
 NAME = Pinguïn Aangedreven
 
@@ -533,8 +533,6 @@ LZ4		= lz4
 XZ		= xz
 ZSTD		= zstd
 
-PAHOLE_FLAGS	= $(shell PAHOLE=$(PAHOLE) $(srctree)/scripts/pahole-flags.sh)
-
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void -Wno-unknown-attribute $(CF)
 NOSTDINC_FLAGS :=
@@ -625,7 +623,6 @@ export KBUILD_RUSTFLAGS RUSTFLAGS_KERNEL RUSTFLAGS_MODULE
 export KBUILD_AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 export KBUILD_AFLAGS_MODULE KBUILD_CFLAGS_MODULE KBUILD_RUSTFLAGS_MODULE KBUILD_LDFLAGS_MODULE
 export KBUILD_AFLAGS_KERNEL KBUILD_CFLAGS_KERNEL KBUILD_RUSTFLAGS_KERNEL
-export PAHOLE_FLAGS
 
 # Files to ignore in find ... statements
 
@@ -1027,6 +1024,7 @@ KBUILD_CPPFLAGS += $(call cc-option,-fmacro-prefix-map=$(srctree)/=)
 # include additional Makefiles when needed
 include-y			:= scripts/Makefile.extrawarn
 include-$(CONFIG_DEBUG_INFO)	+= scripts/Makefile.debug
+include-$(CONFIG_DEBUG_INFO_BTF)+= scripts/Makefile.btf
 include-$(CONFIG_KASAN)		+= scripts/Makefile.kasan
 include-$(CONFIG_KCSAN)		+= scripts/Makefile.kcsan
 include-$(CONFIG_KMSAN)		+= scripts/Makefile.kmsan
@@ -1075,7 +1073,7 @@ KBUILD_USERCFLAGS  += $(filter -m32 -m64 --target=%, $(KBUILD_CPPFLAGS) $(KBUILD
 KBUILD_USERLDFLAGS += $(filter -m32 -m64 --target=%, $(KBUILD_CPPFLAGS) $(KBUILD_CFLAGS))
 
 # userspace programs are linked via the compiler, use the correct linker
-ifeq ($(CONFIG_CC_IS_CLANG)$(CONFIG_LD_IS_LLD),yy)
+ifdef CONFIG_CC_IS_CLANG
 KBUILD_USERLDFLAGS += $(call cc-option, --ld-path=$(LD))
 endif
 
@@ -1277,11 +1275,25 @@ define filechk_version.h
 	echo \#define LINUX_VERSION_MAJOR $(VERSION);                    \
 	echo \#define LINUX_VERSION_PATCHLEVEL $(PATCHLEVEL);            \
 	echo \#define LINUX_VERSION_SUBLEVEL $(SUBLEVEL);		 \
+	echo '/* KYLIN version and range checking macros */';		 \
 	echo \#define KYLIN_VERSION_MAJOR $(KYLIN_VERSION_MAJOR);	 \
 	echo \#define KYLIN_VERSION_MINOR $(KYLIN_VERSION_MINOR);	 \
 	echo '#define KYLIN_RELEASE_VERSION(a,b) (((a) << 8) + (b))';	 \
 	echo \#define KYLIN_RELEASE_CODE $(shell			 \
-	expr $(KYLIN_VERSION_MAJOR) \* 256 + $(KYLIN_VERSION_MINOR)) \
+	expr $(KYLIN_VERSION_MAJOR) \* 256 + $(KYLIN_VERSION_MINOR));		\
+	echo '#define KYLIN_VERSION_GE(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_GT(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE > KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_LE(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE <= KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_LT(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE < KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_EQ(major, minor) \';			\
+	echo '	(KYLIN_RELEASE_CODE == KYLIN_RELEASE_VERSION(major, minor))';	\
+	echo '#define KYLIN_VERSION_RANGE(major1, minor1, major2, minor2) \';	\
+	echo '	(KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(major1, minor1) && \'; \
+	echo '	 KYLIN_RELEASE_CODE <= KYLIN_RELEASE_VERSION(major2, minor2))'	\
 
 endef
 

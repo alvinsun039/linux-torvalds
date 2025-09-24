@@ -359,7 +359,7 @@ u32 mpfs_reset_read(struct device *dev)
 
 	return readl_relaxed(clock_data->base + REG_SUBBLK_RESET_CR);
 }
-EXPORT_SYMBOL_NS_GPL(mpfs_reset_read, MCHP_CLK_MPFS);
+EXPORT_SYMBOL_NS_GPL(mpfs_reset_read, "MCHP_CLK_MPFS");
 
 void mpfs_reset_write(struct device *dev, u32 val)
 {
@@ -367,7 +367,7 @@ void mpfs_reset_write(struct device *dev, u32 val)
 
 	writel_relaxed(val, clock_data->base + REG_SUBBLK_RESET_CR);
 }
-EXPORT_SYMBOL_NS_GPL(mpfs_reset_write, MCHP_CLK_MPFS);
+EXPORT_SYMBOL_NS_GPL(mpfs_reset_write, "MCHP_CLK_MPFS");
 
 static void mpfs_reset_unregister_adev(void *_adev)
 {

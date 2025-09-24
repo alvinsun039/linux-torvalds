@@ -223,7 +223,7 @@ static int bpf_dummy_ops_check_member(const struct btf_type *t,
 	case offsetof(struct bpf_dummy_ops, test_sleepable):
 		break;
 	default:
-		if (prog->aux->sleepable)
+		if (prog->sleepable)
 			return -EINVAL;
 	}
 
@@ -270,12 +270,12 @@ static int bpf_dummy_init_member(const struct btf_type *t,
 	return -EOPNOTSUPP;
 }
 
-static int bpf_dummy_reg(void *kdata)
+static int bpf_dummy_reg(void *kdata, struct bpf_link *link)
 {
 	return -EOPNOTSUPP;
 }
 
-static void bpf_dummy_unreg(void *kdata)
+static void bpf_dummy_unreg(void *kdata, struct bpf_link *link)
 {
 }
 

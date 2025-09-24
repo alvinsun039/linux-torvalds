@@ -217,6 +217,17 @@ int sp_suspend(struct sp_device *sp)
 		ccp_dev_suspend(sp);
 	}
 
+#ifdef CONFIG_X86
+	int ret;
+
+	if (sp->dev_vdata->psp_vdata &&
+		boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+		ret = psp_dev_suspend(sp);
+		if (ret)
+			return ret;
+	}
+#endif
+
 	return 0;
 }
 
@@ -225,6 +236,17 @@ int sp_resume(struct sp_device *sp)
 	if (sp->dev_vdata->ccp_vdata) {
 		ccp_dev_resume(sp);
 	}
+
+#ifdef CONFIG_X86
+	int ret;
+
+	if (sp->dev_vdata->psp_vdata &&
+		boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+		ret = psp_dev_resume(sp);
+		if (ret)
+			return ret;
+	}
+#endif
 
 	return 0;
 }

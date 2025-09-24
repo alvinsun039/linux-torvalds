@@ -347,5 +347,5 @@ static struct platform_driver sunxi_de2_clk_driver = {
 };
 module_platform_driver(sunxi_de2_clk_driver);
 
-MODULE_IMPORT_NS(SUNXI_CCU);
+MODULE_IMPORT_NS("SUNXI_CCU");
 MODULE_LICENSE("GPL");

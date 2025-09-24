@@ -170,17 +170,17 @@ long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 		goto out;
 	error = -EBADF;
 	f = fdget(fd);
-	if (!f.file)
+	if (!fd_file(f))
 		goto out;
 
 	/* explicitly opened as large or we are on 64-bit box */
-	if (f.file->f_flags & O_LARGEFILE)
+	if (fd_file(f)->f_flags & O_LARGEFILE)
 		small = 0;
 
-	dentry = f.file->f_path.dentry;
+	dentry = fd_file(f)->f_path.dentry;
 	inode = dentry->d_inode;
 	error = -EINVAL;
-	if (!S_ISREG(inode->i_mode) || !(f.file->f_mode & FMODE_WRITE))
+	if (!S_ISREG(inode->i_mode) || !(fd_file(f)->f_mode & FMODE_WRITE))
 		goto out_putf;
 
 	error = -EINVAL;
@@ -190,13 +190,13 @@ long do_sys_ftruncate(unsigned int fd, loff_t length, int small)
 
 	error = -EPERM;
 	/* Check IS_APPEND on real upper inode */
-	if (IS_APPEND(file_inode(f.file)))
+	if (IS_APPEND(file_inode(fd_file(f))))
 		goto out_putf;
 	sb_start_write(inode->i_sb);
-	error = security_file_truncate(f.file);
+	error = security_file_truncate(fd_file(f));
 	if (!error)
-		error = do_truncate(file_mnt_idmap(f.file), dentry, length,
-				    ATTR_MTIME | ATTR_CTIME, f.file);
+		error = do_truncate(file_mnt_idmap(fd_file(f)), dentry, length,
+				    ATTR_MTIME | ATTR_CTIME, fd_file(f));
 	sb_end_write(inode->i_sb);
 out_putf:
 	fdput(f);
@@ -253,40 +253,39 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	if (offset < 0 || len <= 0)
 		return -EINVAL;
 
-	/* Return error if mode is not supported */
-	if (mode & ~FALLOC_FL_SUPPORTED_MASK)
+	if (mode & ~(FALLOC_FL_MODE_MASK | FALLOC_FL_KEEP_SIZE))
 		return -EOPNOTSUPP;
 
-	/* Punch hole and zero range are mutually exclusive */
-	if ((mode & (FALLOC_FL_PUNCH_HOLE | FALLOC_FL_ZERO_RANGE)) ==
-	    (FALLOC_FL_PUNCH_HOLE | FALLOC_FL_ZERO_RANGE))
+	/*
+	 * Modes are exclusive, even if that is not obvious from the encoding
+	 * as bit masks and the mix with the flag in the same namespace.
+	 *
+	 * To make things even more complicated, FALLOC_FL_ALLOCATE_RANGE is
+	 * encoded as no bit set.
+	 */
+	switch (mode & FALLOC_FL_MODE_MASK) {
+	case FALLOC_FL_ALLOCATE_RANGE:
+	case FALLOC_FL_UNSHARE_RANGE:
+	case FALLOC_FL_ZERO_RANGE:
+		break;
+	case FALLOC_FL_PUNCH_HOLE:
+		if (!(mode & FALLOC_FL_KEEP_SIZE))
+			return -EOPNOTSUPP;
+		break;
+	case FALLOC_FL_COLLAPSE_RANGE:
+	case FALLOC_FL_INSERT_RANGE:
+		if (mode & FALLOC_FL_KEEP_SIZE)
+			return -EOPNOTSUPP;
+		break;
+	default:
 		return -EOPNOTSUPP;
-
-	/* Punch hole must have keep size set */
-	if ((mode & FALLOC_FL_PUNCH_HOLE) &&
-	    !(mode & FALLOC_FL_KEEP_SIZE))
-		return -EOPNOTSUPP;
-
-	/* Collapse range should only be used exclusively. */
-	if ((mode & FALLOC_FL_COLLAPSE_RANGE) &&
-	    (mode & ~FALLOC_FL_COLLAPSE_RANGE))
-		return -EINVAL;
-
-	/* Insert range should only be used exclusively. */
-	if ((mode & FALLOC_FL_INSERT_RANGE) &&
-	    (mode & ~FALLOC_FL_INSERT_RANGE))
-		return -EINVAL;
-
-	/* Unshare range should only be used with allocate mode. */
-	if ((mode & FALLOC_FL_UNSHARE_RANGE) &&
-	    (mode & ~(FALLOC_FL_UNSHARE_RANGE | FALLOC_FL_KEEP_SIZE)))
-		return -EINVAL;
+	}
 
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
 	/*
-	 * We can only allow pure fallocate on append only files
+	 * On append-only files only space preallocation is supported.
 	 */
 	if ((mode & ~FALLOC_FL_KEEP_SIZE) && IS_APPEND(inode))
 		return -EPERM;
@@ -347,8 +346,8 @@ int ksys_fallocate(int fd, int mode, loff_t offset, loff_t len)
 	struct fd f = fdget(fd);
 	int error = -EBADF;
 
-	if (f.file) {
-		error = vfs_fallocate(f.file, mode, offset, len);
+	if (fd_file(f)) {
+		error = vfs_fallocate(fd_file(f), mode, offset, len);
 		fdput(f);
 	}
 	return error;
@@ -600,16 +599,16 @@ SYSCALL_DEFINE1(fchdir, unsigned int, fd)
 	int error;
 
 	error = -EBADF;
-	if (!f.file)
+	if (!fd_file(f))
 		goto out;
 
 	error = -ENOTDIR;
-	if (!d_can_lookup(f.file->f_path.dentry))
+	if (!d_can_lookup(fd_file(f)->f_path.dentry))
 		goto out_putf;
 
-	error = file_permission(f.file, MAY_EXEC | MAY_CHDIR);
+	error = file_permission(fd_file(f), MAY_EXEC | MAY_CHDIR);
 	if (!error)
-		set_fs_pwd(current->fs, &f.file->f_path);
+		set_fs_pwd(current->fs, &fd_file(f)->f_path);
 out_putf:
 	fdput(f);
 out:
@@ -690,8 +689,8 @@ SYSCALL_DEFINE2(fchmod, unsigned int, fd, umode_t, mode)
 	struct fd f = fdget(fd);
 	int err = -EBADF;
 
-	if (f.file) {
-		err = vfs_fchmod(f.file, mode);
+	if (fd_file(f)) {
+		err = vfs_fchmod(fd_file(f), mode);
 		fdput(f);
 	}
 	return err;
@@ -884,8 +883,8 @@ int ksys_fchown(unsigned int fd, uid_t user, gid_t group)
 	struct fd f = fdget(fd);
 	int error = -EBADF;
 
-	if (f.file) {
-		error = vfs_fchown(f.file, user, group);
+	if (fd_file(f)) {
+		error = vfs_fchown(fd_file(f), user, group);
 		fdput(f);
 	}
 	return error;
@@ -1202,44 +1201,6 @@ struct file *kernel_file_open(const struct path *path, int flags,
 	return f;
 }
 EXPORT_SYMBOL_GPL(kernel_file_open);
-
-/**
- * backing_file_open - open a backing file for kernel internal use
- * @user_path:	path that the user reuqested to open
- * @flags:	open flags
- * @real_path:	path of the backing file
- * @cred:	credentials for open
- *
- * Open a backing file for a stackable filesystem (e.g., overlayfs).
- * @user_path may be on the stackable filesystem and @real_path on the
- * underlying filesystem.  In this case, we want to be able to return the
- * @user_path of the stackable filesystem. This is done by embedding the
- * returned file into a container structure that also stores the stacked
- * file's path, which can be retrieved using backing_file_user_path().
- */
-struct file *backing_file_open(const struct path *user_path, int flags,
-			       const struct path *real_path,
-			       const struct cred *cred)
-{
-	struct file *f;
-	int error;
-
-	f = alloc_empty_backing_file(flags, cred);
-	if (IS_ERR(f))
-		return f;
-
-	path_get(user_path);
-	*backing_file_user_path(f) = *user_path;
-	f->f_path = *real_path;
-	error = do_dentry_open(f, d_inode(real_path->dentry), NULL);
-	if (error) {
-		fput(f);
-		f = ERR_PTR(error);
-	}
-
-	return f;
-}
-EXPORT_SYMBOL_GPL(backing_file_open);
 
 #define WILL_CREATE(flags)	(flags & (O_CREAT | __O_TMPFILE))
 #define O_PATH_FLAGS		(O_DIRECTORY | O_NOFOLLOW | O_PATH | O_CLOEXEC)

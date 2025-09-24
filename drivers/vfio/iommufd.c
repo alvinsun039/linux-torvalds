@@ -7,8 +7,8 @@
 
 #include "vfio.h"
 
-MODULE_IMPORT_NS(IOMMUFD);
-MODULE_IMPORT_NS(IOMMUFD_VFIO);
+MODULE_IMPORT_NS("IOMMUFD");
+MODULE_IMPORT_NS("IOMMUFD_VFIO");
 
 bool vfio_iommufd_device_has_compat_ioas(struct vfio_device *vdev,
 					 struct iommufd_ctx *ictx)
@@ -24,6 +24,10 @@ int vfio_df_iommufd_bind(struct vfio_device_file *df)
 	struct iommufd_ctx *ictx = df->iommufd;
 
 	lockdep_assert_held(&vdev->dev_set->lock);
+
+	/* Returns 0 to permit device opening under noiommu mode */
+	if (vfio_device_is_noiommu(vdev))
+		return 0;
 
 	return vdev->ops->bind_iommufd(vdev, ictx, &df->devid);
 }

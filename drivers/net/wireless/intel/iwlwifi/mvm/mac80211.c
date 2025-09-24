@@ -352,12 +352,6 @@ int iwl_mvm_mac_setup_register(struct iwl_mvm *mvm)
 	if (!mvm->mld_api_is_used)
 		ieee80211_hw_set(hw, TIMING_BEACON_ONLY);
 
-	/* We should probably have this, but mac80211
-	 * currently doesn't support it for MLO.
-	 */
-	if (!(hw->wiphy->flags & WIPHY_FLAG_SUPPORTS_MLO))
-		ieee80211_hw_set(hw, DEAUTH_NEED_MGD_TX_PREP);
-
 	/*
 	 * On older devices, enabling TX A-MSDU occasionally leads to
 	 * something getting messed up, the command read from the FIFO
@@ -1326,7 +1320,7 @@ void __iwl_mvm_mac_stop(struct iwl_mvm *mvm)
 	}
 }
 
-void iwl_mvm_mac_stop(struct ieee80211_hw *hw)
+void iwl_mvm_mac_stop(struct ieee80211_hw *hw, bool suspend)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 
@@ -1467,7 +1461,8 @@ out_unlock:
 }
 
 void iwl_mvm_abort_channel_switch(struct ieee80211_hw *hw,
-				  struct ieee80211_vif *vif)
+				  struct ieee80211_vif *vif,
+				  struct ieee80211_bss_conf *link_conf)
 {
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
@@ -2672,6 +2667,8 @@ static void iwl_mvm_bss_info_changed_station(struct iwl_mvm *mvm,
 
 	if (changes & BSS_CHANGED_ASSOC) {
 		if (vif->cfg.assoc) {
+			mvmvif->session_prot_connection_loss = false;
+
 			/* clear statistics to get clean beacon counter */
 			iwl_mvm_request_statistics(mvm, true);
 			for_each_mvm_vif_valid_link(mvmvif, i)
@@ -4036,8 +4033,9 @@ int iwl_mvm_mac_set_rts_threshold(struct ieee80211_hw *hw, u32 value)
 }
 
 void iwl_mvm_sta_rc_update(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
-			   struct ieee80211_sta *sta, u32 changed)
+			   struct ieee80211_link_sta *link_sta, u32 changed)
 {
+	struct ieee80211_sta *sta = link_sta->sta;
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 
 	if (changed & (IEEE80211_RC_BW_CHANGED |
@@ -4079,9 +4077,13 @@ void iwl_mvm_mac_mgd_prepare_tx(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif,
 				struct ieee80211_prep_tx_info *info)
 {
+	struct iwl_mvm_vif *mvmvif = iwl_mvm_vif_from_mac80211(vif);
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 
 	mutex_lock(&mvm->mutex);
+
+	if (info->was_assoc && !mvmvif->session_prot_connection_loss)
+		return;
 	iwl_mvm_protect_assoc(mvm, vif, info->duration, info->link_id);
 	mutex_unlock(&mvm->mutex);
 }
@@ -4838,8 +4840,8 @@ static void iwl_mvm_ftm_responder_chanctx_iter(void *_data, u8 *mac,
 		data->responder = true;
 }
 
-static bool iwl_mvm_is_ftm_responder_chanctx(struct iwl_mvm *mvm,
-					     struct ieee80211_chanctx_conf *ctx)
+bool iwl_mvm_is_ftm_responder_chanctx(struct iwl_mvm *mvm,
+				      struct ieee80211_chanctx_conf *ctx)
 {
 	struct iwl_mvm_ftm_responder_iter_data data = {
 		.responder = false,
@@ -4858,9 +4860,7 @@ static int __iwl_mvm_add_chanctx(struct iwl_mvm *mvm,
 {
 	u16 *phy_ctxt_id = (u16 *)ctx->drv_priv;
 	struct iwl_mvm_phy_ctxt *phy_ctxt;
-	bool use_def = iwl_mvm_is_ftm_responder_chanctx(mvm, ctx) ||
-		iwl_mvm_enable_fils(mvm, ctx);
-	struct cfg80211_chan_def *def = use_def ? &ctx->def : &ctx->min_def;
+	struct cfg80211_chan_def *def = iwl_mvm_chanctx_def(mvm, ctx);
 	int ret;
 
 	lockdep_assert_held(&mvm->mutex);
@@ -4926,15 +4926,13 @@ void iwl_mvm_change_chanctx(struct ieee80211_hw *hw,
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	u16 *phy_ctxt_id = (u16 *)ctx->drv_priv;
 	struct iwl_mvm_phy_ctxt *phy_ctxt = &mvm->phy_ctxts[*phy_ctxt_id];
-	bool use_def = iwl_mvm_is_ftm_responder_chanctx(mvm, ctx) ||
-		iwl_mvm_enable_fils(mvm, ctx);
-	struct cfg80211_chan_def *def = use_def ? &ctx->def : &ctx->min_def;
+	struct cfg80211_chan_def *def = iwl_mvm_chanctx_def(mvm, ctx);
 
 	if (WARN_ONCE((phy_ctxt->ref > 1) &&
 		      (changed & ~(IEEE80211_CHANCTX_CHANGE_WIDTH |
 				   IEEE80211_CHANCTX_CHANGE_RX_CHAINS |
 				   IEEE80211_CHANCTX_CHANGE_RADAR |
-				   IEEE80211_CHANCTX_CHANGE_MIN_WIDTH)),
+				   IEEE80211_CHANCTX_CHANGE_MIN_DEF)),
 		      "Cannot change PHY. Ref=%d, changed=0x%X\n",
 		      phy_ctxt->ref, changed))
 		return;
@@ -4942,7 +4940,7 @@ void iwl_mvm_change_chanctx(struct ieee80211_hw *hw,
 	mutex_lock(&mvm->mutex);
 
 	/* we are only changing the min_width, may be a noop */
-	if (changed == IEEE80211_CHANCTX_CHANGE_MIN_WIDTH) {
+	if (changed == IEEE80211_CHANCTX_CHANGE_MIN_DEF) {
 		if (phy_ctxt->width == def->width)
 			goto out_unlock;
 
@@ -5651,8 +5649,16 @@ void iwl_mvm_channel_switch_rx_beacon(struct ieee80211_hw *hw,
 
 	if (chsw->count >= mvmvif->csa_count && chsw->block_tx) {
 		if (mvmvif->csa_misbehave) {
+			struct ieee80211_bss_conf *link_conf;
+
 			/* Second time, give up on this AP*/
-			iwl_mvm_abort_channel_switch(hw, vif);
+
+			link_conf = wiphy_dereference(hw->wiphy,
+						      vif->link_conf[chsw->link_id]);
+			if (WARN_ON(!link_conf))
+				return;
+
+			iwl_mvm_abort_channel_switch(hw, vif, link_conf);
 			ieee80211_chswitch_done(vif, false, 0);
 			mvmvif->csa_misbehave = false;
 			return;
@@ -6354,7 +6360,7 @@ const struct ieee80211_ops iwl_mvm_hw_ops = {
 	.allow_buffered_frames = iwl_mvm_mac_allow_buffered_frames,
 	.release_buffered_frames = iwl_mvm_mac_release_buffered_frames,
 	.set_rts_threshold = iwl_mvm_mac_set_rts_threshold,
-	.sta_rc_update = iwl_mvm_sta_rc_update,
+	.link_sta_rc_update = iwl_mvm_sta_rc_update,
 	.conf_tx = iwl_mvm_mac_conf_tx,
 	.mgd_prepare_tx = iwl_mvm_mac_mgd_prepare_tx,
 	.mgd_complete_tx = iwl_mvm_mac_mgd_complete_tx,

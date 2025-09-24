@@ -478,7 +478,7 @@ int devm_tng_gpio_probe(struct device *dev, struct tng_gpio *gpio)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(devm_tng_gpio_probe, GPIO_TANGIER);
+EXPORT_SYMBOL_NS_GPL(devm_tng_gpio_probe, "GPIO_TANGIER");
 
 int tng_gpio_suspend(struct device *dev)
 {
@@ -505,7 +505,7 @@ int tng_gpio_suspend(struct device *dev)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(tng_gpio_suspend, GPIO_TANGIER);
+EXPORT_SYMBOL_NS_GPL(tng_gpio_suspend, "GPIO_TANGIER");
 
 int tng_gpio_resume(struct device *dev)
 {
@@ -532,7 +532,7 @@ int tng_gpio_resume(struct device *dev)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(tng_gpio_resume, GPIO_TANGIER);
+EXPORT_SYMBOL_NS_GPL(tng_gpio_resume, "GPIO_TANGIER");
 
 MODULE_AUTHOR("Andy Shevchenko <andriy.shevchenko@linux.intel.com>");
 MODULE_AUTHOR("Pandith N <pandith.n@intel.com>");

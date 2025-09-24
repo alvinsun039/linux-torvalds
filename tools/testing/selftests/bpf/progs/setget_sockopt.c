@@ -6,10 +6,7 @@
 #include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
-
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-#endif
+#include "bpf_misc.h"
 
 extern unsigned long CONFIG_HZ __kconfig;
 
@@ -62,6 +59,7 @@ static const struct sockopt_test sol_tcp_tests[] = {
 	{ .opt = TCP_THIN_LINEAR_TIMEOUTS, .flip = 1, },
 	{ .opt = TCP_USER_TIMEOUT, .new = 123400, .expected = 123400, },
 	{ .opt = TCP_NOTSENT_LOWAT, .new = 1314, .expected = 1314, },
+	{ .opt = TCP_RTO_MAX_MS, .new = 2000, .expected = 2000, },
 	{ .opt = 0, },
 };
 

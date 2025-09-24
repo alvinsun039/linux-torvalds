@@ -250,6 +250,7 @@
 #define X86_FEATURE_FLEXPRIORITY	( 8*32+ 1) /* Intel FlexPriority */
 #define X86_FEATURE_EPT			( 8*32+ 2) /* Intel Extended Page Table */
 #define X86_FEATURE_VPID		( 8*32+ 3) /* Intel Virtual Processor ID */
+#define X86_FEATURE_COHERENCY_SFW_NO	( 8*32+ 4) /* "" SNP cache coherency software work around not needed */
 
 #define X86_FEATURE_VMMCALL		( 8*32+15) /* Prefer VMMCALL to VMCALL */
 #define X86_FEATURE_XENPV		( 8*32+16) /* "" Xen paravirtual guest */
@@ -504,8 +505,8 @@
 #define X86_FEATURE_TSA_L1_NO		(21*32+12) /* "" AMD CPU not vulnerable to TSA-L1 */
 #define X86_FEATURE_CLEAR_CPU_BUF_VM	(21*32+13) /* "" Clear CPU buffers using VERW before VMRUN */
 
-/* VIA/Cyrix/Centaur-defined CPU features, CPUID level 0xC0000006, word 22 */
-#define X86_FEATURE_ZXPAUSE		(22*32 + 0) /* ZHAOXIN ZXPAUSE */
+/* Zhaoxin/Centaur-defined CPU features, CPUID level 0xC0000006, word 22 */
+#define X86_FEATURE_PAUSEOPT		(22*32 + 0) /* ZHAOXIN PAUSEOPT */
 
 /* HYGON-defined CPU features, CPUID level 0x8c860000:0 (EDX), word 23 */
 #define X86_FEATURE_SM3			(23*32 + 1) /* SM3 instructions */

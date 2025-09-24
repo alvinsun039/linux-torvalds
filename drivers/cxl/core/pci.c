@@ -100,7 +100,7 @@ int devm_cxl_port_enumerate_dports(struct cxl_port *port)
 		return ctx.error;
 	return ctx.count;
 }
-EXPORT_SYMBOL_NS_GPL(devm_cxl_port_enumerate_dports, CXL);
+EXPORT_SYMBOL_NS_GPL(devm_cxl_port_enumerate_dports, "CXL");
 
 static int cxl_dvsec_mem_range_valid(struct cxl_dev_state *cxlds, int id)
 {
@@ -208,7 +208,7 @@ int cxl_await_media_ready(struct cxl_dev_state *cxlds)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_await_media_ready, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_await_media_ready, "CXL");
 
 static int wait_for_valid(struct pci_dev *pdev, int d)
 {
@@ -416,7 +416,7 @@ int cxl_dvsec_rr_decode(struct device *dev, int d,
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_dvsec_rr_decode, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_dvsec_rr_decode, "CXL");
 
 /**
  * cxl_hdm_decode_init() - Setup HDM decoding for the endpoint
@@ -493,7 +493,7 @@ int cxl_hdm_decode_init(struct cxl_dev_state *cxlds, struct cxl_hdm *cxlhdm,
 
 	return devm_cxl_enable_mem(&port->dev, cxlds);
 }
-EXPORT_SYMBOL_NS_GPL(cxl_hdm_decode_init, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_hdm_decode_init, "CXL");
 
 #define CXL_DOE_TABLE_ACCESS_REQ_CODE		0x000000ff
 #define   CXL_DOE_TABLE_ACCESS_REQ_CODE_READ	0
@@ -639,7 +639,7 @@ void read_cdat_data(struct cxl_port *port)
 	port->cdat.table = cdat_table + sizeof(__le32);
 	port->cdat.length = cdat_length;
 }
-EXPORT_SYMBOL_NS_GPL(read_cdat_data, CXL);
+EXPORT_SYMBOL_NS_GPL(read_cdat_data, "CXL");
 
 static void __cxl_handle_cor_ras(struct cxl_dev_state *cxlds,
 				 void __iomem *ras_base)
@@ -801,7 +801,7 @@ void cxl_setup_parent_dport(struct device *host, struct cxl_dport *dport)
 	if (dport->rch)
 		cxl_disable_rch_root_ints(dport);
 }
-EXPORT_SYMBOL_NS_GPL(cxl_setup_parent_dport, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_setup_parent_dport, "CXL");
 
 static void cxl_handle_rdport_cor_ras(struct cxl_dev_state *cxlds,
 					  struct cxl_dport *dport)
@@ -914,7 +914,7 @@ void cxl_cor_error_detected(struct pci_dev *pdev)
 		cxl_handle_endpoint_cor_ras(cxlds);
 	}
 }
-EXPORT_SYMBOL_NS_GPL(cxl_cor_error_detected, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_cor_error_detected, "CXL");
 
 pci_ers_result_t cxl_error_detected(struct pci_dev *pdev,
 				    pci_channel_state_t state)
@@ -964,4 +964,4 @@ pci_ers_result_t cxl_error_detected(struct pci_dev *pdev,
 	}
 	return PCI_ERS_RESULT_NEED_RESET;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_error_detected, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_error_detected, "CXL");

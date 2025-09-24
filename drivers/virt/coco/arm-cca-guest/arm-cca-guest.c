@@ -202,7 +202,7 @@ static int __init arm_cca_guest_init(void)
 	if (!is_realm_world())
 		return -ENODEV;
 
-	ret = tsm_register(&arm_cca_tsm_ops, NULL, &tsm_report_extra_type);
+	ret = tsm_register(&arm_cca_tsm_ops, NULL);
 	if (ret < 0)
 		pr_err("Error %d registering with TSM\n", ret);
 

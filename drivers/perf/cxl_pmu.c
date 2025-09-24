@@ -881,7 +881,7 @@ static int cxl_pmu_probe(struct device *dev)
 		return rc;
 	irq = rc;
 
-	irq_name = devm_kasprintf(dev, GFP_KERNEL, "%s_overflow\n", dev_name);
+	irq_name = devm_kasprintf(dev, GFP_KERNEL, "%s_overflow", dev_name);
 	if (!irq_name)
 		return -ENOMEM;
 
@@ -984,7 +984,7 @@ static __exit void cxl_pmu_exit(void)
 }
 
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(CXL);
+MODULE_IMPORT_NS("CXL");
 module_init(cxl_pmu_init);
 module_exit(cxl_pmu_exit);
 MODULE_ALIAS_CXL(CXL_DEVICE_PMU);

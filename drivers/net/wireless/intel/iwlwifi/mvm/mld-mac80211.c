@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 /*
- * Copyright (C) 2022-2023 Intel Corporation
+ * Copyright (C) 2022-2024 Intel Corporation
  */
 #include "mvm.h"
 
@@ -302,32 +302,19 @@ __iwl_mvm_mld_assign_vif_chanctx(struct iwl_mvm *mvm,
 	if (ret)
 		goto out;
 
-	/* Initialize rate control for the AP station, since we might be
-	 * doing a link switch here - we cannot initialize it before since
-	 * this needs the phy context assigned (and in FW?), and we cannot
-	 * do it later because it needs to be initialized as soon as we're
-	 * able to TX on the link, i.e. when active.
+	/*
+	 * if link switching (link not active yet) we'll activate it in
+	 * firmware later on link-info change, which mac80211 guarantees
+	 * for link switch after the stations are set up
 	 */
-	if (mvmvif->ap_sta) {
-		struct ieee80211_link_sta *link_sta;
-
-		rcu_read_lock();
-		link_sta = rcu_dereference(mvmvif->ap_sta->link[link_id]);
-
-		if (!WARN_ON_ONCE(!link_sta))
-			iwl_mvm_rs_rate_init(mvm, vif, mvmvif->ap_sta,
-					     link_conf, link_sta,
-					     phy_ctxt->channel->band);
-		rcu_read_unlock();
+	if (ieee80211_vif_link_active(vif, link_conf->link_id)) {
+		ret = iwl_mvm_link_changed(mvm, vif, link_conf,
+					   LINK_CONTEXT_MODIFY_ACTIVE |
+					   LINK_CONTEXT_MODIFY_RATES_INFO,
+					   true);
+		if (ret)
+			goto out;
 	}
-
-	/* then activate */
-	ret = iwl_mvm_link_changed(mvm, vif, link_conf,
-				   LINK_CONTEXT_MODIFY_ACTIVE |
-				   LINK_CONTEXT_MODIFY_RATES_INFO,
-				   true);
-	if (ret)
-		goto out;
 
 	/*
 	 * Power state must be updated before quotas,
@@ -741,6 +728,11 @@ iwl_mvm_mld_link_info_changed_station(struct iwl_mvm *mvm,
 	if (WARN_ON_ONCE(!mvmvif->link[link_conf->link_id]))
 		return;
 
+	/* not yet marked active in vif means during link switch */
+	if (!ieee80211_vif_link_active(vif, link_conf->link_id) &&
+	    vif->cfg.assoc && mvmvif->link[link_conf->link_id]->phy_ctxt)
+		link_changes |= LINK_CONTEXT_MODIFY_ACTIVE;
+
 	has_he = link_conf->he_support && !iwlwifi_mod_params.disable_11ax;
 	has_eht = link_conf->eht_support && !iwlwifi_mod_params.disable_11be;
 
@@ -756,8 +748,8 @@ iwl_mvm_mld_link_info_changed_station(struct iwl_mvm *mvm,
 		link_changes |= LINK_CONTEXT_MODIFY_HE_PARAMS;
 	}
 
-	/* Update EHT Puncturing info */
-	if (changes & BSS_CHANGED_EHT_PUNCTURING && vif->cfg.assoc)
+	/* if associated, maybe puncturing changed - we'll check later */
+	if (vif->cfg.assoc)
 		link_changes |= LINK_CONTEXT_MODIFY_EHT_PARAMS;
 
 	if (link_changes) {
@@ -840,6 +832,8 @@ static void iwl_mvm_mld_vif_cfg_changed_station(struct iwl_mvm *mvm,
 
 	if (changes & BSS_CHANGED_ASSOC) {
 		if (vif->cfg.assoc) {
+			mvmvif->session_prot_connection_loss = false;
+
 			/* clear statistics to get clean beacon counter */
 			iwl_mvm_request_statistics(mvm, true);
 			iwl_mvm_sf_update(mvm, vif, false);
@@ -1256,7 +1250,7 @@ const struct ieee80211_ops iwl_mvm_mld_hw_ops = {
 	.allow_buffered_frames = iwl_mvm_mac_allow_buffered_frames,
 	.release_buffered_frames = iwl_mvm_mac_release_buffered_frames,
 	.set_rts_threshold = iwl_mvm_mac_set_rts_threshold,
-	.sta_rc_update = iwl_mvm_sta_rc_update,
+	.link_sta_rc_update = iwl_mvm_sta_rc_update,
 	.conf_tx = iwl_mvm_mld_mac_conf_tx,
 	.mgd_prepare_tx = iwl_mvm_mac_mgd_prepare_tx,
 	.mgd_complete_tx = iwl_mvm_mac_mgd_complete_tx,

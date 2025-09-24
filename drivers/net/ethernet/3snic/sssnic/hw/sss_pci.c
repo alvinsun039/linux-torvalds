@@ -10,7 +10,7 @@
 #define	PCI_EXP_AER_FLAGS	(PCI_EXP_DEVCTL_CERE | PCI_EXP_DEVCTL_NFERE | \
 				 PCI_EXP_DEVCTL_FERE | PCI_EXP_DEVCTL_URRE)
 
-MODULE_IMPORT_NS(CXL);
+MODULE_IMPORT_NS("CXL");
 
 int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 {

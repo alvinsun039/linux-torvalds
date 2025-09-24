@@ -69,6 +69,8 @@ struct rtw89_h2creg_sch_tx_en {
 #define RTW89_C2HREG_HDR_LEN 2
 #define RTW89_H2CREG_HDR_LEN 2
 #define RTW89_C2H_TIMEOUT 1000000
+#define RTW89_C2H_TIMEOUT_USB 4000
+
 struct rtw89_mac_c2h_info {
 	u8 id;
 	u8 content_len;
@@ -1198,6 +1200,138 @@ static inline void SET_CMC_TBL_CSI_BW(void *table, u32 val)
 			   GENMASK(31, 30));
 }
 
+struct rtw89_h2c_cctlinfo_ud_g7 {
+	__le32 c0;
+	__le32 w0;
+	__le32 w1;
+	__le32 w2;
+	__le32 w3;
+	__le32 w4;
+	__le32 w5;
+	__le32 w6;
+	__le32 w7;
+	__le32 w8;
+	__le32 w9;
+	__le32 w10;
+	__le32 w11;
+	__le32 w12;
+	__le32 w13;
+	__le32 w14;
+	__le32 w15;
+	__le32 m0;
+	__le32 m1;
+	__le32 m2;
+	__le32 m3;
+	__le32 m4;
+	__le32 m5;
+	__le32 m6;
+	__le32 m7;
+	__le32 m8;
+	__le32 m9;
+	__le32 m10;
+	__le32 m11;
+	__le32 m12;
+	__le32 m13;
+	__le32 m14;
+	__le32 m15;
+} __packed;
+
+#define CCTLINFO_G7_C0_MACID GENMASK(6, 0)
+#define CCTLINFO_G7_C0_OP BIT(7)
+
+#define CCTLINFO_G7_W0_DATARATE GENMASK(11, 0)
+#define CCTLINFO_G7_W0_DATA_GI_LTF GENMASK(14, 12)
+#define CCTLINFO_G7_W0_TRYRATE BIT(15)
+#define CCTLINFO_G7_W0_ARFR_CTRL GENMASK(17, 16)
+#define CCTLINFO_G7_W0_DIS_HE1SS_STBC BIT(18)
+#define CCTLINFO_G7_W0_ACQ_RPT_EN BIT(20)
+#define CCTLINFO_G7_W0_MGQ_RPT_EN BIT(21)
+#define CCTLINFO_G7_W0_ULQ_RPT_EN BIT(22)
+#define CCTLINFO_G7_W0_TWTQ_RPT_EN BIT(23)
+#define CCTLINFO_G7_W0_FORCE_TXOP BIT(24)
+#define CCTLINFO_G7_W0_DISRTSFB BIT(25)
+#define CCTLINFO_G7_W0_DISDATAFB BIT(26)
+#define CCTLINFO_G7_W0_NSTR_EN BIT(27)
+#define CCTLINFO_G7_W0_AMPDU_DENSITY GENMASK(31, 28)
+#define CCTLINFO_G7_W1_DATA_RTY_LOWEST_RATE GENMASK(11, 0)
+#define CCTLINFO_G7_W1_RTS_TXCNT_LMT GENMASK(15, 12)
+#define CCTLINFO_G7_W1_RTSRATE GENMASK(27, 16)
+#define CCTLINFO_G7_W1_RTS_RTY_LOWEST_RATE GENMASK(31, 28)
+#define CCTLINFO_G7_W2_DATA_TX_CNT_LMT GENMASK(5, 0)
+#define CCTLINFO_G7_W2_DATA_TXCNT_LMT_SEL BIT(6)
+#define CCTLINFO_G7_W2_MAX_AGG_NUM_SEL BIT(7)
+#define CCTLINFO_G7_W2_RTS_EN BIT(8)
+#define CCTLINFO_G7_W2_CTS2SELF_EN BIT(9)
+#define CCTLINFO_G7_W2_CCA_RTS GENMASK(11, 10)
+#define CCTLINFO_G7_W2_HW_RTS_EN BIT(12)
+#define CCTLINFO_G7_W2_RTS_DROP_DATA_MODE GENMASK(14, 13)
+#define CCTLINFO_G7_W2_PRELD_EN BIT(15)
+#define CCTLINFO_G7_W2_AMPDU_MAX_LEN GENMASK(26, 16)
+#define CCTLINFO_G7_W2_UL_MU_DIS BIT(27)
+#define CCTLINFO_G7_W2_AMPDU_MAX_TIME GENMASK(31, 28)
+#define CCTLINFO_G7_W3_MAX_AGG_NUM GENMASK(7, 0)
+#define CCTLINFO_G7_W3_DATA_BW GENMASK(10, 8)
+#define CCTLINFO_G7_W3_DATA_BW_ER BIT(11)
+#define CCTLINFO_G7_W3_BA_BMAP GENMASK(14, 12)
+#define CCTLINFO_G7_W3_VCS_STBC BIT(15)
+#define CCTLINFO_G7_W3_VO_LFTIME_SEL GENMASK(18, 16)
+#define CCTLINFO_G7_W3_VI_LFTIME_SEL GENMASK(21, 19)
+#define CCTLINFO_G7_W3_BE_LFTIME_SEL GENMASK(24, 22)
+#define CCTLINFO_G7_W3_BK_LFTIME_SEL GENMASK(27, 25)
+#define CCTLINFO_G7_W3_AMPDU_TIME_SEL BIT(28)
+#define CCTLINFO_G7_W3_AMPDU_LEN_SEL BIT(29)
+#define CCTLINFO_G7_W3_RTS_TXCNT_LMT_SEL BIT(30)
+#define CCTLINFO_G7_W3_LSIG_TXOP_EN BIT(31)
+#define CCTLINFO_G7_W4_MULTI_PORT_ID GENMASK(2, 0)
+#define CCTLINFO_G7_W4_BYPASS_PUNC BIT(3)
+#define CCTLINFO_G7_W4_MBSSID GENMASK(7, 4)
+#define CCTLINFO_G7_W4_DATA_DCM BIT(8)
+#define CCTLINFO_G7_W4_DATA_ER BIT(9)
+#define CCTLINFO_G7_W4_DATA_LDPC BIT(10)
+#define CCTLINFO_G7_W4_DATA_STBC BIT(11)
+#define CCTLINFO_G7_W4_A_CTRL_BQR BIT(12)
+#define CCTLINFO_G7_W4_A_CTRL_BSR BIT(14)
+#define CCTLINFO_G7_W4_A_CTRL_CAS BIT(15)
+#define CCTLINFO_G7_W4_ACT_SUBCH_CBW GENMASK(31, 16)
+#define CCTLINFO_G7_W5_NOMINAL_PKT_PADDING0 GENMASK(1, 0)
+#define CCTLINFO_G7_W5_NOMINAL_PKT_PADDING1 GENMASK(3, 2)
+#define CCTLINFO_G7_W5_NOMINAL_PKT_PADDING2 GENMASK(5, 4)
+#define CCTLINFO_G7_W5_NOMINAL_PKT_PADDING3 GENMASK(7, 6)
+#define CCTLINFO_G7_W5_NOMINAL_PKT_PADDING4 GENMASK(9, 8)
+#define CCTLINFO_G7_W5_SR_RATE GENMASK(14, 10)
+#define CCTLINFO_G7_W5_TID_DISABLE GENMASK(23, 16)
+#define CCTLINFO_G7_W5_ADDR_CAM_INDEX GENMASK(31, 24)
+#define CCTLINFO_G7_W6_AID12_PAID GENMASK(11, 0)
+#define CCTLINFO_G7_W6_RESP_REF_RATE GENMASK(23, 12)
+#define CCTLINFO_G7_W6_ULDL BIT(31)
+#define CCTLINFO_G7_W7_NC GENMASK(2, 0)
+#define CCTLINFO_G7_W7_NR GENMASK(5, 3)
+#define CCTLINFO_G7_W7_NG GENMASK(7, 6)
+#define CCTLINFO_G7_W7_CB GENMASK(9, 8)
+#define CCTLINFO_G7_W7_CS GENMASK(11, 10)
+#define CCTLINFO_G7_W7_CSI_STBC_EN BIT(13)
+#define CCTLINFO_G7_W7_CSI_LDPC_EN BIT(14)
+#define CCTLINFO_G7_W7_CSI_PARA_EN BIT(15)
+#define CCTLINFO_G7_W7_CSI_FIX_RATE GENMASK(27, 16)
+#define CCTLINFO_G7_W7_CSI_BW GENMASK(31, 29)
+#define CCTLINFO_G7_W8_ALL_ACK_SUPPORT BIT(0)
+#define CCTLINFO_G7_W8_BSR_QUEUE_SIZE_FORMAT BIT(1)
+#define CCTLINFO_G7_W8_BSR_OM_UPD_EN BIT(2)
+#define CCTLINFO_G7_W8_MACID_FWD_IDC BIT(3)
+#define CCTLINFO_G7_W8_AZ_SEC_EN BIT(4)
+#define CCTLINFO_G7_W8_CSI_SEC_EN BIT(5)
+#define CCTLINFO_G7_W8_FIX_UL_ADDRCAM_IDX BIT(6)
+#define CCTLINFO_G7_W8_CTRL_CNT_VLD BIT(7)
+#define CCTLINFO_G7_W8_CTRL_CNT GENMASK(11, 8)
+#define CCTLINFO_G7_W8_RESP_SEC_TYPE GENMASK(15, 12)
+/* W9~13 are reserved */
+#define CCTLINFO_G7_W14_VO_CURR_RATE GENMASK(11, 0)
+#define CCTLINFO_G7_W14_VI_CURR_RATE GENMASK(23, 12)
+#define CCTLINFO_G7_W14_BE_CURR_RATE_L GENMASK(31, 24)
+#define CCTLINFO_G7_W15_BE_CURR_RATE_H GENMASK(3, 0)
+#define CCTLINFO_G7_W15_BK_CURR_RATE GENMASK(15, 4)
+#define CCTLINFO_G7_W15_MGNT_CURR_RATE GENMASK(27, 16)
+
 static inline void SET_DCTL_MACID_V1(void *table, u32 val)
 {
 	le32p_replace_bits((__le32 *)(table) + 0, val, GENMASK(6, 0));
@@ -1599,6 +1733,54 @@ static inline void SET_BCN_UPD_CSA_OFST(void *h2c, u32 val)
 {
 	le32p_replace_bits((__le32 *)(h2c) + 2, val,  GENMASK(31, 17));
 }
+
+struct rtw89_h2c_bcn_upd_be {
+	__le32 w0;
+	__le32 w1;
+	__le32 w2;
+	__le32 w3;
+	__le32 w4;
+	__le32 w5;
+	__le32 w6;
+	__le32 w7;
+	__le32 w8;
+	__le32 w9;
+	__le32 w10;
+	__le32 w11;
+} __packed;
+
+#define RTW89_H2C_BCN_UPD_BE_W0_PORT GENMASK(7, 0)
+#define RTW89_H2C_BCN_UPD_BE_W0_MBSSID GENMASK(15, 8)
+#define RTW89_H2C_BCN_UPD_BE_W0_BAND GENMASK(23, 16)
+#define RTW89_H2C_BCN_UPD_BE_W0_GRP_IE_OFST GENMASK(31, 24)
+#define RTW89_H2C_BCN_UPD_BE_W1_MACID GENMASK(7, 0)
+#define RTW89_H2C_BCN_UPD_BE_W1_SSN_SEL GENMASK(9, 8)
+#define RTW89_H2C_BCN_UPD_BE_W1_SSN_MODE GENMASK(11, 10)
+#define RTW89_H2C_BCN_UPD_BE_W1_RATE GENMASK(20, 12)
+#define RTW89_H2C_BCN_UPD_BE_W1_TXPWR GENMASK(23, 21)
+#define RTW89_H2C_BCN_UPD_BE_W1_MACID_EXT GENMASK(31, 24)
+#define RTW89_H2C_BCN_UPD_BE_W2_TXINFO_CTRL_EN BIT(0)
+#define RTW89_H2C_BCN_UPD_BE_W2_NTX_PATH_EN GENMASK(4, 1)
+#define RTW89_H2C_BCN_UPD_BE_W2_PATH_MAP_A GENMASK(6, 5)
+#define RTW89_H2C_BCN_UPD_BE_W2_PATH_MAP_B GENMASK(8, 7)
+#define RTW89_H2C_BCN_UPD_BE_W2_PATH_MAP_C GENMASK(10, 9)
+#define RTW89_H2C_BCN_UPD_BE_W2_PATH_MAP_D GENMASK(12, 11)
+#define RTW89_H2C_BCN_UPD_BE_W2_ANTSEL_A BIT(13)
+#define RTW89_H2C_BCN_UPD_BE_W2_ANTSEL_B BIT(14)
+#define RTW89_H2C_BCN_UPD_BE_W2_ANTSEL_C BIT(15)
+#define RTW89_H2C_BCN_UPD_BE_W2_ANTSEL_D BIT(16)
+#define RTW89_H2C_BCN_UPD_BE_W2_CSA_OFST GENMASK(31, 17)
+#define RTW89_H2C_BCN_UPD_BE_W3_MLIE_CSA_OFST GENMASK(15, 0)
+#define RTW89_H2C_BCN_UPD_BE_W3_CRITICAL_UPD_FLAG_OFST GENMASK(31, 16)
+#define RTW89_H2C_BCN_UPD_BE_W4_VAP1_DTIM_CNT_OFST GENMASK(15, 0)
+#define RTW89_H2C_BCN_UPD_BE_W4_VAP2_DTIM_CNT_OFST GENMASK(31, 16)
+#define RTW89_H2C_BCN_UPD_BE_W5_VAP3_DTIM_CNT_OFST GENMASK(15, 0)
+#define RTW89_H2C_BCN_UPD_BE_W5_VAP4_DTIM_CNT_OFST GENMASK(31, 16)
+#define RTW89_H2C_BCN_UPD_BE_W6_VAP5_DTIM_CNT_OFST GENMASK(15, 0)
+#define RTW89_H2C_BCN_UPD_BE_W6_VAP6_DTIM_CNT_OFST GENMASK(31, 16)
+#define RTW89_H2C_BCN_UPD_BE_W7_VAP7_DTIM_CNT_OFST GENMASK(15, 0)
+#define RTW89_H2C_BCN_UPD_BE_W7_ECSA_OFST GENMASK(30, 16)
+#define RTW89_H2C_BCN_UPD_BE_W7_PROTECTION_KEY_ID BIT(31)
 
 static inline void SET_FWROLE_MAINTAIN_MACID(void *h2c, u32 val)
 {
@@ -3526,6 +3708,8 @@ struct rtw89_fw_h2c_rf_reg_info {
 #define H2C_FUNC_MAC_BCN_UPD		0x5
 #define H2C_FUNC_MAC_DCTLINFO_UD_V1	0x9
 #define H2C_FUNC_MAC_CCTLINFO_UD_V1	0xa
+#define H2C_FUNC_MAC_BCN_UPD_BE		0xd
+#define H2C_FUNC_MAC_CCTLINFO_UD_G7	0x11
 
 /* CLASS 6 - Address CAM */
 #define H2C_CL_MAC_ADDR_CAM_UPDATE	0x6
@@ -3618,6 +3802,8 @@ struct rtw89_fw_h2c_rf_get_mccch {
 #define RTW89_FW_BACKTRACE_MAX_SIZE 512 /* 8 * 64 (entries) */
 #define RTW89_FW_BACKTRACE_KEY 0xBACEBACE
 
+#define FWDL_WAIT_CNT 400000
+
 int rtw89_fw_check_rdy(struct rtw89_dev *rtwdev);
 int rtw89_fw_recognize(struct rtw89_dev *rtwdev);
 int rtw89_fw_recognize_elements(struct rtw89_dev *rtwdev);
@@ -3640,12 +3826,17 @@ int rtw89_fw_h2c_default_cmac_tbl(struct rtw89_dev *rtwdev,
 int rtw89_fw_h2c_assoc_cmac_tbl(struct rtw89_dev *rtwdev,
 				struct ieee80211_vif *vif,
 				struct ieee80211_sta *sta);
+int rtw89_fw_h2c_assoc_cmac_tbl_g7(struct rtw89_dev *rtwdev,
+				   struct ieee80211_vif *vif,
+				   struct ieee80211_sta *sta);
 int rtw89_fw_h2c_txtime_cmac_tbl(struct rtw89_dev *rtwdev,
 				 struct rtw89_sta *rtwsta);
 int rtw89_fw_h2c_txpath_cmac_tbl(struct rtw89_dev *rtwdev,
 				 struct rtw89_sta *rtwsta);
 int rtw89_fw_h2c_update_beacon(struct rtw89_dev *rtwdev,
 			       struct rtw89_vif *rtwvif);
+int rtw89_fw_h2c_update_beacon_be(struct rtw89_dev *rtwdev,
+				  struct rtw89_vif *rtwvif);
 int rtw89_fw_h2c_cam(struct rtw89_dev *rtwdev, struct rtw89_vif *vif,
 		     struct rtw89_sta *rtwsta, const u8 *scan_mac_addr);
 int rtw89_fw_h2c_dctl_sec_cam_v1(struct rtw89_dev *rtwdev,

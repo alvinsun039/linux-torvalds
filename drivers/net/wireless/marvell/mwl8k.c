@@ -1222,6 +1222,10 @@ static int rxq_refill(struct ieee80211_hw *hw, int index, int limit)
 
 		addr = dma_map_single(&priv->pdev->dev, skb->data,
 				      MWL8K_RX_MAXSZ, DMA_FROM_DEVICE);
+		if (dma_mapping_error(&priv->pdev->dev, addr)) {
+			kfree_skb(skb);
+			break;
+		}
 
 		rxq->rxd_count++;
 		rx = rxq->tail++;
@@ -4766,7 +4770,7 @@ static int mwl8k_start(struct ieee80211_hw *hw)
 	return rc;
 }
 
-static void mwl8k_stop(struct ieee80211_hw *hw)
+static void mwl8k_stop(struct ieee80211_hw *hw, bool suspend)
 {
 	struct mwl8k_priv *priv = hw->priv;
 	int i;
@@ -6021,7 +6025,7 @@ static int mwl8k_reload_firmware(struct ieee80211_hw *hw, char *fw_image)
 	struct mwl8k_priv *priv = hw->priv;
 	struct mwl8k_vif *vif, *tmp_vif;
 
-	mwl8k_stop(hw);
+	mwl8k_stop(hw, false);
 	mwl8k_rxq_deinit(hw, 0);
 
 	/*

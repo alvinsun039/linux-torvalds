@@ -31,7 +31,7 @@ const struct snd_soc_dapm_route max_98373_dapm_routes[] = {
 	{ "Left Spk", NULL, "Left BE_OUT" },
 	{ "Right Spk", NULL, "Right BE_OUT" },
 };
-EXPORT_SYMBOL_NS(max_98373_dapm_routes, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_dapm_routes, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 static struct snd_soc_codec_conf max_98373_codec_conf[] = {
 	{
@@ -54,7 +54,7 @@ struct snd_soc_dai_link_component max_98373_components[] = {
 		.dai_name = MAX_98373_CODEC_DAI,
 	},
 };
-EXPORT_SYMBOL_NS(max_98373_components, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_components, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 static int max_98373_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params)
@@ -119,13 +119,13 @@ int max_98373_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	return ret;
 }
-EXPORT_SYMBOL_NS(max_98373_trigger, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_trigger, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 struct snd_soc_ops max_98373_ops = {
 	.hw_params = max_98373_hw_params,
 	.trigger = max_98373_trigger,
 };
-EXPORT_SYMBOL_NS(max_98373_ops, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_ops, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 int max_98373_spk_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -138,14 +138,14 @@ int max_98373_spk_codec_init(struct snd_soc_pcm_runtime *rtd)
 		dev_err(rtd->dev, "Speaker map addition failed: %d\n", ret);
 	return ret;
 }
-EXPORT_SYMBOL_NS(max_98373_spk_codec_init, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_spk_codec_init, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 void max_98373_set_codec_conf(struct snd_soc_card *card)
 {
 	card->codec_conf = max_98373_codec_conf;
 	card->num_configs = ARRAY_SIZE(max_98373_codec_conf);
 }
-EXPORT_SYMBOL_NS(max_98373_set_codec_conf, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98373_set_codec_conf, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 /*
  * Maxim MAX98390
@@ -322,7 +322,7 @@ void max_98390_dai_link(struct device *dev, struct snd_soc_dai_link *link)
 	link->init = max_98390_init;
 	link->ops = &max_98390_ops;
 }
-EXPORT_SYMBOL_NS(max_98390_dai_link, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98390_dai_link, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 void max_98390_set_codec_conf(struct device *dev, struct snd_soc_card *card)
 {
@@ -341,7 +341,7 @@ void max_98390_set_codec_conf(struct device *dev, struct snd_soc_card *card)
 		break;
 	}
 }
-EXPORT_SYMBOL_NS(max_98390_set_codec_conf, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98390_set_codec_conf, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 /*
  * Maxim MAX98357A/MAX98360A
@@ -408,7 +408,7 @@ void max_98357a_dai_link(struct snd_soc_dai_link *link)
 	link->num_codecs = ARRAY_SIZE(max_98357a_components);
 	link->init = max_98357a_init;
 }
-EXPORT_SYMBOL_NS(max_98357a_dai_link, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98357a_dai_link, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 void max_98360a_dai_link(struct snd_soc_dai_link *link)
 {
@@ -416,7 +416,7 @@ void max_98360a_dai_link(struct snd_soc_dai_link *link)
 	link->num_codecs = ARRAY_SIZE(max_98360a_components);
 	link->init = max_98357a_init;
 }
-EXPORT_SYMBOL_NS(max_98360a_dai_link, SND_SOC_INTEL_SOF_MAXIM_COMMON);
+EXPORT_SYMBOL_NS(max_98360a_dai_link, "SND_SOC_INTEL_SOF_MAXIM_COMMON");
 
 MODULE_DESCRIPTION("ASoC Intel SOF Maxim helpers");
 MODULE_LICENSE("GPL");

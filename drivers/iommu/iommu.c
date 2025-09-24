@@ -2231,7 +2231,7 @@ int iommu_group_replace_domain(struct iommu_group *group,
 	mutex_unlock(&group->mutex);
 	return ret;
 }
-EXPORT_SYMBOL_NS_GPL(iommu_group_replace_domain, IOMMUFD_INTERNAL);
+EXPORT_SYMBOL_NS_GPL(iommu_group_replace_domain, "IOMMUFD_INTERNAL");
 
 static int __iommu_device_set_domain(struct iommu_group *group,
 				     struct device *dev,

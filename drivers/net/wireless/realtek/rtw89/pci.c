@@ -1473,7 +1473,7 @@ static void rtw89_pci_release_tx_ring(struct rtw89_dev *rtwdev,
 	rtw89_pci_release_pending_txwd_skb(rtwdev, tx_ring);
 }
 
-static void rtw89_pci_ops_reset(struct rtw89_dev *rtwdev)
+void rtw89_pci_ops_reset(struct rtw89_dev *rtwdev)
 {
 	struct rtw89_pci *rtwpci = (struct rtw89_pci *)rtwdev->priv;
 	const struct rtw89_pci_info *info = rtwdev->pci_info;
@@ -3866,6 +3866,10 @@ static int __maybe_unused rtw89_pci_resume(struct device *dev)
 
 SIMPLE_DEV_PM_OPS(rtw89_pm_ops, rtw89_pci_suspend, rtw89_pci_resume);
 EXPORT_SYMBOL(rtw89_pm_ops);
+
+const struct rtw89_pci_gen_def rtw89_pci_gen_ax = {
+};
+EXPORT_SYMBOL(rtw89_pci_gen_ax);
 
 static const struct rtw89_hci_ops rtw89_pci_ops = {
 	.tx_write	= rtw89_pci_ops_tx_write,

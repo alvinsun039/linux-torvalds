@@ -6,8 +6,6 @@
 #include <bpf/bpf_helpers.h>
 #include "bpf_misc.h"
 
-#define ARRAY_SIZE(x) (int)(sizeof(x) / sizeof((x)[0]))
-
 #define unlikely(x)	__builtin_expect(!!(x), 0)
 
 static volatile int zero = 0;

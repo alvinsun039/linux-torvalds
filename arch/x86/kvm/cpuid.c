@@ -126,7 +126,7 @@ static inline struct kvm_cpuid_entry2 *cpuid_entry2_find(
 
 		/*
 		 * If the index isn't significant, use the first entry with a
-		 * matching function.  It's userspace's responsibilty to not
+		 * matching function.  It's userspace's responsibility to not
 		 * provide "duplicate" entries in all cases.
 		 */
 		if (!(e->flags & KVM_CPUID_FLAG_SIGNIFCANT_INDEX) || e->index == index)
@@ -1381,7 +1381,8 @@ static int get_cpuid_func(struct kvm_cpuid_array *array, u32 func,
 	int r;
 
 	if (func == CENTAUR_CPUID_SIGNATURE &&
-	    boot_cpu_data.x86_vendor != X86_VENDOR_CENTAUR)
+	    boot_cpu_data.x86_vendor != X86_VENDOR_CENTAUR &&
+	    boot_cpu_data.x86_vendor != X86_VENDOR_ZHAOXIN)
 		return 0;
 
 	r = do_cpuid_func(array, func, type);

@@ -301,6 +301,38 @@ struct psp_device *psp_get_master_device(void)
 	return sp ? sp->psp_data : NULL;
 }
 
+#ifdef CONFIG_PM
+void psp_pci_exit(void);
+void psp_pci_init(void);
+
+int psp_dev_suspend(struct sp_device *sp)
+{
+	struct psp_device *psp = psp_master;
+
+	if (!psp)
+		return 0;
+
+	psp_pci_exit();
+
+	return 0;
+}
+
+int psp_dev_resume(struct sp_device *sp)
+{
+	struct psp_device *psp = psp_master;
+
+	if (!psp)
+		return 0;
+
+	/* re-enable interrupt */
+	iowrite32(-1, psp->io_regs + psp->vdata->inten_reg);
+
+	psp_pci_init();
+
+	return 0;
+}
+#endif
+
 void psp_pci_init(void)
 {
 	psp_master = psp_get_master_device();

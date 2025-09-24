@@ -21,7 +21,7 @@
 
 /* LunarLake ops */
 struct snd_sof_dsp_ops sof_lnl_ops;
-EXPORT_SYMBOL_NS(sof_lnl_ops, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_lnl_ops, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 static const struct snd_sof_debugfs_map lnl_dsp_debugfs[] = {
 	{"hda", HDA_DSP_HDA_BAR, 0, 0x4000, SOF_DEBUGFS_ACCESS_ALWAYS},
@@ -78,6 +78,19 @@ static int lnl_hda_dsp_runtime_resume(struct snd_sof_dev *sdev)
 	return hdac_bus_offload_dmic_ssp(sof_to_bus(sdev));
 }
 
+static int lnl_dsp_post_fw_run(struct snd_sof_dev *sdev)
+{
+	if (sdev->first_boot) {
+		struct sof_intel_hda_dev *hda = sdev->pdata->hw_pdata;
+
+		/* Check if IMR boot is usable */
+		if (!sof_debug_check_flag(SOF_DBG_IGNORE_D3_PERSISTENT))
+			hda->imrboot_supported = true;
+	}
+
+	return 0;
+}
+
 int sof_lnl_ops_init(struct snd_sof_dev *sdev)
 {
 	struct sof_ipc4_fw_data *ipc4_data;
@@ -86,7 +99,8 @@ int sof_lnl_ops_init(struct snd_sof_dev *sdev)
 	memcpy(&sof_lnl_ops, &sof_hda_common_ops, sizeof(struct snd_sof_dsp_ops));
 
 	/* probe */
-	sof_lnl_ops.probe = lnl_hda_dsp_probe;
+	if (!sdev->dspless_mode_selected)
+		sof_lnl_ops.probe = lnl_hda_dsp_probe;
 
 	/* shutdown */
 	sof_lnl_ops.shutdown = hda_dsp_shutdown;
@@ -107,7 +121,7 @@ int sof_lnl_ops_init(struct snd_sof_dev *sdev)
 
 	/* pre/post fw run */
 	sof_lnl_ops.pre_fw_run = mtl_dsp_pre_fw_run;
-	sof_lnl_ops.post_fw_run = mtl_dsp_post_fw_run;
+	sof_lnl_ops.post_fw_run = lnl_dsp_post_fw_run;
 
 	/* parse platform specific extended manifest */
 	sof_lnl_ops.parse_platform_ext_manifest = NULL;
@@ -116,8 +130,10 @@ int sof_lnl_ops_init(struct snd_sof_dev *sdev)
 	/* TODO: add core_get and core_put */
 
 	/* PM */
-	sof_lnl_ops.resume			= lnl_hda_dsp_resume;
-	sof_lnl_ops.runtime_resume		= lnl_hda_dsp_runtime_resume;
+	if (!sdev->dspless_mode_selected) {
+		sof_lnl_ops.resume = lnl_hda_dsp_resume;
+		sof_lnl_ops.runtime_resume = lnl_hda_dsp_runtime_resume;
+	}
 
 	sof_lnl_ops.get_stream_position = mtl_dsp_get_stream_hda_link_position;
 
@@ -140,7 +156,7 @@ int sof_lnl_ops_init(struct snd_sof_dev *sdev)
 
 	return 0;
 };
-EXPORT_SYMBOL_NS(sof_lnl_ops_init, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(sof_lnl_ops_init, "SND_SOC_SOF_INTEL_HDA_COMMON");
 
 /* Check if an SDW IRQ occurred */
 static bool lnl_dsp_check_sdw_irq(struct snd_sof_dev *sdev)
@@ -186,4 +202,4 @@ const struct sof_intel_dsp_desc lnl_chip_info = {
 	.disable_interrupts = lnl_dsp_disable_interrupts,
 	.hw_ip_version = SOF_INTEL_ACE_2_0,
 };
-EXPORT_SYMBOL_NS(lnl_chip_info, SND_SOC_SOF_INTEL_HDA_COMMON);
+EXPORT_SYMBOL_NS(lnl_chip_info, "SND_SOC_SOF_INTEL_HDA_COMMON");

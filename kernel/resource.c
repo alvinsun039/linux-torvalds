@@ -460,8 +460,7 @@ int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
 			/* re-alloc */
 			struct resource *rams_new;
 
-			rams_new = kvrealloc(rams, rams_size * sizeof(struct resource),
-					     (rams_size + 16) * sizeof(struct resource),
+			rams_new = kvrealloc(rams, (rams_size + 16) * sizeof(struct resource),
 					     GFP_KERNEL);
 			if (!rams_new)
 				goto out;
@@ -995,7 +994,7 @@ void insert_resource_expand_to_fit(struct resource *root, struct resource *new)
  * to use this interface. The former are built-in and only the latter,
  * CXL, is a module.
  */
-EXPORT_SYMBOL_NS_GPL(insert_resource_expand_to_fit, CXL);
+EXPORT_SYMBOL_NS_GPL(insert_resource_expand_to_fit, "CXL");
 
 /**
  * remove_resource - Remove a resource in the resource tree
@@ -1277,8 +1276,9 @@ static int __request_region_locked(struct resource *res, struct resource *parent
 		 * become unavailable to other users.  Conflicts are
 		 * not expected.  Warn to aid debugging if encountered.
 		 */
-		if (conflict->desc == IORES_DESC_DEVICE_PRIVATE_MEMORY) {
-			pr_warn("Unaddressable device %s %pR conflicts with %pR",
+		if (parent == &iomem_resource &&
+		    conflict->desc == IORES_DESC_DEVICE_PRIVATE_MEMORY) {
+			pr_warn("Unaddressable device %s %pR conflicts with %pR\n",
 				conflict->name, conflict, res);
 		}
 		if (conflict != parent) {
@@ -2053,7 +2053,7 @@ struct resource *alloc_free_mem_region(struct resource *base,
 	return get_free_mem_region(NULL, base, size, align, name,
 				   IORES_DESC_NONE, flags);
 }
-EXPORT_SYMBOL_NS_GPL(alloc_free_mem_region, CXL);
+EXPORT_SYMBOL_NS_GPL(alloc_free_mem_region, "CXL");
 #endif /* CONFIG_GET_FREE_REGION */
 
 static int __init strict_iomem(char *str)

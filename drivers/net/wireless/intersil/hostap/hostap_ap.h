@@ -210,7 +210,7 @@ struct ap_data {
 
 	/* WEP operations for generating challenges to be used with shared key
 	 * authentication */
-	struct lib80211_crypto_ops *crypt;
+	const struct lib80211_crypto_ops *crypt;
 	void *crypt_priv;
 #endif /* PRISM2_NO_KERNEL_IEEE80211_MGMT */
 };

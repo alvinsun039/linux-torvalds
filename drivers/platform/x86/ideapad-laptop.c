@@ -1605,7 +1605,7 @@ static int ideapad_kbd_bl_init(struct ideapad_private *priv)
 	priv->kbd_bl.led.name                    = "platform::" LED_FUNCTION_KBD_BACKLIGHT;
 	priv->kbd_bl.led.brightness_get          = ideapad_kbd_bl_led_cdev_brightness_get;
 	priv->kbd_bl.led.brightness_set_blocking = ideapad_kbd_bl_led_cdev_brightness_set;
-	priv->kbd_bl.led.flags                   = LED_BRIGHT_HW_CHANGED;
+	priv->kbd_bl.led.flags                   = LED_BRIGHT_HW_CHANGED | LED_RETAIN_AT_SHUTDOWN;
 
 	err = led_classdev_register(&priv->platform_device->dev, &priv->kbd_bl.led);
 	if (err)
@@ -1723,19 +1723,19 @@ int ideapad_laptop_register_notifier(struct notifier_block *nb)
 {
 	return blocking_notifier_chain_register(&ideapad_laptop_chain_head, nb);
 }
-EXPORT_SYMBOL_NS_GPL(ideapad_laptop_register_notifier, IDEAPAD_LAPTOP);
+EXPORT_SYMBOL_NS_GPL(ideapad_laptop_register_notifier, "IDEAPAD_LAPTOP");
 
 int ideapad_laptop_unregister_notifier(struct notifier_block *nb)
 {
 	return blocking_notifier_chain_unregister(&ideapad_laptop_chain_head, nb);
 }
-EXPORT_SYMBOL_NS_GPL(ideapad_laptop_unregister_notifier, IDEAPAD_LAPTOP);
+EXPORT_SYMBOL_NS_GPL(ideapad_laptop_unregister_notifier, "IDEAPAD_LAPTOP");
 
 void ideapad_laptop_call_notifier(unsigned long action, void *data)
 {
 	blocking_notifier_call_chain(&ideapad_laptop_chain_head, action, data);
 }
-EXPORT_SYMBOL_NS_GPL(ideapad_laptop_call_notifier, IDEAPAD_LAPTOP);
+EXPORT_SYMBOL_NS_GPL(ideapad_laptop_call_notifier, "IDEAPAD_LAPTOP");
 
 static void ideapad_acpi_notify(acpi_handle handle, u32 event, void *data)
 {

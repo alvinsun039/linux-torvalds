@@ -38,21 +38,21 @@ extern const struct sd_flag_debug sd_flag_debug[];
 #ifdef CONFIG_SCHED_SMT
 static inline int cpu_smt_flags(void)
 {
-	return SD_SHARE_CPUCAPACITY | SD_SHARE_PKG_RESOURCES;
+	return SD_SHARE_CPUCAPACITY | SD_SHARE_LLC;
 }
 #endif
 
 #ifdef CONFIG_SCHED_CLUSTER
 static inline int cpu_cluster_flags(void)
 {
-	return SD_CLUSTER | SD_SHARE_PKG_RESOURCES;
+	return SD_CLUSTER | SD_SHARE_LLC;
 }
 #endif
 
 #ifdef CONFIG_SCHED_MC
 static inline int cpu_core_flags(void)
 {
-	return SD_SHARE_PKG_RESOURCES;
+	return SD_SHARE_LLC;
 }
 #endif
 
@@ -204,6 +204,8 @@ struct sched_domain_topology_level {
 };
 
 extern void __init set_sched_topology(struct sched_domain_topology_level *tl);
+extern void sched_update_asym_prefer_cpu(int cpu, int old_prio, int new_prio);
+
 
 #ifdef CONFIG_SCHED_DEBUG
 # define SD_INIT_NAME(type)		.name = #type
@@ -240,6 +242,10 @@ static inline bool cpus_share_cache(int this_cpu, int that_cpu)
 static inline bool cpus_share_resources(int this_cpu, int that_cpu)
 {
 	return true;
+}
+
+static inline void sched_update_asym_prefer_cpu(int cpu, int old_prio, int new_prio)
+{
 }
 
 #endif	/* !CONFIG_SMP */

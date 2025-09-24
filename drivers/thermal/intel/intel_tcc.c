@@ -33,7 +33,7 @@ int intel_tcc_get_tjmax(int cpu)
 
 	return val ? val : -ENODATA;
 }
-EXPORT_SYMBOL_NS_GPL(intel_tcc_get_tjmax, INTEL_TCC);
+EXPORT_SYMBOL_NS_GPL(intel_tcc_get_tjmax, "INTEL_TCC");
 
 /**
  * intel_tcc_get_offset() - returns the TCC Offset value to Tjmax
@@ -58,7 +58,7 @@ int intel_tcc_get_offset(int cpu)
 
 	return (low >> 24) & 0x3f;
 }
-EXPORT_SYMBOL_NS_GPL(intel_tcc_get_offset, INTEL_TCC);
+EXPORT_SYMBOL_NS_GPL(intel_tcc_get_offset, "INTEL_TCC");
 
 /**
  * intel_tcc_set_offset() - set the TCC offset value to Tjmax
@@ -98,7 +98,7 @@ int intel_tcc_set_offset(int cpu, int offset)
 	else
 		return wrmsr_safe_on_cpu(cpu, MSR_IA32_TEMPERATURE_TARGET, low, high);
 }
-EXPORT_SYMBOL_NS_GPL(intel_tcc_set_offset, INTEL_TCC);
+EXPORT_SYMBOL_NS_GPL(intel_tcc_set_offset, "INTEL_TCC");
 
 /**
  * intel_tcc_get_temp() - returns the current temperature
@@ -136,4 +136,4 @@ int intel_tcc_get_temp(int cpu, int *temp, bool pkg)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(intel_tcc_get_temp, INTEL_TCC);
+EXPORT_SYMBOL_NS_GPL(intel_tcc_get_temp, "INTEL_TCC");

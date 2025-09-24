@@ -277,7 +277,7 @@ int cxl_internal_send_cmd(struct cxl_memdev_state *mds,
 		return -EIO;
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_internal_send_cmd, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_internal_send_cmd, "CXL");
 
 static bool cxl_mem_raw_command_allowed(u16 opcode)
 {
@@ -834,7 +834,7 @@ out:
 	kvfree(gsl);
 	return rc;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_enumerate_cmds, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_enumerate_cmds, "CXL");
 
 /*
  * General Media Event Record
@@ -1031,7 +1031,7 @@ void cxl_mem_get_event_records(struct cxl_memdev_state *mds, u32 status)
 	if (status & CXLDEV_EVENT_STATUS_INFO)
 		cxl_mem_get_records_log(mds, CXL_EVENT_TYPE_INFO);
 }
-EXPORT_SYMBOL_NS_GPL(cxl_mem_get_event_records, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_mem_get_event_records, "CXL");
 
 /**
  * cxl_mem_get_partition_info - Get partition info
@@ -1121,7 +1121,7 @@ int cxl_dev_state_identify(struct cxl_memdev_state *mds)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_dev_state_identify, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_dev_state_identify, "CXL");
 
 static int __cxl_mem_sanitize(struct cxl_memdev_state *mds, u16 cmd)
 {
@@ -1274,7 +1274,7 @@ int cxl_mem_create_range_info(struct cxl_memdev_state *mds)
 			   mds->active_volatile_bytes,
 			   mds->active_persistent_bytes, "pmem");
 }
-EXPORT_SYMBOL_NS_GPL(cxl_mem_create_range_info, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_mem_create_range_info, "CXL");
 
 int cxl_set_timestamp(struct cxl_memdev_state *mds)
 {
@@ -1300,7 +1300,7 @@ int cxl_set_timestamp(struct cxl_memdev_state *mds)
 
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_set_timestamp, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_set_timestamp, "CXL");
 
 int cxl_mem_get_poison(struct cxl_memdev *cxlmd, u64 offset, u64 len,
 		       struct cxl_region *cxlr)
@@ -1350,7 +1350,7 @@ int cxl_mem_get_poison(struct cxl_memdev *cxlmd, u64 offset, u64 len,
 	mutex_unlock(&mds->poison.lock);
 	return rc;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_mem_get_poison, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_mem_get_poison, "CXL");
 
 static void free_poison_buf(void *buf)
 {
@@ -1384,7 +1384,7 @@ int cxl_poison_state_init(struct cxl_memdev_state *mds)
 	mutex_init(&mds->poison.lock);
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_poison_state_init, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_poison_state_init, "CXL");
 
 struct cxl_memdev_state *cxl_memdev_state_create(struct device *dev)
 {
@@ -1405,7 +1405,7 @@ struct cxl_memdev_state *cxl_memdev_state_create(struct device *dev)
 
 	return mds;
 }
-EXPORT_SYMBOL_NS_GPL(cxl_memdev_state_create, CXL);
+EXPORT_SYMBOL_NS_GPL(cxl_memdev_state_create, "CXL");
 
 void __init cxl_mbox_init(void)
 {

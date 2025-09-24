@@ -451,4 +451,4 @@ MODULE_AUTHOR("Wang Zhifeng <zhifeng.wang@intel.com>");
 MODULE_AUTHOR("Zhang Lixu <lixu.zhang@intel.com>");
 MODULE_DESCRIPTION("Intel La Jolla Cove Adapter USB-GPIO driver");
 MODULE_LICENSE("GPL");
-MODULE_IMPORT_NS(LJCA);
+MODULE_IMPORT_NS("LJCA");

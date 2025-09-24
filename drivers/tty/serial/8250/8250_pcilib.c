@@ -36,5 +36,5 @@ int serial8250_pci_setup_port(struct pci_dev *dev, struct uart_8250_port *port,
 	}
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(serial8250_pci_setup_port, SERIAL_8250_PCI);
+EXPORT_SYMBOL_NS_GPL(serial8250_pci_setup_port, "SERIAL_8250_PCI");
 MODULE_LICENSE("GPL");

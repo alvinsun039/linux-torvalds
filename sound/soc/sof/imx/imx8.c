@@ -657,5 +657,5 @@ static struct platform_driver snd_sof_of_imx8_driver = {
 };
 module_platform_driver(snd_sof_of_imx8_driver);
 
-MODULE_IMPORT_NS(SND_SOC_SOF_XTENSA);
+MODULE_IMPORT_NS("SND_SOC_SOF_XTENSA");
 MODULE_LICENSE("Dual BSD/GPL");

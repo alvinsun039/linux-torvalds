@@ -9,7 +9,9 @@
 #include <asm/compiler.h>
 #include <asm/pgtable.h>
 
+#ifndef page_to_phys
 #define page_to_phys(page)	page_to_pa(page)
+#endif
 
 /* Maximum PIO space address supported?  */
 #define IO_SPACE_LIMIT		0xffffffffffffffff

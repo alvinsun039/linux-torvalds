@@ -700,12 +700,6 @@ struct transaction_s
 
 	/* Disk flush needs to be sent to fs partition [no locking] */
 	int			t_need_data_flush;
-
-	/*
-	 * For use by the filesystem to store fs-specific data
-	 * structures associated with the transaction
-	 */
-	struct list_head	t_private_list;
 };
 
 struct transaction_run_stats_s {
@@ -1715,7 +1709,7 @@ static inline int tid_geq(tid_t x, tid_t y)
 	return (difference >= 0);
 }
 
-extern int jbd2_journal_blocks_per_page(struct inode *inode);
+extern int jbd2_journal_blocks_per_folio(struct inode *inode);
 extern size_t journal_tag_bytes(journal_t *journal);
 
 static inline bool jbd2_journal_has_csum_v2or3_feature(journal_t *j)

@@ -1400,8 +1400,16 @@ static int super_s_dev_set(struct super_block *s, struct fs_context *fc)
 
 static int super_s_dev_test(struct super_block *s, struct fs_context *fc)
 {
-	return !(s->s_iflags & SB_I_RETIRED) &&
-		s->s_dev == *(dev_t *)fc->sget_key;
+	if ((s->s_iflags & SB_I_RETIRED))
+		return false;
+
+	if (s->s_dev != *(dev_t *)fc->sget_key)
+		return false;
+
+	if (s->s_bdev && !disk_live(s->s_bdev->bd_disk))
+		return false;
+
+	return true;
 }
 
 /**
@@ -2156,3 +2164,4 @@ int sb_init_dio_done_wq(struct super_block *sb)
 		destroy_workqueue(wq);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(sb_init_dio_done_wq);

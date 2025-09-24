@@ -1108,7 +1108,6 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 		if (sk_fullsock(sk)) {
 			const struct ipv6_pinfo *np = tcp_inet6_sk(sk);
 
-			trace_tcp_send_reset(sk, skb);
 			if (np->repflow)
 				label = ip6_flowlabel(ipv6h);
 			priority = READ_ONCE(sk->sk_priority);
@@ -1123,6 +1122,8 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 		if (net->ipv6.sysctl.flowlabel_reflect & FLOWLABEL_REFLECT_TCP_RESET)
 			label = ip6_flowlabel(ipv6h);
 	}
+
+	trace_tcp_send_reset(sk, skb);
 
 	tcp_v6_send_response(sk, skb, seq, ack_seq, 0, 0, 0, oif, 1,
 			     ipv6_get_dsfield(ipv6h), label, priority, txhash,
@@ -1784,7 +1785,6 @@ lookup:
 	if (!sk)
 		goto no_tcp_socket;
 
-process:
 	if (sk->sk_state == TCP_TIME_WAIT)
 		goto do_time_wait;
 
@@ -1859,6 +1859,7 @@ process:
 		}
 	}
 
+process:
 	if (static_branch_unlikely(&ip6_min_hopcount)) {
 		/* min_hopcount can be changed concurrently from do_ipv6_setsockopt() */
 		if (unlikely(hdr->hop_limit < READ_ONCE(tcp_inet6_sk(sk)->min_hopcount))) {

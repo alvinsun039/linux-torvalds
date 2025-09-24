@@ -255,5 +255,5 @@ static struct platform_driver sun50i_h6_r_ccu_driver = {
 };
 module_platform_driver(sun50i_h6_r_ccu_driver);
 
-MODULE_IMPORT_NS(SUNXI_CCU);
+MODULE_IMPORT_NS("SUNXI_CCU");
 MODULE_LICENSE("GPL");

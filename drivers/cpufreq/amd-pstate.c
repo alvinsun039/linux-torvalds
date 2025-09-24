@@ -837,8 +837,10 @@ static void amd_pstate_update_limits(unsigned int cpu)
 		highest_perf_changed = true;
 		WRITE_ONCE(cpudata->prefcore_ranking, cur_high);
 
-		if (cur_high < CPPC_MAX_PERF)
+		if (cur_high < CPPC_MAX_PERF) {
 			sched_set_itmt_core_prio((int)cur_high, cpu);
+			sched_update_asym_prefer_cpu(cpu, prev_high, cur_high);
+		}
 	}
 
 free_cpufreq_put:

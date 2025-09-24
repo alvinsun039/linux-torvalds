@@ -354,7 +354,7 @@ bool cpu_cache_has_invalidate_memregion(void)
 {
 	return !cpu_feature_enabled(X86_FEATURE_HYPERVISOR);
 }
-EXPORT_SYMBOL_NS_GPL(cpu_cache_has_invalidate_memregion, DEVMEM);
+EXPORT_SYMBOL_NS_GPL(cpu_cache_has_invalidate_memregion, "DEVMEM");
 
 int cpu_cache_invalidate_memregion(int res_desc)
 {
@@ -363,7 +363,7 @@ int cpu_cache_invalidate_memregion(int res_desc)
 	wbinvd_on_all_cpus();
 	return 0;
 }
-EXPORT_SYMBOL_NS_GPL(cpu_cache_invalidate_memregion, DEVMEM);
+EXPORT_SYMBOL_NS_GPL(cpu_cache_invalidate_memregion, "DEVMEM");
 #endif
 
 static void __cpa_flush_all(void *arg)
@@ -1661,7 +1661,7 @@ repeat:
 
 		/*
 		 * We need to keep the pfn from the existing PTE,
-		 * after all we're only going to change it's attributes
+		 * after all we're only going to change its attributes
 		 * not the memory it points to
 		 */
 		new_pte = pfn_pte(pfn, new_prot);
@@ -2487,7 +2487,7 @@ int __init kernel_unmap_pages_in_pgd(pgd_t *pgd, unsigned long address,
 	/*
 	 * The typical sequence for unmapping is to find a pte through
 	 * lookup_address_in_pgd() (ideally, it should never return NULL because
-	 * the address is already mapped) and change it's protections. As pfn is
+	 * the address is already mapped) and change its protections. As pfn is
 	 * the *target* of a mapping, it's not useful while unmapping.
 	 */
 	struct cpa_data cpa = {

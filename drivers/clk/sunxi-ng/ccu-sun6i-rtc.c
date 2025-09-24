@@ -380,5 +380,5 @@ int sun6i_rtc_ccu_probe(struct device *dev, void __iomem *reg)
 	return devm_sunxi_ccu_probe(dev, reg, &sun6i_rtc_ccu_desc);
 }
 
-MODULE_IMPORT_NS(SUNXI_CCU);
+MODULE_IMPORT_NS("SUNXI_CCU");
 MODULE_LICENSE("GPL");

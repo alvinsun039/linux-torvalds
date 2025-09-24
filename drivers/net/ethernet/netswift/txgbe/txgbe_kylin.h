@@ -1116,8 +1116,7 @@ struct _kc_ethtool_pauseparam {
 
 #ifdef CONFIG_SUSE_KERNEL
 #include "kcompat_sles_defs.h"
-#elif (defined(CONFIG_UOS_KERNEL) || defined(CONFIG_EULER_KERNEL) || \
-       defined(CONFIG_KYLIN_KERNEL))
+#elif (defined(CONFIG_UOS_KERNEL) || defined(CONFIG_EULER_KERNEL))
 #include "kcompat_chn_os.h"
 #endif
 

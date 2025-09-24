@@ -76,6 +76,8 @@ struct rv_jit_context {
 	int nexentries;
 	unsigned long flags;
 	int stack_size;
+	u64 arena_vm_start;
+	u64 user_vm_start;
 };
 
 /* Convert from ninsns to bytes. */
@@ -594,6 +596,21 @@ static inline u32 rv_fence(u8 pred, u8 succ)
 	u16 imm11_0 = pred << 4 | succ;
 
 	return rv_i_insn(imm11_0, 0, 0, 0, 0xf);
+}
+
+static inline void emit_fence_r_rw(struct rv_jit_context *ctx)
+{
+	emit(rv_fence(0x2, 0x3), ctx);
+}
+
+static inline void emit_fence_rw_w(struct rv_jit_context *ctx)
+{
+	emit(rv_fence(0x3, 0x1), ctx);
+}
+
+static inline void emit_fence_rw_rw(struct rv_jit_context *ctx)
+{
+	emit(rv_fence(0x3, 0x3), ctx);
 }
 
 static inline u32 rv_nop(void)

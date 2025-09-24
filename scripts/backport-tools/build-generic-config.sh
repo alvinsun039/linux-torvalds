@@ -26,9 +26,9 @@ do
 			usage
 			exit 0;;
 		-a|--arch)
-			if [ "$2" != "aarch64" -a "$2" != "x86_64" ]; then
+			if [ "$2" != "aarch64" -a "$2" != "x86_64" -a "$2" != "loongarch64" ]; then
 				usage
-				echo "Not supported, not aarch64 or x86_64."
+				echo "Not supported, not aarch64/x86_64/loongarch64."
 				exit -1;
 			fi
 			CROSS_ARCH=$2

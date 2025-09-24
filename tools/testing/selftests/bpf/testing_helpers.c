@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+#include "disasm.h"
 #include "test_progs.h"
 #include "testing_helpers.h"
 #include <linux/membarrier.h>
@@ -328,21 +329,35 @@ __u64 read_perf_max_sample_freq(void)
 	return sample_freq;
 }
 
-static int finit_module(int fd, const char *param_values, int flags)
+int finit_module(int fd, const char *param_values, int flags)
 {
 	return syscall(__NR_finit_module, fd, param_values, flags);
 }
 
-static int delete_module(const char *name, int flags)
+int delete_module(const char *name, int flags)
 {
 	return syscall(__NR_delete_module, name, flags);
 }
 
 int unload_bpf_testmod(bool verbose)
 {
+	int ret, cnt = 0;
+
 	if (kern_sync_rcu())
 		fprintf(stdout, "Failed to trigger kernel-side RCU sync!\n");
-	if (delete_module("bpf_testmod", 0)) {
+
+	for (;;) {
+		ret = delete_module("bpf_testmod", 0);
+		if (!ret || errno != EAGAIN)
+			break;
+		if (++cnt > 10000) {
+			fprintf(stdout, "Unload of bpf_testmod timed out\n");
+			break;
+		}
+		usleep(100);
+	}
+
+	if (ret) {
 		if (errno == ENOENT) {
 			if (verbose)
 				fprintf(stdout, "bpf_testmod.ko is already unloaded.\n");

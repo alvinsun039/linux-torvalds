@@ -122,9 +122,9 @@ static int get_device_index(struct coda_mount_data *data)
 	}
 
 	f = fdget(data->fd);
-	if (!f.file)
+	if (!fd_file(f))
 		goto Ebadf;
-	inode = file_inode(f.file);
+	inode = file_inode(fd_file(f));
 	if (!S_ISCHR(inode->i_mode) || imajor(inode) != CODA_PSDEV_MAJOR) {
 		fdput(f);
 		goto Ebadf;
