@@ -1673,7 +1673,7 @@ static void read_symbols(const char *modname)
 						     namespace);
 		}
 
-		if (!get_modinfo(&info, "description"))
+		if (extra_warn && !get_modinfo(&info, "description"))
 			warn("missing MODULE_DESCRIPTION() in %s\n", modname);
 	}
 
