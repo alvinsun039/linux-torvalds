@@ -64,6 +64,11 @@ struct prog_test_fail3 {
 	char arr2[];
 };
 
+struct bpf_testmod_ctx {
+	struct callback_head	rcu;
+	refcount_t		usage;
+};
+
 struct prog_test_ref_kfunc *
 bpf_kfunc_call_test_acquire(unsigned long *scalar_ptr) __ksym;
 void bpf_kfunc_call_test_release(struct prog_test_ref_kfunc *p) __ksym;
@@ -105,4 +110,16 @@ void bpf_kfunc_call_test_fail1(struct prog_test_fail1 *p);
 void bpf_kfunc_call_test_fail2(struct prog_test_fail2 *p);
 void bpf_kfunc_call_test_fail3(struct prog_test_fail3 *p);
 void bpf_kfunc_call_test_mem_len_fail1(void *mem, int len);
+
+void bpf_kfunc_common_test(void) __ksym;
+
+struct bpf_testmod_ctx *bpf_testmod_ctx_create(int *err) __ksym;
+void bpf_testmod_ctx_release(struct bpf_testmod_ctx *ctx) __ksym;
+
+struct st_ops_args;
+int bpf_kfunc_st_ops_test_prologue(struct st_ops_args *args) __ksym;
+int bpf_kfunc_st_ops_test_epilogue(struct st_ops_args *args) __ksym;
+int bpf_kfunc_st_ops_test_pro_epilogue(struct st_ops_args *args) __ksym;
+int bpf_kfunc_st_ops_inc10(struct st_ops_args *args) __ksym;
+
 #endif /* _BPF_TESTMOD_KFUNC_H */
