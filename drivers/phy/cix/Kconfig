@@ -23,3 +23,10 @@ config PHY_CIX_USB3
 	select GENERIC_PHY
 	help
 	  Enable this to support the CIX USB3 PHY for TYPEA Connection
+
+config PHY_CIX_PCIE
+        tristate "Cix PCIE PHY Driver"
+        depends on OF && HAS_IOMEM
+        select GENERIC_PHY
+        help
+          Enable this to support the CIX PCIE PHY
