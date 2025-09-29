@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
+/* Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd. */
 
 #include <linux/ethtool.h>
 #include <linux/phy.h>
+#include <linux/pci.h>
+#include <linux/platform_device.h>
 #include "phytmac.h"
 #include "phytmac_v1.h"
 #include "phytmac_v2.h"
@@ -129,6 +132,7 @@ static int phytmac_set_wol(struct net_device *ndev, struct ethtool_wolinfo *wol)
 		pdata->wol |= PHYTMAC_WAKE_MCAST;
 
 	device_set_wakeup_enable(pdata->dev, pdata->wol ? 1 : 0);
+	phytmac_set_bios_wol_enable(pdata, pdata->wol ? 1 : 0);
 
 	return 0;
 }
@@ -382,43 +386,32 @@ static int phytmac_get_link_ksettings(struct net_device *ndev,
 	u32 advertising = 0;
 
 	if (!ndev->phydev) {
+		kset->base.port = PORT_FIBRE;
+		kset->base.transceiver = XCVR_INTERNAL;
+		kset->base.duplex = pdata->duplex;
+		kset->base.speed = pdata->speed;
+
 		if (pdata->phy_interface == PHY_INTERFACE_MODE_USXGMII ||
 		    pdata->phy_interface == PHY_INTERFACE_MODE_10GBASER) {
 			supported = SUPPORTED_10000baseT_Full
 				    | SUPPORTED_FIBRE | SUPPORTED_Pause;
 			advertising = ADVERTISED_10000baseT_Full
 				      | ADVERTISED_FIBRE | ADVERTISED_Pause;
-			kset->base.port = PORT_FIBRE;
-			kset->base.transceiver = XCVR_INTERNAL;
-			kset->base.duplex = DUPLEX_FULL;
-			kset->base.speed = SPEED_10000;
 		}  else if (pdata->phy_interface == PHY_INTERFACE_MODE_2500BASEX) {
-			supported = SUPPORTED_2500baseX_Full | SUPPORTED_Pause;
-			advertising = ADVERTISED_2500baseX_Full | ADVERTISED_Pause;
-			kset->base.port = PORT_FIBRE;
-			kset->base.transceiver = XCVR_INTERNAL;
-			kset->base.duplex = DUPLEX_FULL;
-			kset->base.speed = SPEED_2500;
+			supported = SUPPORTED_2500baseX_Full
+				    | SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_2500baseX_Full
+				      | ADVERTISED_FIBRE | ADVERTISED_Pause;
 		} else if (pdata->phy_interface == PHY_INTERFACE_MODE_1000BASEX) {
-			supported = SUPPORTED_1000baseT_Full | SUPPORTED_100baseT_Full
-				    | SUPPORTED_10baseT_Full | SUPPORTED_FIBRE
-				    | SUPPORTED_Pause;
-			advertising = ADVERTISED_1000baseT_Full | ADVERTISED_100baseT_Full
-				      | ADVERTISED_10baseT_Full | ADVERTISED_FIBRE
-				      | ADVERTISED_Pause;
-			kset->base.port = PORT_FIBRE;
-			kset->base.transceiver = XCVR_INTERNAL;
-			kset->base.duplex = DUPLEX_FULL;
-			kset->base.speed = SPEED_100;
+			supported = SUPPORTED_1000baseT_Full
+				    | SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_1000baseT_Full
+				      | ADVERTISED_FIBRE | ADVERTISED_Pause;
 		} else if (pdata->phy_interface == PHY_INTERFACE_MODE_SGMII) {
-			supported = SUPPORTED_1000baseT_Full | SUPPORTED_100baseT_Full
-				|  SUPPORTED_10baseT_Full | SUPPORTED_FIBRE | SUPPORTED_Pause;
-			advertising = ADVERTISED_1000baseT_Full | ADVERTISED_100baseT_Full
-				| ADVERTISED_10baseT_Full | ADVERTISED_FIBRE | ADVERTISED_Pause;
-			kset->base.port = PORT_FIBRE;
-			kset->base.transceiver = XCVR_INTERNAL;
-			kset->base.duplex = DUPLEX_FULL;
-			kset->base.speed = SPEED_1000;
+			supported = SUPPORTED_1000baseT_Full
+				    | SUPPORTED_FIBRE | SUPPORTED_Pause;
+			advertising = ADVERTISED_1000baseT_Full
+				      | ADVERTISED_FIBRE | ADVERTISED_Pause;
 		}
 
 		ethtool_convert_legacy_u32_to_link_mode(kset->link_modes.supported,
@@ -438,7 +431,7 @@ static int phytmac_set_link_ksettings(struct net_device *ndev,
 	int ret = 0;
 
 	if (!ndev->phydev) {
-		netdev_err(ndev, "fixed link interface not supported set link\n");
+		netdev_err(ndev, "Without a PHY, setting link is not supported\n");
 		ret = -EOPNOTSUPP;
 	} else {
 		phy_ethtool_set_link_ksettings(ndev, kset);
@@ -513,6 +506,19 @@ static inline void phytmac_set_msglevel(struct net_device *ndev, u32 level)
 	pdata->msg_enable = level;
 }
 
+static void phytmac_get_drvinfo(struct net_device *ndev, struct ethtool_drvinfo *drvinfo)
+{
+	struct phytmac *pdata = netdev_priv(ndev);
+
+	strscpy(drvinfo->driver, PHYTMAC_DRV_NAME, sizeof(drvinfo->driver));
+	strscpy(drvinfo->version, PHYTMAC_DRIVER_VERSION, sizeof(drvinfo->version));
+
+	if (pdata->platdev)
+		strscpy(drvinfo->bus_info, pdata->platdev->name, sizeof(drvinfo->bus_info));
+	else if (pdata->pcidev)
+		strscpy(drvinfo->bus_info, pci_name(pdata->pcidev), sizeof(drvinfo->bus_info));
+}
+
 static const struct ethtool_ops phytmac_ethtool_ops = {
 	.get_regs_len			= phytmac_get_regs_len,
 	.get_regs			= phytmac_get_regs,
@@ -535,6 +541,7 @@ static const struct ethtool_ops phytmac_ethtool_ops = {
 	.set_channels			= phytmac_set_channels,
 	.get_wol			= phytmac_get_wol,
 	.set_wol			= phytmac_set_wol,
+	.get_drvinfo			= phytmac_get_drvinfo,
 };
 
 void phytmac_set_ethtool_ops(struct net_device *ndev)

@@ -2,6 +2,9 @@
 /*
  * Phytium GMAC PCI wrapper.
  *
+ * Copyright(c) 2022 - 2025 Phytium Technology Co., Ltd.
+ *
+ * Author: Wenting Song <songwenting@phytium.com>
  */
 
 #include <linux/pci.h>
@@ -21,7 +24,6 @@
 struct phytmac_data {
 	struct phytmac_hw_if	*hw_if;
 	u32			caps;
-	u32			tsu_rate;
 	u16			queue_num;
 	int			speed;
 	bool			duplex;
@@ -225,7 +227,7 @@ struct phytmac_data phytmac_1000basex = {
 	.use_mii = false,
 	.speed = 1000,
 	.duplex = true,
-	.interface = PHY_INTERFACE_MODE_SGMII,
+	.interface = PHY_INTERFACE_MODE_1000BASEX,
 	.properties = fl_properties[0],
 };
 
@@ -316,3 +318,4 @@ module_pci_driver(phytmac_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Phytium NIC PCI wrapper");
+MODULE_VERSION(PHYTMAC_DRIVER_VERSION);
