@@ -177,7 +177,7 @@ static void mnt_ns_release(struct mnt_namespace *ns)
 	lockdep_assert_not_held(&mnt_ns_tree_lock.lock);
 
 	/* keep alive for {list,stat}mount() */
-	if (refcount_dec_and_test(&ns->passive)) {
+	if (ns && refcount_dec_and_test(&ns->passive)) {
 		fsnotify_mntns_delete(ns);
 		put_user_ns(ns->user_ns);
 		kfree(ns);
