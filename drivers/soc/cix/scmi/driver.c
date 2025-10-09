@@ -2393,7 +2393,7 @@ static int scmi_probe(struct platform_device *pdev)
 	if (ret)
 		goto clear_txrx_setup;
 
-	ret = blocking_notifier_chain_register(&scmi_requested_devices_nh,
+	ret = blocking_notifier_chain_register(&cix_scmi_requested_devices_nh,
 					       &info->dev_req_nb);
 	if (ret)
 		goto clear_bus_notifier;
@@ -2485,7 +2485,7 @@ notification_exit:
 		scmi_raw_mode_cleanup(info->raw);
 	scmi_notification_exit(&info->handle);
 clear_dev_req_notifier:
-	blocking_notifier_chain_unregister(&scmi_requested_devices_nh,
+	blocking_notifier_chain_unregister(&cix_scmi_requested_devices_nh,
 					   &info->dev_req_nb);
 clear_bus_notifier:
 	bus_unregister_notifier(&scmi_bus_type, &info->bus_nb);
@@ -2522,7 +2522,7 @@ static int scmi_remove(struct platform_device *pdev)
 		fwnode_handle_put(child);
 	idr_destroy(&info->active_protocols);
 
-	blocking_notifier_chain_unregister(&scmi_requested_devices_nh,
+	blocking_notifier_chain_unregister(&cix_scmi_requested_devices_nh,
 					   &info->dev_req_nb);
 	bus_unregister_notifier(&scmi_bus_type, &info->bus_nb);
 
@@ -2591,7 +2591,7 @@ MODULE_DEVICE_TABLE(acpi, scmi_acpi_match);
 
 static struct platform_driver scmi_driver = {
 	.driver = {
-		   .name = "arm-scmi",
+		   .name = "cix-arm-scmi",
 		   .suppress_bind_attrs = true,
 		   .acpi_match_table = scmi_acpi_match,
 		   .dev_groups = versions_groups,

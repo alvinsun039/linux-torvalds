@@ -278,15 +278,15 @@ static const struct scmi_device_id scmi_id_table[] = {
 };
 MODULE_DEVICE_TABLE(scmi, scmi_id_table);
 
-static struct scmi_driver scmi_clocks_driver = {
-	.name = "scmi-clocks",
+static struct scmi_driver cix_scmi_clocks_driver = {
+	.name = "cix-scmi-clocks",
 	.probe = scmi_clocks_probe,
 	.id_table = scmi_id_table,
 };
 
 static int __init scmi_clocks_init(void)
 {
-	return cix_scmi_driver_register(&scmi_clocks_driver, THIS_MODULE, KBUILD_MODNAME);
+	return cix_scmi_driver_register(&cix_scmi_clocks_driver, THIS_MODULE, KBUILD_MODNAME);
 }
 
 subsys_initcall_sync(scmi_clocks_init);

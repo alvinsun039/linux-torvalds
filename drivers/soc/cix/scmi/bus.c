@@ -18,6 +18,9 @@
 
 #include "common.h"
 
+BLOCKING_NOTIFIER_HEAD(cix_scmi_requested_devices_nh);
+EXPORT_SYMBOL_GPL(cix_scmi_requested_devices_nh);
+
 static DEFINE_IDA(scmi_bus_id);
 
 static DEFINE_IDR(scmi_requested_devices);
@@ -100,7 +103,7 @@ EXPORT_SYMBOL_GPL(cix_scmi_device_destroy);
  * The requested device name MUST NOT be already existent for any protocol;
  * at first the freshly requested @id_table is annotated in the IDR table
  * @scmi_requested_devices and then the requested device is advertised to any
- * registered party via the @scmi_requested_devices_nh notification chain.
+ * registered party via the @cix_scmi_requested_devices_nh notification chain.
  *
  * Return: 0 on Success
  */
@@ -189,7 +192,7 @@ out:
 	mutex_unlock(&scmi_requested_devices_mtx);
 
 	if (!ret)
-		blocking_notifier_call_chain(&scmi_requested_devices_nh,
+		blocking_notifier_call_chain(&cix_scmi_requested_devices_nh,
 					     SCMI_BUS_NOTIFY_DEVICE_REQUEST,
 					     (void *)rdev->id_table);
 
