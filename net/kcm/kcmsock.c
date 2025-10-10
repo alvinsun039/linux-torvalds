@@ -429,7 +429,7 @@ static void psock_write_space(struct sock *sk)
 
 	/* Check if the socket is reserved so someone is waiting for sending. */
 	kcm = psock->tx_kcm;
-	if (kcm)
+	if (kcm && !unlikely(kcm->tx_stopped))
 		queue_work(kcm_wq, &kcm->tx_work);
 
 	spin_unlock_bh(&mux->lock);
@@ -1694,6 +1694,12 @@ static int kcm_release(struct socket *sock)
 	 * it will just return.
 	 */
 	__skb_queue_purge(&sk->sk_write_queue);
+
+	/* Set tx_stopped. This is checked when psock is bound to a kcm and we
+	 * get a writespace callback. This prevents further work being queued
+	 * from the callback (unbinding the psock occurs after canceling work.
+	 */
+	kcm->tx_stopped = 1;
 
 	release_sock(sk);
 
