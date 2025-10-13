@@ -242,7 +242,7 @@ static void debugfs_release_dentry(struct dentry *dentry)
 		return;
 
 	/* check it wasn't a dir (no fsdata) or automount (no real_fops) */
-	if (fsd && fsd->real_fops) {
+	if (fsd && (fsd->real_fops || fsd->short_fops)) {
 #ifdef CONFIG_LOCKDEP
 		lockdep_unregister_key(&fsd->key);
 		kfree(fsd->lock_name);
