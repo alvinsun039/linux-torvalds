@@ -100,6 +100,7 @@ int hns_roce_fill_res_qp_entry_raw(struct sk_buff *msg, struct ib_qp *ib_qp)
 		struct hns_roce_v2_qp_context qpc;
 		struct hns_roce_v2_scc_context sccc;
 	} context = {};
+	u32 sccn = hr_qp->qpn;
 	int ret;
 
 	if (!hr_dev->hw->query_qpc)
@@ -109,15 +110,20 @@ int hns_roce_fill_res_qp_entry_raw(struct sk_buff *msg, struct ib_qp *ib_qp)
 	if (ret)
 		return ret;
 
+	/* If SCC is disabled or the query fails, the queried SCCC will
+	 * be all 0.
+	 */
 	if (!(hr_dev->caps.flags & HNS_ROCE_CAP_FLAG_QP_FLOW_CTRL) ||
 	    !hr_dev->hw->query_sccc)
 		goto out;
 
-	/* The scc may not exist. If the scc query fails,
-	 * only the qpc content is displayed, and the
-	 * scc value is all 0.
-	 */
-	ret = hr_dev->hw->query_sccc(hr_dev, hr_qp->qpn, &context.sccc);
+	if (hr_qp->cong_type == CONG_TYPE_DIP) {
+		if (!hr_qp->dip)
+			goto out;
+		sccn = hr_qp->dip->dip_idx;
+	}
+
+	ret = hr_dev->hw->query_sccc(hr_dev, sccn, &context.sccc);
 	if (ret)
 		ibdev_warn_ratelimited(&hr_dev->ib_dev,
 				       "failed to query SCCC, ret = %d.\n",

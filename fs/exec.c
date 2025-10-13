@@ -117,6 +117,9 @@ static inline void put_binfmt(struct linux_binfmt * fmt)
 
 bool path_noexec(const struct path *path)
 {
+	/* If it's an anonymous inode make sure that we catch any shenanigans. */
+	VFS_WARN_ON_ONCE(IS_ANON_FILE(d_inode(path->dentry)) &&
+			 !(path->mnt->mnt_sb->s_iflags & SB_I_NOEXEC));
 	return (path->mnt->mnt_flags & MNT_NOEXEC) ||
 	       (path->mnt->mnt_sb->s_iflags & SB_I_NOEXEC);
 }
@@ -911,10 +914,14 @@ EXPORT_SYMBOL(transfer_args_to_stack);
 
 #endif /* CONFIG_MMU */
 
+/*
+ * On success, caller must call do_close_execat() on the returned
+ * struct file to close it.
+ */
 static struct file *do_open_execat(int fd, struct filename *name, int flags)
 {
-	struct file *file;
 	int err;
+	struct file *file __free(fput) = NULL;
 	struct open_flags open_exec_flags = {
 		.open_flag = O_LARGEFILE | O_RDONLY | __FMODE_EXEC,
 		.acc_mode = MAY_EXEC,
@@ -933,27 +940,35 @@ static struct file *do_open_execat(int fd, struct filename *name, int flags)
 	if (IS_ERR(file))
 		return file;
 
+	if (path_noexec(&file->f_path))
+		return ERR_PTR(-EACCES);
+
 	/*
 	 * In the past the regular type check was here. It moved to may_open() in
 	 * 633fb6ac3980 ("exec: move S_ISREG() check earlier"). Since then it is
 	 * an invariant that all non-regular files error out before we get here.
 	 */
-	err = -EACCES;
-	if (WARN_ON_ONCE(!S_ISREG(file_inode(file)->i_mode)) ||
-	    path_noexec(&file->f_path))
-		goto exit;
+	if (WARN_ON_ONCE(!S_ISREG(file_inode(file)->i_mode)))
+		return ERR_PTR(-EACCES);
 
 	err = deny_write_access(file);
 	if (err)
-		goto exit;
+		return ERR_PTR(err);
 
-	return file;
-
-exit:
-	fput(file);
-	return ERR_PTR(err);
+	return no_free_ptr(file);
 }
 
+/**
+ * open_exec - Open a path name for execution
+ *
+ * @name: path name to open with the intent of executing it.
+ *
+ * Returns ERR_PTR on failure or allocated struct file on success.
+ *
+ * As this is a wrapper for the internal do_open_execat(), callers
+ * must call allow_write_access() before fput() on release. Also see
+ * do_close_execat().
+ */
 struct file *open_exec(const char *name)
 {
 	struct filename *filename = getname_kernel(name);
@@ -1518,6 +1533,15 @@ static int prepare_bprm_creds(struct linux_binprm *bprm)
 	return -ENOMEM;
 }
 
+/* Matches do_open_execat() */
+static void do_close_execat(struct file *file)
+{
+	if (!file)
+		return;
+	allow_write_access(file);
+	fput(file);
+}
+
 static void free_bprm(struct linux_binprm *bprm)
 {
 	if (bprm->mm) {
@@ -1531,10 +1555,7 @@ static void free_bprm(struct linux_binprm *bprm)
 		mutex_unlock(&current->signal->cred_guard_mutex);
 		abort_creds(bprm->cred);
 	}
-	if (bprm->file) {
-		allow_write_access(bprm->file);
-		fput(bprm->file);
-	}
+	do_close_execat(bprm->file);
 	if (bprm->executable)
 		fput(bprm->executable);
 	/* If a binfmt changed the interp, free it. */
@@ -1556,8 +1577,7 @@ static struct linux_binprm *alloc_bprm(int fd, struct filename *filename, int fl
 
 	bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);
 	if (!bprm) {
-		allow_write_access(file);
-		fput(file);
+		do_close_execat(file);
 		return ERR_PTR(-ENOMEM);
 	}
 

@@ -26,7 +26,6 @@
 #include <linux/percpu_counter.h>
 #include <linux/percpu.h>
 #include <linux/task_work.h>
-#include <linux/ima.h>
 #include <linux/swap.h>
 #include <linux/kmemleak.h>
 
@@ -196,6 +195,11 @@ static int init_file(struct file *f, int flags, const struct cred *cred)
 	 * refcount bumps we should reinitialize the reused file first.
 	 */
 	file_ref_init(&f->f_ref, 1);
+	/*
+	 * Disable permission and pre-content events for all files by default.
+	 * They may be enabled later by file_set_fsnotify_mode_from_watchers().
+	 */
+	file_set_fsnotify_mode(f, FMODE_NONOTIFY_PERM);
 	return 0;
 }
 
@@ -377,10 +381,45 @@ struct file *alloc_file_pseudo(struct inode *inode, struct vfsmount *mnt,
 	if (IS_ERR(file)) {
 		ihold(inode);
 		path_put(&path);
+		return file;
 	}
+	/*
+	 * Disable all fsnotify events for pseudo files by default.
+	 * They may be enabled by caller with file_set_fsnotify_mode().
+	 */
+	file_set_fsnotify_mode(file, FMODE_NONOTIFY);
 	return file;
 }
 EXPORT_SYMBOL(alloc_file_pseudo);
+
+struct file *alloc_file_pseudo_noaccount(struct inode *inode,
+					 struct vfsmount *mnt, const char *name,
+					 int flags,
+					 const struct file_operations *fops)
+{
+	int ret;
+	struct path path;
+	struct file *file;
+
+	ret = alloc_path_pseudo(name, inode, mnt, &path);
+	if (ret)
+		return ERR_PTR(ret);
+
+	file = alloc_empty_file_noaccount(flags, current_cred());
+	if (IS_ERR(file)) {
+		ihold(inode);
+		path_put(&path);
+		return file;
+	}
+	file_init_path(file, &path, fops);
+	/*
+	 * Disable all fsnotify events for pseudo files by default.
+	 * They may be enabled by caller with file_set_fsnotify_mode().
+	 */
+	file_set_fsnotify_mode(file, FMODE_NONOTIFY);
+	return file;
+}
+EXPORT_SYMBOL_GPL(alloc_file_pseudo_noaccount);
 
 struct file *alloc_file_clone(struct file *base, int flags,
 				const struct file_operations *fops)
@@ -415,7 +454,7 @@ static void __fput(struct file *file)
 	eventpoll_release(file);
 	locks_remove_file(file);
 
-	ima_file_free(file);
+	security_file_release(file);
 	if (unlikely(file->f_flags & FASYNC)) {
 		if (file->f_op->fasync)
 			file->f_op->fasync(-1, file, 0);

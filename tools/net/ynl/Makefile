@@ -5,6 +5,8 @@ SUBDIRS = lib generated samples
 all: $(SUBDIRS)
 	./ynl-regen.sh -f -p $(PWD)/../../../
 
+samples: | lib generated
+
 $(SUBDIRS):
 	@if [ -f "$@/Makefile" ] ; then \
 		$(MAKE) -C $@ ; \

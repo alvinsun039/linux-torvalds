@@ -13,7 +13,7 @@ struct_dev_ifalias*                 ifalias
 unsigned_long                       mem_end                                                         
 unsigned_long                       mem_start                                                       
 unsigned_long                       base_addr                                                       
-unsigned_long                       state                                                           
+unsigned_long                       state                   read_mostly         read_mostly         netif_running(dev)
 struct_list_head                    dev_list                                                        
 struct_list_head                    napi_list                                                       
 struct_list_head                    unreg_list                                                      
@@ -38,7 +38,7 @@ netdev_features_t                   wanted_features
 netdev_features_t                   vlan_features                                                   
 netdev_features_t                   hw_enc_features         -                   -                   netif_skb_features
 netdev_features_t                   mpls_features                                                   
-netdev_features_t                   gso_partial_features                                            
+netdev_features_t                   gso_partial_features    read_mostly                             gso_features_check
 unsigned_int                        min_mtu                                                         
 unsigned_int                        max_mtu                                                         
 unsigned_short                      type                                                            
@@ -136,8 +136,8 @@ struct_netpoll_info*                npinfo                  -                   
 possible_net_t                      nd_net                  -                   read_mostly         (dev_net)napi_busy_loop,tcp_v(4/6)_rcv,ip(v6)_rcv,ip(6)_input,ip(6)_input_finish
 void*                               ml_priv                                                         
 enum_netdev_ml_priv_type            ml_priv_type                                                    
-struct_pcpu_lstats__percpu*         lstats                                                          
-struct_pcpu_sw_netstats__percpu*    tstats                                                          
+struct_pcpu_lstats__percpu*         lstats                  read_mostly                             dev_lstats_add()
+struct_pcpu_sw_netstats__percpu*    tstats                  read_mostly                             dev_sw_netstats_tx_add()
 struct_pcpu_dstats__percpu*         dstats                                                          
 struct_garp_port*                   garp_port                                                       
 struct_mrp_port*                    mrp_port                                                        

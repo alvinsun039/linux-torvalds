@@ -18,6 +18,7 @@
 #include "opdef.h"
 #include "kbuf.h"
 #include "rsrc.h"
+#include "poll.h"
 #include "rw.h"
 
 struct io_rw {
@@ -130,6 +131,30 @@ int io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 			return ret;
 	}
 
+	return 0;
+}
+
+/*
+ * Multishot read is prepared just like a normal read/write request, only
+ * difference is that we set the MULTISHOT flag.
+ */
+int io_read_mshot_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
+{
+	struct io_rw *rw = io_kiocb_to_cmd(req, struct io_rw);
+	int ret;
+
+	/* must be used with provided buffers */
+	if (!(req->flags & REQ_F_BUFFER_SELECT))
+		return -EINVAL;
+
+	ret = io_prep_rw(req, sqe);
+	if (unlikely(ret))
+		return ret;
+
+	if (rw->addr || rw->len)
+		return -EINVAL;
+
+	req->flags |= REQ_F_APOLL_MULTISHOT;
 	return 0;
 }
 
@@ -392,8 +417,7 @@ static struct iovec *__io_import_iovec(int ddir, struct io_kiocb *req,
 	buf = u64_to_user_ptr(rw->addr);
 	sqe_len = rw->len;
 
-	if (opcode == IORING_OP_READ || opcode == IORING_OP_WRITE ||
-	    (req->flags & REQ_F_BUFFER_SELECT)) {
+	if (!io_issue_defs[opcode].vectored || req->flags & REQ_F_BUFFER_SELECT) {
 		if (io_do_buffer_select(req)) {
 			buf = io_buffer_select(req, &sqe_len, issue_flags);
 			if (!buf)
@@ -531,6 +555,9 @@ static int io_setup_async_rw(struct io_kiocb *req, const struct iovec *iovec,
 {
 	if (!force && !io_cold_defs[req->opcode].prep_async)
 		return 0;
+	/* opcode type doesn't need async data */
+	if (!io_cold_defs[req->opcode].async_size)
+		return 0;
 	if (!req_has_async_data(req)) {
 		struct io_async_rw *iorw;
 
@@ -639,7 +666,8 @@ static bool io_rw_should_retry(struct io_kiocb *req)
 	 * just use poll if we can, and don't attempt if the fs doesn't
 	 * support callback based unlocks
 	 */
-	if (io_file_can_poll(req) || !(req->file->f_mode & FMODE_BUF_RASYNC))
+	if (io_file_can_poll(req) ||
+	    !(req->file->f_op->fop_flags & FOP_BUFFER_RASYNC))
 		return false;
 
 	wait->wait.func = io_async_buf_func;
@@ -792,8 +820,11 @@ static int __io_read(struct io_kiocb *req, unsigned int issue_flags)
 
 	if (ret == -EAGAIN || (req->flags & REQ_F_REISSUE)) {
 		req->flags &= ~REQ_F_REISSUE;
-		/* if we can poll, just do that */
-		if (req->opcode == IORING_OP_READ && io_file_can_poll(req))
+		/*
+		 * If we can poll, just do that. For a vectored read, we'll
+		 * need to copy state first.
+		 */
+		if (io_file_can_poll(req) && !io_issue_defs[req->opcode].vectored)
 			return -EAGAIN;
 		/* IOPOLL retry should happen for io-wq threads */
 		if (!force_nonblock && !(req->ctx->flags & IORING_SETUP_IOPOLL))
@@ -888,6 +919,75 @@ int io_read(struct io_kiocb *req, unsigned int issue_flags)
 	return ret;
 }
 
+int io_read_mshot(struct io_kiocb *req, unsigned int issue_flags)
+{
+	struct io_rw *rw = io_kiocb_to_cmd(req, struct io_rw);
+	unsigned int cflags = 0;
+	int ret;
+
+	/*
+	 * Multishot MUST be used on a pollable file
+	 */
+	if (!file_can_poll(req->file))
+		return -EBADFD;
+	if (issue_flags & IO_URING_F_IOWQ)
+		return -EAGAIN;
+
+	ret = __io_read(req, issue_flags);
+
+	/*
+	 * If we get -EAGAIN, recycle our buffer and just let normal poll
+	 * handling arm it.
+	 */
+	if (ret == -EAGAIN) {
+		/*
+		 * Reset rw->len to 0 again to avoid clamping future mshot
+		 * reads, in case the buffer size varies.
+		 */
+		if (io_kbuf_recycle(req, issue_flags))
+			rw->len = 0;
+		if (issue_flags & IO_URING_F_MULTISHOT)
+			return IOU_ISSUE_SKIP_COMPLETE;
+		return -EAGAIN;
+	}
+
+	/*
+	 * Any successful return value will keep the multishot read armed.
+	 */
+	if (ret > 0) {
+		/*
+		 * Put our buffer and post a CQE. If we fail to post a CQE, then
+		 * jump to the termination path. This request is then done.
+		 */
+		cflags = io_put_kbuf(req, issue_flags);
+		rw->len = 0; /* similarly to above, reset len to 0 */
+
+		if (io_fill_cqe_req_aux(req,
+					issue_flags & IO_URING_F_COMPLETE_DEFER,
+					ret, cflags | IORING_CQE_F_MORE)) {
+			if (issue_flags & IO_URING_F_MULTISHOT) {
+				/*
+				 * Force retry, as we might have more data to
+				 * be read and otherwise it won't get retried
+				 * until (if ever) another poll is triggered.
+				 */
+				io_poll_multishot_retry(req);
+				return IOU_ISSUE_SKIP_COMPLETE;
+			}
+			return -EAGAIN;
+		}
+	}
+
+	/*
+	 * Either an error, or we've hit overflow posting the CQE. For any
+	 * multishot request, hitting overflow will terminate it.
+	 */
+	io_req_set_res(req, ret, cflags);
+	if (issue_flags & IO_URING_F_MULTISHOT)
+		return IOU_STOP_MULTISHOT;
+	return IOU_OK;
+}
+
 static bool io_kiocb_start_write(struct io_kiocb *req, struct kiocb *kiocb)
 {
 	struct inode *inode;
@@ -940,10 +1040,10 @@ int io_write(struct io_kiocb *req, unsigned int issue_flags)
 		if (unlikely(!io_file_supports_nowait(req, EPOLLOUT)))
 			goto copy_iov;
 
-		/* File path supports NOWAIT for non-direct_IO only for block devices. */
+		/* Check if we can support NOWAIT. */
 		if (!(kiocb->ki_flags & IOCB_DIRECT) &&
-			!(kiocb->ki_filp->f_mode & FMODE_BUF_WASYNC) &&
-			(req->flags & REQ_F_ISREG))
+		    !(req->file->f_op->fop_flags & FOP_BUFFER_WASYNC) &&
+		    (req->flags & REQ_F_ISREG))
 			goto copy_iov;
 
 		kiocb->ki_flags |= IOCB_NOWAIT;

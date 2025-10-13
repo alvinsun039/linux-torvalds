@@ -198,7 +198,7 @@ void _halrf_txgapk_bb_afe_by_mode_8852c(struct rf_info *rf,
 			// AFE debug mode
 			halrf_wreg(rf, 0x12b8, 0x40000000, 0x1);
 
-			//DAC ON  AD ON //By¡@KS
+			//DAC ON  AD ON
 			// Analog Part ADC rst
 			halrf_wreg(rf, 0x030c, 0xff000000, 0x1f);
 			halrf_wreg(rf, 0x030c, 0xff000000, 0x13);

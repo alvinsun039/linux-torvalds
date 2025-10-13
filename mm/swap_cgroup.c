@@ -120,6 +120,9 @@ unsigned short lookup_swap_cgroup_id(swp_entry_t ent)
 {
 	struct swap_cgroup_ctrl *ctrl;
 
+	if (mem_cgroup_disabled())
+		return 0;
+
 	ctrl = &swap_cgroup_ctrl[swp_type(ent)];
 	return __swap_cgroup_id_lookup(ctrl->map, swp_offset(ent));
 }

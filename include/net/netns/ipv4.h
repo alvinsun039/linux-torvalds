@@ -201,6 +201,7 @@ struct netns_ipv4 {
 	unsigned long sysctl_tcp_comp_sack_slack_ns;
 	int sysctl_max_syn_backlog;
 	int sysctl_tcp_fastopen;
+	int sysctl_tcp_tw_timeout;
 	const struct tcp_congestion_ops __rcu  *tcp_congestion_control;
 	struct tcp_fastopen_context __rcu *tcp_fastopen_ctx;
 	unsigned int sysctl_tcp_fastopen_blackhole_timeout;

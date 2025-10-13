@@ -23,6 +23,7 @@ static siphash_aligned_key_t net_secret;
 static siphash_aligned_key_t ts_secret;
 
 #define EPHEMERAL_PORT_SHUFFLE_PERIOD (10 * HZ)
+int ephemeral_port_shuffle_period = EPHEMERAL_PORT_SHUFFLE_PERIOD;
 
 static __always_inline void net_secret_init(void)
 {
@@ -107,7 +108,7 @@ u64 secure_ipv6_port_ephemeral(const __be32 *saddr, const __be32 *daddr,
 	} __aligned(SIPHASH_ALIGNMENT) combined = {
 		.saddr = *(struct in6_addr *)saddr,
 		.daddr = *(struct in6_addr *)daddr,
-		.timeseed = jiffies / EPHEMERAL_PORT_SHUFFLE_PERIOD,
+		.timeseed = jiffies / ephemeral_port_shuffle_period,
 		.dport = dport,
 	};
 	net_secret_init();
@@ -151,7 +152,7 @@ u64 secure_ipv4_port_ephemeral(__be32 saddr, __be32 daddr, __be16 dport)
 	net_secret_init();
 	return siphash_4u32((__force u32)saddr, (__force u32)daddr,
 			    (__force u16)dport,
-			    jiffies / EPHEMERAL_PORT_SHUFFLE_PERIOD,
+			    jiffies / ephemeral_port_shuffle_period,
 			    &net_secret);
 }
 EXPORT_SYMBOL_GPL(secure_ipv4_port_ephemeral);

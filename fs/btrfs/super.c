@@ -1152,7 +1152,7 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_flags |= SB_POSIXACL;
 #endif
 	sb->s_flags |= SB_I_VERSION;
-	sb->s_iflags |= SB_I_CGROUPWB;
+	sb->s_iflags |= SB_I_CGROUPWB | SB_I_ALLOW_HSM;
 
 	err = super_setup_bdi(sb);
 	if (err) {
@@ -1457,6 +1457,8 @@ static struct dentry *btrfs_mount_root(struct file_system_type *fs_type,
 			return ERR_PTR(error);
 	}
 
+	/* No support for restricting writes to btrfs devices yet... */
+	mode &= ~BLK_OPEN_RESTRICT_WRITES;
 	/*
 	 * Setup a dummy root and fs_info for test/set super.  This is because
 	 * we don't actually fill this stuff out until open_ctree, but we need

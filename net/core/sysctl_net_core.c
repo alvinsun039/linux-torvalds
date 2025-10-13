@@ -23,6 +23,7 @@
 #include <net/net_ratelimit.h>
 #include <net/busy_poll.h>
 #include <net/pkt_sched.h>
+#include <net/secure_seq.h>
 
 #include "dev.h"
 
@@ -665,6 +666,14 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= SYSCTL_ZERO,
+	},
+	{
+		.procname	= "ephemeral_port_shuffle_period",
+		.data		= &ephemeral_port_shuffle_period,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies_minmax,
+		.extra1		= SYSCTL_ONE,
 	},
 	{ }
 };

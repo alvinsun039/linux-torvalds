@@ -213,6 +213,7 @@ struct hubp_funcs {
 			unsigned int min_dst_y_next_start_optimized);
 
 	void (*hubp_wait_pipe_read_start)(struct hubp *hubp);
+	void (*hubp_clear_tiling)(struct hubp *hubp);
 };
 
 #endif

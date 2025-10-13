@@ -286,4 +286,27 @@ void dc_3dlut_func_retain(struct dc_3dlut *lut)
 	kref_get(&lut->refcount);
 }
 
+void dc_plane_force_dcc_and_tiling_disable(struct dc_plane_state *plane_state,
+					   bool clear_tiling)
+{
+	struct dc *dc;
+	int i;
 
+	if (!plane_state)
+		return;
+
+	dc = plane_state->ctx->dc;
+
+	if (!dc || !dc->current_state)
+		return;
+
+	for (i = 0; i < dc->res_pool->pipe_count; i++) {
+		struct pipe_ctx *pipe_ctx = &dc->current_state->res_ctx.pipe_ctx[i];
+
+		if (!pipe_ctx)
+			continue;
+
+		if (dc->hwss.clear_surface_dcc_and_tiling)
+			dc->hwss.clear_surface_dcc_and_tiling(pipe_ctx, plane_state, clear_tiling);
+	}
+}

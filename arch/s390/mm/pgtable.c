@@ -352,7 +352,6 @@ pte_t ptep_modify_prot_start(struct vm_area_struct *vma, unsigned long addr,
 	int nodat;
 	struct mm_struct *mm = vma->vm_mm;
 
-	preempt_disable();
 	pgste = ptep_xchg_start(mm, addr, ptep);
 	nodat = !!(pgste_val(pgste) & _PGSTE_GPS_NODAT);
 	old = ptep_flush_lazy(mm, addr, ptep, nodat);
@@ -379,7 +378,6 @@ void ptep_modify_prot_commit(struct vm_area_struct *vma, unsigned long addr,
 	} else {
 		set_pte(ptep, pte);
 	}
-	preempt_enable();
 }
 
 static inline void pmdp_idte_local(struct mm_struct *mm,

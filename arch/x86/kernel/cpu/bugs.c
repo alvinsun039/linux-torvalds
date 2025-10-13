@@ -16,6 +16,7 @@
 #include <linux/sched/smt.h>
 #include <linux/pgtable.h>
 #include <linux/bpf.h>
+#include <linux/machine_t.h>
 
 #include <asm/spec-ctrl.h>
 #include <asm/cmdline.h>
@@ -51,6 +52,7 @@ static void __init srso_select_mitigation(void);
 static void __init gds_select_mitigation(void);
 static void __init its_select_mitigation(void);
 static void __init tsa_select_mitigation(void);
+static void __init vmscape_select_mitigation(void);
 
 /* The base value of the SPEC_CTRL MSR without task-specific bits set */
 u64 x86_spec_ctrl_base;
@@ -59,6 +61,14 @@ EXPORT_SYMBOL_GPL(x86_spec_ctrl_base);
 /* The current value of the SPEC_CTRL MSR with task-specific bits set */
 DEFINE_PER_CPU(u64, x86_spec_ctrl_current);
 EXPORT_SYMBOL_GPL(x86_spec_ctrl_current);
+
+/*
+ * Set when the CPU has run a potentially malicious guest. An IBPB will
+ * be needed to before running userspace. That IBPB will flush the branch
+ * predictor content.
+ */
+DEFINE_PER_CPU(bool, x86_ibpb_exit_to_user);
+EXPORT_PER_CPU_SYMBOL_GPL(x86_ibpb_exit_to_user);
 
 u64 x86_pred_cmd __ro_after_init = PRED_CMD_IBPB;
 EXPORT_SYMBOL_GPL(x86_pred_cmd);
@@ -186,6 +196,7 @@ void __init cpu_select_mitigations(void)
 	gds_select_mitigation();
 	its_select_mitigation();
 	tsa_select_mitigation();
+	vmscape_select_mitigation();
 }
 
 /*
@@ -1756,7 +1767,10 @@ static void __init spectre_v2_select_rsb_mitigation(enum spectre_v2_mitigation m
 	case SPECTRE_V2_EIBRS:
 	case SPECTRE_V2_EIBRS_LFENCE:
 	case SPECTRE_V2_EIBRS_RETPOLINE:
-		if (boot_cpu_has_bug(X86_BUG_EIBRS_PBRSB)) {
+		if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON) {
+			setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT);
+			pr_info("Spectre v2 / SpectreRSB : Filling RSB on VMEXIT for Hygon\n");
+		} else if (boot_cpu_has_bug(X86_BUG_EIBRS_PBRSB)) {
 			pr_info("Spectre v2 / PBRSB-eIBRS: Retire a single CALL on VMEXIT\n");
 			setup_force_cpu_cap(X86_FEATURE_RSB_VMEXIT_LITE);
 		}
@@ -2182,80 +2196,6 @@ out:
 	pr_info("%s\n", tsa_strings[tsa_mitigation]);
 }
 
-void cpu_bugs_smt_update(void)
-{
-	mutex_lock(&spec_ctrl_mutex);
-
-	if (sched_smt_active() && unprivileged_ebpf_enabled() &&
-	    spectre_v2_enabled == SPECTRE_V2_EIBRS_LFENCE)
-		pr_warn_once(SPECTRE_V2_EIBRS_LFENCE_EBPF_SMT_MSG);
-
-	switch (spectre_v2_user_stibp) {
-	case SPECTRE_V2_USER_NONE:
-		break;
-	case SPECTRE_V2_USER_STRICT:
-	case SPECTRE_V2_USER_STRICT_PREFERRED:
-		update_stibp_strict();
-		break;
-	case SPECTRE_V2_USER_PRCTL:
-	case SPECTRE_V2_USER_SECCOMP:
-		update_indir_branch_cond();
-		break;
-	}
-
-	switch (mds_mitigation) {
-	case MDS_MITIGATION_FULL:
-	case MDS_MITIGATION_VMWERV:
-		if (sched_smt_active() && !boot_cpu_has(X86_BUG_MSBDS_ONLY))
-			pr_warn_once(MDS_MSG_SMT);
-		update_mds_branch_idle();
-		break;
-	case MDS_MITIGATION_OFF:
-		break;
-	}
-
-	switch (taa_mitigation) {
-	case TAA_MITIGATION_VERW:
-	case TAA_MITIGATION_UCODE_NEEDED:
-		if (sched_smt_active())
-			pr_warn_once(TAA_MSG_SMT);
-		break;
-	case TAA_MITIGATION_TSX_DISABLED:
-	case TAA_MITIGATION_OFF:
-		break;
-	}
-
-	switch (mmio_mitigation) {
-	case MMIO_MITIGATION_VERW:
-	case MMIO_MITIGATION_UCODE_NEEDED:
-		if (sched_smt_active())
-			pr_warn_once(MMIO_MSG_SMT);
-		break;
-	case MMIO_MITIGATION_OFF:
-		break;
-	}
-
-	switch (tsa_mitigation) {
-	case TSA_MITIGATION_USER_KERNEL:
-	case TSA_MITIGATION_VM:
-	case TSA_MITIGATION_FULL:
-	case TSA_MITIGATION_UCODE_NEEDED:
-		/*
-		 * TSA-SQ can potentially lead to info leakage between
-		 * SMT threads.
-		 */
-		if (sched_smt_active())
-			static_branch_enable(&cpu_buf_idle_clear);
-		else
-			static_branch_disable(&cpu_buf_idle_clear);
-		break;
-	case TSA_MITIGATION_NONE:
-		break;
-	}
-
-	mutex_unlock(&spec_ctrl_mutex);
-}
-
 #undef pr_fmt
 #define pr_fmt(fmt)	"Speculative Store Bypass: " fmt
 
@@ -2624,6 +2564,55 @@ int arch_prctl_spec_ctrl_get(struct task_struct *task, unsigned long which)
 	}
 }
 
+/**
+ * enum ibpb_brtype_cmd - IBPB action control flag
+ * @IBPB_FLUSH_IND:IBPB command only flushes indirect branches in branch target buffer
+ * @IBPB_FLUSH_ALL:IBPB command flushes all types of branches in branch target buffer
+ */
+enum ibpb_brtype_cmd {
+	IBPB_FLUSH_IND,
+	IBPB_FLUSH_ALL,
+};
+
+static enum ibpb_brtype_cmd ibpb_brtype __ro_after_init = IBPB_FLUSH_ALL;
+
+/**
+ * The kernel parameter ibpb_brtype is used to control
+ * whether IBPB flushes all branches or indirect branches:
+ * ibpb_brtype=     [X86, HYGON only]
+ *                IBPB action control flag
+ *                Format: { ibpb-all | ibpb-ind }
+ *                ibpb-all -- IBPB flushes all types of branches,this is the default value.
+ *                ibpb-ind -- IBPB flushes only indirect branches.
+ */
+static int __init ibpb_brtype_cmdline(char *str)
+{
+	if (!str)
+		return -EINVAL;
+
+	if (!is_vendor_hygon()) {
+		pr_info("not hygon");
+		return 0;
+	}
+
+	if (!strcmp(str, "ibpb-all")) {
+		ibpb_brtype = IBPB_FLUSH_ALL;
+		pr_info("IBPB flushes all branches.\n");
+	} else if (!strcmp(str, "ibpb-ind")) {
+		ibpb_brtype = IBPB_FLUSH_IND;
+		pr_info("IBPB flushes only indirect branches.\n");
+	} else {
+		pr_err("Ignoring unknown ibpb branch type option (%s).", str);
+	}
+
+	return 0;
+}
+early_param("ibpb_brtype", ibpb_brtype_cmdline);
+
+#define HYGON_FAMILY_24 0x18
+#define HYGON_MODEL_3 3
+#define IBPB_FLUSH_ALL_BIT 55
+
 void x86_spec_ctrl_setup_ap(void)
 {
 	if (boot_cpu_has(X86_FEATURE_MSR_SPEC_CTRL))
@@ -2631,6 +2620,13 @@ void x86_spec_ctrl_setup_ap(void)
 
 	if (ssb_mode == SPEC_STORE_BYPASS_DISABLE)
 		x86_amd_ssb_disable();
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON &&
+	    boot_cpu_data.x86 == HYGON_FAMILY_24) {
+		if (boot_cpu_data.x86_model > HYGON_MODEL_3 &&
+		    ibpb_brtype == IBPB_FLUSH_ALL)
+			msr_set_bit(MSR_ZEN4_BP_CFG, IBPB_FLUSH_ALL_BIT);
+	}
 }
 
 bool itlb_multihit_kvm_mitigation;
@@ -2816,9 +2812,29 @@ early_param("spec_rstack_overflow", srso_parse_cmdline);
 
 #define SRSO_NOTICE "WARNING: See https://kernel.org/doc/html/latest/admin-guide/hw-vuln/srso.html for mitigation options."
 
+/*
+ * Whether the HYGON IBPB action flushes all types of branches is not controlled by microcode;
+ * Instead, it is controlled by bit 55 of MSR 0xc001102e according to kernel command line.
+ */
+bool ibpb_can_flush_allbranch(void)
+{
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_HYGON &&
+	    boot_cpu_data.x86 == HYGON_FAMILY_24) {
+		if (boot_cpu_data.x86_model <= HYGON_MODEL_3) {
+			return true;
+		} else if (ibpb_brtype == IBPB_FLUSH_ALL) {
+			msr_set_bit(MSR_ZEN4_BP_CFG, IBPB_FLUSH_ALL_BIT);
+			return true;
+		}
+		return false;
+	}
+
+	return boot_cpu_has(X86_FEATURE_IBPB_BRTYPE);
+}
+
 static void __init srso_select_mitigation(void)
 {
-	bool has_microcode = boot_cpu_has(X86_FEATURE_IBPB_BRTYPE);
+	bool ibpb_allbr_flag = ibpb_can_flush_allbranch();
 
 	if (cpu_mitigations_off())
 		return;
@@ -2829,7 +2845,7 @@ static void __init srso_select_mitigation(void)
 		return;
 	}
 
-	if (has_microcode) {
+	if (ibpb_allbr_flag) {
 		/*
 		 * Zen1/2 with SMT off aren't vulnerable after the right
 		 * IBPB microcode has been applied.
@@ -2860,7 +2876,7 @@ static void __init srso_select_mitigation(void)
 		return;
 
 	case SRSO_CMD_MICROCODE:
-		if (has_microcode) {
+		if (ibpb_allbr_flag) {
 			srso_mitigation = SRSO_MITIGATION_MICROCODE;
 			pr_warn(SRSO_NOTICE);
 		}
@@ -2882,7 +2898,7 @@ static void __init srso_select_mitigation(void)
 				setup_force_cpu_cap(X86_FEATURE_SRSO);
 				set_return_thunk(srso_return_thunk);
 			}
-			if (has_microcode)
+			if (ibpb_allbr_flag)
 				srso_mitigation = SRSO_MITIGATION_SAFE_RET;
 			else
 				srso_mitigation = SRSO_MITIGATION_SAFE_RET_UCODE_NEEDED;
@@ -2893,7 +2909,7 @@ static void __init srso_select_mitigation(void)
 
 	case SRSO_CMD_IBPB:
 		if (IS_ENABLED(CONFIG_MITIGATION_IBPB_ENTRY)) {
-			if (has_microcode) {
+			if (ibpb_allbr_flag) {
 				setup_force_cpu_cap(X86_FEATURE_ENTRY_IBPB);
 				setup_force_cpu_cap(X86_FEATURE_IBPB_ON_VMEXIT);
 				srso_mitigation = SRSO_MITIGATION_IBPB;
@@ -2920,7 +2936,7 @@ static void __init srso_select_mitigation(void)
 
 	case SRSO_CMD_IBPB_ON_VMEXIT:
 		if (IS_ENABLED(CONFIG_MITIGATION_IBPB_ENTRY)) {
-			if (has_microcode) {
+			if (ibpb_allbr_flag) {
 				setup_force_cpu_cap(X86_FEATURE_IBPB_ON_VMEXIT);
 				srso_mitigation = SRSO_MITIGATION_IBPB_ON_VMEXIT;
 
@@ -2942,7 +2958,167 @@ out:
 }
 
 #undef pr_fmt
+#define pr_fmt(fmt)	"VMSCAPE: " fmt
+
+enum vmscape_mitigations {
+	VMSCAPE_MITIGATION_NONE,
+	VMSCAPE_MITIGATION_AUTO,
+	VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER,
+	VMSCAPE_MITIGATION_IBPB_ON_VMEXIT,
+};
+
+static const char * const vmscape_strings[] = {
+	[VMSCAPE_MITIGATION_NONE]		= "Vulnerable",
+	/* [VMSCAPE_MITIGATION_AUTO] */
+	[VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER]	= "Mitigation: IBPB before exit to userspace",
+	[VMSCAPE_MITIGATION_IBPB_ON_VMEXIT]	= "Mitigation: IBPB on VMEXIT",
+};
+
+static enum vmscape_mitigations vmscape_mitigation __ro_after_init =
+	IS_ENABLED(CONFIG_MITIGATION_VMSCAPE) ? VMSCAPE_MITIGATION_AUTO : VMSCAPE_MITIGATION_NONE;
+
+static int __init vmscape_parse_cmdline(char *str)
+{
+	if (!str)
+		return -EINVAL;
+
+	if (!strcmp(str, "off")) {
+		vmscape_mitigation = VMSCAPE_MITIGATION_NONE;
+	} else if (!strcmp(str, "ibpb")) {
+		vmscape_mitigation = VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER;
+	} else if (!strcmp(str, "force")) {
+		setup_force_cpu_bug(X86_BUG_VMSCAPE);
+		vmscape_mitigation = VMSCAPE_MITIGATION_AUTO;
+	} else {
+		pr_err("Ignoring unknown vmscape=%s option.\n", str);
+	}
+
+	return 0;
+}
+early_param("vmscape", vmscape_parse_cmdline);
+
+static void __init vmscape_select_mitigation(void)
+{
+	if (cpu_mitigations_off() ||
+	    !boot_cpu_has_bug(X86_BUG_VMSCAPE) ||
+	    !boot_cpu_has(X86_FEATURE_IBPB)) {
+		vmscape_mitigation = VMSCAPE_MITIGATION_NONE;
+		return;
+	}
+
+	if (vmscape_mitigation == VMSCAPE_MITIGATION_AUTO)
+		vmscape_mitigation = VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER;
+
+	if (retbleed_mitigation == RETBLEED_MITIGATION_IBPB ||
+	    srso_mitigation == SRSO_MITIGATION_IBPB_ON_VMEXIT)
+		vmscape_mitigation = VMSCAPE_MITIGATION_IBPB_ON_VMEXIT;
+
+	if (vmscape_mitigation == VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER)
+		setup_force_cpu_cap(X86_FEATURE_IBPB_EXIT_TO_USER);
+
+	pr_info("%s\n", vmscape_strings[vmscape_mitigation]);
+}
+
+#undef pr_fmt
 #define pr_fmt(fmt) fmt
+
+#define VMSCAPE_MSG_SMT "VMSCAPE: SMT on, STIBP is required for full protection. See https://www.kernel.org/doc/html/latest/admin-guide/hw-vuln/vmscape.html for more details.\n"
+
+void cpu_bugs_smt_update(void)
+{
+	mutex_lock(&spec_ctrl_mutex);
+
+	if (sched_smt_active() && unprivileged_ebpf_enabled() &&
+	    spectre_v2_enabled == SPECTRE_V2_EIBRS_LFENCE)
+		pr_warn_once(SPECTRE_V2_EIBRS_LFENCE_EBPF_SMT_MSG);
+
+	switch (spectre_v2_user_stibp) {
+	case SPECTRE_V2_USER_NONE:
+		break;
+	case SPECTRE_V2_USER_STRICT:
+	case SPECTRE_V2_USER_STRICT_PREFERRED:
+		update_stibp_strict();
+		break;
+	case SPECTRE_V2_USER_PRCTL:
+	case SPECTRE_V2_USER_SECCOMP:
+		update_indir_branch_cond();
+		break;
+	}
+
+	switch (mds_mitigation) {
+	case MDS_MITIGATION_FULL:
+	case MDS_MITIGATION_VMWERV:
+		if (sched_smt_active() && !boot_cpu_has(X86_BUG_MSBDS_ONLY))
+			pr_warn_once(MDS_MSG_SMT);
+		update_mds_branch_idle();
+		break;
+	case MDS_MITIGATION_OFF:
+		break;
+	}
+
+	switch (taa_mitigation) {
+	case TAA_MITIGATION_VERW:
+	case TAA_MITIGATION_UCODE_NEEDED:
+		if (sched_smt_active())
+			pr_warn_once(TAA_MSG_SMT);
+		break;
+	case TAA_MITIGATION_TSX_DISABLED:
+	case TAA_MITIGATION_OFF:
+		break;
+	}
+
+	switch (mmio_mitigation) {
+	case MMIO_MITIGATION_VERW:
+	case MMIO_MITIGATION_UCODE_NEEDED:
+		if (sched_smt_active())
+			pr_warn_once(MMIO_MSG_SMT);
+		break;
+	case MMIO_MITIGATION_OFF:
+		break;
+	}
+
+	switch (tsa_mitigation) {
+	case TSA_MITIGATION_USER_KERNEL:
+	case TSA_MITIGATION_VM:
+	case TSA_MITIGATION_FULL:
+	case TSA_MITIGATION_UCODE_NEEDED:
+		/*
+		 * TSA-SQ can potentially lead to info leakage between
+		 * SMT threads.
+		 */
+		if (sched_smt_active())
+			static_branch_enable(&cpu_buf_idle_clear);
+		else
+			static_branch_disable(&cpu_buf_idle_clear);
+		break;
+	case TSA_MITIGATION_NONE:
+		break;
+	}
+
+	switch (vmscape_mitigation) {
+	case VMSCAPE_MITIGATION_NONE:
+	case VMSCAPE_MITIGATION_AUTO:
+		break;
+	case VMSCAPE_MITIGATION_IBPB_ON_VMEXIT:
+	case VMSCAPE_MITIGATION_IBPB_EXIT_TO_USER:
+		/*
+		 * Hypervisors can be attacked across-threads, warn for SMT when
+		 * STIBP is not already enabled system-wide.
+		 *
+		 * Intel eIBRS (!AUTOIBRS) implies STIBP on.
+		 */
+		if (!sched_smt_active() ||
+		    spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT ||
+		    spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT_PREFERRED ||
+		    (spectre_v2_in_eibrs_mode(spectre_v2_enabled) &&
+		     !boot_cpu_has(X86_FEATURE_AUTOIBRS)))
+			break;
+		pr_warn_once(VMSCAPE_MSG_SMT);
+		break;
+	}
+
+	mutex_unlock(&spec_ctrl_mutex);
+}
 
 #ifdef CONFIG_SYSFS
 
@@ -3151,6 +3327,11 @@ static ssize_t srbds_show_state(char *buf)
 	return sysfs_emit(buf, "%s\n", srbds_strings[srbds_mitigation]);
 }
 
+static inline bool spectre_v2_in_eibrs_mode_hygon(void)
+{
+	return is_vendor_hygon() ? spectre_v2_in_eibrs_mode(spectre_v2_enabled) : false;
+}
+
 static ssize_t retbleed_show_state(char *buf)
 {
 	if (retbleed_mitigation == RETBLEED_MITIGATION_UNRET ||
@@ -3161,6 +3342,7 @@ static ssize_t retbleed_show_state(char *buf)
 
 		return sysfs_emit(buf, "%s; SMT %s\n", retbleed_strings[retbleed_mitigation],
 				  !sched_smt_active() ? "disabled" :
+				  spectre_v2_in_eibrs_mode_hygon() ||
 				  spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT ||
 				  spectre_v2_user_stibp == SPECTRE_V2_USER_STRICT_PREFERRED ?
 				  "enabled with STIBP protection" : "vulnerable");
@@ -3185,6 +3367,11 @@ static ssize_t gds_show_state(char *buf)
 static ssize_t tsa_show_state(char *buf)
 {
 	return sysfs_emit(buf, "%s\n", tsa_strings[tsa_mitigation]);
+}
+
+static ssize_t vmscape_show_state(char *buf)
+{
+	return sysfs_emit(buf, "%s\n", vmscape_strings[vmscape_mitigation]);
 }
 
 static ssize_t cpu_show_common(struct device *dev, struct device_attribute *attr,
@@ -3250,6 +3437,9 @@ static ssize_t cpu_show_common(struct device *dev, struct device_attribute *attr
 
 	case X86_BUG_TSA:
 		return tsa_show_state(buf);
+
+	case X86_BUG_VMSCAPE:
+		return vmscape_show_state(buf);
 
 	default:
 		break;
@@ -3339,5 +3529,10 @@ ssize_t cpu_show_indirect_target_selection(struct device *dev, struct device_att
 ssize_t cpu_show_tsa(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return cpu_show_common(dev, attr, buf, X86_BUG_TSA);
+}
+
+ssize_t cpu_show_vmscape(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return cpu_show_common(dev, attr, buf, X86_BUG_VMSCAPE);
 }
 #endif
