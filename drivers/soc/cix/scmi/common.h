@@ -143,7 +143,7 @@ extern struct bus_type scmi_bus_type;
 
 #define SCMI_BUS_NOTIFY_DEVICE_REQUEST		0
 #define SCMI_BUS_NOTIFY_DEVICE_UNREQUEST	1
-extern struct blocking_notifier_head scmi_requested_devices_nh;
+extern struct blocking_notifier_head cix_scmi_requested_devices_nh;
 
 int cix_scmi_protocol_acquire(const struct scmi_handle *handle, u8 protocol_id);
 void cix_scmi_protocol_release(const struct scmi_handle *handle, u8 protocol_id);
