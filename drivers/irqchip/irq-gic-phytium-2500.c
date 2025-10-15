@@ -46,6 +46,7 @@ static u8 dist_prio_nmi __ro_after_init = GICV3_PRIO_NMI;
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
+#define FLAGS_WORKAROUND_ASR_ERRATUM_8601001    (1ULL << 3)
 
 #define GIC_IRQ_TYPE_PARTITION	(GIC_IRQ_TYPE_LPI + 1)
 
@@ -784,6 +785,23 @@ static int gic_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu)
 	else
 		irqd_clr_forwarded_to_vcpu(d);
 	return 0;
+}
+
+static u64 gic_cpu_to_affinity(int cpu){
+    u64 mpidr = cpu_logical_map(cpu);
+    u64 aff;
+
+    /* ASR8601 needs to have its affinities shifted down... */
+    if (unlikely(gic_data.flags & FLAGS_WORKAROUND_ASR_ERRATUM_8601001))
+        mpidr = (MPIDR_AFFINITY_LEVEL(mpidr, 1) |
+             (MPIDR_AFFINITY_LEVEL(mpidr, 2) << 8));
+
+    aff = ((u64)MPIDR_AFFINITY_LEVEL(mpidr, 3) << 32 |
+           MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+           MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8  |
+           MPIDR_AFFINITY_LEVEL(mpidr, 0));
+
+    return aff;
 }
 
 static u64 gic_mpidr_to_affinity(unsigned long mpidr)
