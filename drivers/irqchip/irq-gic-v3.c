@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
+#include <linux/kernel.h>
 #include <linux/kstrtox.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
@@ -24,6 +25,7 @@
 #include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic-common.h>
 #include <linux/irqchip/arm-gic-v3.h>
+#include <linux/irqchip/arm-gic-v3-prio.h>
 #include <linux/irqchip/irq-partition-percpu.h>
 #include <linux/bitfield.h>
 #include <linux/bits.h>
@@ -36,11 +38,13 @@
 
 #include "irq-gic-common.h"
 
-#define GICD_INT_NMI_PRI	(GICD_INT_DEF_PRI & ~0x80)
+static u8 dist_prio_irq __ro_after_init = GICV3_PRIO_IRQ;
+static u8 dist_prio_nmi __ro_after_init = GICV3_PRIO_NMI;
 
 #define FLAGS_WORKAROUND_GICR_WAKER_MSM8996	(1ULL << 0)
 #define FLAGS_WORKAROUND_CAVIUM_ERRATUM_38539	(1ULL << 1)
 #define FLAGS_WORKAROUND_ASR_ERRATUM_8601001	(1ULL << 2)
+#define FLAGS_WORKAROUND_INSECURE		(1ULL << 3)
 
 #define GIC_IRQ_TYPE_PARTITION	(GIC_IRQ_TYPE_LPI + 1)
 
@@ -80,6 +84,8 @@ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
 #define GIC_LINE_NR	min(GICD_TYPER_SPIS(gic_data.rdists.gicd_typer), 1020U)
 #define GIC_ESPI_NR	GICD_TYPER_ESPIS(gic_data.rdists.gicd_typer)
 
+static bool nmi_support_forbidden;
+
 /*
  * There are 16 SGIs, though we only actually use 8 in Linux. The other 8 SGIs
  * are potentially stolen by the secure side. Some code, especially code dealing
@@ -109,30 +115,6 @@ static DEFINE_STATIC_KEY_TRUE(supports_deactivate_key);
  *   interrupt.
  */
 static DEFINE_STATIC_KEY_FALSE(supports_pseudo_nmis);
-
-DEFINE_STATIC_KEY_FALSE(gic_nonsecure_priorities);
-EXPORT_SYMBOL(gic_nonsecure_priorities);
-
-/*
- * When the Non-secure world has access to group 0 interrupts (as a
- * consequence of SCR_EL3.FIQ == 0), reading the ICC_RPR_EL1 register will
- * return the Distributor's view of the interrupt priority.
- *
- * When GIC security is enabled (GICD_CTLR.DS == 0), the interrupt priority
- * written by software is moved to the Non-secure range by the Distributor.
- *
- * If both are true (which is when gic_nonsecure_priorities gets enabled),
- * we need to shift down the priority programmed by software to match it
- * against the value returned by ICC_RPR_EL1.
- */
-#define GICD_INT_RPR_PRI(priority)					\
-	({								\
-		u32 __priority = (priority);				\
-		if (static_branch_unlikely(&gic_nonsecure_priorities))	\
-			__priority = 0x80 | (__priority >> 1);		\
-									\
-		__priority;						\
-	})
 
 static u32 gic_get_pribits(void)
 {
@@ -184,21 +166,62 @@ static void __init gic_prio_init(void)
 {
 	bool ds;
 
-	ds = gic_dist_security_disabled();
-	if (!ds) {
-		u32 val;
+	cpus_have_group0 = gic_has_group0();
 
-		val = readl_relaxed(gic_data.dist_base + GICD_CTLR);
-		val |= GICD_CTLR_DS;
-		writel_relaxed(val, gic_data.dist_base + GICD_CTLR);
-
-		ds = gic_dist_security_disabled();
-		if (ds)
-			pr_warn("Broken GIC integration, security disabled");
+    ds = gic_dist_security_disabled();
+    if ((gic_data.flags & FLAGS_WORKAROUND_INSECURE) && !ds) {
+        if (cpus_have_group0) {
+            u32 val;
+ 
+            val = readl_relaxed(gic_data.dist_base + GICD_CTLR);
+            val |= GICD_CTLR_DS;
+            writel_relaxed(val, gic_data.dist_base + GICD_CTLR);
+ 
+            ds = gic_dist_security_disabled();
+            if (ds)
+                pr_warn("Broken GIC integration, security disabled\n");
+        } else {
+            pr_warn("Broken GIC integration, pNMI forbidden\n");
+            nmi_support_forbidden = true;
+        }
 	}
 
 	cpus_have_security_disabled = ds;
-	cpus_have_group0 = gic_has_group0();
+
+    /*
+     * How priority values are used by the GIC depends on two things:
+     * the security state of the GIC (controlled by the GICD_CTRL.DS bit)
+     * and if Group 0 interrupts can be delivered to Linux in the non-secure
+     * world as FIQs (controlled by the SCR_EL3.FIQ bit). These affect the
+     * way priorities are presented in ICC_PMR_EL1 and in the distributor:
+     *
+     * GICD_CTRL.DS | SCR_EL3.FIQ | ICC_PMR_EL1 | Distributor
+     * -------------------------------------------------------
+     *      1       |      -      |  unchanged  |  unchanged
+     * -------------------------------------------------------
+     *      0       |      1      |  non-secure |  non-secure
+     * -------------------------------------------------------
+     *      0       |      0      |  unchanged  |  non-secure
+     *
+     * In the non-secure view reads and writes are modified:
+     *
+     * - A value written is right-shifted by one and the MSB is set,
+     *   forcing the priority into the non-secure range.
+     *
+     * - A value read is left-shifted by one.
+     *
+     * In the first two cases, where ICC_PMR_EL1 and the interrupt priority
+     * are both either modified or unchanged, we can use the same set of
+     * priorities.
+     *
+     * In the last case, where only the interrupt priorities are modified to
+     * be in the non-secure range, we program the non-secure values into
+     * the distributor to match the PMR values we want.
+     */
+	if (cpus_have_group0 && !cpus_have_security_disabled) {
+        dist_prio_irq = __gicv3_prio_to_ns(dist_prio_irq);
+        dist_prio_nmi = __gicv3_prio_to_ns(dist_prio_nmi);
+    }
 
 	pr_info("GICD_CTRL.DS=%d, SCR_EL3.FIQ=%d\n",
 		cpus_have_security_disabled,
@@ -636,7 +659,7 @@ static int gic_irq_nmi_setup(struct irq_data *d)
 		desc->handle_irq = handle_fasteoi_nmi;
 	}
 
-	gic_irq_set_prio(d, GICD_INT_NMI_PRI);
+	gic_irq_set_prio(d, dist_prio_nmi);
 
 	return 0;
 }
@@ -671,7 +694,7 @@ static void gic_irq_nmi_teardown(struct irq_data *d)
 		desc->handle_irq = handle_fasteoi_irq;
 	}
 
-	gic_irq_set_prio(d, GICD_INT_DEF_PRI);
+	gic_irq_set_prio(d, dist_prio_irq);
 }
 
 static bool gic_arm64_erratum_2941627_needed(struct irq_data *d)
@@ -750,7 +773,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
 
 	offset = convert_offset_index(d, GICD_ICFGR, &index);
 
-	ret = gic_configure_irq(index, type, base + offset, NULL);
+	ret = gic_configure_irq(index, type, base + offset);
 	if (ret && (range == PPI_RANGE || range == EPPI_RANGE)) {
 		/* Misconfigured PPIs are usually not fatal */
 		pr_warn("GIC: PPI INTID%ld is secure or misconfigured\n", irq);
@@ -833,7 +856,7 @@ static bool gic_rpr_is_nmi_prio(void)
 	if (!gic_supports_nmi())
 		return false;
 
-	return unlikely(gic_read_rpr() == GICD_INT_RPR_PRI(GICD_INT_NMI_PRI));
+	return unlikely(gic_read_rpr() == GICV3_PRIO_NMI);
 }
 
 static bool gic_irqnr_is_special(u32 irqnr)
@@ -979,10 +1002,11 @@ static void __init gic_dist_init(void)
 		writel_relaxed(0, base + GICD_ICFGRnE + i / 4);
 
 	for (i = 0; i < GIC_ESPI_NR; i += 4)
-		writel_relaxed(GICD_INT_DEF_PRI_X4, base + GICD_IPRIORITYRnE + i);
+		writel_relaxed(REPEAT_BYTE_U32(dist_prio_irq),
+			       base + GICD_IPRIORITYRnE + i);
 
 	/* Now do the common stuff */
-	gic_dist_config(base, GIC_LINE_NR, NULL);
+	gic_dist_config(base, GIC_LINE_NR, dist_prio_irq);
 
 	val = GICD_CTLR_ARE_NS | GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1;
 	if (gic_data.rdists.gicd_typer2 & GICD_TYPER2_nASSGIcap) {
@@ -1161,14 +1185,8 @@ static void gic_update_rdist_properties(void)
 			gic_data.rdists.has_vpend_valid_dirty ? "Valid+Dirty " : "");
 }
 
-static void gic_cpu_sys_reg_init(void)
+static void gic_cpu_sys_reg_enable(void)
 {
-	int i, cpu = smp_processor_id();
-	u64 mpidr = gic_cpu_to_affinity(cpu);
-	u64 need_rss = MPIDR_RS(mpidr);
-	bool group0;
-	u32 pribits;
-
 	/*
 	 * Need to check that the SRE bit has actually been set. If
 	 * not, it means that SRE is disabled at EL2. We're going to
@@ -1178,6 +1196,16 @@ static void gic_cpu_sys_reg_init(void)
 	 */
 	if (!gic_enable_sre())
 		pr_err("GIC: unable to set SRE (disabled at EL2), panic ahead\n");
+
+}
+
+static void gic_cpu_sys_reg_init(void)
+{
+	int i, cpu = smp_processor_id();
+	u64 mpidr = gic_cpu_to_affinity(cpu);
+	u64 need_rss = MPIDR_RS(mpidr);
+	bool group0;
+	u32 pribits;
 
 	pribits = gic_get_pribits();
 
@@ -1314,7 +1342,8 @@ static void gic_cpu_init(void)
 	for (i = 0; i < gic_data.ppi_nr + SGI_NR; i += 32)
 		writel_relaxed(~0, rbase + GICR_IGROUPR0 + i / 8);
 
-	gic_cpu_config(rbase, gic_data.ppi_nr + SGI_NR, gic_redist_wait_for_rwp);
+	gic_cpu_config(rbase, gic_data.ppi_nr + SGI_NR, dist_prio_irq);
+	gic_redist_wait_for_rwp();
 
 	/* initialise system registers */
 	gic_cpu_sys_reg_init();
@@ -1339,6 +1368,7 @@ static int gic_check_rdist(unsigned int cpu)
 
 static int gic_starting_cpu(unsigned int cpu)
 {
+	gic_cpu_sys_reg_enable();
 	gic_cpu_init();
 
 	if (gic_dist_supports_lpis())
@@ -1504,6 +1534,7 @@ static int gic_cpu_pm_notifier(struct notifier_block *self,
 	if (cmd == CPU_PM_EXIT || cmd == CPU_PM_ENTER_FAILED) {
 		if (gic_dist_security_disabled())
 			gic_enable_redist(true);
+		gic_cpu_sys_reg_enable();
 		gic_cpu_sys_reg_init();
 	} else if (cmd == CPU_PM_ENTER && gic_dist_security_disabled()) {
 		gic_write_grpen1(0);
@@ -1896,6 +1927,18 @@ static bool gic_enable_quirk_arm64_2941627(void *data)
 	return true;
 }
 
+static bool gic_enable_quirk_rk3399(void *data)
+{
+	struct gic_chip_data *d = data;
+
+	if (of_machine_is_compatible("rockchip,rk3399")) {
+		d->flags |= FLAGS_WORKAROUND_INSECURE;
+		return true;
+	}
+
+	return false;
+}
+
 static bool rd_set_non_coherent(void *data)
 {
 	struct gic_chip_data *d = data;
@@ -1971,6 +2014,12 @@ static const struct gic_quirk gic_quirks[] = {
 		.init   = rd_set_non_coherent,
 	},
 	{
+		.desc	= "GICv3: Insecure RK3399 integration",
+		.iidr	= 0x0000043b,
+		.mask	= 0xff000fff,
+		.init	= gic_enable_quirk_rk3399,
+	},
+	{
 	}
 };
 
@@ -1978,7 +2027,7 @@ static void gic_enable_nmi_support(void)
 {
 	int i;
 
-	if (!gic_prio_masking_enabled())
+	if (!gic_prio_masking_enabled() || nmi_support_forbidden)
 		return;
 
 	rdist_nmi_refs = kcalloc(gic_data.ppi_nr + SGI_NR,
@@ -1991,36 +2040,6 @@ static void gic_enable_nmi_support(void)
 
 	pr_info("Pseudo-NMIs enabled using %s ICC_PMR_EL1 synchronisation\n",
 		gic_has_relaxed_pmr_sync() ? "relaxed" : "forced");
-
-	/*
-	 * How priority values are used by the GIC depends on two things:
-	 * the security state of the GIC (controlled by the GICD_CTRL.DS bit)
-	 * and if Group 0 interrupts can be delivered to Linux in the non-secure
-	 * world as FIQs (controlled by the SCR_EL3.FIQ bit). These affect the
-	 * ICC_PMR_EL1 register and the priority that software assigns to
-	 * interrupts:
-	 *
-	 * GICD_CTRL.DS | SCR_EL3.FIQ | ICC_PMR_EL1 | Group 1 priority
-	 * -----------------------------------------------------------
-	 *      1       |      -      |  unchanged  |    unchanged
-	 * -----------------------------------------------------------
-	 *      0       |      1      |  non-secure |    non-secure
-	 * -----------------------------------------------------------
-	 *      0       |      0      |  unchanged  |    non-secure
-	 *
-	 * where non-secure means that the value is right-shifted by one and the
-	 * MSB bit set, to make it fit in the non-secure priority range.
-	 *
-	 * In the first two cases, where ICC_PMR_EL1 and the interrupt priority
-	 * are both either modified or unchanged, we can use the same set of
-	 * priorities.
-	 *
-	 * In the last case, where only the interrupt priorities are modified to
-	 * be in the non-secure range, we use a different PMR value to mask IRQs
-	 * and the rest of the values that we use remain unchanged.
-	 */
-	if (gic_has_group0() && !gic_dist_security_disabled())
-		static_branch_enable(&gic_nonsecure_priorities);
 
 	static_branch_enable(&supports_pseudo_nmis);
 
@@ -2102,6 +2121,7 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 
 	gic_update_rdist_properties();
 
+	gic_cpu_sys_reg_enable();
 	gic_prio_init();
 	gic_dist_init();
 	gic_cpu_init();
@@ -2110,7 +2130,7 @@ static int __init gic_init_bases(phys_addr_t dist_phys_base,
 	gic_cpu_pm_init();
 
 	if (gic_dist_supports_lpis()) {
-		its_init(handle, &gic_data.rdists, gic_data.domain);
+		its_init(handle, &gic_data.rdists, gic_data.domain, dist_prio_irq);
 		its_cpu_init();
 		its_lpi_memreserve_init();
 	} else {

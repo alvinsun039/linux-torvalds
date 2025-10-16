@@ -23,10 +23,10 @@ struct fregs_offset {
 	int offset;
 };
 
-#define FREGS_OFFSET(n, field)				\
-{							\
-	.name = n,					\
-	.offset = offsetof(struct ftrace_regs, field),	\
+#define FREGS_OFFSET(n, field)					\
+{								\
+	.name = n,						\
+	.offset = offsetof(struct __arch_ftrace_regs, field),	\
 }
 
 static const struct fregs_offset fregs_offsets[] = {
@@ -551,7 +551,20 @@ void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
 void ftrace_graph_func(unsigned long ip, unsigned long parent_ip,
 		       struct ftrace_ops *op, struct ftrace_regs *fregs)
 {
-	prepare_ftrace_return(ip, &fregs->lr, fregs->fp);
+	unsigned long return_hooker = (unsigned long)&return_to_handler;
+	unsigned long frame_pointer = arch_ftrace_regs(fregs)->fp;
+	unsigned long *parent = &arch_ftrace_regs(fregs)->lr;
+	unsigned long old;
+
+	if (unlikely(atomic_read(&current->tracing_graph_pause)))
+		return;
+
+	old = *parent;
+
+	if (!function_graph_enter_regs(old, ip, frame_pointer,
+				       (void *)frame_pointer, fregs)) {
+		*parent = return_hooker;
+	}
 }
 #else
 /*

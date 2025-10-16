@@ -421,8 +421,7 @@ int __init ftrace_dyn_arch_init(void)
 void ftrace_graph_func(unsigned long ip, unsigned long parent_ip,
 		       struct ftrace_ops *op, struct ftrace_regs *fregs)
 {
-	unsigned long sp = fregs->regs.gpr[1];
-	int bit;
+	unsigned long sp = arch_ftrace_regs(fregs)->regs.gpr[1];
 
 	if (unlikely(ftrace_graph_is_dead()))
 		goto out;
@@ -430,15 +429,10 @@ void ftrace_graph_func(unsigned long ip, unsigned long parent_ip,
 	if (unlikely(atomic_read(&current->tracing_graph_pause)))
 		goto out;
 
-	bit = ftrace_test_recursion_trylock(ip, parent_ip);
-	if (bit < 0)
-		goto out;
-
-	if (!function_graph_enter(parent_ip, ip, 0, (unsigned long *)sp))
+	if (!function_graph_enter_regs(parent_ip, ip, 0, (unsigned long *)sp, fregs))
 		parent_ip = ppc_function_entry(return_to_handler);
 
-	ftrace_test_recursion_unlock(bit);
 out:
-	fregs->regs.link = parent_ip;
+	arch_ftrace_regs(fregs)->regs.link = parent_ip;
 }
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
