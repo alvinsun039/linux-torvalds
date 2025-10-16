@@ -528,7 +528,7 @@ static inline void rtw_thread_enter(char *name)
 	allow_signal(SIGTERM);
 }
 
-static inline void rtw_thread_exit(_completion *comp)
+static inline __noreturn void rtw_thread_exit(_completion *comp)
 {
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 17, 0))
 	complete_and_exit(comp, 0);
