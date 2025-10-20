@@ -93,6 +93,14 @@ static __always_inline void bpf_set_bit(unsigned long nr,
 	addr[index] |= (1UL << offset);
 }
 
+static inline int ffsl(long x)
+{
+	if (x == 0)
+		return 0;
+
+	return __builtin_ctzl(x & ~x) + 1;
+}
+
 static __always_inline u8 bpf_find_next_zero_bit(const unsigned long *addr,
 						 unsigned long size,
 						 unsigned long offset)
@@ -108,7 +116,7 @@ static __always_inline u8 bpf_find_next_zero_bit(const unsigned long *addr,
 		}
 
 		if (word != 0) {
-			unsigned long bit = __builtin_ffsl(word) - 1;
+			unsigned long bit = ffsl(word) - 1;
 			unsigned long result = index * BITS_PER_LONG + bit;
 			return (result < size) ? (u8)result : (u8)size;
 		}
