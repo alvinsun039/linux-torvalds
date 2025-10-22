@@ -54,7 +54,7 @@ static void init_zhaoxin_cap(struct cpuinfo_x86 *c)
 		set_cpu_cap(c, X86_FEATURE_REP_GOOD);
 }
 
-#define ZX_PATCH_VERSION "v6.0.6"
+#define ZX_PATCH_VERSION "v6.0.8.1"
 
 static void early_init_zhaoxin(struct cpuinfo_x86 *c)
 {

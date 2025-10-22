@@ -35,7 +35,7 @@
 #include <asm/cpufeature.h>
 #include <asm/fpu/api.h>
 
-static struct x86_cpu_id via_rng_cpu_id[];
+static struct x86_cpu_id via_rng_cpu_ids[];
 
 
 enum {
@@ -196,7 +196,7 @@ static int __init via_rng_mod_init(void)
 {
 	int err;
 
-	if (!x86_match_cpu(via_rng_cpu_id))
+	if (!x86_match_cpu(via_rng_cpu_ids))
 		return -ENODEV;
 
 	pr_info("VIA RNG detected\n");
@@ -217,11 +217,11 @@ static void __exit via_rng_mod_exit(void)
 }
 module_exit(via_rng_mod_exit);
 
-static struct x86_cpu_id via_rng_cpu_id[] = {
+static struct x86_cpu_id via_rng_cpu_ids[] = {
 	X86_MATCH_VENDOR_FAM_FEATURE(CENTAUR, 6, X86_FEATURE_XSTORE, NULL),
 	{}
 };
-MODULE_DEVICE_TABLE(x86cpu, via_rng_cpu_id);
+MODULE_DEVICE_TABLE(x86cpu, via_rng_cpu_ids);
 
 MODULE_DESCRIPTION("H/W RNG driver for VIA CPU with PadLock");
 MODULE_LICENSE("GPL");

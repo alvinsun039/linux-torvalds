@@ -91,7 +91,7 @@ enum {
 		EAMD3D		= 1<<20,
 };
 
-#define ZX_PATCH_VERSION "v6.0.6"
+#define ZX_PATCH_VERSION "v6.0.8.1"
 
 static void early_init_centaur(struct cpuinfo_x86 *c)
 {
