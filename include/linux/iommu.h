@@ -590,6 +590,12 @@ struct iommu_ops {
 	struct iommu_domain *blocked_domain;
 	struct iommu_domain *release_domain;
 	struct iommu_domain *default_domain;
+
+#ifdef CONFIG_SMMU_BYPASS_DEV
+#ifndef __GENKSYMS__
+	int (*device_domain_type)(struct device *dev, unsigned int *type);
+#endif
+#endif
 };
 
 /**
