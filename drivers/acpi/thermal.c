@@ -30,6 +30,7 @@
 #include <linux/workqueue.h>
 #include <linux/uaccess.h>
 #include <linux/units.h>
+#include <linux/devfreq_cooling.h>
 
 #define ACPI_THERMAL_CLASS		"thermal_zone"
 #define ACPI_THERMAL_DEVICE_NAME	"Thermal Zone"
@@ -557,6 +558,14 @@ static void acpi_thermal_zone_device_critical(struct thermal_zone_device *therma
 	thermal_zone_device_critical(thermal);
 }
 
+static bool check_cdev_type(struct thermal_cooling_device *cdev, const char *type)
+{
+	if (cdev->type && !strncmp(cdev->type, type, strlen(type)))
+		return true;
+	else
+		return false;
+}
+
 static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 					  struct thermal_cooling_device *cdev,
 					  bool bind)
@@ -569,6 +578,12 @@ static int acpi_thermal_cooling_device_cb(struct thermal_zone_device *thermal,
 	int j;
 	int trip = -1;
 	int result = 0;
+
+	if (check_cdev_type(cdev, "devfreq")) {
+		struct devfreq_cooling_device *dfc = (struct devfreq_cooling_device *)cdev->devdata;
+
+		device = to_acpi_device_node(dfc->devfreq->dev.parent->fwnode);
+	}
 
 	if (tz->trips.critical.valid)
 		trip++;
