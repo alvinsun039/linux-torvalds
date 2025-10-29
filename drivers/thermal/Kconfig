@@ -79,6 +79,7 @@ config THERMAL_OF
 config THERMAL_ACPI
        depends on ACPI
        bool
+       default y
 
 config THERMAL_WRITABLE_TRIPS
 	bool "Enable writable trip points"
