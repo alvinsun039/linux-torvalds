@@ -249,7 +249,6 @@ enum io_uring_op {
 	IORING_OP_SENDMSG_ZC,
 	IORING_OP_READ_MULTISHOT,
 	IORING_OP_WAITID,
-	IORING_OP_FTRUNCATE,
 
 	/* this goes last, obviously */
 	IORING_OP_LAST,
