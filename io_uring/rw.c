@@ -29,19 +29,9 @@ struct io_rw {
 	rwf_t				flags;
 };
 
-static bool io_file_supports_nowait(struct io_kiocb *req, __poll_t mask)
+static inline bool io_file_supports_nowait(struct io_kiocb *req)
 {
-	/* If FMODE_NOWAIT is set for a file, we're golden */
-	if (req->flags & REQ_F_SUPPORT_NOWAIT)
-		return true;
-	/* No FMODE_NOWAIT, if we can poll, check the status */
-	if (io_file_can_poll(req)) {
-		struct poll_table_struct pt = { ._key = mask };
-
-		return vfs_poll(req->file, &pt) & mask;
-	}
-	/* No FMODE_NOWAIT support, and file isn't pollable. Tough luck. */
-	return false;
+	return req->flags & REQ_F_SUPPORT_NOWAIT;
 }
 
 #ifdef CONFIG_COMPAT
@@ -743,8 +733,8 @@ static int io_rw_init_file(struct io_kiocb *req, fmode_t mode)
 	 * supports async. Otherwise it's impossible to use O_NONBLOCK files
 	 * reliably. If not, or it IOCB_NOWAIT is set, don't retry.
 	 */
-	if (kiocb->ki_flags & IOCB_NOWAIT ||
-	    ((file->f_flags & O_NONBLOCK && (req->flags & REQ_F_SUPPORT_NOWAIT))))
+	if ((kiocb->ki_flags & IOCB_NOWAIT) ||
+	    ((file->f_flags & O_NONBLOCK) && !io_file_supports_nowait(req)))
 		req->flags |= REQ_F_NOWAIT;
 
 	if (ctx->flags & IORING_SETUP_IOPOLL) {
@@ -810,7 +800,7 @@ static int __io_read(struct io_kiocb *req, unsigned int issue_flags)
 
 	if (force_nonblock) {
 		/* If the file doesn't support async, just async punt */
-		if (unlikely(!io_file_supports_nowait(req, EPOLLIN))) {
+		if (unlikely(!io_file_supports_nowait(req))) {
 			ret = io_setup_async_rw(req, iovec, s, true);
 			return ret ?: -EAGAIN;
 		}
@@ -1050,7 +1040,7 @@ int io_write(struct io_kiocb *req, unsigned int issue_flags)
 
 	if (force_nonblock) {
 		/* If the file doesn't support async, just async punt */
-		if (unlikely(!io_file_supports_nowait(req, EPOLLOUT)))
+		if (unlikely(!io_file_supports_nowait(req)))
 			goto copy_iov;
 
 		/* Check if we can support NOWAIT. */
