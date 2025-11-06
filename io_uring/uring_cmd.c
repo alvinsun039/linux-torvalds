@@ -98,9 +98,6 @@ static void io_uring_cmd_work(struct io_kiocb *req, struct io_tw_state *ts)
 	if (ts->locked)
 		issue_flags = IO_URING_F_COMPLETE_DEFER;
 
-	if (current->flags & (PF_EXITING | PF_KTHREAD))
-		issue_flags |= IO_URING_F_TASK_DEAD;
-
 	ioucmd->task_work_cb(ioucmd, issue_flags);
 }
 
