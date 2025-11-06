@@ -416,6 +416,13 @@ static __maybe_unused int mdio_bus_phy_resume(struct device *dev)
 		phydev->state != PHY_UP);
 
 	ret = phy_init_hw(phydev);
+	/* Some phy driver may return EOPNOTSUPP,
+	 * because the phy_device instance not attached to net_device,
+	 * and then it thinks itself don't support default MII type.
+	 * Return 0 and consider the process as having been completed normally.
+	 */
+	if (ret == -EOPNOTSUPP)
+		return 0;
 	if (ret < 0)
 		return ret;
 
