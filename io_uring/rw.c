@@ -854,8 +854,6 @@ static int __io_read(struct io_kiocb *req, unsigned int issue_flags)
 			goto done;
 		ret = 0;
 	} else if (ret == -EIOCBQUEUED) {
-		req->flags |= REQ_F_PARTIAL_IO;
-		io_kbuf_recycle(req, issue_flags);
 		if (iovec)
 			kfree(iovec);
 		return IOU_ISSUE_SKIP_COMPLETE;
@@ -878,9 +876,6 @@ static int __io_read(struct io_kiocb *req, unsigned int issue_flags)
 		ret = ret > 0 ? ret : ret2;
 		goto done;
 	}
-
-	req->flags |= REQ_F_PARTIAL_IO;
-	io_kbuf_recycle(req, issue_flags);
 
 	io = req->async_data;
 	s = &io->s;
@@ -1090,11 +1085,6 @@ int io_write(struct io_kiocb *req, unsigned int issue_flags)
 		ret2 = loop_rw_iter(WRITE, rw, &s->iter);
 	else
 		ret2 = -EINVAL;
-
-	if (ret2 == -EIOCBQUEUED) {
-		req->flags |= REQ_F_PARTIAL_IO;
-		io_kbuf_recycle(req, issue_flags);
-	}
 
 	if (req->flags & REQ_F_REISSUE) {
 		req->flags &= ~REQ_F_REISSUE;
