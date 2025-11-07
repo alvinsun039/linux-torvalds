@@ -440,9 +440,9 @@ static inline bool io_allowed_run_tw(struct io_ring_ctx *ctx)
  * 2) PF_KTHREAD is set, in which case the invoker of the task_work is
  *    our fallback task_work.
  */
-static inline bool io_should_terminate_tw(struct io_ring_ctx *ctx)
+static inline bool io_should_terminate_tw(void)
 {
-	return (current->flags & (PF_KTHREAD | PF_EXITING)) || percpu_ref_is_dying(&ctx->refs);
+	return current->flags & (PF_KTHREAD | PF_EXITING);
 }
 
 static inline void io_req_queue_tw_complete(struct io_kiocb *req, s32 res)
