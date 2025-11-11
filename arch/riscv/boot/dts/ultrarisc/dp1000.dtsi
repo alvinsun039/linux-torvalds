@@ -11,12 +11,12 @@
 	#size-cells = <0x02>;
 	compatible = "ultrarisc,dp1000";
 	model = "ultrarisc,dp1000";
-	
+
 	cpus {
 		#address-cells = <0x01>;
 		#size-cells = <0x00>;
 		timebase-frequency = <10000000>;
-		
+
 		cpu0: cpu@0 {
 			device_type = "cpu";
 			reg = <0x00>;
@@ -114,9 +114,7 @@
 			compatible = "riscv";
 			riscv,isa = "rv64imafdcbh";
 			mmu-type = "riscv,sv48";
-			
 			clock-frequency = <2000000000>;
-			
 			cpu6_intc:interrupt-controller {
 				#address-cells = <0x01>;
 				interrupt-controller;
@@ -140,18 +138,18 @@
 			};
 		};
 	};
-	
+
 	memory@80000000 {
 		device_type = "memory";
 		reg = <0x00 0x80000000 0x4 0x00000000>;
 	};
-	
+
 	soc {
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;
 		compatible = "simple-bus";
 		ranges;
-		
+
 		clocks {
 			compatible = "simple-bus";
 			u-boot,dm-pre-reloc;
@@ -167,7 +165,7 @@
 				#clock-cells = <0>;
 			};
 		};
-		
+
 		clint: clint@8000000 {
 			compatible = "riscv,clint0";
 			interrupts-extended = <&cpu0_intc 0x03>, <&cpu0_intc 0x07>,
@@ -180,7 +178,7 @@
 			<&cpu7_intc 0x03>, <&cpu7_intc 0x07>;
 			reg = <0x00 0x8000000 0x00 0x100000>;
 		};
-		
+
 		plic: plic@9000000 {
 			#interrupt-cells = <1>;
 			#address-cells = <0>;
@@ -199,7 +197,7 @@
 			riscv,max-priority = <0x07>;
 			riscv,ndev = <160>;
 		};
-		
+
 		uart0: serial@20300000 {
 			interrupt-parent = <0x01>;
 			interrupts = <17>;
@@ -210,7 +208,7 @@
 			reg-offset = <0x0>;
 			reg-shift = <0x02>;
 		};
-		
+
 		uart1: serial@20310000 {
 			interrupt-parent = <0x01>;
 			interrupts = <18>;
@@ -221,7 +219,7 @@
 			reg-offset = <0x0>;
 			reg-shift = <0x02>;
 		};
-		
+
 		uart2: serial@20400000 {
 			interrupt-parent = <0x01>;
 			interrupts = <25>;
@@ -232,7 +230,7 @@
 			reg-offset = <0x0>;
 			reg-shift = <0x02>;
 		};
-		
+
 		uart3: serial@20410000 {
 			interrupt-parent = <0x01>;
 			interrupts = <26>;
@@ -243,7 +241,7 @@
 			reg-offset = <0x0>;
 			reg-shift = <0x02>;
 		};
-		
+
 		spi0: spi@20320000 {
 			compatible = "baikal,bt1-ssi","snps,dw-apb-ssi";
 			status = "okay";
@@ -257,7 +255,7 @@
 			num-cs = <3>;
 			spi-max-frequency = <62500000>;
 		};
-		
+
 		spi1: spi@20420000 {
 			compatible = "baikal,bt1-ssi","snps,dw-apb-ssi";
 			status = "okay";
@@ -271,7 +269,7 @@
 			num-cs = <3>;
 			spi-max-frequency = <62500000>;
 		};
-		
+
 		i2c0: i2c@20330000{
 			compatible = "snps,designware-i2c";
 			status = "okay";
@@ -283,7 +281,7 @@
 			interrupt-parent = <0x01>;
 			interrupts = <20>;
 		};
-		
+
 		i2c1: i2c@20340000{
 			compatible = "snps,designware-i2c";
 			status = "okay";
@@ -295,7 +293,7 @@
 			interrupt-parent = <0x01>;
 			interrupts = <21>;
 		};
-		
+
 		i2c2: i2c@20430000{
 			compatible = "snps,designware-i2c";
 			status = "okay";
@@ -307,7 +305,7 @@
 			interrupt-parent = <0x01>;
 			interrupts = <28>;
 		};
-		
+
 		i2c3: i2c@20440000{
 			compatible = "snps,designware-i2c";
 			status = "okay";
@@ -319,7 +317,7 @@
 			interrupt-parent = <0x01>;
 			interrupts = <29>;
 		};
-		
+
 		wdt0: watchdog@20210000 {
 			compatible = "snps,dw-wdt";
 			status = "okay";
@@ -330,13 +328,24 @@
 			interrupts = <33>;
 			clocks = <&device_clk>;
 		};
-		
+
+		pmx0: pinmux@11081000 {
+			compatible = "ultrarisc,dp1000-pinctrl";
+			reg = <0x0 0x11081000  0x0 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			#pinctrl-cells = <2>;
+			pinctrl-single,register-width = <32>;
+			pinctrl-single,function-mask = <0x3ff>;
+			pinctrl-use-default;
+		};
+
 		gpio: gpio@20200000 {
 			compatible = "snps,dw-apb-gpio";
-      			#address-cells = <1>;
-      			#size-cells = <0>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			reg = <0x0 0x20200000 0x0 0x1000>;
-      			clocks = <&csr_clk>, <&device_clk>;
+			clocks = <&csr_clk>, <&device_clk>;
 			clock-names = "bus", "db";
 			status = "okay";
 
@@ -350,6 +359,7 @@
 				#interrupt-cells = <2>;
 				interrupt-parent = <0x01>;
 				interrupts = <34>;
+				gpio-ranges = <&pmx0 0 0 16>;
 			};
 
 			portb: gpio-port@1 {
@@ -358,6 +368,7 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 				snps,nr-gpios = <8>;
+				gpio-ranges = <&pmx0 16 0 8>;
 			};
 
 			portc: gpio-port@2 {
@@ -366,6 +377,7 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 				snps,nr-gpios = <8>;
+				gpio-ranges = <&pmx0 24 0 8>;
 			};
 
 			portd: gpio-port@3 {
@@ -374,9 +386,10 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 				snps,nr-gpios = <8>;
+				gpio-ranges = <&pmx0 32 0 8>;
 			};
 		};
-		
+
 		ethernet1@38000000 {
 			clocks = <&csr_clk>;
 			clock-names = "stmmaceth";
@@ -402,7 +415,7 @@
 				};
 			};
 		};
-		
+
 		dmac: dma-controller@39000000 {
 			compatible = "snps,axi-dma-1.01a";
 			#address-cells = <1>;
@@ -433,18 +446,18 @@
 			dma-coherent;
 			bus-range = <0x0 0xff>;
 			num-lanes = <16>;
-			ranges = <0x81000000  0x0 0x4fbf0000  0x0 0x4fbf0000  0x0 0x00400000>, /* io */
-				 <0x82000000  0x0 0x40000000  0x0 0x40000000  0x0 0x0fbf0000>, /* mem32 */
-				 <0xc3000000 0x40 0x00000000 0x40 0x00000000  0xd 0x00000000>; /* mem64 prefetchable */
+			ranges = <0x81000000  0x0 0x4fbf0000  0x0 0x4fbf0000  0x0 0x00400000>,
+				 <0x82000000  0x0 0x40000000  0x0 0x40000000  0x0 0x0fbf0000>,
+				 <0xc3000000 0x40 0x00000000 0x40 0x00000000  0xd 0x00000000>;
 			max-link-speed = <4>;
 			interrupt-parent = <&plic>;
 			interrupts = <43>, <44>, <45>, <46>, <47>, <48>;
 			interrupt-names = "msi", "inta", "intb", "intc", "intd", "aer";
 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
 			interrupt-map = <0x0 0x0 0x0 0x1 &plic 44>,
-			                <0x0 0x0 0x0 0x2 &plic 45>,
-			                <0x0 0x0 0x0 0x3 &plic 46>,
-			                <0x0 0x0 0x0 0x4 &plic 47>;
+					<0x0 0x0 0x0 0x2 &plic 45>,
+					<0x0 0x0 0x0 0x3 &plic 46>,
+					<0x0 0x0 0x0 0x4 &plic 47>;
 		};
 
 		pcie_x4a: pcie@23000000 {
@@ -459,18 +472,18 @@
 			dma-coherent;
 			bus-range = <0x0 0xff>;
 			num-lanes = <4>;
-			ranges = <0x81000000  0x0 0x6fbf0000  0x0 0x6fbf0000  0x0 0x00400000>, /* io */
-				 <0x82000000  0x0 0x60000000  0x0 0x60000000  0x0 0x0fbf0000>, /* mem32 */
-				 <0xc3000000 0x80 0x00000000 0x80 0x00000000  0xd 0x00000000>; /* mem64 prefetchable */
+			ranges = <0x81000000  0x0 0x6fbf0000  0x0 0x6fbf0000  0x0 0x00400000>,
+				 <0x82000000  0x0 0x60000000  0x0 0x60000000  0x0 0x0fbf0000>,
+				 <0xc3000000 0x80 0x00000000 0x80 0x00000000  0xd 0x00000000>;
 			max-link-speed = <4>;
 			interrupt-parent = <&plic>;
 			interrupts = <63>, <64>, <65>, <66>, <67>, <68>;
 			interrupt-names = "msi", "inta", "intb", "intc", "intd", "aer";
 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
 			interrupt-map = <0x0 0x0 0x0 0x1 &plic 64>,
-			                <0x0 0x0 0x0 0x2 &plic 65>,
-			                <0x0 0x0 0x0 0x3 &plic 66>,
-			                <0x0 0x0 0x0 0x4 &plic 67>;
+					<0x0 0x0 0x0 0x2 &plic 65>,
+					<0x0 0x0 0x0 0x3 &plic 66>,
+					<0x0 0x0 0x0 0x4 &plic 67>;
 		};
 
 		pcie_x4b: pcie@24000000 {
@@ -485,18 +498,18 @@
 			dma-coherent;
 			bus-range = <0x0 0xff>;
 			num-lanes = <4>;
-			ranges = <0x81000000  0x0 0x7fbf0000  0x0 0x7fbf0000 0x0 0x00400000>, /* io */
-				 <0x82000000  0x0 0x70000000  0x0 0x70000000 0x0 0x0fbf0000>, /* mem32 */
-				 <0xc3000000 0xc0 0x00000000 0xc0 0x00000000 0xd 0x00000000>; /* mem64 prefetchable */
+			ranges = <0x81000000  0x0 0x7fbf0000  0x0 0x7fbf0000 0x0 0x00400000>,
+				 <0x82000000  0x0 0x70000000  0x0 0x70000000 0x0 0x0fbf0000>,
+				 <0xc3000000 0xc0 0x00000000 0xc0 0x00000000 0xd 0x00000000>;
 			max-link-speed = <4>;
 			interrupt-parent = <&plic>;
 			interrupts = <73>, <74>, <75>, <76>, <77>, <78>;
 			interrupt-names = "msi", "inta", "intb", "intc", "intd", "aer";
 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
 			interrupt-map = <0x0 0x0 0x0 0x1 &plic 74>,
-			                <0x0 0x0 0x0 0x2 &plic 75>,
-			                <0x0 0x0 0x0 0x3 &plic 76>,
-			                <0x0 0x0 0x0 0x4 &plic 77>;
+					<0x0 0x0 0x0 0x2 &plic 75>,
+					<0x0 0x0 0x0 0x3 &plic 76>,
+					<0x0 0x0 0x0 0x4 &plic 77>;
 		};
 	};
 };
