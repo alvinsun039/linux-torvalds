@@ -1069,7 +1069,7 @@ struct mm_struct {
 #endif
 		} lru_gen;
 #endif
-#if IS_ENABLED(CONFIG_ETMEM) && IS_ENABLED(CONFIG_KVM)
+#if IS_ENABLED(CONFIG_KVM)
 		struct kvm *kvm;
 #endif /* CONFIG_LRU_GEN_WALKS_MMU */
 	} __randomize_layout;
