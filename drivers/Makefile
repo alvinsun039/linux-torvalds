@@ -199,6 +199,7 @@ obj-$(CONFIG_PECI)		+= peci/
 obj-$(CONFIG_HTE)		+= hte/
 obj-$(CONFIG_DRM_ACCEL)		+= accel/
 obj-$(CONFIG_CDX_BUS)		+= cdx/
+obj-y				+= resctrl/
 
 obj-$(CONFIG_S390)		+= s390/
 
