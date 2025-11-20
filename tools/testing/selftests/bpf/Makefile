@@ -715,7 +715,8 @@ $(VERIFICATION_CERT) $(PRIVATE_KEY): $(VERIFY_SIG_SETUP)
 	$(Q)$(VERIFY_SIG_SETUP) genkey $(BUILD_DIR)
 
 $(VERIFY_SIG_HDR): $(VERIFICATION_CERT)
-	$(Q)xxd -i -n test_progs_verification_cert $< > $@
+	$(Q)ln -fs $< test_progs_verification_cert && \
+	xxd -i test_progs_verification_cert > $@
 
 # Define test_progs test runner.
 TRUNNER_TESTS_DIR := prog_tests
@@ -873,7 +874,8 @@ EXTRA_CLEAN := $(TEST_CUSTOM_PROGS) $(SCRATCH_DIR) $(HOST_SCRATCH_DIR)	\
 			       no_alu32 cpuv4 bpf_gcc bpf_testmod.ko	\
 			       bpf_test_no_cfi.ko			\
 			       liburandom_read.so)			\
-	$(OUTPUT)/FEATURE-DUMP.selftests
+	$(OUTPUT)/FEATURE-DUMP.selftests				\
+	test_progs_verification_cert
 
 .PHONY: docs docs-clean
 
