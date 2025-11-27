@@ -11,14 +11,14 @@ config PHY_CIX_USBDP
 	  Enable this to support the CIX USBDP PHY for TYPEC Connection
 
 config PHY_CIX_USB2
-	bool "Cix USB2 PHY Driver"
+	tristate "Cix USB2 PHY Driver"
 	depends on ARM64 && OF
 	select GENERIC_PHY
 	help
 	  Enable this to support the CIX USB2 PHY
 
 config PHY_CIX_USB3
-	bool "Cix USB3 PHY Driver"
+	tristate "Cix USB3 PHY Driver"
 	depends on ARM64 && OF && HAS_IOMEM
 	select GENERIC_PHY
 	help
