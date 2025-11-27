@@ -42,6 +42,42 @@ module_param(disable_msipolling, bool, 0444);
 MODULE_PARM_DESC(disable_msipolling,
 	"Disable MSI-based polling for CMD_SYNC completion.");
 
+#ifdef CONFIG_SMMU_BYPASS_DEV
+struct smmu_bypass_device {
+	unsigned short vendor;
+	unsigned short device;
+};
+
+#define MAX_CMDLINE_SMMU_BYPASS_DEV 16
+static struct smmu_bypass_device smmu_bypass_devices[MAX_CMDLINE_SMMU_BYPASS_DEV];
+static int smmu_bypass_devices_num;
+
+static int __init arm_smmu_bypass_dev_setup(char *str)
+{
+	unsigned short vendor;
+	unsigned short device;
+	int ret;
+
+	if (!str)
+		return -EINVAL;
+
+	ret = sscanf(str, "%hx:%hx", &vendor, &device);
+	if (ret != 2)
+		return -EINVAL;
+
+	if (smmu_bypass_devices_num >= MAX_CMDLINE_SMMU_BYPASS_DEV)
+		return -ERANGE;
+
+	smmu_bypass_devices[smmu_bypass_devices_num].vendor = vendor;
+	smmu_bypass_devices[smmu_bypass_devices_num].device = device;
+	smmu_bypass_devices_num++;
+
+	return 0;
+}
+
+__setup("smmu.bypassdev=", arm_smmu_bypass_dev_setup);
+#endif
+
 static struct iommu_ops arm_smmu_ops;
 static struct iommu_dirty_ops arm_smmu_dirty_ops;
 
@@ -3516,6 +3552,29 @@ static int arm_smmu_def_domain_type(struct device *dev)
 	return 0;
 }
 
+#ifdef CONFIG_SMMU_BYPASS_DEV
+static int arm_smmu_device_domain_type(struct device *dev, unsigned int *type)
+{
+	int i;
+	struct pci_dev *pdev;
+
+	if (!dev_is_pci(dev))
+		return -ERANGE;
+
+	pdev = to_pci_dev(dev);
+	for (i = 0; i < smmu_bypass_devices_num; i++) {
+		if ((smmu_bypass_devices[i].vendor == pdev->vendor)
+		    && (smmu_bypass_devices[i].device == pdev->device)) {
+			dev_info(dev, "device 0x%x:0x%x uses identity mapping.",
+					pdev->vendor, pdev->device);
+			*type = IOMMU_DOMAIN_IDENTITY;
+			return 0;
+		}
+	}
+	return -ERANGE;
+}
+#endif
+
 static struct iommu_ops arm_smmu_ops = {
 	.identity_domain	= &arm_smmu_identity_domain,
 	.blocked_domain		= &arm_smmu_blocked_domain,
@@ -3535,6 +3594,9 @@ static struct iommu_ops arm_smmu_ops = {
 	.def_domain_type	= arm_smmu_def_domain_type,
 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
 	.owner			= THIS_MODULE,
+#ifdef CONFIG_SMMU_BYPASS_DEV
+	.device_domain_type     = arm_smmu_device_domain_type,
+#endif
 	.default_domain_ops = &(const struct iommu_domain_ops) {
 		.attach_dev		= arm_smmu_attach_dev,
 		.set_dev_pasid		= arm_smmu_s1_set_dev_pasid,
@@ -3673,12 +3735,59 @@ static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
 	return 0;
 }
 
+#ifdef CONFIG_SMMU_BYPASS_DEV
+static void arm_smmu_install_bypass_ste_for_dev(struct arm_smmu_device *smmu,
+						u32 sid)
+{
+	u64 val;
+	struct arm_smmu_ste *step = arm_smmu_get_step_for_sid(smmu, sid);
+
+	if (!step)
+		return;
+
+	val = STRTAB_STE_0_V;
+	val |= FIELD_PREP(STRTAB_STE_0_CFG, STRTAB_STE_0_CFG_BYPASS);
+	step->data[0] = cpu_to_le64(val);
+	step->data[1] = cpu_to_le64(FIELD_PREP(STRTAB_STE_1_SHCFG,
+	STRTAB_STE_1_SHCFG_INCOMING));
+	step->data[2] = 0;
+}
+
+static int arm_smmu_prepare_init_l2_strtab(struct device *dev, void *data)
+{
+	u32 sid;
+	int ret;
+	unsigned int type;
+	struct pci_dev *pdev;
+	struct arm_smmu_device *smmu = (struct arm_smmu_device *)data;
+
+	if (arm_smmu_device_domain_type(dev, &type))
+		return 0;
+
+	pdev = to_pci_dev(dev);
+	sid = PCI_DEVID(pdev->bus->number, pdev->devfn);
+	if (!arm_smmu_sid_in_range(smmu, sid))
+		return -ERANGE;
+
+	ret = arm_smmu_init_l2_strtab(smmu, sid);
+	if (ret)
+		return ret;
+
+	arm_smmu_install_bypass_ste_for_dev(smmu, sid);
+
+	return 0;
+}
+#endif
+
 static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
 {
 	void *strtab;
 	u64 reg;
 	u32 size, l1size;
 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+#ifdef CONFIG_SMMU_BYPASS_DEV
+	int ret;
+#endif
 
 	/* Calculate the L1 size, capped to the SIDSIZE. */
 	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
@@ -3708,7 +3817,19 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
 	reg |= FIELD_PREP(STRTAB_BASE_CFG_SPLIT, STRTAB_SPLIT);
 	cfg->strtab_base_cfg = reg;
 
+#ifdef CONFIG_SMMU_BYPASS_DEV
+	ret = arm_smmu_init_l1_strtab(smmu);
+	if (ret)
+		return ret;
+
+	if (smmu_bypass_devices_num) {
+		ret = bus_for_each_dev(&pci_bus_type, NULL, (void *)smmu,
+				       arm_smmu_prepare_init_l2_strtab);
+}
+	return ret;
+#else
 	return arm_smmu_init_l1_strtab(smmu);
+#endif
 }
 
 static int arm_smmu_init_strtab_linear(struct arm_smmu_device *smmu)

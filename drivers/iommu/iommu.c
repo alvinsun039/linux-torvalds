@@ -1618,6 +1618,11 @@ iommu_group_alloc_default_domain(struct iommu_group *group, int req_type)
 {
 	const struct iommu_ops *ops = dev_iommu_ops(iommu_group_first_dev(group));
 	struct iommu_domain *dom;
+#ifdef CONFIG_SMMU_BYPASS_DEV
+	struct device *dev =
+		list_first_entry(&group->devices, struct group_device, list)->dev;
+	unsigned int type = iommu_def_domain_type;
+#endif
 
 	lockdep_assert_held(&group->mutex);
 
@@ -1635,8 +1640,18 @@ iommu_group_alloc_default_domain(struct iommu_group *group, int req_type)
 	if (req_type)
 		return __iommu_group_alloc_default_domain(group, req_type);
 
+#ifdef CONFIG_SMMU_BYPASS_DEV
+	/* direct allocate required default domain type for some specific devices. */
+	if (ops->device_domain_type != NULL) {
+		if (ops->device_domain_type(dev, &type))
+			type = iommu_def_domain_type;
+	}
+
+	dom = __iommu_group_alloc_default_domain(group, type);
+#else
 	/* The driver gave no guidance on what type to use, try the default */
 	dom = __iommu_group_alloc_default_domain(group, iommu_def_domain_type);
+#endif
 	if (!IS_ERR(dom))
 		return dom;
 
