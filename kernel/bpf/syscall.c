@@ -3021,15 +3021,31 @@ static int bpf_obj_get(const union bpf_attr *attr)
 				attr->file_flags);
 }
 
-void bpf_link_init(struct bpf_link *link, enum bpf_link_type type,
-		   const struct bpf_link_ops *ops, struct bpf_prog *prog)
+/* bpf_link_init_sleepable() allows to specify whether BPF link itself has
+ * "sleepable" semantics, which normally would mean that BPF link's attach
+ * hook can dereference link or link's underlying program for some time after
+ * detachment due to RCU Tasks Trace-based lifetime protection scheme.
+ * BPF program itself can be non-sleepable, yet, because it's transitively
+ * reachable through BPF link, its freeing has to be delayed until after RCU
+ * Tasks Trace GP.
+ */
+void bpf_link_init_sleepable(struct bpf_link *link, enum bpf_link_type type,
+			     const struct bpf_link_ops *ops, struct bpf_prog *prog,
+			     bool sleepable)
 {
 	WARN_ON(ops->dealloc && ops->dealloc_deferred);
 	atomic64_set(&link->refcnt, 1);
 	link->type = type;
+	link->sleepable = sleepable;
 	link->id = 0;
 	link->ops = ops;
 	link->prog = prog;
+}
+
+void bpf_link_init(struct bpf_link *link, enum bpf_link_type type,
+		   const struct bpf_link_ops *ops, struct bpf_prog *prog)
+{
+	bpf_link_init_sleepable(link, type, ops, prog, false);
 }
 
 static void bpf_link_free_id(int id)
@@ -3096,20 +3112,21 @@ static void bpf_link_defer_dealloc_mult_rcu_gp(struct rcu_head *rcu)
 static void bpf_link_free(struct bpf_link *link)
 {
 	const struct bpf_link_ops *ops = link->ops;
-	bool sleepable = false;
 
 	bpf_link_free_id(link->id);
-	if (link->prog) {
-		sleepable = link->prog->sleepable;
-		/* detach BPF program, clean up used resources */
+	/* detach BPF program, clean up used resources */
+	if (link->prog)
 		ops->release(link);
-	}
 	if (ops->dealloc_deferred) {
-		/* schedule BPF link deallocation; if underlying BPF program
-		 * is sleepable, we need to first wait for RCU tasks trace
-		 * sync, then go through "classic" RCU grace period
+		/* Schedule BPF link deallocation, which will only then
+		 * trigger putting BPF program refcount.
+		 * If underlying BPF program is sleepable or BPF link's target
+		 * attach hookpoint is sleepable or otherwise requires RCU GPs
+		 * to ensure link and its underlying BPF program is not
+		 * reachable anymore, we need to first wait for RCU tasks
+		 * trace sync, and then go through "classic" RCU grace period
 		 */
-		if (sleepable)
+		if (link->sleepable || (link->prog && link->prog->sleepable))
 			call_rcu_tasks_trace(&link->rcu, bpf_link_defer_dealloc_mult_rcu_gp);
 		else
 			call_rcu(&link->rcu, bpf_link_defer_dealloc_rcu_gp);
@@ -3173,7 +3190,14 @@ static void bpf_link_show_fdinfo(struct seq_file *m, struct file *filp)
 	char prog_tag[sizeof(prog->tag) * 2 + 1] = { };
 
 	if (type < ARRAY_SIZE(bpf_link_type_strs) && bpf_link_type_strs[type]) {
-		seq_printf(m, "link_type:\t%s\n", bpf_link_type_strs[type]);
+		if (link->type == BPF_LINK_TYPE_KPROBE_MULTI)
+			seq_printf(m, "link_type:\t%s\n", link->flags == BPF_F_KPROBE_MULTI_RETURN ?
+				   "kretprobe_multi" : "kprobe_multi");
+		else if (link->type == BPF_LINK_TYPE_UPROBE_MULTI)
+			seq_printf(m, "link_type:\t%s\n", link->flags == BPF_F_UPROBE_MULTI_RETURN ?
+				   "uretprobe_multi" : "uprobe_multi");
+		else
+			seq_printf(m, "link_type:\t%s\n", bpf_link_type_strs[type]);
 	} else {
 		WARN_ONCE(1, "missing BPF_LINK_TYPE(...) for link type %u\n", type);
 		seq_printf(m, "link_type:\t<%u>\n", type);
@@ -3734,6 +3758,32 @@ static int bpf_perf_link_fill_kprobe(const struct perf_event *event,
 	info->perf_event.kprobe.cookie = event->bpf_cookie;
 	return 0;
 }
+
+static void bpf_perf_link_fdinfo_kprobe(const struct perf_event *event,
+					struct seq_file *seq)
+{
+	const char *name;
+	int err;
+	u32 prog_id, type;
+	u64 offset, addr;
+	unsigned long missed;
+
+	err = bpf_get_perf_event_info(event, &prog_id, &type, &name,
+				      &offset, &addr, &missed);
+	if (err)
+		return;
+
+	seq_printf(seq,
+		   "name:\t%s\n"
+		   "offset:\t%#llx\n"
+		   "missed:\t%lu\n"
+		   "addr:\t%#llx\n"
+		   "event_type:\t%s\n"
+		   "cookie:\t%llu\n",
+		   name, offset, missed, addr,
+		   type == BPF_FD_TYPE_KRETPROBE ?  "kretprobe" : "kprobe",
+		   event->bpf_cookie);
+}
 #endif
 
 #ifdef CONFIG_UPROBE_EVENTS
@@ -3760,6 +3810,31 @@ static int bpf_perf_link_fill_uprobe(const struct perf_event *event,
 	info->perf_event.uprobe.offset = offset;
 	info->perf_event.uprobe.cookie = event->bpf_cookie;
 	return 0;
+}
+
+static void bpf_perf_link_fdinfo_uprobe(const struct perf_event *event,
+					struct seq_file *seq)
+{
+	const char *name;
+	int err;
+	u32 prog_id, type;
+	u64 offset, ref_ctr_offset;
+	unsigned long missed;
+
+	err = bpf_get_perf_event_info(event, &prog_id, &type, &name,
+				      &offset, &ref_ctr_offset, &missed);
+	if (err)
+		return;
+
+	seq_printf(seq,
+		   "name:\t%s\n"
+		   "offset:\t%#llx\n"
+		   "ref_ctr_offset:\t%#llx\n"
+		   "event_type:\t%s\n"
+		   "cookie:\t%llu\n",
+		   name, offset, ref_ctr_offset,
+		   type == BPF_FD_TYPE_URETPROBE ?  "uretprobe" : "uprobe",
+		   event->bpf_cookie);
 }
 #endif
 
@@ -3829,10 +3904,79 @@ static int bpf_perf_link_fill_link_info(const struct bpf_link *link,
 	}
 }
 
+static void bpf_perf_event_link_show_fdinfo(const struct perf_event *event,
+					    struct seq_file *seq)
+{
+	seq_printf(seq,
+		   "type:\t%u\n"
+		   "config:\t%llu\n"
+		   "event_type:\t%s\n"
+		   "cookie:\t%llu\n",
+		   event->attr.type, event->attr.config,
+		   "event", event->bpf_cookie);
+}
+
+static void bpf_tracepoint_link_show_fdinfo(const struct perf_event *event,
+					    struct seq_file *seq)
+{
+	int err;
+	const char *name;
+	u32 prog_id;
+
+	err = bpf_get_perf_event_info(event, &prog_id, NULL, &name, NULL,
+				      NULL, NULL);
+	if (err)
+		return;
+
+	seq_printf(seq,
+		   "tp_name:\t%s\n"
+		   "event_type:\t%s\n"
+		   "cookie:\t%llu\n",
+		   name, "tracepoint", event->bpf_cookie);
+}
+
+static void bpf_probe_link_show_fdinfo(const struct perf_event *event,
+				       struct seq_file *seq)
+{
+#ifdef CONFIG_KPROBE_EVENTS
+	if (event->tp_event->flags & TRACE_EVENT_FL_KPROBE)
+		return bpf_perf_link_fdinfo_kprobe(event, seq);
+#endif
+
+#ifdef CONFIG_UPROBE_EVENTS
+	if (event->tp_event->flags & TRACE_EVENT_FL_UPROBE)
+		return bpf_perf_link_fdinfo_uprobe(event, seq);
+#endif
+}
+
+static void bpf_perf_link_show_fdinfo(const struct bpf_link *link,
+				      struct seq_file *seq)
+{
+	struct bpf_perf_link *perf_link;
+	const struct perf_event *event;
+
+	perf_link = container_of(link, struct bpf_perf_link, link);
+	event = perf_get_event(perf_link->perf_file);
+	if (IS_ERR(event))
+		return;
+
+	switch (event->prog->type) {
+	case BPF_PROG_TYPE_PERF_EVENT:
+		return bpf_perf_event_link_show_fdinfo(event, seq);
+	case BPF_PROG_TYPE_TRACEPOINT:
+		return bpf_tracepoint_link_show_fdinfo(event, seq);
+	case BPF_PROG_TYPE_KPROBE:
+		return bpf_probe_link_show_fdinfo(event, seq);
+	default:
+		return;
+	}
+}
+
 static const struct bpf_link_ops bpf_perf_link_lops = {
 	.release = bpf_perf_link_release,
 	.dealloc = bpf_perf_link_dealloc,
 	.fill_link_info = bpf_perf_link_fill_link_info,
+	.show_fdinfo = bpf_perf_link_show_fdinfo,
 };
 
 static int bpf_perf_link_attach(const union bpf_attr *attr, struct bpf_prog *prog)

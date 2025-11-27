@@ -616,9 +616,12 @@ void mptcp_pm_add_addr_received(const struct sock *ssk,
 		} else {
 			__MPTCP_INC_STATS(sock_net((struct sock *)msk), MPTCP_MIB_ADDADDRDROP);
 		}
-	/* id0 should not have a different address */
+	/* - id0 should not have a different address
+	 * - special case for C-flag: linked to fill_local_addresses_vec()
+	 */
 	} else if ((addr->id == 0 && !mptcp_pm_is_init_remote_addr(msk, addr)) ||
-		   (addr->id > 0 && !READ_ONCE(pm->accept_addr))) {
+		   (addr->id > 0 && !READ_ONCE(pm->accept_addr) &&
+		    !mptcp_pm_add_addr_c_flag_case(msk))) {
 		mptcp_pm_announce_addr(msk, addr, true);
 		mptcp_pm_add_addr_send_ack(msk);
 	} else if (mptcp_pm_schedule_work(msk, MPTCP_PM_ADD_ADDR_RECEIVED)) {
@@ -887,9 +890,7 @@ int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc)
 	skc_local.addr.id = 0;
 	skc_local.flags = MPTCP_PM_ADDR_FLAG_IMPLICIT;
 
-	if (mptcp_pm_is_userspace(msk))
-		return mptcp_userspace_pm_get_local_id(msk, &skc_local);
-	return mptcp_pm_nl_get_local_id(msk, &skc_local);
+	return msk->pm.ops->get_local_id(msk, &skc_local);
 }
 
 bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
@@ -898,10 +899,7 @@ bool mptcp_pm_is_backup(struct mptcp_sock *msk, struct sock_common *skc)
 
 	mptcp_local_address((struct sock_common *)skc, &skc_local);
 
-	if (mptcp_pm_is_userspace(msk))
-		return mptcp_userspace_pm_is_backup(msk, &skc_local);
-
-	return mptcp_pm_nl_is_backup(msk, &skc_local);
+	return msk->pm.ops->get_priority(msk, &skc_local);
 }
 
 static void mptcp_pm_subflows_chk_stale(const struct mptcp_sock *msk, struct sock *ssk)
@@ -985,17 +983,46 @@ void mptcp_pm_worker(struct mptcp_sock *msk)
 	spin_unlock_bh(&msk->pm.lock);
 }
 
+static void mptcp_pm_ops_init(struct mptcp_sock *msk,
+			      struct mptcp_pm_ops *pm_ops)
+{
+	if (!pm_ops || !bpf_try_module_get(pm_ops, pm_ops->owner)) {
+		pr_warn_once("pm %s fails, fallback to default pm",
+			     pm_ops->name);
+		pm_ops = &mptcp_pm_kernel;
+	}
+
+	msk->pm.ops = pm_ops;
+	if (msk->pm.ops->init)
+		msk->pm.ops->init(msk);
+
+	pr_debug("pm %s initialized\n", pm_ops->name);
+}
+
+static void mptcp_pm_ops_release(struct mptcp_sock *msk)
+{
+	struct mptcp_pm_ops *pm_ops = msk->pm.ops;
+
+	msk->pm.ops = NULL;
+	if (pm_ops->release)
+		pm_ops->release(msk);
+
+	bpf_module_put(pm_ops, pm_ops->owner);
+
+	pr_debug("pm %s released\n", pm_ops->name);
+}
+
 void mptcp_pm_destroy(struct mptcp_sock *msk)
 {
 	mptcp_pm_free_anno_list(msk);
-
-	if (mptcp_pm_is_userspace(msk))
-		mptcp_userspace_pm_free_local_addr_list(msk);
+	mptcp_pm_ops_release(msk);
 }
 
 void mptcp_pm_data_reset(struct mptcp_sock *msk)
 {
-	u8 pm_type = mptcp_get_pm_type(sock_net((struct sock *)msk));
+	const struct net *net = sock_net((struct sock *)msk);
+	const char *pm_name = mptcp_get_path_manager(net);
+	u8 pm_type = mptcp_get_pm_type(net);
 	struct mptcp_pm_data *pm = &msk->pm;
 
 	memset(&pm->reset, 0, sizeof(pm->reset));
@@ -1003,23 +1030,9 @@ void mptcp_pm_data_reset(struct mptcp_sock *msk)
 	pm->rm_list_rx.nr = 0;
 	WRITE_ONCE(pm->pm_type, pm_type);
 
-	if (pm_type == MPTCP_PM_TYPE_KERNEL) {
-		bool subflows_allowed = !!mptcp_pm_get_subflows_max(msk);
-
-		/* pm->work_pending must be only be set to 'true' when
-		 * pm->pm_type is set to MPTCP_PM_TYPE_KERNEL
-		 */
-		WRITE_ONCE(pm->work_pending,
-			   (!!mptcp_pm_get_local_addr_max(msk) &&
-			    subflows_allowed) ||
-			   !!mptcp_pm_get_add_addr_signal_max(msk));
-		WRITE_ONCE(pm->accept_addr,
-			   !!mptcp_pm_get_add_addr_accept_max(msk) &&
-			   subflows_allowed);
-		WRITE_ONCE(pm->accept_subflow, subflows_allowed);
-
-		bitmap_fill(pm->id_avail_bitmap, MPTCP_PM_MAX_ADDR_ID + 1);
-	}
+	rcu_read_lock();
+	mptcp_pm_ops_init(msk, mptcp_pm_find(pm_name));
+	rcu_read_unlock();
 }
 
 void mptcp_pm_data_init(struct mptcp_sock *msk)
@@ -1052,6 +1065,11 @@ struct mptcp_pm_ops *mptcp_pm_find(const char *name)
 
 int mptcp_pm_validate(struct mptcp_pm_ops *pm_ops)
 {
+	if (!pm_ops->get_local_id || !pm_ops->get_priority) {
+		pr_err("%s does not implement required ops\n", pm_ops->name);
+		return -EINVAL;
+	}
+
 	return 0;
 }
 

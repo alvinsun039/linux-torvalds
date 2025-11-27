@@ -2431,6 +2431,9 @@ static bool filemap_range_uptodate(struct address_space *mapping,
 		pos -= folio_pos(folio);
 	}
 
+	if (pos == 0 && count >= folio_size(folio))
+		return false;
+
 	return mapping->a_ops->is_partially_uptodate(folio, pos, count);
 }
 
@@ -2561,8 +2564,9 @@ static int filemap_get_pages(struct kiocb *iocb, size_t count,
 	struct folio *folio;
 	int err = 0;
 
-	/* "last_index" is the index of the page beyond the end of the read */
-	last_index = DIV_ROUND_UP(iocb->ki_pos + count, PAGE_SIZE);
+	/* "last_index" is the index of the folio beyond the end of the read */
+	last_index = round_up(iocb->ki_pos + count,
+			mapping_min_folio_nrbytes(mapping)) >> PAGE_SHIFT;
 retry:
 	if (fatal_signal_pending(current))
 		return -EINTR;
@@ -2591,9 +2595,10 @@ retry:
 			goto err;
 	}
 	if (!folio_test_uptodate(folio)) {
-		if ((iocb->ki_flags & IOCB_WAITQ) &&
-		    folio_batch_count(fbatch) > 1)
-			iocb->ki_flags |= IOCB_NOWAIT;
+		if (folio_batch_count(fbatch) > 1) {
+			err = -EAGAIN;
+			goto err;
+		}
 		err = filemap_update_page(iocb, mapping, count, folio,
 					  need_uptodate);
 		if (err)

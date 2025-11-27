@@ -654,6 +654,8 @@ xfs_bmap_extents_to_btree(
 	args.minlen = args.maxlen = args.prod = 1;
 	args.wasdel = wasdel;
 	*logflagsp = 0;
+	args.curr_af = 0;
+	args.next_af = mp->m_sb.sb_agcount;
 	error = xfs_alloc_vextent_start_ag(&args,
 				XFS_INO_TO_FSB(mp, ip->i_ino));
 	if (error)
@@ -803,6 +805,8 @@ xfs_bmap_local_to_extents(
 	 */
 	args.total = total;
 	args.minlen = args.maxlen = args.prod = 1;
+	args.curr_af = 0;
+	args.next_af = args.mp->m_sb.sb_agcount;
 	error = xfs_alloc_vextent_start_ag(&args,
 			XFS_INO_TO_FSB(args.mp, ip->i_ino));
 	if (error)
@@ -3239,6 +3243,8 @@ xfs_bmap_btalloc_select_lengths(
 	struct xfs_perag	*pag;
 	xfs_agnumber_t		agno, startag;
 	int			error = 0;
+	xfs_agnumber_t		start_af = args->curr_af;
+	xfs_agnumber_t		end_af = args->next_af - 1;
 
 	if (ap->tp->t_flags & XFS_TRANS_LOWMODE) {
 		args->total = ap->minlen;
@@ -3251,8 +3257,13 @@ xfs_bmap_btalloc_select_lengths(
 	if (startag == NULLAGNUMBER)
 		startag = 0;
 
+	/* if startag is not in current AF range, make it be. */
+	if (startag < start_af || startag > end_af)
+		startag = start_af;
+
 	*blen = 0;
-	for_each_perag_wrap(mp, startag, agno, pag) {
+	WARN_ON_ONCE((args->curr_af < 0) || (args->curr_af >= mp->m_sb.sb_agcount));
+	for_each_perag_af_wrap(mp, startag, agno, pag, start_af, args->next_af) {
 		error = xfs_bmap_longest_free_extent(pag, args->tp, blen);
 		if (error && error != -EAGAIN)
 			break;
@@ -3541,6 +3552,8 @@ xfs_bmap_btalloc_low_space(
 
 	if (args->minlen > ap->minlen) {
 		args->minlen = ap->minlen;
+		args->curr_af = 0;
+		args->next_af = args->mp->m_sb.sb_agcount;
 		error = xfs_alloc_vextent_start_ag(args, ap->blkno);
 		if (error || args->fsbno != NULLFSBLOCK)
 			return error;
@@ -3646,6 +3659,32 @@ xfs_bmap_btalloc_best_length(
 	return xfs_bmap_btalloc_low_space(ap, args);
 }
 
+static int __maybe_unused
+xfs_bmap_btalloc_best_length_iterate_afs(
+	struct xfs_bmalloca     *ap,
+	struct xfs_alloc_arg    *args,
+	int                     stripe_align)
+{
+	struct xfs_mount        *mp = ap->ip->i_mount;
+	int                     error;
+	unsigned int i;
+
+	args->curr_af = 0;
+
+	for (i = 0; args->curr_af < mp->m_sb.sb_agcount; i++) {
+		args->next_af = mp->m_sb.sb_agcount - mp->m_af[i];
+		error = xfs_bmap_btalloc_best_length(ap, args, stripe_align);
+		if (error || args->fsbno != NULLFSBLOCK)
+			break;
+
+		args->curr_af = args->next_af;
+		/* Exit LOWMODE when going to the next AF. */
+		ap->tp->t_flags &= ~XFS_TRANS_LOWMODE;
+	}
+
+	return error;
+}
+
 static int
 xfs_bmap_btalloc(
 	struct xfs_bmalloca	*ap)
@@ -3663,6 +3702,8 @@ xfs_bmap_btalloc(
 		.alignment	= 1,
 		.minalignslop	= 0,
 		.postallocs	= 1,
+		.curr_af	= 0,
+		.next_af	= mp->m_sb.sb_agcount,
 	};
 	xfs_fileoff_t		orig_offset;
 	xfs_extlen_t		orig_length;
@@ -3685,7 +3726,8 @@ xfs_bmap_btalloc(
 			xfs_inode_is_filestream(ap->ip))
 		error = xfs_bmap_btalloc_filestreams(ap, &args, stripe_align);
 	else
-		error = xfs_bmap_btalloc_best_length(ap, &args, stripe_align);
+		error = xfs_bmap_btalloc_best_length_iterate_afs(ap, &args,
+							 stripe_align);
 	if (error)
 		return error;
 

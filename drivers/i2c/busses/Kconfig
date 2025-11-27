@@ -373,7 +373,7 @@ config I2C_SCMI
 	  To compile this driver as a module, choose M here:
 	  the module will be called i2c-scmi.
 
-config I2C_ZHAOXIN_SMB
+config I2C_ZHAOXIN_SMBUS
 	tristate "Zhaoxin SMBus Interface"
 	depends on PCI || COMPILE_TEST
 	default m
