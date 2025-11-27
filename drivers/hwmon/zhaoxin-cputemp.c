@@ -45,7 +45,7 @@ static ssize_t name_show(struct device *dev, struct device_attribute *devattr, c
 
 	if (attr->index == SHOW_NAME)
 		ret = sprintf(buf, "%s\n", data->name);
-	else    /* show label */
+	else /* show label */
 		ret = sprintf(buf, "Core %d\n", data->id);
 	return ret;
 }
@@ -122,9 +122,9 @@ static int zhaoxin_cputemp_probe(struct platform_device *pdev)
 	data->id = pdev->id;
 	data->name = "zhaoxin_cputemp";
 	data->msr_temp = 0x1423;
-	if (c->x86_model == 0x6b) {
-		data->msr_crit  = 0x175b;
-		data->msr_max   = 0x175a;
+	if (c->x86_model == 0x6b || c->x86_model == 0x7b) {
+		data->msr_crit = 0x175b;
+		data->msr_max = 0x175a;
 	} else {
 		data->msr_crit = 0x1416;
 		data->msr_max = 0x1415;
@@ -263,6 +263,8 @@ static const struct x86_cpu_id cputemp_ids[] __initconst = {
 	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, 0x5b, NULL),
 	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, 0x6b, NULL),
 	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, 0x6b, NULL),
+	X86_MATCH_VENDOR_FAM_MODEL(CENTAUR, 7, 0x7b, NULL),
+	X86_MATCH_VENDOR_FAM_MODEL(ZHAOXIN, 7, 0x7b, NULL),
 	{}
 };
 MODULE_DEVICE_TABLE(x86cpu, cputemp_ids);
@@ -280,8 +282,8 @@ static int __init zhaoxin_cputemp_init(void)
 	if (err)
 		goto exit;
 
-	err = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "hwmon/zhaoxin:online",
-			zhaoxin_cputemp_online, zhaoxin_cputemp_down_prep);
+	err = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "hwmon/zhaoxin:online", zhaoxin_cputemp_online,
+				zhaoxin_cputemp_down_prep);
 	if (err < 0)
 		goto exit_driver_unreg;
 
@@ -315,5 +317,5 @@ MODULE_DESCRIPTION("Zhaoxin CPU temperature monitor");
 MODULE_LICENSE("GPL");
 MODULE_IMPORT_NS("HWMON_THERMAL");
 
-module_init(zhaoxin_cputemp_init)
-module_exit(zhaoxin_cputemp_exit)
+module_init(zhaoxin_cputemp_init);
+module_exit(zhaoxin_cputemp_exit);

@@ -6,7 +6,7 @@
  *
  */
 
-#define DRIVER_VERSION "1.0.0"
+#define DRIVER_VERSION "1.0.1"
 
 #include <linux/acpi.h>
 #include <linux/gpio/driver.h>
@@ -26,17 +26,19 @@
 #include "../core.h"
 #include "pinctrl-zhaoxin.h"
 
-static u16 zx_pad_read16(struct zhaoxin_pinctrl *pctrl, u8 index)
+u16 zx_pad_read16(struct zhaoxin_pinctrl *pctrl, u8 index)
 {
 	outb(index, pctrl->pmio_rx90 + pctrl->pmio_base);
 	return inw(pctrl->pmio_rx8c + pctrl->pmio_base);
 }
+EXPORT_SYMBOL_GPL(zx_pad_read16);
 
-static void zx_pad_write16(struct zhaoxin_pinctrl *pctrl, u8 index, u16 value)
+void zx_pad_write16(struct zhaoxin_pinctrl *pctrl, u8 index, u16 value)
 {
 	outb(index, pctrl->pmio_rx90 + pctrl->pmio_base);
 	outw(value, pctrl->pmio_rx8c + pctrl->pmio_base);
 }
+EXPORT_SYMBOL_GPL(zx_pad_write16);
 
 static int zhaoxin_get_groups_count(struct pinctrl_dev *pctldev)
 {
@@ -123,10 +125,9 @@ static void zhaoxin_gpio_set_gpio_mode_and_pull(struct zhaoxin_pinctrl *pctrl, u
 		tmp = ZHAOXIN_PULL_UP_10K | 1;
 	else
 		tmp = ZHAOXIN_PULL_DOWN | 1;
-	value = zx_pad_read16(pctrl, pin);
 
-	//for gpio
-	if (pin <= 0x32 && pin >= 0x29) {
+	if (pctrl->gpio_type(pctrl, pin) == ZX_TYPE_GPIO) {
+		value = zx_pad_read16(pctrl, pin);
 		if (isup) {
 			value &= (~(ZHAOXIN_PULL_DOWN));
 			value |= tmp;
@@ -134,10 +135,12 @@ static void zhaoxin_gpio_set_gpio_mode_and_pull(struct zhaoxin_pinctrl *pctrl, u
 			value &= (~(ZHAOXIN_PULL_UP));
 			value |= tmp;
 		}
-		value &= ~(0x1);
+
+		value &= (~(0xf));
 		zx_pad_write16(pctrl, pin, value);
 		value_back = zx_pad_read16(pctrl, pin);
-	} else { // for pgpio
+	} else if (pctrl->gpio_type(pctrl, pin) == ZX_TYPE_PGPIO) {
+		value = zx_pad_read16(pctrl, pin);
 		if (isup) {
 			value &= (~(ZHAOXIN_PULL_DOWN));
 			value |= tmp;
@@ -145,9 +148,13 @@ static void zhaoxin_gpio_set_gpio_mode_and_pull(struct zhaoxin_pinctrl *pctrl, u
 			value &= (~(ZHAOXIN_PULL_UP));
 			value |= tmp;
 		}
-		value |= 0x1;
+
+		value &= (~(0xf));
+		value |= 1;
 		zx_pad_write16(pctrl, pin, value);
 		value_back = zx_pad_read16(pctrl, pin);
+	} else {
+		dev_info(pctrl->dev, "pin %d is not a gpio or pgpio\n", pin);
 	}
 }
 
@@ -160,6 +167,7 @@ static int zhaoxin_gpio_request_enable(struct pinctrl_dev *pctldev,
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
 	zhaoxin_gpio_set_gpio_mode_and_pull(pctrl, pin, true);
 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
+
 	return 0;
 }
 
@@ -245,8 +253,8 @@ static int zhaoxin_gpio_get(struct gpio_chip *chip, unsigned int offset)
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
 	value = zx_pad_read16(pctrl, gpio_in_cal->index + gap);
 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
-
 	value &= (1 << bit);
+
 	return !!value;
 }
 
@@ -360,7 +368,6 @@ static void zhaoxin_gpio_irq_mask_unmask(struct irq_data *d, bool mask)
 
 	int_cal = pctrl->pin_topologys->int_cal;
 	mod_sel_cal = pctrl->pin_topologys->mod_sel_cal;
-
 	if (gpio >= 0) {
 		for (i = 0; i < int_cal->size; i++)
 			if (gpio == int_cal->cal_array[i])
@@ -376,13 +383,23 @@ static void zhaoxin_gpio_irq_mask_unmask(struct irq_data *d, bool mask)
 		base_offset = reg_off->pmio_offset;
 
 		raw_spin_lock_irqsave(&pctrl->lock, flags);
-		value = inw(pctrl->pmio_base + reg_off->pmio_offset);
-		if (mask)
-			value &= (~(1 << bit_off));
-		else
-			value |= (1 << bit_off);
+		if (!int_cal->is_pmio) {
+			value = readw(pctrl->pm_pmio_base + reg_off->pmio_offset);
+			if (mask)
+				value &= (~(1 << bit_off));
+			else
+				value |= (1 << bit_off);
 
-		outw(value, pctrl->pmio_base + reg_off->pmio_offset);
+			writew(value, pctrl->pm_pmio_base + reg_off->pmio_offset);
+		} else {
+			value = inw(pctrl->pmio_base + reg_off->pmio_offset);
+			if (mask)
+				value &= (~(1 << bit_off));
+			else
+				value |= (1 << bit_off);
+
+			outw(value, pctrl->pmio_base + reg_off->pmio_offset);
+		}
 		if (mask) {
 			value1 = readw(pctrl->pm_pmio_base + mod->pmio_offset);
 			value1 |= (1 << bit_off);
@@ -430,13 +447,16 @@ static irqreturn_t zhaoxin_gpio_irq(int irq, void *data)
 		pending = 0;
 		raw_spin_lock_irqsave(&pctrl->lock, flags);
 		status = readw(pctrl->pm_pmio_base + stat_cal->reg[i].pmio_offset);
-		enable = inw(pctrl->pmio_base + init->reg[i].pmio_offset);
+
+		if (!init->is_pmio)
+			enable = readw(pctrl->pm_pmio_base + init->reg[i].pmio_offset);
+		else
+			enable = inw(pctrl->pmio_base + init->reg[i].pmio_offset);
 		raw_spin_unlock_irqrestore(&pctrl->lock, flags);
 		enable &= status;
 		pending = enable;
 		for_each_set_bit(bit_offset, &pending, init->reg[i].size) {
 			hwirq = init->cal_array[index + bit_offset];
-			//find the son irq
 			subirq = irq_find_mapping(gc->irq.domain, hwirq);
 			generic_handle_irq(subirq);
 		}
@@ -460,6 +480,10 @@ static int zhaoxin_gpio_irq_type(struct irq_data *d, unsigned int type)
 	int position, point;
 	u16 value;
 	bool isup = true;
+	bool high_bit = false;
+	u16 mask = 0;
+	int bits_num = 0;
+	u16 test_mask;
 
 	trigger_cal = pctrl->pin_topologys->trigger_cal;
 	pin = zhaoxin_gpio_to_pin(pctrl, irqd_to_hwirq(d), NULL, NULL);
@@ -473,32 +497,68 @@ static int zhaoxin_gpio_irq_type(struct irq_data *d, unsigned int type)
 		isup = false;
 
 	zhaoxin_gpio_set_gpio_mode_and_pull(pctrl, pin, isup);
-	//find the gpio position
+
 	for (position = 0; position < trigger_cal->size; position++)
 		if (trigger_cal->cal_array[position] == gpio)
 			break;
-
+	mask = trigger_cal->mask;
+	bits_num = trigger_cal->bits_num;
 	index = trigger_cal->index + ALIGN(position + 1, 4) / 4 - 1;
 	point = position % 4;
+	if (point > 1)
+		high_bit = true;
 
 	raw_spin_lock_irqsave(&pctrl->lock, flags);
 
 	value = zx_pad_read16(pctrl, index);
 
-	if ((type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH)
-		value |= TRIGGER_BOTH_EDGE << (point * 4);
-	else if (type & IRQ_TYPE_EDGE_FALLING)
-		value |= TRIGGER_FALL_EDGE << (point * 4);
-	else if (type & IRQ_TYPE_EDGE_RISING)
-		value |= TRIGGER_RISE_EDGE << (point * 4);
-	else if (type & IRQ_TYPE_LEVEL_LOW)
-		value |= TRIGGER_LOW_LEVEL << (point * 4);
-	else if (type & IRQ_TYPE_LEVEL_HIGH)
-		value |= TRIGGER_HIGH_LEVEL << (point * 4);
-	else
-		pr_debug("%s wrang type\n", __func__);
+	if ((type & IRQ_TYPE_EDGE_BOTH) == IRQ_TYPE_EDGE_BOTH) {
+		if (high_bit) {
+			point = point - 2;
+			position = 8;
+		} else
+			position = 0;
+		test_mask = (~(mask << (point * bits_num + position)));
+		value &= (~(mask << (point * bits_num + position)));
+		value |= TRIGGER_BOTH_EDGE << (point * bits_num + position);
+	} else if (type & IRQ_TYPE_EDGE_FALLING) {
+		if (high_bit) {
+			point = point - 2;
+			position = 8;
+		} else
+			position = 0;
+		test_mask = (~(mask << (point * bits_num + position)));
+		value &= (~(mask << (point * bits_num + position)));
+		value |= TRIGGER_FALL_EDGE << (point * bits_num + position);
+	} else if (type & IRQ_TYPE_EDGE_RISING) {
+		if (high_bit) {
+			point = point - 2;
+			position = 8;
+		} else
+			position = 0;
+		test_mask = (~(mask << (point * bits_num + position)));
+		value &= (~(mask << (point * bits_num + position)));
+		value |= TRIGGER_RISE_EDGE << (point * bits_num + position);
+	} else if (type & IRQ_TYPE_LEVEL_LOW) {
+		if (high_bit) {
+			point = point - 2;
+			position = 8;
+		} else
+			position = 0;
+		test_mask = (~(mask << (point * bits_num + position)));
+		value &= (~(mask << (point * bits_num + position)));
+		value |= TRIGGER_LOW_LEVEL << (point * bits_num + position);
+	} else if (type & IRQ_TYPE_LEVEL_HIGH) {
+		if (high_bit) {
+			point = point - 2;
+			position = 8;
+		} else
+			position = 0;
+		test_mask = (~(mask << (point * bits_num + position)));
+		value &= (~(mask << (point * bits_num + position)));
+		value |= TRIGGER_HIGH_LEVEL << (point * bits_num + position);
+	}
 
-	//write back
 	zx_pad_write16(pctrl, index, value);
 
 	if (type & IRQ_TYPE_EDGE_BOTH)
@@ -519,7 +579,6 @@ static int zhaoxin_gpio_irq_wake(struct irq_data *d, unsigned int on)
 	pin = zhaoxin_gpio_to_pin(pctrl, irqd_to_hwirq(d), NULL, NULL);
 
 	if (pin) {
-		//father irq
 		if (on)
 			enable_irq_wake(pctrl->irq);
 		else
@@ -637,6 +696,8 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 	pctrl->soc = soc_data;
 	raw_spin_lock_init(&pctrl->lock);
 	pctrl->pin_topologys = pctrl->soc->pin_topologys;
+	pctrl->gpio_type = pctrl->soc->gpio_type;
+	pctrl->private_init = pctrl->soc->private_init;
 	pctrl->pin_map_size = pctrl->soc->pin_map_size;
 	pctrl->pin_maps =
 		devm_kcalloc(&pdev->dev, pctrl->pin_map_size, sizeof(*pctrl->pin_maps), GFP_KERNEL);
@@ -650,11 +711,10 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 	regs = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(regs))
 		return PTR_ERR(regs);
+	if (pctrl->private_init)
+		pctrl->private_init(pctrl);
 
 	pctrl->pm_pmio_base = regs;
-	pctrl->pmio_base = 0x800;
-	pctrl->pmio_rx90 = 0x90;
-	pctrl->pmio_rx8c = 0x8c;
 	irq = platform_get_irq(pdev, 0);
 	if (irq < 0)
 		return irq;
@@ -672,7 +732,6 @@ static int zhaoxin_pinctrl_probe(struct platform_device *pdev,
 		return PTR_ERR(pctrl->pctldev);
 	}
 	ret = zhaoxin_gpio_probe(pctrl, irq);
-
 	if (ret)
 		return ret;
 	platform_set_drvdata(pdev, pctrl);
@@ -754,8 +813,4 @@ EXPORT_SYMBOL_GPL(zhaoxin_pinctrl_resume_noirq);
 MODULE_AUTHOR("www.zhaoxin.com");
 MODULE_DESCRIPTION("Shanghai Zhaoxin pinctrl driver");
 MODULE_VERSION(DRIVER_VERSION);
-MODULE_LICENSE("GPL v2");
-
-MODULE_AUTHOR("JasonHe <jasonhe@zhaoxin.com>");
-MODULE_DESCRIPTION("zhaoxin pinctrl/GPIO core driver");
 MODULE_LICENSE("GPL v2");

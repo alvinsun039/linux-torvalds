@@ -23,6 +23,10 @@
 #define IPPROTO_MPTCP 262
 #endif
 
+#ifndef MPTCP_PM_EV_FLAG_DENY_JOIN_ID0
+#define MPTCP_PM_EV_FLAG_DENY_JOIN_ID0	(1 << 0)
+#endif
+
 static void syntax(char *argv[])
 {
 	fprintf(stderr, "%s add|ann|rem|csf|dsf|get|set|del|flush|dump|events|listen|accept [<args>]\n", argv[0]);
