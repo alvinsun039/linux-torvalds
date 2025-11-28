@@ -14,6 +14,12 @@ extern int acpi_strict;
 extern int acpi_disabled;
 extern int acpi_pci_disabled;
 
+/*
+ * acpi_disable_cmcff is only used in IA-32 Architecture, this
+ * definition is only for compatibility.
+ */
+#define acpi_disable_cmcff 1
+
 /* _ASM_SW64_PDC_H */
 #define ACPI_PDC_P_FFH                  (0x0001)
 #define ACPI_PDC_C_C1_HALT              (0x0002)
@@ -105,6 +111,18 @@ static inline bool arch_has_acpi_pdc(void)
 static inline void arch_acpi_set_pdc_bits(u32 *buf)
 {
 }
+
+static inline unsigned long acpi_get_wakeup_address(void)
+{
+	return 0;
+}
+
+static inline bool acpi_skip_set_wakeup_address(void)
+{
+	return true;
+}
+
+#define acpi_skip_set_wakeup_address acpi_skip_set_wakeup_address
 #else /* !CONFIG_ACPI */
 
 static inline void acpi_noirq_set(void) { }

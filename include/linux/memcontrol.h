@@ -253,7 +253,6 @@ struct mem_cgroup {
 	struct list_head objcg_list;
 
 	struct memcg_vmstats_percpu __percpu *vmstats_percpu;
-	struct memcg1_events_percpu __percpu *events_percpu;
 
 #ifdef CONFIG_CGROUP_WRITEBACK
 	struct list_head cgwb_list;
@@ -274,6 +273,8 @@ struct mem_cgroup {
 	/* Legacy consumer-oriented counters */
 	struct page_counter kmem;		/* v1 only */
 	struct page_counter tcpmem;		/* v1 only */
+
+	struct memcg1_events_percpu __percpu *events_percpu;
 
 	unsigned long soft_limit;
 
@@ -353,11 +354,11 @@ static inline bool folio_memcg_kmem(struct folio *folio);
  * After the initialization objcg->memcg is always pointing at
  * a valid memcg, but can be atomically swapped to the parent memcg.
  *
- * The caller must ensure that the returned memcg won't be released:
- * e.g. acquire the rcu_read_lock or css_set_lock.
+ * The caller must ensure that the returned memcg won't be released.
  */
 static inline struct mem_cgroup *obj_cgroup_memcg(struct obj_cgroup *objcg)
 {
+	lockdep_assert_once(rcu_read_lock_held() || lockdep_is_held(&cgroup_mutex));
 	return READ_ONCE(objcg->memcg);
 }
 
@@ -429,9 +430,17 @@ static inline struct mem_cgroup *folio_memcg(struct folio *folio)
 	return __folio_memcg(folio);
 }
 
-static inline struct mem_cgroup *page_memcg(struct page *page)
+/*
+ * folio_memcg_charged - If a folio is charged to a memory cgroup.
+ * @folio: Pointer to the folio.
+ *
+ * Returns true if folio is charged to a memory cgroup, otherwise returns false.
+ */
+static inline bool folio_memcg_charged(struct folio *folio)
 {
-	return folio_memcg(page_folio(page));
+	if (folio_memcg_kmem(folio))
+		return __folio_objcg(folio) != NULL;
+	return __folio_memcg(folio) != NULL;
 }
 
 /**
@@ -450,7 +459,6 @@ static inline struct mem_cgroup *folio_memcg_rcu(struct folio *folio)
 	unsigned long memcg_data = READ_ONCE(folio->memcg_data);
 
 	VM_BUG_ON_FOLIO(folio_test_slab(folio), folio);
-	WARN_ON_ONCE(!rcu_read_lock_held());
 
 	if (memcg_data & MEMCG_DATA_KMEM) {
 		struct obj_cgroup *objcg;
@@ -458,6 +466,8 @@ static inline struct mem_cgroup *folio_memcg_rcu(struct folio *folio)
 		objcg = (void *)(memcg_data & ~OBJEXTS_FLAGS_MASK);
 		return obj_cgroup_memcg(objcg);
 	}
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
 
 	return (struct mem_cgroup *)(memcg_data & ~OBJEXTS_FLAGS_MASK);
 }
@@ -911,7 +921,13 @@ unsigned long mem_cgroup_get_zone_lru_size(struct lruvec *lruvec,
 	return READ_ONCE(mz->lru_zone_size[zone_idx][lru]);
 }
 
-void mem_cgroup_handle_over_high(gfp_t gfp_mask);
+void __mem_cgroup_handle_over_high(gfp_t gfp_mask);
+
+static inline void mem_cgroup_handle_over_high(gfp_t gfp_mask)
+{
+	if (unlikely(current->memcg_nr_pages_over_high))
+		__mem_cgroup_handle_over_high(gfp_mask);
+}
 
 unsigned long mem_cgroup_get_max(struct mem_cgroup *memcg);
 
@@ -949,7 +965,7 @@ static inline void mod_memcg_page_state(struct page *page,
 		return;
 
 	rcu_read_lock();
-	memcg = page_memcg(page);
+	memcg = folio_memcg(page_folio(page));
 	if (memcg)
 		mod_memcg_state(memcg, idx, val);
 	rcu_read_unlock();
@@ -1066,11 +1082,6 @@ void split_page_memcg(struct page *head, int old_order, int new_order);
 #define MEM_CGROUP_ID_SHIFT	0
 
 static inline struct mem_cgroup *folio_memcg(struct folio *folio)
-{
-	return NULL;
-}
-
-static inline struct mem_cgroup *page_memcg(struct page *page)
 {
 	return NULL;
 }
@@ -1526,7 +1537,7 @@ static inline void unlock_page_lruvec_irqrestore(struct lruvec *lruvec,
 	spin_unlock_irqrestore(&lruvec->lru_lock, flags);
 }
 
-/* Test requires a stable page->memcg binding, see page_memcg() */
+/* Test requires a stable folio->memcg binding, see folio_memcg() */
 static inline bool folio_matches_lruvec(struct folio *folio,
 		struct lruvec *lruvec)
 {
@@ -1719,7 +1730,6 @@ static inline int memcg_kmem_id(struct mem_cgroup *memcg)
 	return memcg ? memcg->kmemcg_id : -1;
 }
 
-struct mem_cgroup *mem_cgroup_from_obj(void *p);
 struct mem_cgroup *mem_cgroup_from_slab_obj(void *p);
 
 static inline void count_objcg_event(struct obj_cgroup *objcg,
@@ -1782,11 +1792,6 @@ static inline bool memcg_kmem_online(void)
 static inline int memcg_kmem_id(struct mem_cgroup *memcg)
 {
 	return -1;
-}
-
-static inline struct mem_cgroup *mem_cgroup_from_obj(void *p)
-{
-	return NULL;
 }
 
 static inline struct mem_cgroup *mem_cgroup_from_slab_obj(void *p)

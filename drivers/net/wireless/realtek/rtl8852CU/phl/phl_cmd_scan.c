@@ -1467,6 +1467,11 @@ enum rtw_phl_status rtw_phl_cmd_scan_request(void *phl,
 	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
 	void *drv = phl_to_drvpriv(phl_info);
 
+	if (!param || !param->wifi_role) {
+		PHL_ERR("rtw_phl_cmd_scan_request:: invalid param or wifi_role\n");
+		return RTW_PHL_STATUS_INVALID_PARAM;
+	}
+
 	//Debug log
 	if(param->wifi_role->rlink[RTW_RLINK_PRIMARY].hw_band == HW_BAND_1)
 		PHL_INFO("rtw_phl_cmd_scan_request:: HW_BAND_1!\n");

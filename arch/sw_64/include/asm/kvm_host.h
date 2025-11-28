@@ -185,6 +185,12 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu);
 int kvm_sw64_perf_init(void);
 int kvm_sw64_perf_teardown(void);
 void kvm_flush_tlb_all(void);
+int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu);
+int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu);
+int vcpu_interrupt_line(struct kvm_vcpu *vcpu, int number);
+void vcpu_send_ipi(struct kvm_vcpu *vcpu, int target_vcpuid, int type);
+void sw64_kvm_clear_irq(struct kvm_vcpu *vcpu);
+void sw64_kvm_try_deliver_interrupt(struct kvm_vcpu *vcpu);
 void kvm_sw64_update_vpn(struct kvm_vcpu *vcpu, unsigned long vpn);
 int kvm_sw64_init_vm(struct kvm *kvm);
 void kvm_sw64_destroy_vm(struct kvm *kvm);
@@ -194,4 +200,14 @@ long kvm_sw64_get_vcb(struct file *filp, unsigned long arg);
 
 void update_aptp(unsigned long pgd);
 void vcpu_set_numa_affinity(struct kvm_vcpu *vcpu);
+
+/*
+ * Returns true if a Performance Monitoring Interrupt (PMI), a.k.a. perf event,
+ * arrived in guest context.
+ */
+static inline bool kvm_arch_pmi_in_guest(struct kvm_vcpu *vcpu)
+{
+	return IS_ENABLED(CONFIG_GUEST_PERF_EVENTS) && !!vcpu;
+}
+
 #endif /* _ASM_SW64_KVM_HOST_H */

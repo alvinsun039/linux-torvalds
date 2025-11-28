@@ -177,7 +177,7 @@ static void mnt_ns_release(struct mnt_namespace *ns)
 	lockdep_assert_not_held(&mnt_ns_tree_lock.lock);
 
 	/* keep alive for {list,stat}mount() */
-	if (refcount_dec_and_test(&ns->passive)) {
+	if (ns && refcount_dec_and_test(&ns->passive)) {
 		fsnotify_mntns_delete(ns);
 		put_user_ns(ns->user_ns);
 		kfree(ns);
@@ -2153,9 +2153,15 @@ SYSCALL_DEFINE1(oldumount, char __user *, name)
 
 static bool is_mnt_ns_file(struct dentry *dentry)
 {
+	struct ns_common *ns;
+
 	/* Is this a proxy for a mount namespace? */
-	return dentry->d_op == &ns_dentry_operations &&
-	       dentry->d_fsdata == &mntns_operations;
+	if (dentry->d_op != &ns_dentry_operations)
+		return false;
+
+	ns = d_inode(dentry)->i_private;
+
+	return ns->ops == &mntns_operations;
 }
 
 struct ns_common *from_mnt_ns(struct mnt_namespace *mnt)
@@ -5820,23 +5826,34 @@ retry:
 	return ret;
 }
 
-static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
-			    u64 last_mnt_id, u64 *mnt_ids, size_t nr_mnt_ids,
-			    bool reverse)
+struct klistmount {
+	u64 last_mnt_id;
+	u64 mnt_parent_id;
+	u64 *kmnt_ids;
+	u32 nr_mnt_ids;
+	struct mnt_namespace *ns;
+	struct path root;
+};
+
+static ssize_t do_listmount(struct klistmount *kls, bool reverse)
 {
-	struct path root __free(path_put) = {};
+	struct mnt_namespace *ns = kls->ns;
+	u64 mnt_parent_id = kls->mnt_parent_id;
+	u64 last_mnt_id = kls->last_mnt_id;
+	u64 *mnt_ids = kls->kmnt_ids;
+	size_t nr_mnt_ids = kls->nr_mnt_ids;
 	struct path orig;
 	struct mount *r, *first;
 	ssize_t ret;
 
 	rwsem_assert_held(&namespace_sem);
 
-	ret = grab_requested_root(ns, &root);
+	ret = grab_requested_root(ns, &kls->root);
 	if (ret)
 		return ret;
 
 	if (mnt_parent_id == LSMT_ROOT) {
-		orig = root;
+		orig = kls->root;
 	} else {
 		orig.mnt = lookup_mnt_in_ns(mnt_parent_id, ns);
 		if (!orig.mnt)
@@ -5848,7 +5865,7 @@ static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
 	 * Don't trigger audit denials. We just want to determine what
 	 * mounts to show users.
 	 */
-	if (!is_path_reachable(real_mount(orig.mnt), orig.dentry, &root) &&
+	if (!is_path_reachable(real_mount(orig.mnt), orig.dentry, &kls->root) &&
 	    !ns_capable_noaudit(ns->user_ns, CAP_SYS_ADMIN))
 		return -EPERM;
 
@@ -5881,14 +5898,45 @@ static ssize_t do_listmount(struct mnt_namespace *ns, u64 mnt_parent_id,
 	return ret;
 }
 
+static void __free_klistmount_free(const struct klistmount *kls)
+{
+	path_put(&kls->root);
+	kvfree(kls->kmnt_ids);
+	mnt_ns_release(kls->ns);
+}
+
+static inline int prepare_klistmount(struct klistmount *kls, struct mnt_id_req *kreq,
+				     size_t nr_mnt_ids)
+{
+
+	u64 last_mnt_id = kreq->param;
+
+	/* The first valid unique mount id is MNT_UNIQUE_ID_OFFSET + 1. */
+	if (last_mnt_id != 0 && last_mnt_id <= MNT_UNIQUE_ID_OFFSET)
+		return -EINVAL;
+
+	kls->last_mnt_id = last_mnt_id;
+
+	kls->nr_mnt_ids = nr_mnt_ids;
+	kls->kmnt_ids = kvmalloc_array(nr_mnt_ids, sizeof(*kls->kmnt_ids),
+				       GFP_KERNEL_ACCOUNT);
+	if (!kls->kmnt_ids)
+		return -ENOMEM;
+
+	kls->ns = grab_requested_mnt_ns(kreq);
+	if (!kls->ns)
+		return -ENOENT;
+
+	kls->mnt_parent_id = kreq->mnt_id;
+	return 0;
+}
+
 SYSCALL_DEFINE4(listmount, const struct mnt_id_req __user *, req,
 		u64 __user *, mnt_ids, size_t, nr_mnt_ids, unsigned int, flags)
 {
-	u64 *kmnt_ids __free(kvfree) = NULL;
+	struct klistmount kls __free(klistmount_free) = {};
 	const size_t maxcount = 1000000;
-	struct mnt_namespace *ns __free(mnt_ns_release) = NULL;
 	struct mnt_id_req kreq;
-	u64 last_mnt_id;
 	ssize_t ret;
 
 	if (flags & ~LISTMOUNT_REVERSE)
@@ -5909,31 +5957,20 @@ SYSCALL_DEFINE4(listmount, const struct mnt_id_req __user *, req,
 	if (ret)
 		return ret;
 
-	last_mnt_id = kreq.param;
-	/* The first valid unique mount id is MNT_UNIQUE_ID_OFFSET + 1. */
-	if (last_mnt_id != 0 && last_mnt_id <= MNT_UNIQUE_ID_OFFSET)
-		return -EINVAL;
+	ret = prepare_klistmount(&kls, &kreq, nr_mnt_ids);
+	if (ret)
+		return ret;
 
-	kmnt_ids = kvmalloc_array(nr_mnt_ids, sizeof(*kmnt_ids),
-				  GFP_KERNEL_ACCOUNT);
-	if (!kmnt_ids)
-		return -ENOMEM;
-
-	ns = grab_requested_mnt_ns(&kreq);
-	if (!ns)
-		return -ENOENT;
-
-	if (kreq.mnt_ns_id && (ns != current->nsproxy->mnt_ns) &&
-	    !ns_capable_noaudit(ns->user_ns, CAP_SYS_ADMIN))
+	if (kreq.mnt_ns_id && (kls.ns != current->nsproxy->mnt_ns) &&
+	    !ns_capable_noaudit(kls.ns->user_ns, CAP_SYS_ADMIN))
 		return -ENOENT;
 
 	scoped_guard(rwsem_read, &namespace_sem)
-		ret = do_listmount(ns, kreq.mnt_id, last_mnt_id, kmnt_ids,
-				   nr_mnt_ids, (flags & LISTMOUNT_REVERSE));
+		ret = do_listmount(&kls, (flags & LISTMOUNT_REVERSE));
 	if (ret <= 0)
 		return ret;
 
-	if (copy_to_user(mnt_ids, kmnt_ids, ret * sizeof(*mnt_ids)))
+	if (copy_to_user(mnt_ids, kls.kmnt_ids, ret * sizeof(*mnt_ids)))
 		return -EFAULT;
 
 	return ret;

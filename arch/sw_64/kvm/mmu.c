@@ -71,21 +71,35 @@ enum {
  *
  * Function clears a PMD entry, flushes TLBs.
  */
-static void apt_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
+static void apt_dissolve_pmd(struct kvm *kvm, pmd_t *pmd)
 {
-	int i;
-
 	if (!pmd_trans_huge(*pmd))
 		return;
 
-	if (pmd_cont(*pmd)) {
-		for (i = 0; i < CONT_PMDS; i++, pmd++)
-			pmd_clear(pmd);
-	} else
+	pmd_clear(pmd);
+	kvm_flush_remote_tlbs(kvm);
+	put_page(virt_to_page(pmd));
+}
+
+/**
+ * apt_dissolve_cont_pmd() - clear and flush huge cont PMD entry
+ * @kvm:	pointer to kvm structure.
+ * @addr:	IPA
+ * @pmd:	pmd pointer for IPA
+ *
+ * Function clears a cont PMD entry, flushes TLBs.
+ */
+static void apt_dissolve_cont_pmd(struct kvm *kvm, pmd_t *pmd)
+{
+	int i;
+	pmd_t *start_pmd;
+
+	start_pmd = pmd;
+	for (i = 0; i < CONT_PMDS; i++, pmd++)
 		pmd_clear(pmd);
 
 	kvm_flush_remote_tlbs(kvm);
-	put_page(virt_to_page(pmd));
+	put_page(virt_to_page(start_pmd));
 }
 
 /**
@@ -96,7 +110,7 @@ static void apt_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
  *
  * Function clears a PUD entry, flushes TLBs.
  */
-static void apt_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pudp)
+static void apt_dissolve_pud(struct kvm *kvm, pud_t *pudp)
 {
 	if (!pud_leaf(*pudp))
 		return;
@@ -805,7 +819,7 @@ dissolve:
 	 * on to allocate page.
 	 */
 	if (logging_active)
-		apt_dissolve_pud(kvm, addr, pud);
+		apt_dissolve_pud(kvm, pud);
 
 find_pud:
 	if (pud_none(*pud)) {
@@ -829,8 +843,13 @@ find_pud:
 	 * While dirty page logging - dissolve huge PMD, then continue on to
 	 * allocate page.
 	 */
-	if (logging_active)
-		apt_dissolve_pmd(kvm, addr, pmd);
+	if (logging_active) {
+		if (pmd_cont(*pmd))
+			apt_dissolve_cont_pmd(kvm,
+					pmd_offset(pud, addr & CONT_PMD_MASK));
+		else
+			apt_dissolve_pmd(kvm, pmd);
+	}
 
 find_pmd:
 	/* Create stage-2 page mappings - Level 2 */
@@ -894,7 +913,7 @@ static int apt_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
 	 * on to allocate page.
 	 */
 	if (logging_active)
-		apt_dissolve_pud(kvm, addr, pud);
+		apt_dissolve_pud(kvm, pud);
 
 	if (pud_none(*pud)) {
 		if (!cache)
@@ -917,8 +936,13 @@ static int apt_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
 	 * While dirty page logging - dissolve huge PMD, then continue on to
 	 * allocate page.
 	 */
-	if (logging_active)
-		apt_dissolve_pmd(kvm, addr, pmd);
+	if (logging_active) {
+		if (pmd_cont(*pmd))
+			apt_dissolve_cont_pmd(kvm,
+					pmd_offset(pud, addr & CONT_PMD_MASK));
+		else
+			apt_dissolve_pmd(kvm, pmd);
+	}
 
 	/* Create stage-2 page mappings - Level 2 */
 	if (pmd_none(*pmd)) {
@@ -1197,7 +1221,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu,
 
 	/* Let's check if we will get back a huge page backed by hugetlbfs */
 	down_read(&current->mm->mmap_lock);
-	vma = find_vma_intersection(current->mm, hva, hva + 1);
+	vma = vma_lookup(current->mm, hva);
 	if (unlikely(!vma)) {
 		kvm_err("Failed to find VMA for hva 0x%lx\n", hva);
 		up_read(&current->mm->mmap_lock);
