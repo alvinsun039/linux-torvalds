@@ -576,12 +576,8 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 			xhci->quirks |= XHCI_TRB_OVERFETCH;
 		}
 
-		if (pdev->device == 0x9203) {
-#ifdef CONFIG_SW64
-			xhci->quirks |= XHCI_RESET_ON_RESUME;
-#endif
+		if (pdev->device == 0x9203)
 			xhci->quirks |= XHCI_TRB_OVERFETCH;
-		}
 	}
 
 	if (pdev->vendor == PCI_VENDOR_ID_ZHAOXIN && !is_zhaoxin_cpu()) {
