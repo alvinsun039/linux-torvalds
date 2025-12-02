@@ -1721,6 +1721,8 @@ static int cdnsp_gadget_init_endpoints(struct cdnsp_device *pdev)
 	return 0;
 }
 
+EXPORT_SYMBOL(cdnsp_gadget_init);
+
 static void cdnsp_gadget_free_endpoints(struct cdnsp_device *pdev)
 {
 	struct cdnsp_ep *pep;

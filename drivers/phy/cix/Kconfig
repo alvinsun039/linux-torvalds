@@ -4,7 +4,7 @@
 #
 
 config PHY_CIX_USBDP
-	bool "Cix USBDP PHY Driver"
+	tristate "Cix USBDP PHY Driver"
 	depends on ARM64 && OF && HAS_IOMEM
 	select GENERIC_PHY
 	help
