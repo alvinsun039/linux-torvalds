@@ -175,8 +175,11 @@ static int reset_lookup_handle(const union acpi_object *obj, void *data)
 
 static int rmem_dev_set_dma(struct device *dev, phys_addr_t base, size_t size)
 {
+dev_err(dev, "==== dev[%s], dev->dma[%s]", dev ? "1": "NULL", dev->dma_mem ? "1": "NULL");
 	if (!dev || dev->dma_mem)
 		return -EINVAL;
+dev_err(dev, "==== memblock_is_region_memory[%d], memblock_is_map_memory[%d]",
+	memblock_is_region_memory(base, size), memblock_is_map_memory(base));
 
 	if (!memblock_is_region_memory(base, size)
 		|| memblock_is_map_memory(base))

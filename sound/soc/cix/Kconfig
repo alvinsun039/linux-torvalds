@@ -28,21 +28,4 @@ config SND_SOC_CDNS_I2S_MC_CIX
 	  Say Y or M if you want to add driver support for Cadence
 	  I2S-MC (MultiChannel) controller.
 
-config SND_SOC_IPBLOQ_HDA_CIX
-	tristate "IPBLOG HDA Driver"
-	select SND_HDA_CORE
-	select SND_HDA_EXT_CORE
-	select SND_HDA_ALIGNED_MMIO
-	depends on ARM64
-	help
-	  Say Y or M if you want add support for ipbloq hda
-
-config SND_HDACODEC_REALTEK_CIX
-	tristate "Build Realtek HD-audio codec support"
-	depends on SND_SOC_IPBLOQ_HDA_CIX
-	depends on ARM64
-        help
-          Say Y or M here to include Realtek HD-audio codec support in
-          snd-soc-hda driver, such as ALC256.
-
 endmenu
