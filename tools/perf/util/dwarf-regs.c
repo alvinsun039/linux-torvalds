@@ -18,6 +18,10 @@
 #define EM_LOONGARCH	258 /* LoongArch */
 #endif
 
+#ifndef EM_SW64
+#define EM_SW64		0x9916
+#endif
+
 /* Define const char * {arch}_register_tbl[] */
 #define DEFINE_DWARF_REGSTR_TABLE
 #include "../arch/x86/include/dwarf-regs-table.h"
