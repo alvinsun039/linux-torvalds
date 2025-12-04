@@ -339,12 +339,6 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	bootmem_init();
 
-#ifdef CONFIG_KYLIN_DIFFERENCES
-	/* Try to read cpu version. */
-	extern void cpu_version_init(void);
-	cpu_version_init();
-#endif
-
 	kasan_init();
 
 	request_standard_resources();

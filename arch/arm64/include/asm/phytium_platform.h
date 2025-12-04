@@ -62,4 +62,7 @@ u8 ft_lpc_read(u8 addr);
 u8 ft_lpc_write(u8 value, u8 addr);
 int phytium_lpc_irq_find_mapping(u32 offset);
 
+extern u64 phytium_cpu_version;
+#define CPU_VERSION_SMC_FUNC_ID        0xC2000002
+
 #endif // __PHYTIUM_PLATFORM_H_
