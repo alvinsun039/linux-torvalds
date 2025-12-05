@@ -1920,7 +1920,7 @@ static struct platform_driver mpam_msc_driver = {
 		.name = "mpam_msc",
 	},
 	.probe = mpam_msc_drv_probe,
-	.remove = mpam_msc_drv_remove,
+	.remove_new = mpam_msc_drv_remove,
 };
 
 /* Any of these features mean the BWA_WD field is valid. */
