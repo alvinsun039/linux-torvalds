@@ -16,6 +16,7 @@
 #include <linux/arm-smccc.h>
 #include <linux/cpumask.h>
 #include <asm/phytium_platform.h>
+#include <asm/virt.h>
 
 u64 phytium_cpu_version;
 EXPORT_SYMBOL(phytium_cpu_version);
@@ -164,7 +165,7 @@ static int __init detect_hisi_cpu_type(void)
  */
 static int __init machine_t_init(void)
 {
-	if (!IS_ENABLED(CONFIG_KYLIN_DIFFERENCES))
+	if (!IS_ENABLED(CONFIG_KYLIN_DIFFERENCES) || !is_hyp_mode_available())
 		return 0;
 
 	if (IS_BUILTIN(CONFIG_ARCH_PHYTIUM) &&

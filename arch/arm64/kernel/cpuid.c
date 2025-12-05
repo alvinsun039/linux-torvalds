@@ -14,6 +14,7 @@
 #include <linux/elf.h>
 #include <linux/dmi.h>
 #include <asm/phytium_platform.h>
+#include <asm/virt.h>
 
 #define DMI_PROCESSOR_VERSION_OFFSET 0x10
 #define DMI_PROCESSOR_MIN_LENGTH 48
@@ -202,7 +203,7 @@ static int __init arm64_init_model_name(void)
 	const char *name;
 	u32 midr = read_cpuid_id();
 
-	if (!IS_ENABLED(CONFIG_KYLIN_DIFFERENCES))
+	if (!IS_ENABLED(CONFIG_KYLIN_DIFFERENCES) || !is_hyp_mode_available())
 		goto out;
 
 	if (is_vendor_phytium() &&
