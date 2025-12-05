@@ -23,6 +23,8 @@
 #define IPPROTO_MPTCP 262
 #endif
 
+#define MPTCP_PM_ADDR_FLAG_UNKNOWN _BITUL(7)
+
 #ifndef MPTCP_PM_EV_FLAG_DENY_JOIN_ID0
 #define MPTCP_PM_EV_FLAG_DENY_JOIN_ID0	(1 << 0)
 #endif
@@ -831,6 +833,8 @@ int add_addr(int fd, int pm_family, int argc, char *argv[])
 					flags |= MPTCP_PM_ADDR_FLAG_BACKUP;
 				else if (!strcmp(tok, "fullmesh"))
 					flags |= MPTCP_PM_ADDR_FLAG_FULLMESH;
+				else if (!strcmp(tok, "unknown"))
+					flags |= MPTCP_PM_ADDR_FLAG_UNKNOWN;
 				else
 					error(1, errno,
 					      "unknown flag %s", argv[arg]);
@@ -1032,6 +1036,13 @@ static void print_addr(struct rtattr *attrs, int len)
 			if (flags & MPTCP_PM_ADDR_FLAG_IMPLICIT) {
 				printf("implicit");
 				flags &= ~MPTCP_PM_ADDR_FLAG_IMPLICIT;
+				if (flags)
+					printf(",");
+			}
+
+			if (flags & MPTCP_PM_ADDR_FLAG_UNKNOWN) {
+				printf("unknown");
+				flags &= ~MPTCP_PM_ADDR_FLAG_UNKNOWN;
 				if (flags)
 					printf(",");
 			}
