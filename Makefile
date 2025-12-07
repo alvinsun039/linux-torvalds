@@ -428,6 +428,11 @@ ifeq ($(ARCH),loong64)
        SRCARCH := loongarch
 endif
 
+# Additional ARCH settings for riscv
+ifeq ($(ARCH),riscv64)
+       SRCARCH := riscv
+endif
+
 export cross_compiling :=
 ifneq ($(SRCARCH),$(SUBARCH))
 cross_compiling := 1
