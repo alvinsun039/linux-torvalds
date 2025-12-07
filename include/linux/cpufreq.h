@@ -1219,6 +1219,11 @@ static inline int cpufreq_boost_enabled(void)
 	return 0;
 }
 
+static inline int cpufreq_boost_supported(void)
+{
+	return 0;
+}
+
 static inline int cpufreq_enable_boost_support(void)
 {
 	return -EINVAL;
