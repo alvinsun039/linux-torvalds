@@ -97,7 +97,8 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 R:	George Guo <guodongtai@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
-R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Yang Xiuwei <yangxiuwei@kylinos.cn>
+R:	Cheng Kaitao <chengkaitao@kylinos.cn>
 R:	Lei Xiang <leixiang@kylinos.cn>
 S:	Supported
 F:	fs/aio.c
@@ -265,6 +266,7 @@ SATA/SAS/RAID Host Bus Adapter
 M:	Hu Hai <huhai@kylinos.cn>
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Sang Yao <sangyao@kylinos.cn>
 R:	pengyu <pengyu@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 S:	Supported
@@ -307,10 +309,10 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
-R:	mengfanhui <mengfanhui@kylinos.cn>
 R:	wangyufeng <wangyufeng@kylinos.cn>
 R:	pengyu <pengyu@kylinos.cn>
-R:	liyouhong <liyouhong@kylinos.cn>
+R:	Li Youhong <liyouhong@kylinos.cn>
+R:	Cheng Kaitao <chengkaitao@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 R:	pengcan <pengcan@kylinos.cn>
 S:	Supported
@@ -842,6 +844,7 @@ R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
 R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Sang Yao <sangyao@kylinos.cn>
 S:	Supported
 F:	drivers/nvme/
 F:	include/linux/nvme.h
@@ -923,6 +926,8 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 M:	Zhang Genjian <zhanggenjian@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
+R:	Li Youhong <liyouhong@kylinos.cn>
+R:	Cao Guanghui <caoguanghui@kylinos.cn>
 S:	Supported
 F:	drivers/md/md*
 F:	drivers/md/raid*
