@@ -24,7 +24,7 @@ config USB_CDNS3
 	  as module, the module will be called cdns3.ko.
 
 config USB_CDNSP_CIX
-       bool "Cadence USBSSP Dual-Role Controller for Cix platform"
+       tristate "Cadence USBSSP Dual-Role Controller for Cix platform"
        depends on USB_CDNS_SUPPORT && ARM64
        help
          Say Y here if your system has a Cadence USBSSP dual-role controller.
@@ -142,7 +142,7 @@ config USB_CDNSP_HOST
 	  standard XHCI driver.
 
 config USB_CDNSP_SKY1
-       bool "sky1 base on Cadence CDNSP Dual-Role Controller"
+       tristate "sky1 base on Cadence CDNSP Dual-Role Controller"
        depends on OF || COMPILE_TEST
        select USB_CDNSP_HOST
        default USB_CDNSP_CIX

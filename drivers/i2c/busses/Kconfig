@@ -542,7 +542,7 @@ config I2C_CADENCE
 	  e.g. used by Xilinx Zynq.
 
 config I2C_CIX
-	bool "Cadence I2C Controller for Cix"
+	tristate "Cadence I2C Controller for Cix"
 	depends on ARCH_ZYNQ || ARM64 || XTENSA || COMPILE_TEST
 	help
 	  Say yes here to select Cadence I2C Host Controller on Cix platform.

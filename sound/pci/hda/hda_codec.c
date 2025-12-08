@@ -2901,6 +2901,10 @@ static void hda_call_codec_resume(struct hda_codec *codec)
 	codec->power_jiffies = jiffies;
 
 	hda_set_power_state(codec, AC_PWRST_D0);
+	if (codec->reconfig_init_verbs && codec->bus->core.config_init_verbs) {
+		codec->bus->core.config_init_verbs(&codec->bus->core, codec->core.vendor_id);
+		codec->reconfig_init_verbs = 0;
+	}
 	restore_shutup_pins(codec);
 	hda_exec_init_verbs(codec);
 	snd_hda_jack_set_dirty_all(codec);
@@ -2954,6 +2958,15 @@ static int hda_codec_runtime_resume(struct device *dev)
 	return 0;
 }
 
+static int hda_codec_runtime_idle(struct device *dev)
+{
+	struct hda_codec *codec = dev_to_hda_codec(dev);
+
+	if (codec->jackpoll_interval && !codec->bus->jackpoll_in_suspend)
+		return -EBUSY;
+	return 0;
+}
+
 #endif /* CONFIG_PM */
 
 #ifdef CONFIG_PM_SLEEP
@@ -2969,6 +2982,9 @@ static int hda_codec_pm_prepare(struct device *dev)
 static void hda_codec_pm_complete(struct device *dev)
 {
 	struct hda_codec *codec = dev_to_hda_codec(dev);
+
+	if (!codec->reconfig_init_verbs && codec->bus->core.config_init_verbs)
+		codec->reconfig_init_verbs = 1;
 
 	/* If no other pm-functions are called between prepare() and complete() */
 	if (dev->power.power_state.event == PM_EVENT_SUSPEND)
@@ -2987,6 +3003,11 @@ static int hda_codec_pm_suspend(struct device *dev)
 
 static int hda_codec_pm_resume(struct device *dev)
 {
+	struct hda_codec *codec = dev_to_hda_codec(dev);
+
+	if (!codec->reconfig_init_verbs && codec->bus->core.config_init_verbs)
+		codec->reconfig_init_verbs = 1;
+
 	dev->power.power_state = PMSG_RESUME;
 	return pm_runtime_force_resume(dev);
 }
@@ -3026,7 +3047,7 @@ const struct dev_pm_ops hda_codec_driver_pm = {
 	.restore = hda_codec_pm_restore,
 #endif /* CONFIG_PM_SLEEP */
 	SET_RUNTIME_PM_OPS(hda_codec_runtime_suspend, hda_codec_runtime_resume,
-			   NULL)
+			   hda_codec_runtime_idle)
 };
 
 /* suspend the codec at shutdown; called from driver's shutdown callback */

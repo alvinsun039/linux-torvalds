@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 
-subdir-ccflags-y += -I$(src)
+subdir-cflags-y += -I$(src)
 subdir-ccflags-y += -I$(src)/include
 subdir-ccflags-y += -I$(src)/zhouyi
 subdir-ccflags-y += -I$(src)/sky1

@@ -111,7 +111,7 @@ config TYPEC_WUSB3801
 	  module will be called wusb3801.ko.
 
 config TYPEC_RTS5453
-	bool "Realtek rts5453 Type-C port controller driver"
+	tristate "Realtek rts5453 Type-C port controller driver"
 	depends on I2C
 	select REGMAP_I2C
 	help
