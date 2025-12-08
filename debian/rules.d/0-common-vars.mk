@@ -114,7 +114,7 @@ DEB_BUILD_ARCH = $(shell dpkg-architecture -qDEB_BUILD_ARCH)
 arch := $(DEB_HOST_ARCH)
 CROSS_COMPILE ?= $(DEB_HOST_GNU_TYPE)-
 
-Arch=$(shell echo $(arch) | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/amd64/x86/ -e s/aarch64.*/arm64/ -e s/mips64el/mips/ -e s/loongarch64/loongarch/ -e s/loong64/loongarch/)
+Arch=$(shell echo $(arch) | sed -e s/i.86/x86/ -e s/x86_64/x86/ -e s/amd64/x86/ -e s/aarch64.*/arm64/ -e s/mips64el/mips/ -e s/loongarch64/loongarch/ -e s/loong64/loongarch/ -e s/riscv64/riscv/)
 
 #
 # Set consistent toolchain
