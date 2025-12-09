@@ -1169,6 +1169,41 @@ R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 S:	Supported
 F:	arch/mips/
 
+RISC-V ARCHITECTURE
+M:	Weishi Li <liweishi@kylinos.cn>
+M:	Feng Jiang <jiangfeng@kylinos.cn>
+R:	Xiang Lei <leixiang@kylinos.cn>
+R:	Zongmin Zhou <zhouzongmin@kylinos.cn>
+R:	Longjun Tang <tanglongjun@kylinos.cn>
+R:	Yufeng Wang <wangyufeng@kylinos.cn>
+R:	Qiang Liu <liuqiang@kylinos.cn>
+R:	Chi Zeng <zengchi@kylinos.cn>
+R:	Hao Ge <gehao@kylinos.cn>
+S:	Supported
+F:	Documentation/devicetree/bindings/riscv/
+F:	Documentation/arch/riscv/
+F:	arch/riscv/
+F:	drivers/acpi/riscv/
+F:	drivers/iommu/riscv/
+F:	drivers/tty/hvc/hvc_riscv_sbi.c
+F:	drivers/tty/serial/earlycon-riscv-sbi.c
+F:	drivers/clocksource/timer-riscv.c
+F:	drivers/perf/riscv_*.c
+F:	drivers/irqchip/irq-riscv-*.c
+F:	drivers/firmware/efi/riscv-runtime.c
+F:	drivers/firmware/efi/libstub/riscv.c
+F:	drivers/firmware/efi/libstub/riscv-stub.c
+F:	include/clocksource/timer-riscv.h
+F:	include/linux/irqchip/riscv-*.h
+F:	include/linux/perf/riscv_pmu.h
+F:	lib/crc/riscv/
+F:	lib/crypto/riscv/
+F:	scripts/dtc/include-prefixes/riscv/
+F:	tools/arch/riscv/
+F:	tools/perf/arch/riscv64/
+F:	tools/perf/arch/riscv/
+F:	tools/testing/selftests/riscv/
+
 XEN
 M:	Xie Ming <xieming@kylinos.cn>
 M:	Sun Liming <sunliming@kylinos.cn>
