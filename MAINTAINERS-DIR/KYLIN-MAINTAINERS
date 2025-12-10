@@ -107,14 +107,13 @@ F:	fs/io-wq.c
 F:	include/linux/*aio*.h
 
 ALSA SOUND DRIVER
-M:	Sun Ke <sunke@kylinos.cn>
-M:	Zhao Dongdong <zhaodongdong@kylinos.cn>
+M:	Huang Lei <huanglei@kylinos.cn>
 R:	Song Xiebing <songxiebing@kylinos.cn>
-R:	Yu jun <yujun@kylinos.cn>
 R:	Wang Dicheng <wangdicheng@kylinos.cn>
 R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 R:	Ai Chao <aichao@kylinos.cn>
 R:	shitao <shitao@kylinos.cn>
+R:	Yu jun <yujun@kylinos.cn>
 R:	limiao <limiao@kylinos.cn>
 S:	Supported
 F:	sound/
@@ -127,6 +126,21 @@ F:	drivers/media/pci/cx88/cx88-alsa*
 F:	drivers/media/pci/cobalt/cobalt-alsa*
 F:	drivers/media/pci/ivtv/ivtv-alsa*
 F:	drivers/media/usb/tm6000/tm6000-alsa.c
+
+V4L2 CAMERA DRIVER
+M:	Huang Lei <huanglei@kylinos.cn>
+M:	Chen changcheng <chenchangcheng@kylinos.cn>
+M:	Song Xiebing <songxiebing@kylinos.cn>
+R:	Wang Dicheng <wangdicheng@kylinos.cn>
+R:	Ai Chao <aichao@kylinos.cn>
+R:	Zhang Heng <zhangheng@kylinos.cn>
+R:	limiao <limiao@kylinos.cn>
+S:	Supported
+F:	drivers/media/v4l2-core/
+F:	drivers/media/i2c/
+F:	drivers/media/usb/
+F:	drivers/media/platform/
+F:	drivers/media/spi/
 
 NET AND ETHERNET DRIVERS
 M:	Xiao Linkui <xiaolinkui@kylinos.cn>
@@ -323,7 +337,6 @@ F:	include/target/
 X:	drivers/block/virtio_blk.c
 
 BLUETOOTH SUBSYSTEM
-M:	Huang Lei <huanglei@kylinos.cn>
 M:	Zhao Dongdong <zhaodongdong@kylinos.cn>
 R:	Li Gongwei <ligongwei@kylinos.cn>
 R:	Chen changcheng <chenchangcheng@kylinos.cn>
