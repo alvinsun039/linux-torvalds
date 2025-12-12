@@ -92,6 +92,13 @@ struct udp_sock {
 
 	/* This fields follows rcvbuf value, and is touched by udp_recvmsg */
 	int		forward_threshold;
+
+	/*
+	 * Accounting for the tunnel GRO fastpath.
+	 * Unprotected by compilers guard, as it uses space available in
+	 * the last UDP socket cacheline.
+	 */
+	struct hlist_node	tunnel_list;
 };
 
 #define udp_test_bit(nr, sk)			\
@@ -197,5 +204,14 @@ static inline void udp_allow_gso(struct sock *sk)
 	hlist_for_each_entry_rcu(__sk, list, __sk_common.skc_portaddr_node)
 
 #define IS_UDPLITE(__sk) (__sk->sk_protocol == IPPROTO_UDPLITE)
+
+static inline struct sock *udp_tunnel_sk(const struct net *net, bool is_ipv6)
+{
+#if IS_ENABLED(CONFIG_NET_UDP_TUNNEL)
+	return rcu_dereference(net->ipv4.udp_tunnel_gro[is_ipv6].sk);
+#else
+	return NULL;
+#endif
+}
 
 #endif	/* _LINUX_UDP_H */

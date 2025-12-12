@@ -220,6 +220,8 @@ rmem_max
 
 The maximum receive socket buffer size in bytes.
 
+Default: 4194304
+
 rps_default_mask
 ----------------
 
@@ -244,6 +246,8 @@ wmem_max
 --------
 
 The maximum send socket buffer size in bytes.
+
+Default: 4194304
 
 message_burst and message_cost
 ------------------------------

@@ -41,6 +41,11 @@ struct inet_timewait_death_row {
 
 struct tcp_fastopen_context;
 
+struct udp_tunnel_gro {
+	struct sock __rcu *sk;
+	struct hlist_head list;
+};
+
 struct netns_ipv4 {
 	/* Cacheline organization can be found documented in
 	 * Documentation/networking/net_cachelines/netns_ipv4_sysctl.rst.
@@ -76,6 +81,11 @@ struct netns_ipv4 {
 
 	struct inet_timewait_death_row tcp_death_row;
 	struct udp_table *udp_table;
+
+#if IS_ENABLED(CONFIG_NET_UDP_TUNNEL)
+	/* Not in a pernet subsys because need to be available at GRO stage */
+	struct udp_tunnel_gro udp_tunnel_gro[2];
+#endif
 
 #ifdef CONFIG_SYSCTL
 	struct ctl_table_header	*forw_hdr;
@@ -271,4 +281,5 @@ struct netns_ipv4 {
 	KY_KABI_RESERVE(5)
 	KY_KABI_RESERVE(6)
 };
+
 #endif

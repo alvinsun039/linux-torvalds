@@ -78,7 +78,6 @@ extern const struct qstr dotdot_name;
 # endif
 #endif
 
-#define NEG_DENTRY_LIMIT 16384
 #define d_lock	d_lockref.lock
 
 struct dentry {
@@ -118,8 +117,6 @@ struct dentry {
 		struct hlist_bl_node d_in_lookup_hash;	/* only for in-lookup ones */
 	 	struct rcu_head d_rcu;
 	} d_u;
-	/* negative dentry under this dentry, if it's dir */
-	atomic_t d_neg_dnum;
 } __randomize_layout;
 
 /*
@@ -221,7 +218,6 @@ struct dentry_operations {
 #define DCACHE_PAR_LOOKUP		0x10000000 /* being looked up (with parent locked shared) */
 #define DCACHE_DENTRY_CURSOR		0x20000000
 #define DCACHE_NORCU			0x40000000 /* No RCU delay for freeing */
-#define DCACHE_NEGATIVE_ACCOUNT		0x80000000
 
 extern seqlock_t rename_lock;
 

@@ -399,12 +399,12 @@ acpi_evaluate_reference(acpi_handle handle,
 		acpi_handle_debug(list->handles[i], "Found in reference list\n");
 	}
 
-      end:
 	if (ACPI_FAILURE(status)) {
 		list->count = 0;
 		//kfree(list->handles);
 	}
 
+end:
 	kfree(buffer.pointer);
 
 	return status;
@@ -487,7 +487,7 @@ EXPORT_SYMBOL(acpi_evaluate_ost);
  *
  * Caller must free the returned buffer
  */
-static char *acpi_handle_path(acpi_handle handle)
+char *acpi_handle_path(acpi_handle handle)
 {
 	struct acpi_buffer buffer = {
 		.length = ACPI_ALLOCATE_BUFFER,

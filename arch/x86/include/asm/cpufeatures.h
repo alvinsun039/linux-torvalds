@@ -81,12 +81,10 @@
 #define X86_FEATURE_K6_MTRR		( 3*32+ 1) /* AMD K6 nonstandard MTRRs */
 #define X86_FEATURE_CYRIX_ARR		( 3*32+ 2) /* Cyrix ARRs (= MTRRs) */
 #define X86_FEATURE_CENTAUR_MCR		( 3*32+ 3) /* Centaur MCRs (= MTRRs) */
-
-/* CPU types for specific tunings: */
 #define X86_FEATURE_K8			( 3*32+ 4) /* "" Opteron, Athlon64 */
-/* FREE, was #define X86_FEATURE_K7			( 3*32+ 5) "" Athlon */
-#define X86_FEATURE_P3			( 3*32+ 6) /* "" P3 */
-#define X86_FEATURE_P4			( 3*32+ 7) /* "" P4 */
+#define X86_FEATURE_ZEN5		( 3*32+ 5) /* "" CPU based on Zen5 microarchitecture */
+#define X86_FEATURE_ZEN6		( 3*32+ 6) /* CPU based on Zen6 microarchitecture */
+/* Free					( 3*32+ 7) */
 #define X86_FEATURE_CONSTANT_TSC	( 3*32+ 8) /* TSC ticks at a constant rate */
 #define X86_FEATURE_UP			( 3*32+ 9) /* SMP kernel running on UP */
 #define X86_FEATURE_ART			( 3*32+10) /* Always running timer (ART) */
@@ -512,6 +510,7 @@
 /* HYGON-defined CPU features, CPUID level 0x8c860000:0 (EDX), word 23 */
 #define X86_FEATURE_SM3			(23*32 + 1) /* SM3 instructions */
 #define X86_FEATURE_SM4			(23*32 + 2) /* SM4 instructions */
+#define X86_FEATURE_APX			(21*32+ 9) /* Advanced Performance Extensions */
 
 /*
  * BUG word(s)
