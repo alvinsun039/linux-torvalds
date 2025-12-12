@@ -31,6 +31,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/suspend.h>
 #include <linux/switchtec.h>
+#include <linux/vgaarb.h>
 #include "pci.h"
 
 /*
@@ -409,6 +410,65 @@ static void loongson_pcie_msi_quirk(struct pci_dev *dev)
 	}
 }
 DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON, 0x7a59, loongson_pcie_msi_quirk);
+
+#define DEV_LS7A1000_DC 0x7a06
+#define DEV_LS7A2000_DC 0x7a36
+#define DEV_LS2K3000_DC 0x7a46
+static void loongson_vgadev_quirk(struct pci_dev *pdev)
+{
+	struct pci_dev *devp = NULL;
+
+	while ((devp = pci_get_class(PCI_CLASS_DISPLAY_VGA << 8, devp))) {
+		/* If the graphics card is SM750, set it as a slave */
+		if (devp->vendor == 0x126f && devp->device == 0x0750) {
+			vga_set_default_device(pdev);
+			dev_info(&pdev->dev,
+				"Overriding boot device as %X:%X\n",
+				pdev->vendor, pdev->device);
+			break;
+		}
+
+		if (devp->vendor != PCI_VENDOR_ID_LOONGSON) {
+			vga_set_default_device(devp);
+			dev_info(&pdev->dev,
+				"Overriding boot device as %X:%X\n",
+				devp->vendor, devp->device);
+		}
+	}
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON, DEV_LS7A1000_DC, loongson_vgadev_quirk);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON, DEV_LS7A2000_DC, loongson_vgadev_quirk);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_LOONGSON, DEV_LS2K3000_DC, loongson_vgadev_quirk);
+
+#define DEV_PCIE_PORT_4	0x7a39
+#define DEV_PCIE_PORT_5	0x7a49
+#define DEV_PCIE_PORT_6	0x7a59
+#define DEV_PCIE_PORT_7	0x7a69
+static void loongson_d3_and_link_quirk(struct pci_dev *dev)
+{
+	struct pci_bus *bus = dev->bus;
+	struct pci_dev *bridge;
+	static const struct pci_device_id bridge_devids[] = {
+		{ PCI_VDEVICE(LOONGSON, DEV_PCIE_PORT_4) },
+		{ PCI_VDEVICE(LOONGSON, DEV_PCIE_PORT_5) },
+		{ PCI_VDEVICE(LOONGSON, DEV_PCIE_PORT_6) },
+		{ PCI_VDEVICE(LOONGSON, DEV_PCIE_PORT_7) },
+		{ 0, },
+	};
+
+	/* look for the matching bridge */
+	while (!pci_is_root_bus(bus)) {
+		bridge = bus->self;
+		bus = bus->parent;
+		if (bridge && pci_match_id(bridge_devids, bridge)) {
+			dev->dev_flags |= (PCI_DEV_FLAGS_NO_D3 |
+				PCI_DEV_FLAGS_NO_LINK_SPEED_CHANGE);
+			dev->no_d1d2 = 1;
+		break;
+		}
+	}
+}
+DECLARE_PCI_FIXUP_ENABLE(PCI_ANY_ID, PCI_ANY_ID, loongson_d3_and_link_quirk);
 
 /* Chipsets where PCI->PCI transfers vanish or hang */
 static void quirk_nopcipci(struct pci_dev *dev)
