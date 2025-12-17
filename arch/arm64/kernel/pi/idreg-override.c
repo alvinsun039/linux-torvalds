@@ -255,7 +255,7 @@ static const struct {
 	{ "arm64.nolse",		"id_aa64isar0.atomic=0" },
 	{ "rodata=off",			"arm64_sw.rodataoff=1" },
 	{ "arm64.nolva",		"id_aa64mmfr2.varange=0" },
-	{ "arm64.nompam",		"id_aa64pfr0.mpam=0 id_aa64pfr1.mpam_frac=0" },
+	{ "arm64.mpam",			"id_aa64pfr0.mpam=1 id_aa64pfr1.mpam_frac=1" },
 };
 
 static int __init parse_hexdigit(const char *p, u64 *v)
@@ -415,6 +415,8 @@ void __init init_feature_override(u64 boot_status, const void *fdt,
 	}
 
 	__boot_status = boot_status;
+
+	match_options("id_aa64pfr0.mpam=0 id_aa64pfr1.mpam_frac=0");
 
 	parse_cmdline(fdt, chosen);
 
