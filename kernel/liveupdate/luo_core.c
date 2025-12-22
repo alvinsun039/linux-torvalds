@@ -57,7 +57,7 @@
 #include <linux/mm.h>
 #include <linux/sizes.h>
 #include <linux/string.h>
-#include <linux/unaligned.h>
+#include <asm/unaligned.h>
 
 #include "kexec_handover_internal.h"
 #include "luo_internal.h"

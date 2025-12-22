@@ -18,9 +18,9 @@
 #include <linux/list.h>
 #include <linux/memblock.h>
 #include <linux/page-isolation.h>
-#include <linux/unaligned.h>
 #include <linux/vmalloc.h>
 
+#include <asm/unaligned.h>
 #include <asm/early_ioremap.h>
 
 #include "kexec_handover_internal.h"

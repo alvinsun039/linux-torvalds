@@ -65,7 +65,7 @@
 #include <linux/mutex.h>
 #include <linux/rwsem.h>
 #include <linux/slab.h>
-#include <linux/unaligned.h>
+#include <asm/unaligned.h>
 #include <uapi/linux/liveupdate.h>
 #include "luo_internal.h"
 
