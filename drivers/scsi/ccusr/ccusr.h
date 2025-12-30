@@ -83,6 +83,11 @@ struct ccusr_req_tracker {
 	dma_addr_t sense_phy;
 };
 
+struct ccusr_msg_reply {
+	u32 param;
+	u8 iop_status, scsi_status;
+};
+
 struct ccusr_hba {
 	struct pci_dev *pcidev;
 	volatile struct cciop_if_regs __iomem *regs;

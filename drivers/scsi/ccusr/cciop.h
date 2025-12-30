@@ -180,6 +180,8 @@ enum cciop_request_type {
 #define CCIOP_REQUEST_FLAG_DATA_IN  1
 #define CCIOP_REQUEST_FLAG_DATA_OUT 2
 
+#define CCIOP_BLKFEAT_STABLE_WRITES 1
+
 enum cciop_inbound_message {
 	CCIOP_INBOUND_MSG_NOP = 0,
 	CCIOP_INBOUND_MSG_RESET,    /* MsgParameter: TargetId or 0xFFFFFFFF */
@@ -188,6 +190,7 @@ enum cciop_inbound_message {
 	CCIOP_INBOUND_MSG_TASK,     /* MsgParameter: 1 - Enable, 0 - Disable */
 	CCIOP_INBOUND_MSG_SETID,    /* MsgParameter: vcore_id */
 	CCIOP_INBOUND_MSG_SETADDR,  /* MsgParameter: PCI address */
+	CCIOP_INBOUND_MSG_BLKFEAT,  /* MsgParameter: TargetId */
 };
 
 enum cciop_outbound_message {
