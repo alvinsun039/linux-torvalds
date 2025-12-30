@@ -168,28 +168,6 @@ static int acpi_thermal_get_temperature(struct acpi_thermal *tz)
 	return 0;
 }
 
-static int acpi_thermal_get_sustainable_power(struct acpi_thermal *tz)
-{
-	acpi_status status = AE_OK;
-	unsigned long long tmp;
-
-	if (!tz)
-		return -EINVAL;
-
-	tz->last_temperature = tz->temperature;
-
-	status = acpi_evaluate_integer(tz->device->handle, "SSTP", NULL, &tmp);
-	if (ACPI_FAILURE(status))
-		return -ENODEV;
-
-	tz->sustainable_power = tmp;
-
-	acpi_handle_debug(tz->device->handle, "Sustainable power is %lu mW\n",
-			 tz->sustainable_power);
-
-	return 0;
-}
-
 static int acpi_thermal_get_polling_frequency(struct acpi_thermal *tz)
 {
 	acpi_status status = AE_OK;
