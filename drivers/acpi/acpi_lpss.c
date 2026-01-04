@@ -579,25 +579,26 @@ static struct device *acpi_lpss_find_device(const char *hid, const char *uid)
 static bool acpi_lpss_dep(struct acpi_device *adev, acpi_handle handle)
 {
 	struct acpi_handle_list dep_devices;
-	acpi_status status;
+	bool ret = false;
 	int i;
 
 	if (!acpi_has_method(adev->handle, "_DEP"))
 		return false;
 
-	status = acpi_evaluate_reference(adev->handle, "_DEP", NULL,
-					 &dep_devices);
-	if (ACPI_FAILURE(status)) {
+	if (!acpi_evaluate_reference(adev->handle, "_DEP", NULL, &dep_devices)) {
 		dev_dbg(&adev->dev, "Failed to evaluate _DEP.\n");
 		return false;
 	}
 
 	for (i = 0; i < dep_devices.count; i++) {
-		if (dep_devices.handles[i] == handle)
-			return true;
+		if (dep_devices.handles[i] == handle) {
+			ret = true;
+			break;
+		}
 	}
 
-	return false;
+	acpi_handle_list_free(&dep_devices);
+	return ret;
 }
 
 static void acpi_lpss_link_consumer(struct device *dev1,

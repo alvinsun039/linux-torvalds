@@ -2,26 +2,24 @@
 /*
  * CPU feature support for ARM64.
  *
- * Author:
- *   Jackie Liu <liuyun01@kylinos.cn>
- *   Riwen Lu <luriwen@kylinos.cn>
- *
- * Copyright (C) 2024-2025 KylinSoft Corporation.
+ * Copyright (C) 2024 - 2025 KylinSoft Co., Ltd. All rights reserved.
+ * Copyright (C) 2024 - 2025 Jackie Liu <liuyun01@kylinos.cn>
+ * Copyright (C) 2024 Riwen Lu <luriwen@kylinos.cn>
  */
 
+#include <linux/export.h>
 #include <linux/seq_file.h>
 #include <linux/arm-smccc.h>
 #include <linux/machine_t.h>
 #include <linux/elf.h>
 #include <linux/dmi.h>
 #include <asm/phytium_platform.h>
+#include <asm/virt.h>
 
-#define CPU_VERSION_SMC_FUNC_ID 0xC2000002
 #define DMI_PROCESSOR_VERSION_OFFSET 0x10
 #define DMI_PROCESSOR_MIN_LENGTH 48
 #define MODEL_NAME_LEN 64
 
-static u64 phytium_cpu_version;
 static char arm64_model_name[MODEL_NAME_LEN];
 
 /* CPU model name in cpuinfo */
@@ -75,95 +73,6 @@ void print_cpuid_info(struct seq_file *m)
 {
 	if (is_vendor_phytium())
 		print_phytium_cpuid_info(m);
-}
-
-/**
- * phytium_check_cpu_type - Check CPU type for Phytium
- * @cpu_type: CPU type to check
- *
- * This function checks if the provided CPU type matches the Phytium
- * CPU version.
- *
- * Return: true if the CPU type matches, false otherwise.
- */
-bool phytium_check_cpu_type(u32 cpu_type)
-{
-	if (!phytium_cpu_version)
-		return false;
-
-	return (cpu_type == (phytium_cpu_version & 0xFFFF00));
-}
-EXPORT_SYMBOL(phytium_check_cpu_type);
-
-/**
- * phytium_cpu_type_set_default - Set the default Phytium CPU ID with MIDR and CPU count
- * @midr: MIDR value of the CPU
- *
- * This function sets the default Phytium CPU ID based on the MIDR value
- * and the number of possible CPUs.
- *
- * Return: The default Phytium CPU ID.
- */
-static u32 phytium_cpu_type_set_default(u32 midr)
-{
-	u32 cpuid = 0;
-	unsigned int cpu_count = num_possible_cpus();
-
-	switch (midr) {
-	case MIDR_FT_2000A_4:
-		if (cpu_count == 8)
-			cpuid = PHYTIUM_CPU_D2000_8;
-		else if (cpu_count > 8)
-			cpuid = PHYTIUM_CPU_S2500_64;
-		else
-			cpuid = PHYTIUM_CPU_2000_4_X;
-		break;
-	case MIDR_FT_E2000_BIG:
-	case MIDR_FT_E2000_LITTLE:
-		cpuid = PHYTIUM_CPU_E2000;
-		break;
-	case MIDR_FT_D3000:
-		cpuid = PHYTIUM_CPU_D3000;
-		break;
-	}
-
-	return cpuid;
-}
-
-/**
- * phytium_cpu_version_init - Initialize Phytium CPU version
- *
- * This function initializes the Phytium CPU version by reading the
- * CPU ID and making an ARM SMC call.
- *
- * Return: The Phytium CPU version.
- */
-static u32 phytium_cpu_version_init(void)
-{
-	struct arm_smccc_res res;
-	u32 midr = read_cpuid_id() & MIDR_CPU_MODEL_MASK;
-
-	if (midr == MIDR_FT_1500A || midr == MIDR_FT_2000AHK ||
-	    midr == MIDR_FT_2000PLUS)
-		return 0;
-
-	arm_smccc_smc(CPU_VERSION_SMC_FUNC_ID, 0, 0, 0, 0, 0, 0, 0, &res);
-	if (res.a0) {
-		pr_debug("It's not support arm smc service!\n");
-		return phytium_cpu_type_set_default(midr);
-	}
-	return res.a1;
-}
-
-/**
- * cpu_version_init - Initialize CPU version
- *
- * This function initializes the CPU version if the CPU vendor is Phytium.
- */
-void __init cpu_version_init(void)
-{
-	if (is_vendor_phytium())
-		phytium_cpu_version = phytium_cpu_version_init();
 }
 
 static struct cpu_mode_desc arm64_cpu_desc[] = {
@@ -294,6 +203,9 @@ static int __init arm64_init_model_name(void)
 	const char *name;
 	u32 midr = read_cpuid_id();
 
+	if (!IS_ENABLED(CONFIG_KYLIN_DIFFERENCES) || !is_hyp_mode_available())
+		goto out;
+
 	if (is_vendor_phytium() &&
 	    !dmi_walk(find_dmi_processor_version, arm64_model_name) &&
 	    arm64_model_name[0])
@@ -305,8 +217,9 @@ static int __init arm64_init_model_name(void)
 		return 0;
 	}
 
+out:
 	sprintf(arm64_model_name, "ARMv8 Processor rev %d (%s)",
 		MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
 	return 0;
 }
-arch_initcall(arm64_init_model_name);
+subsys_initcall(arm64_init_model_name);

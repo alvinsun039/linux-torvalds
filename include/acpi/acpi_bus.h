@@ -12,11 +12,9 @@
 #include <linux/device.h>
 #include <linux/property.h>
 
-/* TBD: Make dynamic */
-#define ACPI_MAX_HANDLES	10
 struct acpi_handle_list {
 	u32 count;
-	acpi_handle handles[ACPI_MAX_HANDLES];
+	acpi_handle *handles;
 };
 
 /* acpi_utils.h */
@@ -27,11 +25,14 @@ acpi_status
 acpi_evaluate_integer(acpi_handle handle,
 		      acpi_string pathname,
 		      struct acpi_object_list *arguments, unsigned long long *data);
-acpi_status
-acpi_evaluate_reference(acpi_handle handle,
-			acpi_string pathname,
-			struct acpi_object_list *arguments,
-			struct acpi_handle_list *list);
+bool acpi_evaluate_reference(acpi_handle handle, acpi_string pathname,
+			     struct acpi_object_list *arguments,
+			     struct acpi_handle_list *list);
+bool acpi_handle_list_equal(struct acpi_handle_list *list1,
+			    struct acpi_handle_list *list2);
+void acpi_handle_list_replace(struct acpi_handle_list *dst,
+			      struct acpi_handle_list *src);
+void acpi_handle_list_free(struct acpi_handle_list *list);
 acpi_status
 acpi_evaluate_ost(acpi_handle handle, u32 source_event, u32 status_code,
 		  struct acpi_buffer *status_buf);
@@ -894,6 +895,8 @@ static inline void acpi_put_acpi_dev(struct acpi_device *adev)
 
 int acpi_wait_for_acpi_ipmi(void);
 
+int acpi_scan_add_dep(acpi_handle handle, struct acpi_handle_list *dep_devices);
+u32 arch_acpi_add_auto_dep(acpi_handle handle);
 #else	/* CONFIG_ACPI */
 
 static inline int register_acpi_bus_type(void *bus) { return 0; }
