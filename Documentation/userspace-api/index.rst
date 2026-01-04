@@ -28,12 +28,14 @@ place where this information is gathered.
    iommu
    iommufd
    media/index
+   liveupdate
    netlink/index
    sysfs-platform_profile
    vduse
    futex2
    lsm
    tee
+   ntsync
 
 .. only::  subproject and html
 

@@ -25,9 +25,6 @@
 #include <linux/nmi.h>
 #include <linux/sched/debug.h>
 #include <linux/jump_label.h>
-#ifdef CONFIG_ARM64
-#include <asm/cputype.h>
-#endif
 
 #include <trace/events/ipi.h>
 #define CREATE_TRACE_POINTS
@@ -918,6 +915,9 @@ static int __init nosmp(char *str)
 
 early_param("nosmp", nosmp);
 
+void __weak arch_nrcpus_hook(int *nrcpus)
+{}
+
 /* this is hard limit */
 static int __init nrcpus(char *str)
 {
@@ -925,13 +925,7 @@ static int __init nrcpus(char *str)
 
 	if (!get_option(&str, &nr_cpus))
 		return 0;
-#ifdef CONFIG_ARM64
-	if (IS_ENABLED(CONFIG_ARCH_PHYTIUM) &&
-	    ((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_FT_2500)) {
-		if (nr_cpus <= 1)
-			nr_cpus = 2;
-	}
-#endif
+	arch_nrcpus_hook(&nr_cpus);
 	if (nr_cpus > 0 && nr_cpus < nr_cpu_ids)
 		set_nr_cpu_ids(nr_cpus);
 
@@ -943,13 +937,7 @@ early_param("nr_cpus", nrcpus);
 static int __init maxcpus(char *str)
 {
 	get_option(&str, &setup_max_cpus);
-#ifdef CONFIG_ARM64
-	if (IS_ENABLED(CONFIG_ARCH_PHYTIUM) &&
-	    ((read_cpuid_id() & MIDR_CPU_MODEL_MASK) == MIDR_FT_2500)) {
-		if (setup_max_cpus == 1)
-			setup_max_cpus = 2;
-	}
-#endif
+	arch_nrcpus_hook(&setup_max_cpus);
 	if (setup_max_cpus == 0)
 		arch_disable_smp_support();
 

@@ -97,7 +97,8 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 R:	George Guo <guodongtai@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
-R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Yang Xiuwei <yangxiuwei@kylinos.cn>
+R:	Cheng Kaitao <chengkaitao@kylinos.cn>
 R:	Lei Xiang <leixiang@kylinos.cn>
 S:	Supported
 F:	fs/aio.c
@@ -106,14 +107,13 @@ F:	fs/io-wq.c
 F:	include/linux/*aio*.h
 
 ALSA SOUND DRIVER
-M:	Sun Ke <sunke@kylinos.cn>
-M:	Zhao Dongdong <zhaodongdong@kylinos.cn>
+M:	Huang Lei <huanglei@kylinos.cn>
 R:	Song Xiebing <songxiebing@kylinos.cn>
-R:	Yu jun <yujun@kylinos.cn>
 R:	Wang Dicheng <wangdicheng@kylinos.cn>
 R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 R:	Ai Chao <aichao@kylinos.cn>
 R:	shitao <shitao@kylinos.cn>
+R:	Yu jun <yujun@kylinos.cn>
 R:	limiao <limiao@kylinos.cn>
 S:	Supported
 F:	sound/
@@ -126,6 +126,21 @@ F:	drivers/media/pci/cx88/cx88-alsa*
 F:	drivers/media/pci/cobalt/cobalt-alsa*
 F:	drivers/media/pci/ivtv/ivtv-alsa*
 F:	drivers/media/usb/tm6000/tm6000-alsa.c
+
+V4L2 CAMERA DRIVER
+M:	Huang Lei <huanglei@kylinos.cn>
+M:	Chen changcheng <chenchangcheng@kylinos.cn>
+M:	Song Xiebing <songxiebing@kylinos.cn>
+R:	Wang Dicheng <wangdicheng@kylinos.cn>
+R:	Ai Chao <aichao@kylinos.cn>
+R:	Zhang Heng <zhangheng@kylinos.cn>
+R:	limiao <limiao@kylinos.cn>
+S:	Supported
+F:	drivers/media/v4l2-core/
+F:	drivers/media/i2c/
+F:	drivers/media/usb/
+F:	drivers/media/platform/
+F:	drivers/media/spi/
 
 NET AND ETHERNET DRIVERS
 M:	Xiao Linkui <xiaolinkui@kylinos.cn>
@@ -265,6 +280,7 @@ SATA/SAS/RAID Host Bus Adapter
 M:	Hu Hai <huhai@kylinos.cn>
 M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Sang Yao <sangyao@kylinos.cn>
 R:	pengyu <pengyu@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 S:	Supported
@@ -307,10 +323,10 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
-R:	mengfanhui <mengfanhui@kylinos.cn>
 R:	wangyufeng <wangyufeng@kylinos.cn>
 R:	pengyu <pengyu@kylinos.cn>
-R:	liyouhong <liyouhong@kylinos.cn>
+R:	Li Youhong <liyouhong@kylinos.cn>
+R:	Cheng Kaitao <chengkaitao@kylinos.cn>
 R:	Jiangshan Yi <yijiangshan@kylinos.cn>
 R:	pengcan <pengcan@kylinos.cn>
 S:	Supported
@@ -321,7 +337,6 @@ F:	include/target/
 X:	drivers/block/virtio_blk.c
 
 BLUETOOTH SUBSYSTEM
-M:	Huang Lei <huanglei@kylinos.cn>
 M:	Zhao Dongdong <zhaodongdong@kylinos.cn>
 R:	Li Gongwei <ligongwei@kylinos.cn>
 R:	Chen changcheng <chenchangcheng@kylinos.cn>
@@ -842,6 +857,7 @@ R:	liubaolin <liubaolin@kylinos.cn>
 R:	wangxuewen <wangxuewen@kylinos.cn>
 R:	Wang Yufeng <wangyufeng@kylinos.cn>
 R:	Tan Zheng <tanzheng@kylinos.cn>
+R:	Sang Yao <sangyao@kylinos.cn>
 S:	Supported
 F:	drivers/nvme/
 F:	include/linux/nvme.h
@@ -923,6 +939,8 @@ M:	Liu Zhengyuan <liuzhengyuan@kylinos.cn>
 M:	Liu Yun <liuyun01@kylinos.cn>
 M:	Zhang Genjian <zhanggenjian@kylinos.cn>
 R:	liubaolin <liubaolin@kylinos.cn>
+R:	Li Youhong <liyouhong@kylinos.cn>
+R:	Cao Guanghui <caoguanghui@kylinos.cn>
 S:	Supported
 F:	drivers/md/md*
 F:	drivers/md/raid*
@@ -1163,6 +1181,41 @@ R:	wangxuewen <wangxuewen@kylinos.cn>
 R:	Yongzhen Zhang <zhangyongzhen@kylinos.cn>
 S:	Supported
 F:	arch/mips/
+
+RISC-V ARCHITECTURE
+M:	Weishi Li <liweishi@kylinos.cn>
+M:	Feng Jiang <jiangfeng@kylinos.cn>
+R:	Xiang Lei <leixiang@kylinos.cn>
+R:	Zongmin Zhou <zhouzongmin@kylinos.cn>
+R:	Longjun Tang <tanglongjun@kylinos.cn>
+R:	Yufeng Wang <wangyufeng@kylinos.cn>
+R:	Qiang Liu <liuqiang@kylinos.cn>
+R:	Chi Zeng <zengchi@kylinos.cn>
+R:	Hao Ge <gehao@kylinos.cn>
+S:	Supported
+F:	Documentation/devicetree/bindings/riscv/
+F:	Documentation/arch/riscv/
+F:	arch/riscv/
+F:	drivers/acpi/riscv/
+F:	drivers/iommu/riscv/
+F:	drivers/tty/hvc/hvc_riscv_sbi.c
+F:	drivers/tty/serial/earlycon-riscv-sbi.c
+F:	drivers/clocksource/timer-riscv.c
+F:	drivers/perf/riscv_*.c
+F:	drivers/irqchip/irq-riscv-*.c
+F:	drivers/firmware/efi/riscv-runtime.c
+F:	drivers/firmware/efi/libstub/riscv.c
+F:	drivers/firmware/efi/libstub/riscv-stub.c
+F:	include/clocksource/timer-riscv.h
+F:	include/linux/irqchip/riscv-*.h
+F:	include/linux/perf/riscv_pmu.h
+F:	lib/crc/riscv/
+F:	lib/crypto/riscv/
+F:	scripts/dtc/include-prefixes/riscv/
+F:	tools/arch/riscv/
+F:	tools/perf/arch/riscv64/
+F:	tools/perf/arch/riscv/
+F:	tools/testing/selftests/riscv/
 
 XEN
 M:	Xie Ming <xieming@kylinos.cn>

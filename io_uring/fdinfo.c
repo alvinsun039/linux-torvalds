@@ -50,9 +50,9 @@ static __cold int io_uring_show_cred(struct seq_file *m, unsigned int id,
  * Caller holds a reference to the file already, we don't need to do
  * anything else to get an extra reference.
  */
-__cold void io_uring_show_fdinfo(struct seq_file *m, struct file *f)
+__cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 {
-	struct io_ring_ctx *ctx = f->private_data;
+	struct io_ring_ctx *ctx = file->private_data;
 	struct io_overflow_cqe *ocqe;
 	struct io_rings *r = ctx->rings;
 	unsigned int sq_mask = ctx->sq_entries - 1, cq_mask = ctx->cq_entries - 1;
@@ -64,6 +64,7 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *f)
 	unsigned int sq_shift = 0;
 	unsigned int sq_entries, cq_entries;
 	int sq_pid = -1, sq_cpu = -1;
+	u64 sq_total_time = 0, sq_work_time = 0;
 	bool has_lock;
 	unsigned int i;
 
@@ -144,13 +145,34 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *f)
 
 	if (has_lock && (ctx->flags & IORING_SETUP_SQPOLL)) {
 		struct io_sq_data *sq = ctx->sq_data;
+		struct task_struct *tsk;
 
-		sq_pid = sq->task_pid;
-		sq_cpu = sq->sq_cpu;
+		rcu_read_lock();
+		tsk = rcu_dereference(sq->thread);
+		/*
+		 * sq->thread might be NULL if we raced with the sqpoll
+		 * thread termination.
+		 */
+		if (tsk) {
+			u64 usec;
+
+			get_task_struct(tsk);
+			rcu_read_unlock();
+			usec = io_sq_cpu_usec(tsk);
+			put_task_struct(tsk);
+			sq_pid = sq->task_pid;
+			sq_cpu = sq->sq_cpu;
+			sq_total_time = usec;
+			sq_work_time = sq->work_time;
+		} else {
+			rcu_read_unlock();
+		}
 	}
 
 	seq_printf(m, "SqThread:\t%d\n", sq_pid);
 	seq_printf(m, "SqThreadCpu:\t%d\n", sq_cpu);
+	seq_printf(m, "SqTotalTime:\t%llu\n", sq_total_time);
+	seq_printf(m, "SqWorkTime:\t%llu\n", sq_work_time);
 	seq_printf(m, "UserFiles:\t%u\n", ctx->nr_user_files);
 	for (i = 0; has_lock && i < ctx->nr_user_files; i++) {
 		struct file *f = io_file_from_index(&ctx->file_table, i);
@@ -163,9 +185,8 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *f)
 	seq_printf(m, "UserBufs:\t%u\n", ctx->nr_user_bufs);
 	for (i = 0; has_lock && i < ctx->nr_user_bufs; i++) {
 		struct io_mapped_ubuf *buf = ctx->user_bufs[i];
-		unsigned int len = buf->ubuf_end - buf->ubuf;
 
-		seq_printf(m, "%5u: 0x%llx/%u\n", i, buf->ubuf, len);
+		seq_printf(m, "%5u: 0x%llx/%u\n", i, buf->ubuf, buf->len);
 	}
 	if (has_lock && !xa_empty(&ctx->personalities)) {
 		unsigned long index;
@@ -177,20 +198,11 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *f)
 	}
 
 	seq_puts(m, "PollList:\n");
-	for (i = 0; i < (1U << ctx->cancel_table.hash_bits); i++) {
+	for (i = 0; has_lock && i < (1U << ctx->cancel_table.hash_bits); i++) {
 		struct io_hash_bucket *hb = &ctx->cancel_table.hbs[i];
-		struct io_hash_bucket *hbl = &ctx->cancel_table_locked.hbs[i];
 		struct io_kiocb *req;
 
-		spin_lock(&hb->lock);
 		hlist_for_each_entry(req, &hb->list, hash_node)
-			seq_printf(m, "  op=%d, task_works=%d\n", req->opcode,
-					task_work_pending(req->task));
-		spin_unlock(&hb->lock);
-
-		if (!has_lock)
-			continue;
-		hlist_for_each_entry(req, &hbl->list, hash_node)
 			seq_printf(m, "  op=%d, task_works=%d\n", req->opcode,
 					task_work_pending(req->task));
 	}

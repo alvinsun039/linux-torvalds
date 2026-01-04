@@ -59,7 +59,7 @@ static struct hwrng zhaoxin_rng = {
 	.read = zhaoxin_rng_read,
 };
 
-static struct x86_cpu_id zhaoxin_rng_cpu_ids[] = {
+static const struct x86_cpu_id zhaoxin_rng_cpu_ids[] = {
 	X86_MATCH_VENDOR_FAM_FEATURE(ZHAOXIN, 6, X86_FEATURE_XSTORE, NULL),
 	X86_MATCH_VENDOR_FAM_FEATURE(ZHAOXIN, 7, X86_FEATURE_XSTORE, NULL),
 	X86_MATCH_VENDOR_FAM_FEATURE(CENTAUR, 7, X86_FEATURE_XSTORE, NULL),
@@ -76,7 +76,7 @@ static int __init zhaoxin_rng_mod_init(void)
 		return -ENODEV;
 	}
 
-	pr_info("Zhaoxin RNG detected\n");
+	pr_info(PFX "RNG detected\n");
 
 	err = hwrng_register(&zhaoxin_rng);
 	if (err)

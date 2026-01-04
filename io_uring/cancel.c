@@ -16,6 +16,7 @@
 #include "poll.h"
 #include "timeout.h"
 #include "waitid.h"
+#include "futex.h"
 #include "cancel.h"
 
 struct io_cancel {
@@ -57,9 +58,8 @@ bool io_cancel_req_match(struct io_kiocb *req, struct io_cancel_data *cd)
 		return false;
 	if (cd->flags & IORING_ASYNC_CANCEL_ALL) {
 check_seq:
-		if (cd->seq == req->work.cancel_seq)
+		if (io_cancel_match_sequence(req, cd->seq))
 			return false;
-		req->work.cancel_seq = cd->seq;
 	}
 
 	return true;
@@ -124,6 +124,10 @@ int io_try_cancel(struct io_uring_task *tctx, struct io_cancel_data *cd,
 	if (ret != -ENOENT)
 		return ret;
 
+	ret = io_futex_cancel(ctx, cd, issue_flags);
+	if (ret != -ENOENT)
+		return ret;
+
 	spin_lock(&ctx->completion_lock);
 	if (!(cd->flags & IORING_ASYNC_CANCEL_FD))
 		ret = io_timeout_cancel(ctx, cd);
@@ -180,9 +184,7 @@ static int __io_async_cancel(struct io_cancel_data *cd,
 	io_ring_submit_lock(ctx, issue_flags);
 	ret = -ENOENT;
 	list_for_each_entry(node, &ctx->tctx_list, ctx_node) {
-		struct io_uring_task *tctx = node->task->io_uring;
-
-		ret = io_async_cancel_one(tctx, cd);
+		ret = io_async_cancel_one(node->task->io_uring, cd);
 		if (ret != -ENOENT) {
 			if (!all)
 				break;
@@ -228,16 +230,6 @@ done:
 		req_set_fail(req);
 	io_req_set_res(req, ret, 0);
 	return IOU_OK;
-}
-
-void init_hash_table(struct io_hash_table *table, unsigned size)
-{
-	unsigned int i;
-
-	for (i = 0; i < size; i++) {
-		spin_lock_init(&table->hbs[i].lock);
-		INIT_HLIST_HEAD(&table->hbs[i].list);
-	}
 }
 
 static int __io_sync_cancel(struct io_uring_task *tctx,
@@ -346,4 +338,46 @@ out:
 	if (file)
 		fput(file);
 	return ret;
+}
+
+bool io_cancel_remove_all(struct io_ring_ctx *ctx, struct io_uring_task *tctx,
+			  struct hlist_head *list, bool cancel_all,
+			  bool (*cancel)(struct io_kiocb *))
+{
+	struct hlist_node *tmp;
+	struct io_kiocb *req;
+	bool found = false;
+
+	lockdep_assert_held(&ctx->uring_lock);
+
+	hlist_for_each_entry_safe(req, tmp, list, hash_node) {
+		if (!io_match_task_safe(req, tctx, cancel_all))
+			continue;
+		hlist_del_init(&req->hash_node);
+		if (cancel(req))
+			found = true;
+	}
+
+	return found;
+}
+
+int io_cancel_remove(struct io_ring_ctx *ctx, struct io_cancel_data *cd,
+		     unsigned int issue_flags, struct hlist_head *list,
+		     bool (*cancel)(struct io_kiocb *))
+{
+	struct hlist_node *tmp;
+	struct io_kiocb *req;
+	int nr = 0;
+
+	io_ring_submit_lock(ctx, issue_flags);
+	hlist_for_each_entry_safe(req, tmp, list, hash_node) {
+		if (!io_cancel_req_match(req, cd))
+			continue;
+		if (cancel(req))
+			nr++;
+		if (!(cd->flags & IORING_ASYNC_CANCEL_ALL))
+			break;
+	}
+	io_ring_submit_unlock(ctx, issue_flags);
+	return nr ?: -ENOENT;
 }
