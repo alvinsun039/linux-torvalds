@@ -42,8 +42,9 @@ static void drm_fbdev_dma_fb_destroy(struct fb_info *info)
 	if (!fb_helper->dev)
 		return;
 
-	drm_fb_helper_fini(fb_helper);
-
+	if(info->fbdefio)
+		fb_deferred_io_cleanup(info);
+	
 	drm_client_buffer_vunmap(fb_helper->buffer);
 	drm_client_framebuffer_delete(fb_helper->buffer);
 	drm_client_release(&fb_helper->client);
