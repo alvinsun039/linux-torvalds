@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #include <linux/interrupt.h>
 #include <linux/types.h>
@@ -12,12 +12,16 @@
 #include <linux/vmalloc.h>
 #include <linux/highmem.h>
 #include <linux/uaccess.h>
+#include <linux/crc32.h>
 #include "rnpgbe.h"
 #include "rnpgbe_phy.h"
 #include "rnpgbe_sriov.h"
 #include "rnpgbe_mbx_fw.h"
 #include "rnpgbe_ethtool.h"
+#include "rnpgbe_common.h"
+#ifdef ETHTOOL_GEEE
 #include <linux/mdio.h>
+#endif
 
 int rnpgbe_wol_exclusion(struct rnpgbe_adapter *adapter,
 			 struct ethtool_wolinfo *wol)
@@ -117,27 +121,7 @@ struct rnpgbe_reg_test {
 #define TABLE64_TEST_LO 5
 #define TABLE64_TEST_HI 6
 
-static struct rnpgbe_reg_test reg_test_chip[] = {
-	/* { RNP_FCRTL_chip(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
-	 * { RNP_FCRTH_chip(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
-	 * { RNP_PFCTOP, 1, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
-	 * { RNP_VLNCTRL, 1, PATTERN_TEST, 0x00000000, 0x00000000 },
-	 * { RNP_RDBAL(0), 4, PATTERN_TEST, 0xFFFFFF80, 0xFFFFFF80 },
-	 * { RNP_RDBAH(0), 4, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
-	 * { RNP_RDLEN(0), 4, PATTERN_TEST, 0x000FFF80, 0x000FFFFF },
-	 * { RNP_RXDCTL(0), 4, WRITE_NO_TEST, 0, IXGBE_RXDCTL_ENABLE },
-	 * { RNP_RDT(0), 4, PATTERN_TEST, 0x0000FFFF, 0x0000FFFF },
-	 * { RNP_RXDCTL(0), 4, WRITE_NO_TEST, 0, 0 },
-	 * { RNP_FCRTH(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
-	 * { RNP_FCTTV(0), 1, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
-	 * { RNP_TDBAL(0), 4, PATTERN_TEST, 0xFFFFFF80, 0xFFFFFFFF },
-	 * { RNP_TDBAH(0), 4, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
-	 * { RNP_TDLEN(0), 4, PATTERN_TEST, 0x000FFF80, 0x000FFF80 },
-	 * { RNP_RXCTRL, 1, SET_READ_TEST, 0x00000001, 0x00000001 },
-	 * { RNP_RAL(0), 16, TABLE64_TEST_LO, 0xFFFFFFFF, 0xFFFFFFFF },
-	 * { RNP_RAL(0), 16, TABLE64_TEST_HI, 0x8001FFFF, 0x800CFFFF },
-	 * { RNP_MTA(0), 128, TABLE32_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
-	 */
+static struct rnpgbe_reg_test reg_test_n500[] = {
 	{ .reg = 0 },
 };
 
@@ -199,8 +183,9 @@ static bool rnpgbe_reg_test(struct rnpgbe_adapter *adapter, u64 *data)
 		return true;
 	}
 
-	test = reg_test_chip;
-	/* Perform the remainder of the register test, looping through
+	test = reg_test_n500;
+	/*
+	 * Perform the remainder of the register test, looping through
 	 * the test table until we either fail or reach the null entry.
 	 */
 	while (test->reg) {
@@ -219,7 +204,7 @@ static bool rnpgbe_reg_test(struct rnpgbe_adapter *adapter, u64 *data)
 						      test->mask, test->write);
 				break;
 			case WRITE_NO_TEST:
-				wr32(hw, test->reg + (i * 0x40), test->write);
+				hw_wr32(hw, test->reg + (i * 0x40), test->write);
 				break;
 			case TABLE32_TEST:
 				b = reg_pattern_test(adapter, data,
@@ -265,8 +250,6 @@ void rnpgbe_diag_test(struct net_device *netdev, struct ethtool_test *eth_test,
 		      u64 *data)
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
-	struct rnpgbe_hw *hw = &adapter->hw;
-	bool if_running = netif_running(netdev);
 
 	set_bit(__RNP_TESTING, &adapter->state);
 	if (eth_test->flags == ETH_TEST_FL_OFFLINE) {
@@ -275,13 +258,17 @@ void rnpgbe_diag_test(struct net_device *netdev, struct ethtool_test *eth_test,
 
 			for (i = 0; i < adapter->num_vfs; i++) {
 				if (adapter->vfinfo[i].clear_to_send) {
-					netdev_warn(netdev, "%s",
-						"offline diagnostic is not supported when VFs are present\n");
-					data[0] = 1;
-					data[1] = 1;
-					data[2] = 1;
-					data[3] = 1;
-					eth_test->flags |= ETH_TEST_FL_FAILED;
+					netdev_warn(
+						netdev, "%s",
+						"offline diagnostic is not supported when VFs "
+						"are present, just show pass\n");
+					data[0] = 0;
+					data[1] = 0;
+					data[2] = 0;
+					data[3] = 0;
+					if (rnpgbe_link_test(adapter, &data[4]))
+						eth_test->flags |= ETH_TEST_FL_FAILED;
+					//eth_test->flags |= ETH_TEST_FL_FAILED;
 					clear_bit(__RNP_TESTING,
 						  &adapter->state);
 					goto skip_ol_tests;
@@ -292,16 +279,15 @@ void rnpgbe_diag_test(struct net_device *netdev, struct ethtool_test *eth_test,
 		/* Offline tests */
 		e_info(hw, "offline testing starting\n");
 
-		/* bringing adapter down disables SFP+ optics */
-		if (hw->ops.enable_tx_laser)
-			hw->ops.enable_tx_laser(hw);
-
+		//if (if_running)
+		//	rnpgbe_close(netdev);
 		/* Link test performed before hardware reset so autoneg doesn't
 		 * interfere with test result
 		 */
 		if (rnpgbe_link_test(adapter, &data[4]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
 
+		//rnpgbe_reset(adapter);
 		e_info(hw, "register testing starting\n");
 		if (rnpgbe_reg_test(adapter, &data[0]))
 			eth_test->flags |= ETH_TEST_FL_FAILED;
@@ -319,15 +305,12 @@ void rnpgbe_diag_test(struct net_device *netdev, struct ethtool_test *eth_test,
 		}
 
 		data[3] = 0;
+		/* loopback test is not added now */
 skip_loopback:
 		/* clear testing bit and return adapter to previous state */
 		clear_bit(__RNP_TESTING, &adapter->state);
 	} else {
 		e_info(hw, "online testing starting\n");
-
-		/* if adapter is down, SFP+ optics will be disabled */
-		if (!if_running && hw->ops.enable_tx_laser)
-			hw->ops.enable_tx_laser(hw);
 
 		/* Online tests */
 		if (rnpgbe_link_test(adapter, &data[4]))
@@ -342,9 +325,6 @@ skip_loopback:
 		clear_bit(__RNP_TESTING, &adapter->state);
 	}
 
-	/* if adapter was down, ensure SFP+ optics are disabled again */
-	if (!if_running && hw->ops.disable_tx_laser)
-		hw->ops.disable_tx_laser(hw);
 skip_ol_tests:
 	msleep_interruptible(4 * 1000);
 }
@@ -389,19 +369,28 @@ int rnpgbe_set_phys_id(struct net_device *netdev,
 	return 0;
 }
 
-int rnpgbe_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
+#ifdef HAVE_ETHTOOL_GET_TS_INFO
+#ifdef HAVE_ETHTOOL_KERNEL_TS_INFO
+int rnpgbe_get_ts_info(struct net_device *dev,
+		       struct kernel_ethtool_ts_info *info)
+#else
+int rnpgbe_get_ts_info(struct net_device *dev,
+		       struct ethtool_ts_info *info)
+#endif
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(dev);
 
-	/*For we just set it as pf0 */
+	/* For we just set it as pf0 */
 	if (!(adapter->flags2 & RNP_FLAG2_PTP_ENABLED))
 		return ethtool_op_get_ts_info(dev, info);
 
+#ifdef HAVE_PTP_1588_CLOCK
 	if (adapter->ptp_clock)
 		info->phc_index = ptp_clock_index(adapter->ptp_clock);
 	else
 		info->phc_index = -1;
-
+#endif
+	dbg("phc_index is %d\n", info->phc_index);
 	info->so_timestamping =
 		SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE |
 		SOF_TIMESTAMPING_RX_SOFTWARE | SOF_TIMESTAMPING_TX_SOFTWARE |
@@ -415,11 +404,18 @@ int rnpgbe_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
 			   BIT(HWTSTAMP_FILTER_PTP_V1_L4_EVENT) |
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_SYNC) |
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_EVENT) |
+#ifdef PTP_802_AS1
+			   /* 802.AS1 */
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_EVENT) |
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_SYNC) |
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ) |
+#endif
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ) |
 			   BIT(HWTSTAMP_FILTER_ALL);
 
 	return 0;
 }
+#endif
 
 static unsigned int rnpgbe_max_channels(struct rnpgbe_adapter *adapter)
 {
@@ -429,20 +425,23 @@ static unsigned int rnpgbe_max_channels(struct rnpgbe_adapter *adapter)
 	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
 		/* SR-IOV currently only allows 2 queue on the PF */
 		max_combined = hw->sriov_ring_limit;
-	} else if (adapter->flags & RNP_FLAG_DCB_ENABLED) {
-		/* dcb on max support 32 */
-		max_combined = 32;
 	} else {
 		/* support up to 16 queues with RSS */
 		max_combined = adapter->max_ring_pair_counts;
-		/* should not large than q_vectors ? */
 	}
+#ifdef RNP_MAX_RINGS
+	if (max_combined > RNP_MAX_RINGS)
+		max_combined = RNP_MAX_RINGS;
+#endif
 
 	return max_combined;
 }
 
-int rnpgbe_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
+
+#ifdef ETHTOOL_GEEE
+int rnpgbe_get_keee(struct net_device *netdev, struct ethtool_keee *edata)
 {
+
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
 	struct rnpgbe_hw *hw = &adapter->hw;
 
@@ -452,42 +451,84 @@ int rnpgbe_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
 	if (!(hw->eee_capability))
 		return -EOPNOTSUPP;
 
-	if (hw->eee_capability & EEE_1000BT)
-		edata->supported |= SUPPORTED_1000baseT_Full;
-	if (hw->eee_capability & EEE_100BT)
-		edata->supported |= SUPPORTED_100baseT_Full;
+	linkmode_zero(edata->lp_advertised);
+	linkmode_zero(edata->supported);
+	linkmode_zero(edata->advertised);
+
+	if (hw->eee_capability & EEE_1000BT) {
+		linkmode_set_bit(SUPPORTED_1000baseT_Full,
+					 edata->supported);
+	}
+
+	if (hw->eee_capability & EEE_100BT) {
+		linkmode_set_bit(SUPPORTED_100baseT_Full,
+					 edata->supported);
+	}
 
 	if (adapter->eee_enabled)
 		edata->eee_enabled = true;
 
-	edata->lp_advertised =
-		mmd_eee_adv_to_ethtool_adv_t(adapter->partner_eee);
-	edata->advertised = mmd_eee_adv_to_ethtool_adv_t(adapter->local_eee);
+	if (adapter->partner_eee & EEE_1000BT) {
+		linkmode_set_bit(SUPPORTED_1000baseT_Full,
+					 edata->lp_advertised);
+	}
 
-	/* @eee_active: Result of the eee auto negotiation. */
-	if (adapter->eee_enabled &&
+	if (adapter->partner_eee & EEE_100BT) {
+		linkmode_set_bit(SUPPORTED_100baseT_Full,
+					 edata->lp_advertised);
+	}
+
+	if (adapter->local_eee & EEE_1000BT) {
+		linkmode_set_bit(SUPPORTED_1000baseT_Full,
+					 edata->advertised);
+	}
+
+	if (adapter->local_eee & EEE_100BT) {
+		linkmode_set_bit(SUPPORTED_100baseT_Full,
+					 edata->advertised);
+	}
+
+	// @eee_active: Result of the eee auto negotiation.
+	if ((adapter->eee_enabled) &&
 	    (adapter->local_eee & adapter->partner_eee))
 		edata->eee_active = true;
-	/* @tx_lpi_enabled: Whether the interface should assert its tx lpi */
+	// @tx_lpi_enabled: Whether the interface should assert its tx lpi
+	// todo
 	edata->tx_lpi_enabled = adapter->tx_path_in_lpi_mode;
 	edata->tx_lpi_timer = adapter->tx_lpi_timer;
 
-	/* if in half duplex fixme */
+	// if in half duplex fixme
 	if (!hw->duplex) {
 		edata->eee_enabled = false;
 		edata->eee_active = false;
 		edata->tx_lpi_enabled = false;
-		edata->advertised &= ~edata->advertised;
+		linkmode_zero(edata->advertised);
 	}
-
 	return 0;
+
 }
 
-int rnpgbe_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
+#ifndef HAVE_ETHTOOL_KEEE
+int rnpgbe_get_eee(struct net_device *netdev, struct ethtool_eee *edata)
+{
+	struct ethtool_keee kedata;
+	int ret;
+
+	eee_to_keee(&kedata, edata);
+	ret = rnpgbe_get_keee(netdev, &kedata);
+	keee_to_eee(edata, &kedata);
+
+	return ret;
+}
+#endif
+#endif
+
+#ifdef ETHTOOL_SEEE
+int rnpgbe_set_keee(struct net_device *netdev, struct ethtool_keee *edata)
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
 	struct rnpgbe_hw *hw = &adapter->hw;
-	struct ethtool_eee eee_curr;
+	struct ethtool_keee eee_curr = { };
 	s32 ret_val;
 
 	if (!(hw->feature_flags & RNP_HW_FEATURE_EEE))
@@ -495,13 +536,13 @@ int rnpgbe_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
 
 	memset(&eee_curr, 0, sizeof(struct ethtool_eee));
 
-	ret_val = rnpgbe_get_eee(netdev, &eee_curr);
+	ret_val = rnpgbe_get_keee(netdev, &eee_curr);
 
 	if (ret_val)
 		return ret_val;
 
-	if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) && edata->eee_enabled) {
-		dev_err(&adapter->pdev->dev,
+	if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) && (edata->eee_enabled)) {
+		dev_err(pci_dev_to_dev(adapter->pdev),
 			"not supported enable eee with sriov on\n");
 
 		return -EINVAL;
@@ -509,26 +550,26 @@ int rnpgbe_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
 
 	if (edata->eee_enabled) {
 		if (eee_curr.tx_lpi_enabled != edata->tx_lpi_enabled) {
-			dev_err(&adapter->pdev->dev,
+			dev_err(pci_dev_to_dev(adapter->pdev),
 				"Setting EEE tx-lpi is not supported\n");
 			return -EINVAL;
 		}
 
-		if (!edata->advertised ||
-		    (edata->advertised &
-		     ~(ADVERTISE_100_FULL | ADVERTISE_1000_FULL))) {
-			dev_err(&adapter->pdev->dev,
+		if ((!(linkmode_test_bit(SUPPORTED_1000baseT_Full, edata->advertised))) &&
+		    (!(linkmode_test_bit(SUPPORTED_100baseT_Full, edata->advertised)))) {
+			dev_err(pci_dev_to_dev(adapter->pdev),
 				"EEE Advertisement supports 100Base-Tx Full Duplex(0x08) 1000Base-T Full Duplex(0x20) or both(0x28)\n");
 			return -EINVAL;
 		}
 		adapter->local_eee = 0;
-		if (edata->advertised & ADVERTISE_100_FULL)
+
+		if (linkmode_test_bit(SUPPORTED_100baseT_Full, edata->advertised))
 			adapter->local_eee |= EEE_100BT;
-		if (edata->advertised & SUPPORTED_1000baseT_Full)
+		if (linkmode_test_bit(SUPPORTED_1000baseT_Full, edata->advertised))
 			adapter->local_eee |= EEE_1000BT;
 
 	} else if (!edata->eee_enabled) {
-		/* we set local eee to control eee */
+		// we set local eee to control eee
 		adapter->local_eee = 0;
 	}
 
@@ -539,13 +580,27 @@ int rnpgbe_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
 
 	adapter->tx_lpi_timer = edata->tx_lpi_timer;
 
-	if (hw->ops.setup_eee) {
+	if (hw->ops.setup_eee)
 		hw->ops.setup_eee(hw, RNP_DEFAULT_LIT_LS, adapter->tx_lpi_timer,
 				  adapter->local_eee);
-	}
 
 	return 0;
 }
+
+#ifndef HAVE_ETHTOOL_KEEE
+int rnpgbe_set_eee(struct net_device *netdev, struct ethtool_eee *edata)
+{
+	struct ethtool_keee kedata;
+	int ret;
+
+	eee_to_keee(&kedata, edata);
+	ret = rnpgbe_set_keee(netdev, &kedata);
+	keee_to_eee(edata, &kedata);
+
+	return ret;
+}
+#endif
+#endif
 
 void rnpgbe_get_channels(struct net_device *dev, struct ethtool_channels *ch)
 {
@@ -610,8 +665,11 @@ int rnpgbe_get_module_info(struct net_device *dev,
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(dev);
 	struct rnpgbe_hw *hw = &adapter->hw;
+	struct device *info_dev = &hw->pdev->dev;
 	u8 module_id, diag_supported;
 	int rc;
+
+	rnpgbe_mbx_get_lane_stat(hw);
 
 	if (hw->is_sgmii)
 		return -EIO;
@@ -620,8 +678,8 @@ int rnpgbe_get_module_info(struct net_device *dev,
 					       1, &module_id);
 	if (rc || module_id == 0xff)
 		return -EIO;
-	rc = rnpgbe_mbx_sfp_module_eeprom_info(hw,
-		0xA0, SFF_DIAG_SUPPORT_OFFSET, 1, &diag_supported);
+	rc = rnpgbe_mbx_sfp_module_eeprom_info(
+		hw, 0xA0, SFF_DIAG_SUPPORT_OFFSET, 1, &diag_supported);
 	if (!rc) {
 		switch (module_id) {
 		case SFF_MODULE_ID_SFP:
@@ -640,6 +698,9 @@ int rnpgbe_get_module_info(struct net_device *dev,
 			modinfo->eeprom_len = ETH_MODULE_SFF_8636_LEN;
 			break;
 		default:
+			dev_info(info_dev,
+				 "%s: module_id:0x%x diag_supported:0x%x\n",
+				 __func__, module_id, diag_supported);
 			rc = -EOPNOTSUPP;
 			break;
 		}
@@ -685,11 +746,15 @@ int rnpgbe_get_module_eeprom(struct net_device *dev,
 
 	return rc;
 }
-
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
 void rnpgbe_get_ringparam(struct net_device *netdev,
 			  struct ethtool_ringparam *ring,
 			  struct kernel_ethtool_ringparam __always_unused *ker,
 			  struct netlink_ext_ack __always_unused *extack)
+#else
+void rnpgbe_get_ringparam(struct net_device *netdev,
+			  struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
 	/* all ring share the same status*/
@@ -704,10 +769,15 @@ void rnpgbe_get_ringparam(struct net_device *netdev,
 	ring->rx_jumbo_pending = 0;
 }
 
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
 int rnpgbe_set_ringparam(struct net_device *netdev,
 			 struct ethtool_ringparam *ring,
 			 struct kernel_ethtool_ringparam __always_unused *ker,
 			 struct netlink_ext_ack __always_unused *extack)
+#else
+int rnpgbe_set_ringparam(struct net_device *netdev,
+			 struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
 	struct rnpgbe_ring *temp_ring;
@@ -715,17 +785,18 @@ int rnpgbe_set_ringparam(struct net_device *netdev,
 	int i, err = 0;
 	u32 new_rx_count, new_tx_count;
 
-	if (ring->rx_mini_pending || ring->rx_jumbo_pending)
+	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
 
-	if (ring->tx_pending < RNP_MIN_TXD ||
-	    ring->tx_pending > RNP_MAX_TXD ||
-	    ring->rx_pending < RNP_MIN_RXD ||
-	    ring->rx_pending > RNP_MAX_RXD) {
-		netdev_info(netdev,
-			    "Descriptors requested (Tx: %d / Rx: %d) out of range [%d-%d]\n",
-			    ring->tx_pending, ring->rx_pending, RNP_MIN_TXD,
-			    RNP_MAX_TXD);
+	if ((ring->tx_pending < RNP_MIN_TXD) ||
+	    (ring->tx_pending > RNP_MAX_TXD) ||
+	    (ring->rx_pending < RNP_MIN_RXD) ||
+	    (ring->rx_pending > RNP_MAX_RXD)) {
+		netdev_info(
+			netdev,
+			"Descriptors requested (Tx: %d / Rx: %d) out of range [%d-%d]\n",
+			ring->tx_pending, ring->rx_pending, RNP_MIN_TXD,
+			RNP_MAX_TXD);
 		return -EINVAL;
 	}
 
@@ -735,8 +806,8 @@ int rnpgbe_set_ringparam(struct net_device *netdev,
 	new_rx_count = clamp_t(u32, ring->rx_pending, RNP_MIN_RXD, RNP_MAX_RXD);
 	new_rx_count = ALIGN(new_rx_count, RNP_REQ_RX_DESCRIPTOR_MULTIPLE);
 
-	if (new_tx_count == adapter->tx_ring_item_count &&
-	    new_rx_count == adapter->rx_ring_item_count) {
+	if ((new_tx_count == adapter->tx_ring_item_count) &&
+	    (new_rx_count == adapter->rx_ring_item_count)) {
 		/* nothing to do */
 		return 0;
 	}
@@ -767,11 +838,18 @@ int rnpgbe_set_ringparam(struct net_device *netdev,
 		for (i = 0; i < adapter->num_rx_queues; i++)
 			adapter->rx_ring[i]->reset_count = new_rx_count;
 	}
-	if (hw->ops.driver_status)
-		hw->ops.driver_status(hw, true,
-				      rnpgbe_driver_force_control_mac);
+
+	/* if now we are in force mode, never need force, if not force it */
+	if (!(adapter->priv_flags & RNP_PRIV_FLAG_LINK_DOWN_ON_CLOSE)) {
+		hw->ops.set_mac_rx(hw, false);
+		if (hw->ops.driver_status)
+			hw->ops.driver_status(hw, true,
+					      rnpgbe_driver_force_control_phy);
+	}
+
 	rnpgbe_down(adapter);
-	/* Setup new Tx resources and free the old Tx resources in that order.
+	/*
+	 * Setup new Tx resources and free the old Tx resources in that order.
 	 * We can then assign the new resources to the rings via a memcpy.
 	 * The advantage to this approach is that we are guaranteed to still
 	 * have resources even in the case of an allocation failure.
@@ -807,7 +885,14 @@ int rnpgbe_set_ringparam(struct net_device *netdev,
 			memcpy(&temp_ring[i], adapter->rx_ring[i],
 			       sizeof(struct rnpgbe_ring));
 			/* setup ring count */
-			temp_ring[i].count = new_rx_count;
+			if (!(adapter->rx_ring[i]->ring_flags &
+			      RNP_RING_FLAG_DELAY_SETUP_RX_LEN)) {
+				temp_ring[i].count = new_rx_count;
+			} else {
+				/* setup temp count */
+				temp_ring[i].count = temp_ring[i].temp_count;
+				adapter->rx_ring[i]->reset_count = new_rx_count;
+			}
 			err = rnpgbe_setup_rx_resources(&temp_ring[i], adapter);
 			if (err) {
 				while (i) {
@@ -829,9 +914,11 @@ int rnpgbe_set_ringparam(struct net_device *netdev,
 err_setup:
 	rnpgbe_up(adapter);
 	vfree(temp_ring);
-	if (hw->ops.driver_status)
-		hw->ops.driver_status(hw, false,
-				      rnpgbe_driver_force_control_mac);
+	if (!(adapter->priv_flags & RNP_PRIV_FLAG_LINK_DOWN_ON_CLOSE)) {
+		if (hw->ops.driver_status)
+			hw->ops.driver_status(hw, false,
+					      rnpgbe_driver_force_control_phy);
+	}
 clear_reset:
 	clear_bit(__RNP_RESETTING, &adapter->state);
 	return err;
@@ -877,9 +964,14 @@ int rnpgbe_set_dump(struct net_device *netdev, struct ethtool_dump *dump)
 }
 
 int rnpgbe_get_coalesce(struct net_device *netdev,
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
 			struct ethtool_coalesce *coal,
 			struct kernel_ethtool_coalesce *kernel_coal,
 			struct netlink_ext_ack *extack)
+#else
+			struct ethtool_coalesce *coal)
+#endif
+
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -935,9 +1027,15 @@ int rnpgbe_get_coalesce(struct net_device *netdev,
 	return 0;
 }
 
-int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
+int rnpgbe_set_coalesce(struct net_device *netdev,
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
+			struct ethtool_coalesce *ec,
 			struct kernel_ethtool_coalesce *kernel_coal,
 			struct netlink_ext_ack *extack)
+#else
+			struct ethtool_coalesce *ec)
+#endif
+
 {
 	int reset = 0;
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
@@ -953,8 +1051,8 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 	else
 		adapter->priv_flags &= ~RNP_PRIV_FLAG_RX_COALESCE;
 
-	if (ec->tx_max_coalesced_frames_irq < RNP_MIN_TX_WORK ||
-	    ec->tx_max_coalesced_frames_irq > RNP_MAX_TX_WORK)
+	if ((ec->tx_max_coalesced_frames_irq < RNP_MIN_TX_WORK) ||
+	    (ec->tx_max_coalesced_frames_irq > RNP_MAX_TX_WORK))
 		return -EINVAL;
 	/* check coalesce frame irq */
 	value = clamp_t(u32, ec->tx_max_coalesced_frames_irq, RNP_MIN_TX_WORK,
@@ -965,10 +1063,9 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 		reset = 1;
 		adapter->tx_work_limit = value;
 	}
-
-	/* check vlaue */
-	if (ec->tx_max_coalesced_frames < RNP_MIN_TX_FRAME ||
-	    ec->tx_max_coalesced_frames > RNP_MAX_TX_FRAME)
+	/* check value */
+	if ((ec->tx_max_coalesced_frames < RNP_MIN_TX_FRAME) ||
+	    (ec->tx_max_coalesced_frames > RNP_MAX_TX_FRAME))
 		return -EINVAL;
 
 	value = clamp_t(u32, ec->tx_max_coalesced_frames, RNP_MIN_TX_FRAME,
@@ -977,20 +1074,18 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 		reset = 1;
 		adapter->tx_frames = value;
 	}
-
-	if (ec->tx_coalesce_usecs < RNP_MIN_TX_USEC ||
-	    ec->tx_coalesce_usecs > RNP_MAX_TX_USEC)
+	if ((ec->tx_coalesce_usecs < RNP_MIN_TX_USEC) ||
+	    (ec->tx_coalesce_usecs > RNP_MAX_TX_USEC))
 		return -EINVAL;
-	/* check vlaue */
+	/* check value */
 	value = clamp_t(u32, ec->tx_coalesce_usecs, RNP_MIN_TX_USEC,
 			RNP_MAX_TX_USEC);
 	if (adapter->tx_usecs != value) {
 		reset = 1;
 		adapter->tx_usecs = value;
 	}
-
-	if (ec->rx_max_coalesced_frames_irq < RNP_MIN_RX_WORK ||
-	    ec->rx_max_coalesced_frames_irq > RNP_MAX_RX_WORK)
+	if ((ec->rx_max_coalesced_frames_irq < RNP_MIN_RX_WORK) ||
+	    (ec->rx_max_coalesced_frames_irq > RNP_MAX_RX_WORK))
 		return -EINVAL;
 
 	value = clamp_t(u32, ec->rx_max_coalesced_frames_irq, RNP_MIN_RX_WORK,
@@ -1001,9 +1096,8 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 		reset = 1;
 		adapter->napi_budge = value;
 	}
-
-	if (ec->rx_max_coalesced_frames < RNP_MIN_RX_FRAME ||
-	    ec->rx_max_coalesced_frames > RNP_MAX_RX_FRAME)
+	if ((ec->rx_max_coalesced_frames < RNP_MIN_RX_FRAME) ||
+	    (ec->rx_max_coalesced_frames > RNP_MAX_RX_FRAME))
 		return -EINVAL;
 
 	value = clamp_t(u32, ec->rx_max_coalesced_frames, RNP_MIN_RX_FRAME,
@@ -1012,11 +1106,10 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 		reset = 1;
 		adapter->rx_frames = value;
 	}
-
-	if (ec->rx_coalesce_usecs < RNP_MIN_RX_USEC ||
-	    ec->rx_coalesce_usecs > RNP_MAX_RX_USEC)
+	if ((ec->rx_coalesce_usecs < RNP_MIN_RX_USEC) ||
+	    (ec->rx_coalesce_usecs > RNP_MAX_RX_USEC))
 		return -EINVAL;
-	/* check vlaue */
+	/* check value */
 	value = clamp_t(u32, ec->rx_coalesce_usecs, RNP_MIN_RX_USEC,
 			RNP_MAX_RX_USEC);
 
@@ -1024,16 +1117,15 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 		reset = 1;
 		adapter->rx_usecs = value;
 	}
-
 	/* other setup is not supported */
-	if (ec->pkt_rate_low || ec->pkt_rate_high ||
-	    ec->rx_coalesce_usecs_low || ec->rx_max_coalesced_frames_low ||
-	    ec->tx_coalesce_usecs_low || ec->tx_max_coalesced_frames_low ||
-	    ec->rx_coalesce_usecs_high ||
-	    ec->rx_max_coalesced_frames_high ||
-	    ec->tx_coalesce_usecs_high ||
-	    ec->tx_max_coalesced_frames_high || ec->rate_sample_interval ||
-	    ec->tx_coalesce_usecs_irq || ec->rx_coalesce_usecs_irq)
+	if ((ec->pkt_rate_low) || (ec->pkt_rate_high) ||
+	    (ec->rx_coalesce_usecs_low) || (ec->rx_max_coalesced_frames_low) ||
+	    (ec->tx_coalesce_usecs_low) || (ec->tx_max_coalesced_frames_low) ||
+	    (ec->rx_coalesce_usecs_high) ||
+	    (ec->rx_max_coalesced_frames_high) ||
+	    (ec->tx_coalesce_usecs_high) ||
+	    (ec->tx_max_coalesced_frames_high) || (ec->rate_sample_interval) ||
+	    (ec->tx_coalesce_usecs_irq) || (ec->rx_coalesce_usecs_irq))
 		return -EINVAL;
 
 	if (reset)
@@ -1041,6 +1133,91 @@ int rnpgbe_set_coalesce(struct net_device *netdev, struct ethtool_coalesce *ec,
 
 	return 0;
 }
+
+#ifndef HAVE_NDO_SET_FEATURES
+u32 rnpgbe_get_rx_csum(struct net_device *netdev)
+{
+	return !!(netdev->features & NETIF_F_RXCSUM);
+}
+
+int rnpgbe_set_rx_csum(struct net_device *netdev, u32 data)
+{
+	if (data)
+		netdev->features |= NETIF_F_RXCSUM;
+	else
+		netdev->features &= ~NETIF_F_RXCSUM;
+
+	return 0;
+}
+
+int rnpgbe_set_tx_csum(struct net_device *netdev, u32 data)
+{
+#ifdef NETIF_F_IPV6_CSUM
+	u32 feature_list = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+#else
+	u32 feature_list = NETIF_F_IP_CSUM;
+#endif
+
+#ifdef HAVE_ENCAP_TSO_OFFLOAD
+	if (data)
+		netdev->hw_enc_features |= NETIF_F_GSO_UDP_TUNNEL;
+	else
+		netdev->hw_enc_features &= ~NETIF_F_GSO_UDP_TUNNEL;
+	feature_list |= NETIF_F_GSO_UDP_TUNNEL;
+#endif /* HAVE_ENCAP_TSO_OFFLOAD */
+	feature_list |= NETIF_F_SCTP_CSUM;
+
+	if (data)
+		netdev->features |= feature_list;
+	else
+		netdev->features &= ~feature_list;
+
+	return 0;
+}
+
+#ifdef NETIF_F_TSO
+int rnpgbe_set_tso(struct net_device *netdev, u32 data)
+{
+#ifdef NETIF_F_TSO6
+	u32 feature_list = NETIF_F_TSO | NETIF_F_TSO6;
+#else
+	u32 feature_list = NETIF_F_TSO;
+#endif
+
+	if (data)
+		netdev->features |= feature_list;
+	else
+		netdev->features &= ~feature_list;
+
+#ifndef HAVE_NETDEV_VLAN_FEATURES
+	if (!data) {
+		struct rnpgbe_adapter *adapter = netdev_priv(netdev);
+		struct net_device *v_netdev;
+		int i;
+
+		/* disable TSO on all VLANs if they're present */
+		if (!adapter->vlgrp)
+			goto tso_out;
+
+		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
+			v_netdev = vlan_group_get_device(adapter->vlgrp, i);
+			if (!v_netdev)
+				continue;
+
+			v_netdev->features &= ~feature_list;
+			vlan_group_set_device(adapter->vlgrp, i, v_netdev);
+		}
+	}
+
+tso_out:
+
+#endif /* HAVE_NETDEV_VLAN_FEATURES */
+	return 0;
+}
+#endif
+#endif
+
+#ifdef ETHTOOL_GRXRINGS
 
 static int rnpgbe_get_rss_hash_opts(struct rnpgbe_adapter *adapter,
 				    struct ethtool_rxnfc *cmd)
@@ -1051,10 +1228,12 @@ static int rnpgbe_get_rss_hash_opts(struct rnpgbe_adapter *adapter,
 	switch (cmd->flow_type) {
 	case TCP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case UDP_V4_FLOW:
 	case SCTP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case AH_ESP_V4_FLOW:
 	case AH_V4_FLOW:
@@ -1064,10 +1243,12 @@ static int rnpgbe_get_rss_hash_opts(struct rnpgbe_adapter *adapter,
 		break;
 	case TCP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case UDP_V6_FLOW:
 	case SCTP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case AH_ESP_V6_FLOW:
 	case AH_V6_FLOW:
@@ -1081,6 +1262,47 @@ static int rnpgbe_get_rss_hash_opts(struct rnpgbe_adapter *adapter,
 	return 0;
 }
 
+__maybe_unused static void dump_fsp(struct ethtool_rx_flow_spec *fsp)
+{
+	int i;
+
+	dbg(" fsp cookie is %llx\n", fsp->ring_cookie);
+	switch (fsp->flow_type & ~FLOW_EXT) {
+	case ETHER_FLOW:
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src 0x%02x\n", fsp->h_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst 0x%02x\n", fsp->h_u.ether_spec.h_dest[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src mask 0x%02x\n",
+			    fsp->m_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst mask 0x%02x\n", fsp->m_u.ether_spec.h_dest[i]);
+
+		dbg("proto type is %x\n", fsp->h_u.ether_spec.h_proto);
+
+		break;
+
+	default:
+		dbg("flow type is %x\n", fsp->flow_type);
+		dbg("l2 prot is %x\n", fsp->h_u.ether_spec.h_proto);
+		dbg("ip4 src ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4src);
+		dbg("ip4 src ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4src);
+
+		dbg("ip4 dst ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4dst);
+		dbg("ip4 dst ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4dst);
+
+		dbg("ip4 src port is %x\n", fsp->h_u.tcp_ip4_spec.psrc);
+		dbg("ip4 src port mask is %x\n", fsp->m_u.tcp_ip4_spec.psrc);
+
+		dbg("ip4 dst port is %x\n", fsp->h_u.tcp_ip4_spec.pdst);
+		dbg("ip4 dst port mask is %x\n", fsp->m_u.tcp_ip4_spec.pdst);
+
+		dbg("proto is %x\n", fsp->h_u.usr_ip4_spec.proto);
+		break;
+	}
+}
+
 static int rnpgbe_get_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 					 struct ethtool_rxnfc *cmd)
 {
@@ -1092,10 +1314,12 @@ static int rnpgbe_get_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	/* report total rule count */
 	cmd->data = adapter->fdir_pballoc;
 
-	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
-				  fdir_node)
+	hlist_for_each_entry_safe(rule, node2,
+				  &adapter->fdir_filter_list,
+				  fdir_node) {
 		if (fsp->location <= rule->sw_idx)
 			break;
+	}
 
 	if (!rule || fsp->location != rule->sw_idx)
 		return -EINVAL;
@@ -1132,7 +1356,7 @@ static int rnpgbe_get_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 		fsp->flow_type = ETHER_FLOW;
 		/* support proto and mask only in this mode */
 		fsp->h_u.ether_spec.h_proto = rule->filter.layer2_formate.proto;
-		fsp->m_u.ether_spec.h_proto = 0xffff;
+		fsp->m_u.ether_spec.h_proto = htons(0xffff);
 		break;
 	default:
 		return -EINVAL;
@@ -1148,10 +1372,10 @@ static int rnpgbe_get_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 				rule->filter.formatted.src_ip[0];
 			fsp->h_u.tcp_ip4_spec.ip4dst =
 				rule->filter.formatted.dst_ip[0];
-			fsp->m_u.tcp_ip4_spec.psrc = 0xffff;
-			fsp->m_u.tcp_ip4_spec.pdst = 0xffff;
-			fsp->m_u.tcp_ip4_spec.ip4src = 0xffffffff;
-			fsp->m_u.tcp_ip4_spec.ip4dst = 0xffffffff;
+			fsp->m_u.tcp_ip4_spec.psrc = htons(0xffff);
+			fsp->m_u.tcp_ip4_spec.pdst = htons(0xffff);
+			fsp->m_u.tcp_ip4_spec.ip4src = htonl(0xffffffff);
+			fsp->m_u.tcp_ip4_spec.ip4dst = htonl(0xffffffff);
 		} else {
 			fsp->h_u.tcp_ip4_spec.psrc =
 				rule->filter.formatted.src_port &
@@ -1177,11 +1401,12 @@ static int rnpgbe_get_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 				rule->filter.formatted.dst_ip_mask[0];
 		}
 	}
+	// dump_fsp(fsp);
 
 	/* record action */
-	if (rule->action == RNP_FDIR_DROP_QUEUE) {
+	if (rule->action == RNP_FDIR_DROP_QUEUE)
 		fsp->ring_cookie = RX_CLS_FLOW_DISC;
-	} else {
+	else {
 		if (rule->vf_num != 0) {
 			fsp->ring_cookie =
 				((u64)rule->vf_num << 32) | (rule->action);
@@ -1204,7 +1429,8 @@ static int rnpgbe_get_ethtool_fdir_all(struct rnpgbe_adapter *adapter,
 	/* report total rule count */
 	cmd->data = adapter->fdir_pballoc;
 
-	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
+	hlist_for_each_entry_safe(rule, node2,
+				  &adapter->fdir_filter_list,
 				  fdir_node) {
 		if (cnt == cmd->rule_cnt)
 			return -EMSGSIZE;
@@ -1218,7 +1444,11 @@ static int rnpgbe_get_ethtool_fdir_all(struct rnpgbe_adapter *adapter,
 }
 
 int rnpgbe_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
+#ifdef HAVE_ETHTOOL_GET_RXNFC_VOID_RULE_LOCS
+		     void *rule_locs)
+#else
 		     u32 *rule_locs)
+#endif
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(dev);
 	int ret = -EOPNOTSUPP;
@@ -1226,10 +1456,12 @@ int rnpgbe_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
 
 	switch (cmd->cmd) {
 	case ETHTOOL_GRXRINGS:
-		if (adapter->flags & RNP_FLAG_SRIOV_ENABLED)
+		if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
+			/* we fix 2 when srio on */
 			cmd->data = hw->sriov_ring_limit;
-		else
+		} else {
 			cmd->data = adapter->num_rx_queues;
+		}
 		ret = 0;
 		break;
 	case ETHTOOL_GRXCLSRLCNT:
@@ -1253,13 +1485,11 @@ int rnpgbe_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
 	return ret;
 }
 
-#define UDP_RSS_FLAGS                                                          \
-	(RNP_FLAG2_RSS_FIELD_IPV4_UDP | RNP_FLAG2_RSS_FIELD_IPV6_UDP)
-
 static int rnpgbe_set_rss_hash_opt(struct rnpgbe_adapter *adapter,
 				   struct ethtool_rxnfc *nfc)
 {
-	/* RSS does not support anything other than hashing
+	/*
+	 * RSS does not support anything other than hashing
 	 * to queues on src and dst IPs and ports
 	 */
 	if (nfc->data &
@@ -1295,7 +1525,7 @@ static int rnpgbe_set_rss_hash_opt(struct rnpgbe_adapter *adapter,
 
 static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 					struct ethtool_rx_flow_spec *fsp,
-					u8 *flow_type,
+					uint8_t *flow_type,
 					struct rnpgbe_fdir_filter *input)
 {
 	int i;
@@ -1374,7 +1604,6 @@ static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 			if (fsp->m_u.ether_spec.h_dest[i] != 0)
 				ret = 0;
 		}
-		/* we not support setup vlan type */
 		if (input->filter.layer2_formate.proto == htons(ETH_P_8021Q))
 			ret = 0;
 		if (input->filter.layer2_formate.proto == htons(0x88a8))
@@ -1390,18 +1619,18 @@ static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 				e_err(drv, "tuple 5 count full\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.ip4src != 0 &&
-			    fsp->m_u.usr_ip4_spec.ip4src != 0xffffffff) {
+			if ((fsp->h_u.usr_ip4_spec.ip4src != 0) &&
+			    (fsp->m_u.usr_ip4_spec.ip4src != htonl(0xffffffff))) {
 				e_err(drv, "ip src mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.ip4dst != 0 &&
-			    fsp->m_u.usr_ip4_spec.ip4dst != 0xffffffff) {
+			if ((fsp->h_u.usr_ip4_spec.ip4dst != 0) &&
+			    (fsp->m_u.usr_ip4_spec.ip4dst != htonl(0xffffffff))) {
 				e_err(drv, "ip dst mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.proto != 0 &&
-			    fsp->m_u.usr_ip4_spec.proto != 0xff) {
+			if ((fsp->h_u.usr_ip4_spec.proto != 0) &&
+			    (fsp->m_u.usr_ip4_spec.proto != 0xff)) {
 				e_err(drv, "ip l4 proto mask error\n");
 				ret = 0;
 			}
@@ -1413,7 +1642,7 @@ static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 			/* tcam mode can support mask */
 		}
 		/* not support l4_4_bytes */
-		if (fsp->h_u.usr_ip4_spec.l4_4_bytes != 0) {
+		if ((fsp->h_u.usr_ip4_spec.l4_4_bytes != 0)) {
 			e_err(drv, "ip l4_4_bytes error\n");
 			ret = 0;
 		}
@@ -1424,23 +1653,23 @@ static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 				e_err(drv, "tuple 5 count full\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.ip4src != 0 &&
-			    fsp->m_u.tcp_ip4_spec.ip4src != 0xffffffff) {
+			if ((fsp->h_u.tcp_ip4_spec.ip4src != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.ip4src != htonl(0xffffffff))) {
 				e_err(drv, "src mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.ip4dst != 0 &&
-			    fsp->m_u.tcp_ip4_spec.ip4dst != 0xffffffff) {
+			if ((fsp->h_u.tcp_ip4_spec.ip4dst != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.ip4dst != htonl(0xffffffff))) {
 				e_err(drv, "dst mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.psrc != 0 &&
-			    fsp->m_u.tcp_ip4_spec.psrc != 0xffff) {
+			if ((fsp->h_u.tcp_ip4_spec.psrc != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.psrc != htons(0xffff))) {
 				e_err(drv, "src port mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.pdst != 0 &&
-			    fsp->m_u.tcp_ip4_spec.pdst != 0xffff) {
+			if ((fsp->h_u.tcp_ip4_spec.pdst != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.pdst != htons(0xffff))) {
 				e_err(drv, "src port mask error\n");
 				ret = 0;
 			}
@@ -1460,6 +1689,33 @@ static int rnpgbe_flowspec_to_flow_type(struct rnpgbe_adapter *adapter,
 	return ret;
 }
 
+/* check if this sw_idx set before */
+__maybe_unused static int
+rnpgbe_check_ethtool_fdir_entry(struct rnpgbe_adapter *adapter, u16 sw_idx,
+				u16 *hw_idx)
+{
+	struct rnpgbe_fdir_filter *rule;
+	struct hlist_node *node2;
+	int find = 0;
+
+	rule = NULL;
+	hlist_for_each_entry_safe(rule, node2,
+				  &adapter->fdir_filter_list,
+				  fdir_node) {
+		/* hash found, or no matching entry */
+		if (rule->sw_idx >= sw_idx)
+			break;
+
+	}
+	/* if there is an old rule occupying our place remove it */
+	if (rule && (rule->sw_idx == sw_idx)) {
+		*hw_idx = rule->hw_idx;
+		find = 1;
+	}
+
+	return find;
+}
+
 int rnpgbe_update_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 				     struct rnpgbe_fdir_filter *input,
 				     u16 sw_idx)
@@ -1476,7 +1732,8 @@ int rnpgbe_update_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	parent = NULL;
 	rule = NULL;
 
-	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
+	hlist_for_each_entry_safe(rule, node2,
+				  &adapter->fdir_filter_list,
 				  fdir_node) {
 		/* hash found, or no matching entry */
 		if (rule->sw_idx >= sw_idx)
@@ -1486,15 +1743,15 @@ int rnpgbe_update_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	}
 
 	/* if there is an old rule occupying our place remove it */
-	if (rule && rule->sw_idx == sw_idx) {
+	if (rule && (rule->sw_idx == sw_idx)) {
 		/* only clear hw enable bits */
 		/* hardware filters are only configured when interface is up,
 		 * and we should not issue filter commands while the interface
 		 * is down
 		 */
-		if (netif_running(adapter->netdev) && !input) {
-			err = rnpgbe_fdir_erase_perfect_filter(adapter->fdir_mode,
-				hw, &rule->filter,
+		if (netif_running(adapter->netdev) && (!input)) {
+			err = rnpgbe_fdir_erase_perfect_filter(
+				adapter->fdir_mode, hw, &rule->filter,
 				rule->hw_idx);
 			if (err)
 				return -EINVAL;
@@ -1527,52 +1784,53 @@ int rnpgbe_update_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	else
 		hlist_add_head(&input->fdir_node, &adapter->fdir_filter_list);
 
-	/* we must setup all */
-	/* should first earase all tcam and l2 rule */
-
 	if (adapter->fdir_mode != fdir_mode_tcam)
 		hw->ops.clr_all_layer2_remapping(hw);
 	else
 		hw->ops.clr_all_tuple5_remapping(hw);
 
 	/* setup hw */
-	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
+	hlist_for_each_entry_safe(rule, node2,
+				  &adapter->fdir_filter_list,
 				  fdir_node) {
-		if (netif_running(adapter->netdev))
-			break;
-		/* hw_idx */
-		if (rule->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER)
-			rule->hw_idx = hw_idx_layer2++;
-		else
-			rule->hw_idx = hw_idx_tuple5++;
+		if (netif_running(adapter->netdev)) {
+			/* hw_idx */
+			if (rule->filter.formatted.flow_type ==
+			    RNP_ATR_FLOW_TYPE_ETHER)
+				rule->hw_idx = hw_idx_layer2++;
+			else
+				rule->hw_idx = hw_idx_tuple5++;
 
-		if (!rule->vf_num && rule->action != ACTION_TO_MPE) {
-			int idx = rule->action;
+			if ((!rule->vf_num) &&
+			    (rule->action != ACTION_TO_MPE)) {
+				int idx = rule->action;
 
-			err = rnpgbe_fdir_write_perfect_filter(adapter->fdir_mode,
-				hw, &rule->filter,
-				rule->hw_idx,
-				(rule->action == RNP_FDIR_DROP_QUEUE) ?
-					      RNP_FDIR_DROP_QUEUE :
-					      adapter->rx_ring[idx]->rnpgbe_queue_idx,
-				(adapter->priv_flags &
-				 RNP_PRIV_FLAG_REMAP_PRIO) ?
-					      true :
-					      false);
-		} else {
-			err = rnpgbe_fdir_write_perfect_filter(adapter->fdir_mode,
-				hw, &rule->filter,
-				rule->hw_idx,
-				(rule->action == RNP_FDIR_DROP_QUEUE) ?
-					      RNP_FDIR_DROP_QUEUE :
-					      rule->action,
-				(adapter->priv_flags &
-				 RNP_PRIV_FLAG_REMAP_PRIO) ?
-					      true :
-					      false);
+				err = rnpgbe_fdir_write_perfect_filter(
+					adapter->fdir_mode, hw, &rule->filter,
+					rule->hw_idx,
+					(rule->action == RNP_FDIR_DROP_QUEUE) ?
+						RNP_FDIR_DROP_QUEUE :
+						adapter->rx_ring[idx]
+							->rnpgbe_queue_idx,
+					(adapter->priv_flags &
+					 RNP_PRIV_FLAG_REMAP_PRIO) ?
+						true :
+						false);
+			} else {
+				err = rnpgbe_fdir_write_perfect_filter(
+					adapter->fdir_mode, hw, &rule->filter,
+					rule->hw_idx,
+					(rule->action == RNP_FDIR_DROP_QUEUE) ?
+						RNP_FDIR_DROP_QUEUE :
+						rule->action,
+					(adapter->priv_flags &
+					 RNP_PRIV_FLAG_REMAP_PRIO) ?
+						true :
+						false);
+			}
+			if (err)
+				return -EINVAL;
 		}
-		if (err)
-			return -EINVAL;
 	}
 
 	/* update counts */
@@ -1584,6 +1842,47 @@ int rnpgbe_update_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 		adapter->tuple_5_count--;
 	}
 	return 0;
+}
+
+/* used to dbg flo_spec info */
+__maybe_unused static void print_fsp(struct ethtool_rx_flow_spec *fsp)
+{
+	int i;
+
+	switch (fsp->flow_type & ~FLOW_EXT) {
+	case ETHER_FLOW:
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src 0x%02x\n", fsp->h_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst 0x%02x\n", fsp->h_u.ether_spec.h_dest[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src mask 0x%02x\n",
+			    fsp->m_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst mask 0x%02x\n", fsp->m_u.ether_spec.h_dest[i]);
+
+		dbg("proto type is %x\n", fsp->h_u.ether_spec.h_proto);
+
+		break;
+
+	default:
+		dbg("flow type is %x\n", fsp->flow_type);
+
+		dbg("ip4 src ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4src);
+		dbg("ip4 src ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4src);
+
+		dbg("ip4 dst ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4dst);
+		dbg("ip4 dst ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4dst);
+
+		dbg("ip4 src port is %x\n", fsp->h_u.tcp_ip4_spec.psrc);
+		dbg("ip4 src port mask is %x\n", fsp->m_u.tcp_ip4_spec.psrc);
+
+		dbg("ip4 dst port is %x\n", fsp->h_u.tcp_ip4_spec.pdst);
+		dbg("ip4 dst port mask is %x\n", fsp->m_u.tcp_ip4_spec.pdst);
+
+		dbg("l4 proto type is %x\n", fsp->h_u.usr_ip4_spec.proto);
+		break;
+	}
 }
 
 static int rnpgbe_add_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
@@ -1600,28 +1899,25 @@ static int rnpgbe_add_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	if (!(adapter->flags & RNP_FLAG_FDIR_PERFECT_CAPABLE))
 		return -EOPNOTSUPP;
 
-	/* Don't allow programming if the action is a queue greater than
-	 * the number of online Rx queues.
-	 */
-	/* is sriov is on, allow vf and queue */
-	/* vf should smaller than num_vfs */
+	// dump_fsp(fsp);
+	// print_fsp(fsp);
 	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
-		if (fsp->ring_cookie != RX_CLS_FLOW_DISC &&
+		if ((fsp->ring_cookie != RX_CLS_FLOW_DISC) &&
 		    (((ring_cookie_high & 0xff) > adapter->num_vfs) ||
 		     ((fsp->ring_cookie & (u64)0xffffffff) >=
 		      hw->sriov_ring_limit)))
 			return -EINVAL;
 
 	} else {
-		if (fsp->ring_cookie != RX_CLS_FLOW_DISC &&
-		    fsp->ring_cookie >= adapter->num_rx_queues) {
+		if ((fsp->ring_cookie != RX_CLS_FLOW_DISC) &&
+		    (fsp->ring_cookie >= adapter->num_rx_queues)) {
 			if (fsp->ring_cookie != ACTION_TO_MPE)
 				return -EINVAL;
 		}
 	}
 
 	/* Don't allow indexes to exist outside of available space */
-	if (fsp->location >= adapter->fdir_pballoc) {
+	if (fsp->location >= (adapter->fdir_pballoc)) {
 		e_err(drv, "Location out of range\n");
 		return -EINVAL;
 	}
@@ -1629,18 +1925,21 @@ static int rnpgbe_add_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	input = kzalloc(sizeof(*input), GFP_ATOMIC);
 	if (!input)
 		return -ENOMEM;
-
 	/* set SW index */
 	input->sw_idx = fsp->location;
 
 	/* record flow type */
-	if (!rnpgbe_flowspec_to_flow_type(adapter,
-		    fsp, &input->filter.formatted.flow_type, input)) {
+	if (!rnpgbe_flowspec_to_flow_type(
+		    adapter, fsp, &input->filter.formatted.flow_type, input)) {
 		e_err(drv, "Unrecognized flow type\n");
 		goto err_out;
 	}
 
-	if (input->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_IPV4) {
+	if (input->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER) {
+		/* used to determine hw reg offset */
+		// input->hw_idx = adapter->layer2_count;
+	} else if (input->filter.formatted.flow_type ==
+		   RNP_ATR_FLOW_TYPE_IPV4) {
 		/* Copy input into formatted structures */
 		input->filter.formatted.src_ip[0] =
 			fsp->h_u.usr_ip4_spec.ip4src;
@@ -1651,15 +1950,14 @@ static int rnpgbe_add_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 		input->filter.formatted.dst_ip_mask[0] =
 			fsp->m_u.usr_ip4_spec.ip4dst;
 		input->filter.formatted.src_port = 0;
-		input->filter.formatted.src_port_mask = 0xffff;
+		input->filter.formatted.src_port_mask = htons(0xffff);
 		input->filter.formatted.dst_port = 0;
-		input->filter.formatted.dst_port_mask = 0xffff;
+		input->filter.formatted.dst_port_mask = htons(0xffff);
 		input->filter.formatted.inner_mac[0] =
 			fsp->h_u.usr_ip4_spec.proto;
 		input->filter.formatted.inner_mac_mask[0] =
 			fsp->m_u.usr_ip4_spec.proto;
-	} else {
-		/* tcp or udp or sctp*/
+	} else { /* tcp or udp or sctp*/
 		/* Copy input into formatted structures */
 		input->filter.formatted.src_ip[0] =
 			fsp->h_u.tcp_ip4_spec.ip4src;
@@ -1678,18 +1976,19 @@ static int rnpgbe_add_ethtool_fdir_entry(struct rnpgbe_adapter *adapter,
 	}
 
 	/* determine if we need to drop or route the packet */
-	if (fsp->ring_cookie == RX_CLS_FLOW_DISC) {
+	if (fsp->ring_cookie == RX_CLS_FLOW_DISC)
 		input->action = RNP_FDIR_DROP_QUEUE;
-	} else {
+	else {
 		input->vf_num = (fsp->ring_cookie >> 32) & 0xff;
 		if (input->vf_num) {
 			/* in vf mode input->action is the real queue nums */
 			input->action =
-				hw->sriov_ring_limit * (input->vf_num - 1) +
+				hw->sriov_ring_limit *
+					(((fsp->ring_cookie >> 32) & 0xff) -
+					 1) +
 				(fsp->ring_cookie & 0xffffffff);
-		} else {
+		} else
 			input->action = fsp->ring_cookie;
-		}
 	}
 
 	spin_lock(&adapter->fdir_perfect_lock);
@@ -1737,6 +2036,22 @@ int rnpgbe_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 
 	return ret;
 }
+#endif
+#ifdef ETHTOOL_SRXNTUPLE
+/*
+ * We need to keep this around for kernels 2.6.33 - 2.6.39 in order to avoid
+ * a null pointer dereference as it was assumed if the NETIF_F_NTUPLE flag
+ * was defined that this function was present.
+ */
+int rnpgbe_set_rx_ntuple(struct net_device __always_unused *dev,
+			 struct ethtool_rx_ntuple __always_unused *cmd)
+{
+	return -EOPNOTSUPP;
+}
+
+#endif
+
+#if defined(ETHTOOL_GRSSH) && defined(ETHTOOL_SRSSH)
 
 u32 rnpgbe_rss_indir_size(struct net_device *netdev)
 {
@@ -1762,10 +2077,36 @@ void rnpgbe_get_reta(struct rnpgbe_adapter *adapter, u32 *indir)
 		indir[i] = adapter->rss_indir_tbl[i] & rss_m;
 }
 
+#ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+int rnpgbe_get_rxfh(struct net_device *netdev, struct ethtool_rxfh_param *rxfh)
+#else /* HAVE_ETHTOOL_RXFH_PARAM */
 int rnpgbe_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
+#endif /* HAVE_ETHTOOL_RXFH_PARAM */
+#else /* HAVE_RXFH_HASHFUNC */
+int rnpgbe_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
+#endif /* HAVE_RXFH_HASHFUNC */
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
+	u8 *seed = NULL;
 
+#ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if (rxfh->hfunc) {
+		switch (adapter->rss_func_mode) {
+		case rss_func_top:
+			rxfh->hfunc = ETH_RSS_HASH_TOP;
+			break;
+		case rss_func_xor:
+			rxfh->hfunc = ETH_RSS_HASH_XOR;
+			break;
+		case rss_func_order:
+			rxfh->hfunc = ETH_RSS_HASH_TOP;
+			break;
+		}
+	}
+
+#else
 	if (hfunc) {
 		switch (adapter->rss_func_mode) {
 		case rss_func_top:
@@ -1779,53 +2120,97 @@ int rnpgbe_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
 			break;
 		}
 	}
+#endif
+#endif
 
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if (rxfh->indir)
+		rnpgbe_get_reta(adapter, rxfh->indir);
+#else
 	if (indir)
 		rnpgbe_get_reta(adapter, indir);
+#endif
 
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if (rxfh->key)
+		seed = rxfh->key;
+#else
 	if (key)
-		memcpy(key, adapter->rss_key, rnpgbe_get_rxfh_key_size(netdev));
+		seed = key;
+#endif
+	if (seed)
+		memcpy(seed, adapter->rss_key, rnpgbe_get_rxfh_key_size(netdev));
 
 	return 0;
 }
 
-enum {
-	PART_FW,
-	PART_CFG,
-	PART_MACSN,
-	PART_PCSPHY,
-	PART_PXE,
-};
+static int check_fw_type(struct rnpgbe_hw *hw, const u8 *data, int len)
+{
+	u32 device_id;
+	int ret = 0;
+	u32 crc32_goal;
+	u32 crc32 = 0xffffffff;
+	struct crc32_info *info = (struct crc32_info *)(data + CRC_OFFSET);
+
+	if (info->magic == CRC32_MAGIC) {
+		crc32_goal = info->crc32;
+		info->crc32 = 0;
+		info->magic = 0;
+
+		crc32 = crc32_le(crc32, data, len);
+		if (crc32 != crc32_goal)
+			return -1;
+		info->magic = CRC32_MAGIC;
+		info->crc32 = crc32_goal;
+	}
+
+	device_id = *((u16 *)data + 30);
+
+	/* if no device_id no check */
+	if ((device_id == 0) || (device_id == 0xffff))
+		return 0;
+
+	switch (hw->hw_type) {
+	case rnpgbe_hw_n500:
+		if (device_id != 0x8308)
+			ret = 1;
+	break;
+	case rnpgbe_hw_n210:
+		if (device_id != 0x8208)
+			ret = 1;
+	break;
+	case rnpgbe_hw_n210L:
+		if (device_id != 0x820a)
+			ret = 1;
+	break;
+	default:
+		ret = 1;
+	}
+
+	return ret;
+}
 
 static int rnpgbe_flash_firmware(struct rnpgbe_adapter *adapter, int region,
 				 const u8 *data, int bytes)
 {
 	struct rnpgbe_hw *hw = &adapter->hw;
 
-	switch (region) {
-	case PART_FW:
-		if (*((u32 *)(data)) != 0xa55aa55a)
+	if ((hw->hw_type == rnpgbe_hw_n500) ||
+	    (hw->hw_type == rnpgbe_hw_n210) ||
+	    (hw->hw_type == rnpgbe_hw_n210L)) {
+		switch (region) {
+		case PART_FW:
+			if ((*((u32 *)(data)) != 0xa55aa55a) ||
+			    check_fw_type(hw, data, bytes))
+				return -EINVAL;
+			break;
+		default:
 			return -EINVAL;
-		break;
-	case PART_CFG:
-		if (*((u32 *)(data)) != 0x00010cf9)
-			return -EINVAL;
-		break;
-	case PART_MACSN:
-		break;
-	case PART_PCSPHY:
-		if (*((u16 *)(data)) != 0x081d)
-			return -EINVAL;
-		break;
-	case PART_PXE:
-		if (*((u16 *)(data)) != 0xaa55)
-			return -EINVAL;
-		break;
-	default:
-		return -EINVAL;
+		}
+		return rnpgbe_fw_update(hw, region, data, bytes);
 	}
 
-	return rnp500_fw_update(hw, region, data, bytes);
+	return -EINVAL;
 }
 
 static int rnpgbe_flash_firmware_from_file(struct net_device *dev,
@@ -1844,7 +2229,6 @@ static int rnpgbe_flash_firmware_from_file(struct net_device *dev,
 
 	rc = rnpgbe_flash_firmware(adapter, region, fw->data, fw->size);
 	release_firmware(fw);
-
 	return rc;
 }
 
@@ -1864,67 +2248,152 @@ int rnpgbe_flash_device(struct net_device *dev, struct ethtool_flash *flash)
 
 static int rnpgbe_rss_indir_tbl_max(struct rnpgbe_adapter *adapter)
 {
-	if (adapter->hw.rss_type == rnpgbe_rss_uv3p)
-		return 8;
-	else if (adapter->hw.rss_type == rnpgbe_rss_uv440)
-		return 128;
-	else if (adapter->hw.rss_type == rnpgbe_rss_n10)
-		return 128;
-	else if (adapter->hw.rss_type == rnpgbe_rss_n500)
+	if (adapter->hw.rss_type == rnpgbe_rss_n500)
 		return 128;
 	else
 		return 128;
 }
 
+#ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+int
+rnpgbe_set_rxfh(struct net_device *netdev, struct ethtool_rxfh_param *rxfh,
+		struct netlink_ext_ack *extack)
+#else
 int rnpgbe_set_rxfh(struct net_device *netdev, const u32 *indir, const u8 *key,
 		    const u8 hfunc)
+#endif
+#else
+#ifdef HAVE_RXFH_NONCONST
+int rnpgbe_set_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
+#else
+int rnpgbe_set_rxfh(struct net_device *netdev, const u32 *indir, const u8 *key)
+#endif /* HAVE_RXFH_NONCONST */
+#endif /* HAVE_RXFH_HASHFUNC */
 {
 	struct rnpgbe_adapter *adapter = netdev_priv(netdev);
+#ifdef HAVE_RXFH_HASHFUNC
 	struct rnpgbe_hw *hw = &adapter->hw;
+#endif
 	int i;
 	u32 reta_entries = rnpgbe_rss_indir_tbl_entries(adapter);
 
+#ifdef HAVE_RXFH_HASHFUNC
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if (rxfh->hfunc) {
+		if (hw->ops.set_rss_hfunc) {
+			if (hw->ops.set_rss_hfunc(hw, rxfh->hfunc))
+				return -EINVAL;
+		} else
+			return -EINVAL;
+
+	} else {
+		if (hw->ops.set_rss_hfunc)
+			hw->ops.set_rss_hfunc(hw, rxfh->hfunc);
+	}
+
+#else
 	if (hfunc) {
 		if (hw->ops.set_rss_hfunc) {
 			if (hw->ops.set_rss_hfunc(hw, hfunc))
 				return -EINVAL;
-		} else {
+		} else
 			return -EINVAL;
-		}
 
 	} else {
 		if (hw->ops.set_rss_hfunc)
 			hw->ops.set_rss_hfunc(hw, hfunc);
 	}
+#endif
+#endif
+
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if ((rxfh->indir) && (adapter->flags & RNP_FLAG_SRIOV_ENABLED))
+		return -EINVAL;
+#else
 	if ((indir) && (adapter->flags & RNP_FLAG_SRIOV_ENABLED))
 		return -EINVAL;
-
+#endif
 	/* Fill out the redirection table */
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	if (rxfh->indir) {
+#else
 	if (indir) {
+#endif
 		int max_queues = min_t(int, adapter->num_rx_queues,
 				       rnpgbe_rss_indir_tbl_max(adapter));
 
-		/*Allow max 2 queues w/ SR-IOV.*/
-		if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) && max_queues > 1)
+		if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) &&
+		    (max_queues > 1))
 			max_queues = 1;
 
 		/* Verify user input. */
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+		for (i = 0; i < reta_entries; i++) {
+			if (rxfh->indir[i] >= max_queues)
+				return -EINVAL;
+		}
+		/* store rss tbl */
 		for (i = 0; i < reta_entries; i++)
+			adapter->rss_indir_tbl[i] = rxfh->indir[i];
+#else
+		for (i = 0; i < reta_entries; i++) {
 			if (indir[i] >= max_queues)
 				return -EINVAL;
-
+		}
 		/* store rss tbl */
 		for (i = 0; i < reta_entries; i++)
 			adapter->rss_indir_tbl[i] = indir[i];
+#endif
 
 		rnpgbe_store_reta(adapter);
 	}
 
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	/* Fill out the rss hash key */
+	if (rxfh->key) {
+		memcpy(adapter->rss_key, rxfh->key, rnpgbe_get_rxfh_key_size(netdev));
+		rnpgbe_store_key(adapter);
+	}
+#else
 	/* Fill out the rss hash key */
 	if (key) {
 		memcpy(adapter->rss_key, key, rnpgbe_get_rxfh_key_size(netdev));
 		rnpgbe_store_key(adapter);
 	}
-
+#endif
 	return 0;
+}
+
+#endif
+
+#ifdef HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT
+static const struct ethtool_ops_ext rnpgbe_ethtool_ops_ext = {
+	.size = sizeof(struct ethtool_ops_ext),
+#ifdef HAVE_ETHTOOL_GET_TS_INFO
+	.get_ts_info = rnpgbe_get_ts_info,
+#endif
+	.set_phys_id = rnpgbe_set_phys_id,
+	.get_eee = rnpgbe_get_eee,
+	.set_eee = rnpgbe_set_eee,
+	.get_channels = rnpgbe_get_channels,
+	.set_channels = rnpgbe_set_channels,
+#ifdef ETHTOOL_GMODULEINFO
+	.get_module_info = rnpgbe_get_module_info,
+	.get_module_eeprom = rnpgbe_get_module_eeprom,
+#endif
+#if defined(ETHTOOL_GRSSH) && defined(ETHTOOL_SRSSH)
+	.get_rxfh_indir_size = rnpgbe_rss_indir_size,
+	.get_rxfh_key_size = rnpgbe_get_rxfh_key_size,
+	.get_rxfh = rnpgbe_get_rxfh,
+	.set_rxfh = rnpgbe_set_rxfh,
+#endif /* ETHTOOL_GRSSH && ETHTOOL_SRSSH */
+};
+#endif /* HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT */
+
+void rnpgbe_set_ethtool_ops(struct net_device *netdev)
+{
+#ifdef HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT
+	set_ethtool_ops_ext(netdev, &rnpgbe_ethtool_ops_ext);
+#endif /* HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT */
 }

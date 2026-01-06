@@ -1,29 +1,24 @@
 # SPDX-License-Identifier: GPL-2.0
-# Copyright(c) 2022 - 2024 Mucse Corporation.
-
-# kbuild part of makefile
+# Copyright(c) 2022 - 2025 Mucse Corporation
 #
-# Makefile for the Mucse(R) 10GbE PCI Express Linux Network Driver
+# Makefile for the Mucse(R) 1GbE PCI Express ethernet driver
 #
-EXTRA_CFLAGS += -I./include/ -I./ -I./base -DCONFIG_RNP_FPGA
-#EXTRA_CFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-unused-label
-EXTRA_CFLAGS += -g -O3
-EXTRA_CFLAGS += $(CFLAGS)
+#
 
-obj-m := rnpgbe.o
+obj-$(CONFIG_MGBE) += rnpgbe.o
 rnpgbe-objs :=   \
-		rnpgbe_main.o \
-		rnpgbe_common.o \
-		rnpgbe_debugfs.o \
-		rnpgbe_ethtool.o \
-		rnpgbe_lib.o \
-		rnpgbe_mbx.o \
-		rnpgbe_chip.o \
-		rnpgbe_mbx_fw.o\
-		rnpgbe_sriov.o \
-		rnpgbe_param.o \
-		rnpgbe_sysfs.o \
-		rnpgbe_ptp.o \
-		rnpgbe_sfc.o
+                rnpgbe_main.o \
+                rnpgbe_common.o \
+                rnpgbe_ethtool.o \
+                rnpgbe_lib.o \
+                rnpgbe_mbx.o \
+                rnpgbe_chip.o \
+                rnpgbe_mbx_fw.o\
+                rnpgbe_sriov.o \
+                rnp_compat.o \
+                rnpgbe_param.o \
+                rnpgbe_sysfs.o \
+                rnpgbe_sfc.o \
+                rnpgbe_ptp.o
 
-
+rnpgbe-$(CONFIG_DEBUG_FS) += rnpgbe_debugfs.o
