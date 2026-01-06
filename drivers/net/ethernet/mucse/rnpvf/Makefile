@@ -16,5 +16,6 @@ rnpvf-objs :=   \
                 mbx.o \
                 ethtool.o \
                 rnpvf_sysfs.o \
-                rnpvf_main.o
+                rnpvf_main.o \
+		rnpvf_compat.o 
 

@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
-#ifndef _RNPVF_MBX_H_
-#define _RNPVF_MBX_H_
+#ifndef _RNP_MBX_H_
+#define _RNP_MBX_H_
 
 #include "vf.h"
 
@@ -11,16 +11,16 @@
 
 struct mbx_shm {
 	u32 stat;
-#define MBX_ST_PF_ACK (0x1 << 0)
-#define MBX_ST_PF_STS (0x1 << 1)
-#define MBX_ST_PF_RST (0x1 << 2)
+#define MBX_ST_PF_ACK (1 << 0)
+#define MBX_ST_PF_STS (1 << 1)
+#define MBX_ST_PF_RST (1 << 2)
 
-#define MBX_ST_VF_ACK (0x1 << 3)
-#define MBX_ST_VF_REQ (0x1 << 4)
-#define MBX_ST_VF_RST (0x1 << 5)
+#define MBX_ST_VF_ACK (1 << 3)
+#define MBX_ST_VF_REQ (1 << 4)
+#define MBX_ST_VF_RST (1 << 5)
 
-#define MBX_ST_CPU_ACK (0x1 << 6)
-#define MBX_ST_CPU_REQ (0x1 << 7)
+#define MBX_ST_CPU_ACK (1 << 6)
+#define MBX_ST_CPU_REQ (1 << 7)
 
 	u32 data[RNP_VFMAILBOX_SIZE];
 } __aligned(4);
@@ -64,7 +64,10 @@ struct mbx_shm {
 #define RNP_VF_GET_MTU 0x0c /* vf read reg */
 #define RNP_VF_SET_MTU 0x0d /* vf read reg */
 #define RNP_VF_GET_FW 0x0e /* vf read reg */
-#define RNP_VF_RESET_PF 0x13 /* vf read reg */
+#define RNP_VF_RESET_PF 0x11 /* vf read reg */
+#define RNP_VF_SET_PROMISCE 0x16
+
+#define VF_ALLOC_FEATURE BIT(0)
 
 #define RNP_PF_VFNUM_MASK (0x3f << 21)
 #define RNP_PF_SET_FCS 0x10 /* PF set fcs status */
@@ -75,7 +78,8 @@ struct mbx_shm {
 #define RNP_PF_SET_LINK 0x15
 #define RNP_PF_SET_MTU 0x16
 #define RNP_PF_SET_RESET 0x17
-#define RNP_PF_LINK_UP (0x1 << 31)
+#define RNP_PF_SET_MAC_SPOOF 0x18
+#define RNP_PF_LINK_UP (1 << 31)
 
 #define RNP_PF_REMOVE 0x0f
 #define RNP_PF_GET_LINK 0x10
@@ -114,27 +118,4 @@ enum MBX_ID {
 	MBX_VFCNT
 };
 
-#define PF2VF_MBOX_VEC(mbx, vf) (mbx->pf2vf_mbox_vec_base + 4 * (vf))
-#define CPU2VF_MBOX_VEC(mbx, vf) (mbx->cpu2vf_mbox_vec_base + 4 * (vf))
-#define PF_VF_SHM(mbx, vf)                                                     \
-	((mbx->pf_vf_shm_base) +                                               \
-	 (64 * (vf)))
-#define PF2VF_COUNTER(mbx, vf) (PF_VF_SHM(mbx, vf) + 0)
-#define VF2PF_COUNTER(mbx, vf) (PF_VF_SHM(mbx, vf) + 4)
-#define PF_VF_SHM_DATA(mbx, vf) (PF_VF_SHM(mbx, vf) + 8)
-#define VF2PF_MBOX_CTRL(mbx, vf) ((mbx->vf2pf_mbox_ctrl_base) + (4 * (vf)))
-
-/* === CPU <--> VF === */
-#define CPU_VF_SHM(mbx, vf) (mbx->cpu_vf_shm_base + (64 * (vf)))
-#define CPU2VF_COUNTER(mbx, vf) (CPU_VF_SHM(mbx, vf) + 0)
-#define VF2CPU_COUNTER(mbx, vf) (CPU_VF_SHM(mbx, vf) + 4)
-#define CPU_VF_SHM_DATA(mbx, vf) (CPU_VF_SHM(mbx, vf) + 8)
-#define VF2CPU_MBOX_CTRL(mbx, vf) (mbx->vf2cpu_mbox_ctrl_base + 64 * (vf))
-#define CPU_VF_MBOX_MASK_LO(mbx, vf) (mbx->cpu_vf_mbox_mask_lo_base + 64 * (vf))
-#define CPU_VF_MBOX_MASK_HI(mbx, vf) (mbx->cpu_vf_mbox_mask_hi_base + 64 * (vf))
-#define MBOX_CTRL_REQ (0x1 << 0) /* WO */
-#define MBOX_CTRL_VF_HOLD_SHM (0x1 << 2) /* VF:WR, PF:RO */
-#define MBOX_IRQ_EN 0
-#define MBOX_IRQ_DISABLE 1
-
-#endif /* _RNPVF_MBX_H_ */
+#endif /* _RNP_MBX_H_ */

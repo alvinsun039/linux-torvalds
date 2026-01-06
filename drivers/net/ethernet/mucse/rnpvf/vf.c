@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #include "vf.h"
 #include "rnpvf.h"
@@ -65,10 +65,8 @@ static int rnpvf_set_mtu(struct rnpvf_hw *hw, int mtu)
 
 	/* if nacked the address was rejected, use "perm_addr" */
 	if (!ret_val &&
-	    (msgbuf[0] == (RNP_VF_SET_MTU | RNP_VT_MSGTYPE_NACK))) {
-		// set mtu failed
+	    (msgbuf[0] == (RNP_VF_SET_MTU | RNP_VT_MSGTYPE_NACK)))
 		return -1;
-	}
 
 	return ret_val;
 }
@@ -175,9 +173,8 @@ static s32 rnpvf_reset_hw_vf(struct rnpvf_hw *hw)
 		/* also set up the mc_filter_type which is piggy backed
 		 * on the mac address in word 3
 		 */
-		ret_val = mbx->ops.read_posted(hw, msgbuf,
-					       RNP_VF_PERMADDR_MSG_LEN,
-					       false);
+		ret_val = mbx->ops.read_posted(
+			hw, msgbuf, RNP_VF_PERMADDR_MSG_LEN, false);
 		if (ret_val == 0)
 			break;
 	}
@@ -207,8 +204,8 @@ static s32 rnpvf_reset_hw_vf(struct rnpvf_hw *hw)
 	/* phy status */
 	hw->phy_type = (msgbuf[RNP_VF_PHY_TYPE_WORD] & 0xffff);
 
-	hw->mac.dma_version = msgbuf[RNP_VF_DMA_VERSION_WORD];
-	hw->dma_version = hw->mac.dma_version;
+	hw->dma_version = hw->mac.dma_version =
+		msgbuf[RNP_VF_DMA_VERSION_WORD];
 
 	/* vlan status */
 	vlan = msgbuf[RNP_VF_VLAN_WORD];
@@ -230,7 +227,7 @@ static s32 rnpvf_reset_hw_vf(struct rnpvf_hw *hw)
 
 	hw->usecstocount = msgbuf[RNP_VF_AXI_MHZ];
 
-	DPRINTK(PROBE, INFO, "dma_versioin:%x vlan %d\n",
+	DPRINTK(PROBE, INFO, "dma_versioin:%x vlan %d \n",
 		hw->mac.dma_version, adapter->vf_vlan);
 	DPRINTK(PROBE, INFO, "axi:%x\n", hw->usecstocount);
 	DPRINTK(PROBE, INFO, "firmware :%x\n", hw->fw_version);
@@ -253,11 +250,13 @@ static s32 rnpvf_reset_hw_vf(struct rnpvf_hw *hw)
  **/
 static s32 rnpvf_stop_hw_vf(struct rnpvf_hw *hw)
 {
+	u32 number_of_queues;
 	u16 i;
 	struct rnpvf_adapter *adapter = hw->back;
 	struct rnpvf_ring *ring;
 
-	/* Set the adapter_stopped flag so other driver functions stop touching
+	/*
+	 * Set the adapter_stopped flag so other driver functions stop touching
 	 * the hardware
 	 */
 	hw->adapter_stopped = true;
@@ -267,6 +266,9 @@ static s32 rnpvf_stop_hw_vf(struct rnpvf_hw *hw)
 		ring = adapter->rx_ring[i];
 		ring_wr32(ring, RNP_DMA_RX_START, 0);
 	}
+
+	/* Disable the transmit unit.  Each queue must be disabled. */
+	number_of_queues = hw->mac.max_tx_queues;
 
 	return 0;
 }
@@ -331,14 +333,14 @@ static s32 rnpvf_mta_vector(struct rnpvf_hw *hw, u8 *mc_addr)
  **/
 static s32 rnpvf_get_mac_addr_vf(struct rnpvf_hw *hw, u8 *mac_addr)
 {
-	// memcpy(mac_addr, hw->mac.perm_addr, ETH_ALEN);
 	struct rnp_mbx_info *mbx = &hw->mbx;
 	u32 msgbuf[3];
 	u8 *msg_addr = (u8 *)(&msgbuf[1]);
 	s32 ret_val = 0;
 
 	memset(msgbuf, 0, sizeof(msgbuf));
-	/* If index is one then this is the start of a new list and needs
+	/*
+	 * If index is one then this is the start of a new list and needs
 	 * indication to the PF so it can do it's own list management.
 	 * If it is zero then that tells the PF to just clear all of
 	 * this VF's macvlans and there is no new list.
@@ -364,7 +366,7 @@ static s32 rnpvf_get_mac_addr_vf(struct rnpvf_hw *hw, u8 *mac_addr)
 /**
  *  rnpvf_get_queues_vf - Read device MAC address
  *  @hw: pointer to the HW structure
- *
+ *  @mac_addr: pointer to storage for retrieved MAC address
  **/
 static s32 rnpvf_get_queues_vf(struct rnpvf_hw *hw)
 {
@@ -374,8 +376,11 @@ static s32 rnpvf_get_queues_vf(struct rnpvf_hw *hw)
 
 	memset(msgbuf, 0, sizeof(msgbuf));
 	msgbuf[0] |= RNP_VF_GET_QUEUE;
+	// add for new version
+	msgbuf[1] = 0xaa;
+	msgbuf[2] |= VF_ALLOC_FEATURE;
 
-	ret_val = mbx->ops.write_posted(hw, msgbuf, 1, false);
+	ret_val = mbx->ops.write_posted(hw, msgbuf, 3, false);
 
 	mdelay(10);
 
@@ -409,7 +414,8 @@ static s32 rnpvf_set_uc_addr_vf(struct rnpvf_hw *hw, u32 index, u8 *addr)
 	s32 ret_val = 0;
 
 	memset(msgbuf, 0, sizeof(msgbuf));
-	/* If index is one then this is the start of a new list and needs
+	/*
+	 * If index is one then this is the start of a new list and needs
 	 * indication to the PF so it can do it's own list management.
 	 * If it is zero then that tells the PF to just clear all of
 	 * this VF's macvlans and there is no new list.
@@ -482,9 +488,14 @@ static void rnpvf_write_msg_read_ack(struct rnpvf_hw *hw, u32 *msg,
 static u8 *rnpvf_addr_list_itr(struct rnpvf_hw __maybe_unused *hw,
 			       u8 **mc_addr_ptr)
 {
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
 	struct netdev_hw_addr *mc_ptr;
+#else
+	struct dev_mc_list *mc_ptr;
+#endif
 	u8 *addr = *mc_addr_ptr;
 
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
 	mc_ptr = container_of(addr, struct netdev_hw_addr, addr[0]);
 	if (mc_ptr->list.next) {
 		struct netdev_hw_addr *ha;
@@ -492,9 +503,14 @@ static u8 *rnpvf_addr_list_itr(struct rnpvf_hw __maybe_unused *hw,
 		ha = list_entry(mc_ptr->list.next, struct netdev_hw_addr,
 				list);
 		*mc_addr_ptr = ha->addr;
-	} else {
-		*mc_addr_ptr = NULL;
 	}
+#else
+	mc_ptr = container_of(addr, struct dev_mc_list, dmi_addr[0]);
+	if (mc_ptr->next)
+		*mc_addr_ptr = mc_ptr->next->dmi_addr;
+#endif
+	else
+		*mc_addr_ptr = NULL;
 
 	return addr;
 }
@@ -509,7 +525,9 @@ static u8 *rnpvf_addr_list_itr(struct rnpvf_hw __maybe_unused *hw,
 static s32 rnpvf_update_mc_addr_list_vf(struct rnpvf_hw *hw,
 					struct net_device *netdev)
 {
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
 	struct netdev_hw_addr *ha;
+#endif
 	u32 msgbuf[RNP_VFMAILBOX_SIZE];
 	u16 *vector_list = (u16 *)&msgbuf[1];
 	u32 cnt, i;
@@ -533,12 +551,16 @@ static s32 rnpvf_update_mc_addr_list_vf(struct rnpvf_hw *hw,
 
 	addr_count = netdev_mc_count(netdev);
 
+#ifdef NETDEV_HW_ADDR_T_MULTICAST
 	ha = list_first_entry(&netdev->mc.list, struct netdev_hw_addr,
 			      list);
 	addr_list = ha->addr;
+#else
+	addr_list = netdev->mc_list->dmi_addr;
+#endif
 	for (i = 0; i < addr_count; i++) {
-		vector_list[i] = rnpvf_mta_vector(hw,
-						  rnpvf_addr_list_itr(hw, &addr_list));
+		vector_list[i] = rnpvf_mta_vector(
+			hw, rnpvf_addr_list_itr(hw, &addr_list));
 	}
 
 	rnpvf_write_msg_read_ack(hw, msgbuf, RNP_VFMAILBOX_SIZE);
@@ -566,12 +588,16 @@ static s32 rnpvf_set_vfta_vf(struct rnpvf_hw *hw, u32 vlan, u32 vind,
 	msgbuf[0] |= vlan_on << RNP_VT_MSGINFO_SHIFT;
 
 	err = mbx->ops.write_posted(hw, msgbuf, 2, false);
-	if (err)
+	if (err) {
+		printk("vlan write_posted failed\n");
 		goto mbx_err;
+	}
 
 	err = mbx->ops.read_posted(hw, msgbuf, 2, false);
-	if (err)
+	if (err) {
+		printk("vlan read_posted failed\n");
 		goto mbx_err;
+	}
 
 	/* remove extra bits from the message */
 	msgbuf[0] &= ~RNP_VT_MSGTYPE_CTS;
@@ -674,8 +700,7 @@ void rnpvf_rlpml_set_vf(struct rnpvf_hw *hw, u16 max_size)
 }
 
 static void rnpvf_set_veb_mac_n10(struct rnpvf_hw *hw,
-				  u8 *mac,
-				  u32 vfnum,
+				  u8 *mac, u32 vfnum,
 				  u32 ring)
 {
 	int port;
@@ -692,17 +717,60 @@ static void rnpvf_set_veb_mac_n10(struct rnpvf_hw *hw,
 		     maclow);
 		wr32(hw, RNP_DMA_PORT_VBE_MAC_HI_TBL_N10(port, vfnum),
 		     machi);
+
 		wr32(hw, RNP_DMA_PORT_VEB_VF_RING_TBL_N10(port, vfnum),
 		     ring);
 	}
 }
 
-static void rnpvf_set_vlan_n10(struct rnpvf_hw *hw, u16 vid, u32 vf_num)
+static void rnpvf_set_vlan_n10(struct rnpvf_hw *hw,
+			       u16 vid, u32 vf_num)
 {
 	int port;
 
 	for (port = 0; port < 4; port++)
 		wr32(hw, RNP_DMA_PORT_VEB_VID_TBL_N10(port, vf_num), vid);
+}
+
+static int rnpvf_set_promisc_mode(struct rnpvf_hw *hw, bool promisc)
+{
+
+	struct rnp_mbx_info *mbx = &hw->mbx;
+	u32 msgbuf[2];
+	s32 err;
+
+	msgbuf[0] = RNP_VF_SET_PROMISCE;
+	if (promisc)
+		msgbuf[1] = 1;
+	else
+		msgbuf[1] = 0;
+
+	err = mbx->ops.write_posted(hw, msgbuf, 2, false);
+	if (err) {
+		printk("promisc write_posted failed\n");
+		goto mbx_err;
+	}
+
+	err = mbx->ops.read_posted(hw, msgbuf, 2, false);
+	if (err) {
+		printk("promisc read_posted failed\n");
+		goto mbx_err;
+	}
+
+	/* remove extra bits from the message */
+	msgbuf[0] &= ~RNP_VT_MSGTYPE_CTS;
+	msgbuf[0] &= ~(0xFF << RNP_VT_MSGINFO_SHIFT);
+
+	if (msgbuf[0] != (RNP_VF_SET_PROMISCE | RNP_VT_MSGTYPE_ACK)) {
+		err = RNP_ERR_INVALID_ARGUMENT;
+		printk("set promisc failed\n");
+	}
+
+mbx_err:
+	return err;
+
+
+
 }
 
 static const struct rnpvf_hw_operations rnpvf_hw_ops_n10 = {
@@ -723,6 +791,7 @@ static s32 rnpvf_get_invariants_n10(struct rnpvf_hw *hw)
 		RNPVF_NET_FEATURE_TX_UDP_TUNNEL |
 		RNPVF_NET_FEATURE_VLAN_OFFLOAD | RNPVF_NET_FEATURE_RX_HASH;
 
+	/* mbx setup */
 	mbx->pf2vf_mbox_vec_base = 0xa5000;
 	mbx->vf2pf_mbox_vec_base = 0xa5100;
 	mbx->cpu2vf_mbox_vec_base = 0xa5200;
@@ -775,6 +844,7 @@ static const struct rnp_mac_operations rnpvf_mac_ops = {
 	.get_mtu = rnpvf_get_mtu,
 	.set_mtu = rnpvf_set_mtu,
 	.req_reset_pf = rnpvf_reset_pf,
+	.set_promisc_mode = rnpvf_set_promisc_mode,
 };
 
 const struct rnpvf_info rnp_n10_vf_info = {
