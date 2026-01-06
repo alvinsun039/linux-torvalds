@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #ifndef _RNPGBEVF_H_
 #define _RNPGBEVF_H_
@@ -10,25 +10,20 @@
 #include <linux/io.h>
 #include <linux/netdevice.h>
 #include <linux/if_vlan.h>
+#ifdef CONFIG_NET_NCSI
+#include <net/ncsi.h>
+#endif
 
 #include "vf.h"
 
 #define RNPVF_ALLOC_PAGE_ORDER 0
-
 #define RNPVF_PAGE_BUFFER_NUMS(ring)                                           \
 	(((1 << RNPVF_ALLOC_PAGE_ORDER) * PAGE_SIZE) >> 11)
 
+#ifdef HAVE_STRUCT_DMA_ATTRS
+#define RNPVF_RX_DMA_ATTR NULL
+#else
 #define RNPVF_RX_DMA_ATTR (DMA_ATTR_SKIP_CPU_SYNC | DMA_ATTR_WEAK_ORDERING)
-
-#if defined(CONFIG_MGBEVF_OPTM_WITH_LARGE) && !defined(OPTM_WITH_LARGE)
-#define OPTM_WITH_LPAGE
-#endif
-
-#if (PAGE_SIZE < 8192)
-/* if page_size is 4k, no need use this */
-#ifdef OPTM_WITH_LPAGE
-#undef OPTM_WITH_LPAGE
-#endif
 #endif
 
 extern const struct rnpgbevf_info rnp_n500_vf_info;
@@ -80,6 +75,7 @@ struct rnpgbevf_tx_buffer {
 	unsigned int bytecount;
 	unsigned short gso_segs;
 	bool gso_need_padding;
+
 	__be16 protocol;
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	DEFINE_DMA_UNMAP_LEN(len);
@@ -115,6 +111,7 @@ struct rnpgbevf_tx_buffer {
 struct rnpgbevf_rx_buffer {
 	struct sk_buff *skb;
 	dma_addr_t dma;
+#ifndef CONFIG_RNPGBE_DISABLE_PACKET_SPLIT
 	struct page *page;
 #if (BITS_PER_LONG > 32) || (PAGE_SIZE >= 65536)
 	__u32 page_offset;
@@ -122,25 +119,31 @@ struct rnpgbevf_rx_buffer {
 	__u16 page_offset;
 #endif
 	__u16 pagecnt_bias;
+#endif
 };
 
 enum rnpgbevf_ring_state_t {
+#ifndef CONFIG_RNPGBE_DISABLE_PACKET_SPLIT
 	__RNPVF_RX_3K_BUFFER,
 	__RNPVF_RX_BUILD_SKB_ENABLED,
+#endif
 	__RNPVF_TX_FDIR_INIT_DONE,
 	__RNPVF_TX_XPS_INIT_DONE,
 	__RNPVF_TX_DETECT_HANG,
 	__RNPVF_HANG_CHECK_ARMED,
+	//__RNPGBE_RX_RSC_ENABLED,
 	__RNPVF_RX_CSUM_UDP_ZERO_ERR,
 	__RNPVF_RX_FCOE,
 };
 
+#ifndef CONFIG_RNPGBE_DISABLE_PACKET_SPLIT
 #define ring_uses_build_skb(ring)                                              \
 	test_bit(__RNPVF_RX_BUILD_SKB_ENABLED, &(ring)->state)
+#endif
 
 /* now tx max 4k for one desc */
 #define RNPVF_MAX_TXD_PWR 12
-#define RNPVF_MAX_DATA_PER_TXD (0x1 << RNPVF_MAX_TXD_PWR)
+#define RNPVF_MAX_DATA_PER_TXD (1 << RNPVF_MAX_TXD_PWR)
 /* Tx Descriptors needed, worst case */
 #define TXD_USE_COUNT(S) DIV_ROUND_UP((S), RNPVF_MAX_DATA_PER_TXD)
 #define DESC_NEEDED (MAX_SKB_FRAGS + 4)
@@ -178,11 +181,11 @@ struct rnpgbevf_ring {
 #define RNPVF_RING_VEB_MULTI_FIX ((u32)(1 << 9))
 #define RNPVF_RING_IRQ_MISS_FIX ((u32)(1 << 10))
 #define RNPVF_RING_CHKSM_FIX ((u32)(1 << 11))
+#define RNPVF_RING_LOWER_ITR ((u32)(1 << 12))
 	u8 vfnum;
 	u8 rnpgbevf_msix_off;
 	u16 count; /* amount of descriptors */
-	u8 queue_index;
-	/* queue_index needed for multiqueue queue management */
+	u8 queue_index; /* queue_index needed for multiqueue queue management */
 	u8 rnpgbevf_queue_idx;
 	u16 next_to_use;
 	u16 next_to_clean;
@@ -193,7 +196,11 @@ struct rnpgbevf_ring {
 	struct sk_buff *skb;
 #endif
 	union {
+#ifdef CONFIG_RNPGBE_DISABLE_PACKET_SPLIT
+		u16 rx_buf_len;
+#else
 		u16 next_to_alloc;
+#endif
 		struct {
 			u8 atr_sample_rate;
 			u8 atr_count;
@@ -202,7 +209,9 @@ struct rnpgbevf_ring {
 
 	u8 dcb_tc;
 	struct rnpgbevf_queue_stats stats;
+#ifdef HAVE_NDO_GET_STATS64
 	struct u64_stats_sync syncp;
+#endif
 	union {
 		struct rnpgbevf_tx_queue_stats tx_stats;
 		struct rnpgbevf_rx_queue_stats rx_stats;
@@ -266,15 +275,15 @@ struct rnpgbevf_ring {
 #define RNPVF_MAX_RXD 4096
 #define RNPVF_MIN_RXD 256
 
-#ifndef TSRN500_RX_DEFAULT_BURST
-#define TSRN500_RX_DEFAULT_BURST 16
+#ifndef TSRN10_RX_DEFAULT_BURST
+#define TSRN10_RX_DEFAULT_BURST 16
 #endif
 
-#ifndef TSRN500_RX_DEFAULT_LINE
-#define TSRN500_RX_DEFAULT_LINE 32
+#ifndef TSRN10_RX_DEFAULT_LINE
+#define TSRN10_RX_DEFAULT_LINE 32
 #endif
 
-#define TSRN500_TX_DEFAULT_BURST 8
+#define TSRN10_TX_DEFAULT_BURST 8
 
 /* Supported Rx Buffer Sizes */
 #define RNPVF_RXBUFFER_256 256 /* Used for packet split */
@@ -299,9 +308,11 @@ struct rnpgbevf_ring {
 #define RNPVF_TX_FLAGS_VLAN_PRIO_MASK 0x0000e000
 #define RNPVF_TX_FLAGS_VLAN_SHIFT 16
 
+#ifdef NETIF_F_GSO_PARTIAL
 #define RNPVF_GSO_PARTIAL_FEATURES                                             \
 	(NETIF_F_GSO_GRE | NETIF_F_GSO_GRE_CSUM | NETIF_F_GSO_UDP_TUNNEL |     \
 	 NETIF_F_GSO_UDP_TUNNEL_CSUM)
+#endif /* NETIF_F_GSO_PARTIAL */
 
 struct rnpgbevf_ring_container {
 	struct rnpgbevf_ring *ring; /* pointer to linked list of rings */
@@ -309,9 +320,10 @@ struct rnpgbevf_ring_container {
 	unsigned int total_bytes; /* total bytes processed this int */
 	unsigned int total_packets; /* total packets processed this int */
 	unsigned int total_packets_old;
-	u8 count; /* total number of rings in vector */
-	u8 itr; /* current ITR setting for ring */
+	u16 count; /* total number of rings in vector */
+	u16 itr; /* current ITR setting for ring */
 	u16 add_itr;
+	int update_count;
 };
 
 /* iterator for handling rings in ring container */
@@ -335,6 +347,7 @@ struct rnpgbevf_q_vector {
 	 * represents the vector for this rings
 	 */
 	struct rnpgbevf_ring_container rx, tx;
+
 	struct napi_struct napi;
 	cpumask_t affinity_mask;
 	int numa_node;
@@ -345,9 +358,12 @@ struct rnpgbevf_q_vector {
 #define RNPVF_QVECTOR_FLAG_IRQ_MISS_CHECK ((u32)(1 << 0))
 #define RNPVF_QVECTOR_FLAG_ITR_FEATURE ((u32)(1 << 1))
 #define RNPVF_QVECTOR_FLAG_REDUCE_TX_IRQ_MISS ((u32)(1 << 2))
+
 	int irq_check_usecs;
 	struct hrtimer irq_miss_check_timer;
+
 	char name[IFNAMSIZ + 9];
+
 	/* for dynamic allocation of rings associated with this q_vector */
 	struct rnpgbevf_ring ring[0] ____cacheline_internodealigned_in_smp;
 };
@@ -373,7 +389,7 @@ static inline u16 rnpgbevf_desc_unused(struct rnpgbevf_ring *ring)
 	return ((ntc > ntu) ? 0 : ring->count) + ntc - ntu - 1;
 }
 
-/**
+/*
  * microsecond values for various ITR rates shifted by 2 to fit itr register
  * with the first 3 bits reserved 0
  */
@@ -382,6 +398,14 @@ static inline u16 rnpgbevf_desc_unused(struct rnpgbevf_ring *ring)
 #define RNPVF_20K_ITR 200
 #define RNPVF_10K_ITR 400
 #define RNPVF_8K_ITR 500
+
+/* Helper macros to switch between ints/sec and what the register uses.
+ * And yes, it's the same math going both ways.  The lowest value
+ * supported by all of the rnp hardware is 8.
+ */
+#define EITR_INTS_PER_SEC_TO_REG(_eitr)                                        \
+	((_eitr) ? (1000000000 / ((_eitr) * 256)) : 8)
+#define EITR_REG_TO_INTS_PER_SEC EITR_INTS_PER_SEC_TO_REG
 
 #define RNPVF_DESC_UNUSED(R)                                                   \
 	((((R)->next_to_clean > (R)->next_to_use) ? 0 : (R)->count) +          \
@@ -418,7 +442,7 @@ struct rnpgbevf_hw {
 	u8 __iomem *hw_addr;
 	u8 __iomem *hw_addr_bar0;
 	u8 __iomem *ring_msix_base;
-	u8 vfnum; // fun
+	u8 vfnum;
 #define VF_NUM_MASK 0x3f
 	struct pci_dev *pdev;
 	u16 device_id;
@@ -449,21 +473,22 @@ struct rnpgbevf_hw {
 #define PF_NCSI_EN BIT(1)
 	u32 pf_feature;
 	int mode;
-#define RNPVF_NET_FEATURE_SG ((u32)(0x1 << 0))
-#define RNPVF_NET_FEATURE_TX_CHECKSUM ((u32)(0x1 << 1))
-#define RNPVF_NET_FEATURE_RX_CHECKSUM ((u32)(0x1 << 2))
-#define RNPVF_NET_FEATURE_TSO ((u32)(0x1 << 3))
-#define RNPVF_NET_FEATURE_TX_UDP_TUNNEL (0x1 << 4)
-#define RNPVF_NET_FEATURE_VLAN_FILTER (0x1 << 5)
-#define RNPVF_NET_FEATURE_VLAN_OFFLOAD (0x1 << 6)
-#define RNPVF_NET_FEATURE_RX_NTUPLE_FILTER (0x1 << 7)
-#define RNPVF_NET_FEATURE_TCAM (0x1 << 8)
-#define RNPVF_NET_FEATURE_RX_HASH (0x1 << 9)
-#define RNPVF_NET_FEATURE_RX_FCS (0x1 << 10)
-#define RNPVF_NET_FEATURE_HW_TC (0x1 << 11)
-#define RNPVF_NET_FEATURE_USO (0x1 << 12)
-#define RNPVF_NET_FEATURE_STAG_FILTER (0x1 << 13)
-#define RNPVF_NET_FEATURE_STAG_OFFLOAD (0x1 << 14)
+#define RNPVF_NET_FEATURE_SG ((u32)(1 << 0))
+#define RNPVF_NET_FEATURE_TX_CHECKSUM ((u32)(1 << 1))
+#define RNPVF_NET_FEATURE_RX_CHECKSUM ((u32)(1 << 2))
+#define RNPVF_NET_FEATURE_TSO ((u32)(1 << 3))
+#define RNPVF_NET_FEATURE_TX_UDP_TUNNEL (1 << 4)
+#define RNPVF_NET_FEATURE_VLAN_FILTER (1 << 5)
+#define RNPVF_NET_FEATURE_VLAN_OFFLOAD (1 << 6)
+#define RNPVF_NET_FEATURE_RX_NTUPLE_FILTER (1 << 7)
+#define RNPVF_NET_FEATURE_TCAM (1 << 8)
+#define RNPVF_NET_FEATURE_RX_HASH (1 << 9)
+#define RNPVF_NET_FEATURE_RX_FCS (1 << 10)
+#define RNPVF_NET_FEATURE_HW_TC (1 << 11)
+#define RNPVF_NET_FEATURE_USO (1 << 12)
+#define RNPVF_NET_FEATURE_STAG_FILTER (1 << 13)
+#define RNPVF_NET_FEATURE_STAG_OFFLOAD (1 << 14)
+
 	u32 feature_flags;
 };
 
@@ -477,16 +502,32 @@ enum irq_mode_enum {
 
 /* board specific private data structure */
 struct rnpgbevf_adapter {
+#if defined(NETIF_F_HW_VLAN_TX) || defined(NETIF_F_HW_VLAN_CTAG_TX)
+#ifdef HAVE_VLAN_RX_REGISTER
+	struct vlan_group *vlgrp; /* must be first, see ixgbe_receive_skb */
+#else
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
+#endif
+
+#endif /* NETIF_F_HW_VLAN_TX || NETIF_F_HW_VLAN_CTAG_TX */
 #define GET_VFNUM_FROM_BAR0 BIT(0)
 	u16 status;
 	u16 vf_vlan;
 	struct timer_list watchdog_timer;
 	u16 bd_number;
 	struct work_struct reset_task;
+	/* this var is used for auto itr modify */
+	/* hw not Supported well */
+	unsigned long last_moder_packets[MAX_RX_QUEUES];
+	unsigned long last_moder_tx_packets;
+	unsigned long last_moder_bytes[MAX_RX_QUEUES];
+	unsigned long last_moder_jiffies;
+	int last_moder_time[MAX_RX_QUEUES];
+
 	/* Interrupt Throttle Rate */
 	u16 rx_itr_setting;
 	u16 tx_itr_setting;
+
 	u16 rx_usecs;
 	u16 rx_frames;
 	u16 tx_usecs;
@@ -513,7 +554,6 @@ struct rnpgbevf_adapter {
 	u64 hw_tso_ctxt;
 	u64 hw_tso6_ctxt;
 	u32 tx_timeout_count;
-
 	/* RX */
 	struct rnpgbevf_ring *rx_ring[MAX_RX_QUEUES];
 	int rx_ring_item_count;
@@ -522,20 +562,15 @@ struct rnpgbevf_adapter {
 	u64 hw_rx_no_dma_resources;
 	u64 hw_csum_rx_good;
 	u64 non_eop_descs;
-
 	u32 alloc_rx_page_failed;
 	u32 alloc_rx_buff_failed;
-
 	int vector_off;
 	int num_other_vectors;
 	int irq_mode;
 	struct rnpgbevf_q_vector *q_vector[MAX_MSIX_VECTORS];
-
 	int num_msix_vectors;
 	struct msix_entry *msix_entries;
-
 	u32 dma_channels; /* the real used dma ring channels */
-
 	/* Some features need tri-state capability,
 	 * thus the additional *_CAPABLE flags.
 	 */
@@ -579,9 +614,11 @@ struct rnpgbevf_adapter {
 	bool link_up;
 	struct work_struct watchdog_task;
 	u8 port;
-	/* mbx_lock */
 	spinlock_t mbx_lock;
 	char name[60];
+#ifdef CONFIG_NET_NCSI
+	struct ncsi_dev *ncsi_dev;
+#endif
 };
 
 enum rnpgbevf_state_t {
@@ -602,8 +639,8 @@ struct rnpgbevf_cb {
 	u16 append_cnt;
 	bool page_released;
 };
-
 #define RNPVF_CB(skb) ((struct rnpgbevf_cb *)(skb)->cb)
+
 #define RING2ADAPT(ring) netdev_priv((ring)->netdev)
 
 enum rnpgbevf_boards {
@@ -617,7 +654,6 @@ extern const struct rnp_mbx_operations rnpgbevf_mbx_ops;
 /* needed by ethtool.c */
 extern char rnpgbevf_driver_name[];
 extern const char rnpgbevf_driver_version[];
-
 extern void rnpgbevf_up(struct rnpgbevf_adapter *adapter);
 extern void rnpgbevf_down(struct rnpgbevf_adapter *adapter);
 extern void rnpgbevf_reinit_locked(struct rnpgbevf_adapter *adapter);
@@ -639,10 +675,8 @@ extern int register_mbx_irq(struct rnpgbevf_adapter *adapter);
 extern int rnpgbevf_init_interrupt_scheme(struct rnpgbevf_adapter *adapter);
 extern int rnpgbevf_close(struct net_device *netdev);
 extern int rnpgbevf_open(struct net_device *netdev);
-
 extern void rnp_napi_add_all(struct rnpgbevf_adapter *adapter);
 extern void rnp_napi_del_all(struct rnpgbevf_adapter *adapter);
-
 extern int rnpgbevf_sysfs_init(struct net_device *ndev);
 extern void rnpgbevf_sysfs_exit(struct net_device *ndev);
 
@@ -655,15 +689,13 @@ static inline struct netdev_queue *txring_txq(const struct rnpgbevf_ring *ring)
 {
 	return netdev_get_tx_queue(ring->netdev, ring->queue_index);
 }
-
-/**
+/*
  * FCoE requires that all Rx buffers be over 2200 bytes in length.  Since
  * this is twice the size of a half page we need to double the page order
  * for FCoE enabled Rx queues.
  */
 static inline unsigned int rnpgbevf_rx_bufsz(struct rnpgbevf_ring *ring)
 {
-	/* 1 rx-desc trans max half page(2048), for jumbo frame sg is needed */
 	return (RNPVF_RXBUFFER_1536 - NET_IP_ALIGN);
 }
 
@@ -671,7 +703,6 @@ static inline unsigned int rnpgbevf_rx_pg_order(struct rnpgbevf_ring *ring)
 {
 	return 0;
 }
-
 #define rnpgbevf_rx_pg_size(_ring) (PAGE_SIZE << rnpgbevf_rx_pg_order(_ring))
 
 static inline u32 rnpgbevf_rx_desc_used_hw(struct rnpgbevf_hw *hw,
@@ -693,5 +724,7 @@ static inline u32 rnpgbevf_tx_desc_unused_hw(struct rnpgbevf_hw *hw,
 
 	return ((tail > head) ? (count - tail + head) : (head - tail));
 }
+
+#define IS_VALID_VID(vid) ((vid) >= 0 && (vid) < 4096)
 
 #endif /* _RNPGBEVF_H_ */

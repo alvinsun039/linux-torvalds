@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #ifndef _RNPGBEVF_REGS_H_
 #define _RNPGBEVF_REGS_H_
@@ -11,25 +11,26 @@ enum NIC_MODE {
 	MODE_NIC_MODE_8PORT_10G = 3,
 };
 
+/* RNP-Ring Registers */
 #define RNPGBE_DMA_RING_BASE 0x8000
 #define RNPGBE_DMA_RX_DESC_TIMEOUT_TH 0x8000
 #define RNPGBE_DMA_TX_DESC_FETCH_CTL 0x8004
 #define RNPGBE_DMA_TX_FLOW_CTRL_TM 0x8008
+/* DMA-ENABLE-IRQ */
 #define RNPGBE_RING_BASE_N10 (0x8000)
 #define RNPGBE_RING_BASE_N500 (0x1000)
-
-#define RNPGBE_RING_OFFSET(i) (0x100 * (i))
-
+#define RNPGBE_RING_OFFSET(i) (0x100 * i)
 #define RNPGBE_DMA_RX_START (0x10)
 #define RNPGBE_DMA_RX_READY (0x14)
 #define RNPGBE_DMA_TX_START (0x18)
 #define RNPGBE_DMA_TX_READY (0x1c)
 #define RNPGBE_DMA_INT_STAT (0x20)
 #define RNPGBE_DMA_INT_MASK (0x24)
-#define TX_INT_MASK (0x1 << 1)
-#define RX_INT_MASK (0x1 << 0)
+#define TX_INT_MASK (1 << 1)
+#define RX_INT_MASK (1 << 0)
 #define RNPGBE_DMA_INT_CLR (0x28)
 #define RNPGBE_DMA_INT_TRIG (0x2c)
+/* RX-Queue Registers */
 #define RNPGBE_DMA_REG_RX_DESC_BUF_BASE_ADDR_HI (0x30)
 #define RNPGBE_DMA_REG_RX_DESC_BUF_BASE_ADDR_LO (0x34)
 #define RNPGBE_DMA_REG_RX_DESC_BUF_LEN (0x38)
@@ -41,6 +42,7 @@ enum NIC_MODE {
 #define RNPGBE_DMA_REG_RX_ARB_DEF_LVL (0x50)
 #define PCI_DMA_REG_RX_DESC_TIMEOUT_TH (0x54)
 #define PCI_DMA_REG_RX_SCATTER_LENGH (0x58)
+/* TX-Queue Registers */
 #define RNPGBE_DMA_REG_TX_DESC_BUF_BASE_ADDR_HI (0x60)
 #define RNPGBE_DMA_REG_TX_DESC_BUF_BASE_ADDR_LO (0x64)
 #define RNPGBE_DMA_REG_TX_DESC_BUF_LEN (0x68)
@@ -53,6 +55,7 @@ enum NIC_MODE {
 #define RNPGBE_DMA_REG_TX_FLOW_CTRL_TH (0x84)
 #define RNPGBE_DMA_REG_TX_FLOW_CTRL_TM (0x88)
 
+/* VEB Registers */
 #define VEB_TBL_CNTS 64
 #define RNPGBE_DMA_PORT_VBE_MAC_LO_TBL_N10(port, vf)                           \
 	(0x80A0 + 4 * (port) + 0x100 * (vf))
@@ -76,7 +79,8 @@ enum NIC_MODE {
 #define RNPGBE_DMA_STATS_MAC_TO_DMA (0x1a8)
 #define RNPGBE_DMA_STATS_SWITCH_TO_DMA (0x1ac)
 
-#define RNPVF500_VEB_VFMPRC(i) (0x4018 + 0x100 * (i))
+#define RNPVF500_VEB_VFMPRC(i) (0x4018 + 0x100 * i)
+/* =====  PF-VF Functions ==== */
 #define VF_NUM_REG 0xa3000
 #define VF_NUM_REG_N10 0x75f000
 #define VF_NUM_REG_N500 (0xe000)
@@ -84,6 +88,7 @@ enum NIC_MODE {
 #define VF_NUM(vfnum, fun) ((1 << 7) | (((fun) & 0x1) << 6) | ((vfnum) & 0x3f))
 #define PF_NUM(fun) (((fun) & 0x1) << 6)
 
+/* ==== Ring-MSIX Registers (MSI-X_module_design.docs) === */
 #define RING_VECTOR(n) (0x4000 + 0x04 * (n))
 
 static inline unsigned int p_rnpgbevf_rd_reg(void *reg)
@@ -93,11 +98,10 @@ static inline unsigned int p_rnpgbevf_rd_reg(void *reg)
 	printk(KERN_DEBUG " rd-reg: %p ==> 0x%08x\n", reg, v);
 	return v;
 }
-
 #define p_rnpgbevf_wr_reg(reg, val)                                            \
 	do {                                                                   \
-		printk(KERN_DEBUG " wr-reg: %p <== 0x%08x \t#%-4d %s\n", (reg), (val),    \
-		       __LINE__, __FILE__);                                    \
+		printk(KERN_DEBUG " wr-reg: %p <== 0x%08x \t#%-4d %s\n",       \
+		       (reg), (val), __LINE__, __FILE__);                      \
 		iowrite32((val), (void *)(reg));                               \
 	} while (0)
 
@@ -126,13 +130,14 @@ static inline unsigned int p_rnpgbevf_rd_reg(void *reg)
 
 #define pwr32(hw, reg, val)                                                    \
 	do {                                                                   \
-		printk(KERN_DEBUG " wr-reg: %p <== 0x%08x \t#%-4d %s\n",                  \
+		printk(KERN_DEBUG " wr-reg: %p <== 0x%08x \t#%-4d %s\n",       \
 		       (hw)->hw_addr + (reg), (val), __LINE__, __FILE__);      \
 		iowrite32((val), (hw)->hw_addr + (reg));                       \
 	} while (0)
 
+/* ==== log helper === */
 #ifdef DEBUG
-#define hw_dbg(hw, fmt, args...) printk(KERN_DEBUG "hw-dbg : " fmt, ##args)
+#define hw_dbg(hw, fmt, args...) printk("hw-dbg : " fmt, ##args)
 #else
 #define hw_dbg(hw, fmt, args...)
 #endif
