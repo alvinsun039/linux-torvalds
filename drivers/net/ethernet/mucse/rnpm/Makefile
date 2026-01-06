@@ -11,6 +11,7 @@ rnpm-objs :=   \
 		rnpm_mbx_fw.o\
 		rnpm_phy.o \
 		rnpm_sriov.o \
+		rnpm_compat.o \
 		rnpm_sysfs.o \
 		rnpm_tc.o \
 		rnpm_mpe.o \
