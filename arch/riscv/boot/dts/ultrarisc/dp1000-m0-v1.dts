@@ -8,9 +8,11 @@
 #include <dt-bindings/gpio/gpio.h>
 
 / {
+	model = "Rongda M0 Board v1";
+	compatible = "rongda,m0-v1", "ultrarisc,dp1000";
+
 	chosen {
-		bootargs = "earlycon=sbi console=ttyS0,115200";
-		stdout-path = &uart0;
+		stdout-path = "serial0:115200n8";
 	};
 
 	gpio-poweroff {
