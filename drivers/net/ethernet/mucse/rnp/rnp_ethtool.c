@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2022 - 2023 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #include <linux/interrupt.h>
 #include <linux/types.h>
@@ -13,23 +13,12 @@
 #include <linux/highmem.h>
 #include <linux/uaccess.h>
 #include "rnp.h"
-#include "rnp_sriov.h"
 #include "rnp_phy.h"
+#include "rnp_sriov.h"
 #include "rnp_mbx_fw.h"
 #include "rnp_ethtool.h"
 
-/**
- * rnp_wol_exclusion - get card wol capability
- * @adapter: board private structure
- * @wol: ethtool wol info
- *
- * Returns : 0 -- not support
- *           1 -- support
- *
- * This function try to check wol capability.
- **/
-int rnp_wol_exclusion(struct rnp_adapter *adapter,
-		      struct ethtool_wolinfo *wol)
+int rnp_wol_exclusion(struct rnp_adapter *adapter, struct ethtool_wolinfo *wol)
 {
 	struct rnp_hw *hw = &adapter->hw;
 	int retval = 0;
@@ -40,39 +29,29 @@ int rnp_wol_exclusion(struct rnp_adapter *adapter,
 		retval = 1;
 		wol->supported = 0;
 	}
+
 	return retval;
 }
 
-/**
- * rnp_get_wol - setup to wol info according hw status
- * @netdev: network interface device structure
- * @wol: ethtool wol info
- *
- * This function try to setup wol info.
- **/
 void rnp_get_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 	struct rnp_hw *hw = &adapter->hw;
 
 	wol->wolopts = 0;
+
+	/* we now can't wol */
 	if (rnp_wol_exclusion(adapter, wol) ||
 	    !device_can_wakeup(&adapter->pdev->dev))
 		return;
 
+	/* Only support magic */
 	if (RNP_WOL_GET_SUPPORTED(adapter))
 		wol->supported = hw->wol_supported;
 	if (RNP_WOL_GET_STATUS(adapter))
 		wol->wolopts |= hw->wol_supported;
 }
 
-/**
- * rnp_set_wol - setup hw status according wol info
- * @netdev: network interface device structure
- * @wol: ethtool wol info
- *
- * This function try to setup hw status.
- **/
 int rnp_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
@@ -107,6 +86,16 @@ struct rnp_reg_test {
 	u32 write;
 };
 
+/* In the hardware, registers are laid out either singly, in arrays
+ * spaced 0x40 bytes apart, or in contiguous tables.  We assume
+ * most tests take place on arrays or single registers (handled
+ * as a single-element array) and special-case the tables.
+ * Table tests are always pattern tests.
+ *
+ * We also make provision for some required setup steps by specifying
+ * registers to be written without any read-back testing.
+ */
+
 #define PATTERN_TEST 1
 #define SET_READ_TEST 2
 #define WRITE_NO_TEST 3
@@ -114,18 +103,39 @@ struct rnp_reg_test {
 #define TABLE64_TEST_LO 5
 #define TABLE64_TEST_HI 6
 
-/* default n10 register test 0 now */
+/* default n10 register test */
 static struct rnp_reg_test reg_test_n10[] = {
+	//{RNP_DMA_CONFIG, 1, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF},
+	/*
+	 * { RNP_FCRTL_n10(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
+	 * { RNP_FCRTH_n10(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
+	 * { RNP_PFCTOP, 1, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
+	 * { RNP_VLNCTRL, 1, PATTERN_TEST, 0x00000000, 0x00000000 },
+	 * { RNP_RDBAL(0), 4, PATTERN_TEST, 0xFFFFFF80, 0xFFFFFF80 },
+	 * { RNP_RDBAH(0), 4, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
+	 * { RNP_RDLEN(0), 4, PATTERN_TEST, 0x000FFF80, 0x000FFFFF },
+	 * { RNP_RDT(0), 4, PATTERN_TEST, 0x0000FFFF, 0x0000FFFF },
+	 * { RNP_RXDCTL(0), 4, WRITE_NO_TEST, 0, 0 },
+	 * { RNP_FCRTH(0), 1, PATTERN_TEST, 0x8007FFF0, 0x8007FFF0 },
+	 * { RNP_FCTTV(0), 1, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
+	 * { RNP_TDBAL(0), 4, PATTERN_TEST, 0xFFFFFF80, 0xFFFFFFFF },
+	 * { RNP_TDBAH(0), 4, PATTERN_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
+	 * { RNP_TDLEN(0), 4, PATTERN_TEST, 0x000FFF80, 0x000FFF80 },
+	 * { RNP_RXCTRL, 1, SET_READ_TEST, 0x00000001, 0x00000001 },
+	 * { RNP_RAL(0), 16, TABLE64_TEST_LO, 0xFFFFFFFF, 0xFFFFFFFF },
+	 * { RNP_RAL(0), 16, TABLE64_TEST_HI, 0x8001FFFF, 0x800CFFFF },
+	 * { RNP_MTA(0), 128, TABLE32_TEST, 0xFFFFFFFF, 0xFFFFFFFF },
+	 */
 	{ .reg = 0 },
 };
 
 /* write and read check */
-static bool reg_pattern_test(struct rnp_adapter *adapter, u64 *data,
-			     int reg, u32 mask, u32 write)
+static bool reg_pattern_test(struct rnp_adapter *adapter, u64 *data, int reg,
+			     u32 mask, u32 write)
 {
 	u32 pat, val, before;
-	static const u32 test_pattern[] = { 0x5A5A5A5A, 0xA5A5A5A5,
-					    0x00000000, 0xFFFFFFFF };
+	static const u32 test_pattern[] = { 0x5A5A5A5A, 0xA5A5A5A5, 0x00000000,
+					    0xFFFFFFFF };
 
 	for (pat = 0; pat < ARRAY_SIZE(test_pattern); pat++) {
 		before = readl(adapter->hw.hw_addr + reg);
@@ -135,20 +145,18 @@ static bool reg_pattern_test(struct rnp_adapter *adapter, u64 *data,
 		if (val != (test_pattern[pat] & write & mask)) {
 			e_err(drv,
 			      "pattern test reg %04X failed: got 0x%08X expected 0x%08X\n",
-			      reg, val,
-			      (test_pattern[pat] & write & mask));
+			      reg, val, (test_pattern[pat] & write & mask));
 			*data = reg;
 			writel(before, adapter->hw.hw_addr + reg);
 			return 1;
 		}
 		writel(before, adapter->hw.hw_addr + reg);
 	}
-
 	return 0;
 }
 
-static bool reg_set_and_check(struct rnp_adapter *adapter, u64 *data,
-			      int reg, u32 mask, u32 write)
+static bool reg_set_and_check(struct rnp_adapter *adapter, u64 *data, int reg,
+			      u32 mask, u32 write)
 {
 	u32 val, before;
 
@@ -164,17 +172,9 @@ static bool reg_set_and_check(struct rnp_adapter *adapter, u64 *data,
 		return 1;
 	}
 	writel(before, (adapter->hw.hw_addr + reg));
-
 	return 0;
 }
 
-/**
- * rnp_reg_test - do register test
- * @adapter: board private structure
- * @data: test term
- *
- * This function try to do register test
- **/
 static bool rnp_reg_test(struct rnp_adapter *adapter, u64 *data)
 {
 	struct rnp_reg_test *test;
@@ -188,7 +188,8 @@ static bool rnp_reg_test(struct rnp_adapter *adapter, u64 *data)
 	}
 
 	test = reg_test_n10;
-	/* Perform the remainder of the register test, looping through
+	/*
+	 * Perform the remainder of the register test, looping through
 	 * the test table until we either fail or reach the null entry.
 	 */
 	while (test->reg) {
@@ -199,30 +200,25 @@ static bool rnp_reg_test(struct rnp_adapter *adapter, u64 *data)
 			case PATTERN_TEST:
 				b = reg_pattern_test(adapter, data,
 						     test->reg + (i * 0x40),
-						     test->mask,
-						     test->write);
+						     test->mask, test->write);
 				break;
 			case SET_READ_TEST:
 				b = reg_set_and_check(adapter, data,
 						      test->reg + (i * 0x40),
-						      test->mask,
-						      test->write);
+						      test->mask, test->write);
 				break;
 			case WRITE_NO_TEST:
-				wr32(hw, test->reg + (i * 0x40),
-				     test->write);
+				wr32(hw, test->reg + (i * 0x40), test->write);
 				break;
 			case TABLE32_TEST:
 				b = reg_pattern_test(adapter, data,
 						     test->reg + (i * 4),
-						     test->mask,
-						     test->write);
+						     test->mask, test->write);
 				break;
 			case TABLE64_TEST_LO:
 				b = reg_pattern_test(adapter, data,
 						     test->reg + (i * 8),
-						     test->mask,
-						     test->write);
+						     test->mask, test->write);
 				break;
 			case TABLE64_TEST_HI:
 				b = reg_pattern_test(adapter, data,
@@ -235,8 +231,8 @@ static bool rnp_reg_test(struct rnp_adapter *adapter, u64 *data)
 		}
 		test++;
 	}
-	*data = 0;
 
+	*data = 0;
 	return false;
 }
 
@@ -251,12 +247,11 @@ static int rnp_link_test(struct rnp_adapter *adapter, u64 *data)
 	hw->ops.check_link(hw, &link_speed, &link_up, &duplex, true);
 	if (!link_up)
 		*data = 1;
-
 	return *data;
 }
 
-void rnp_diag_test(struct net_device *netdev,
-		   struct ethtool_test *eth_test, u64 *data)
+void rnp_diag_test(struct net_device *netdev, struct ethtool_test *eth_test,
+		   u64 *data)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 	struct rnp_hw *hw = &adapter->hw;
@@ -270,13 +265,12 @@ void rnp_diag_test(struct net_device *netdev,
 			for (i = 0; i < adapter->num_vfs; i++) {
 				if (adapter->vfinfo[i].clear_to_send) {
 					netdev_warn(netdev, "%s",
-						    "offline diagnostic is not supported when VFs are present\n");
+						    "offline are skiped with VFs\n");
 					data[0] = 1;
 					data[1] = 1;
 					data[2] = 1;
 					data[3] = 1;
-					eth_test->flags |=
-						ETH_TEST_FL_FAILED;
+					eth_test->flags |= ETH_TEST_FL_FAILED;
 					clear_bit(__RNP_TESTING,
 						  &adapter->state);
 					goto skip_ol_tests;
@@ -307,13 +301,21 @@ void rnp_diag_test(struct net_device *netdev,
 		 * loopback diagnostic.
 		 */
 		if (adapter->flags &
-				(RNP_FLAG_SRIOV_ENABLED | RNP_FLAG_VMDQ_ENABLED)) {
+		    (RNP_FLAG_SRIOV_ENABLED | RNP_FLAG_VMDQ_ENABLED)) {
 			e_info(hw, "Skip MAC loopback diagnostic in VT mode\n");
 			data[3] = 0;
 			goto skip_loopback;
 		}
 
 		data[3] = 0;
+		/* loopback test is not added now */
+		/*
+		 * rnp_reset(adapter);
+		 * e_info(hw, "loopback testing starting\n");
+		 * todo Loopback test
+		 * if (rnp_loopback_test(adapter, &data[3]))
+		 * eth_test->flags |= ETH_TEST_FL_FAILED;
+		 */
 skip_loopback:
 		/* clear testing bit and return adapter to previous state */
 		clear_bit(__RNP_TESTING, &adapter->state);
@@ -344,13 +346,7 @@ skip_ol_tests:
 	msleep_interruptible(4 * 1000);
 }
 
-/**
- * rnp_get_fecparam - get fec parameters
- * @netdev: network interface device structure
- * @fecparam: fecparam structrue
- *
- * This function is called when ethtool --show-fec.
- **/
+#ifdef ETHTOOL_GFECPARAM
 int rnp_get_fecparam(struct net_device *netdev,
 		     struct ethtool_fecparam *fecparam)
 {
@@ -371,13 +367,6 @@ int rnp_get_fecparam(struct net_device *netdev,
 	return 0;
 }
 
-/**
- * rnp_set_fecparam - set fec parameters
- * @netdev: network interface device structure
- * @fecparam: fecparam structrue
- *
- * This function is called when ethtool --set-fec.
- **/
 int rnp_set_fecparam(struct net_device *netdev,
 		     struct ethtool_fecparam *fecparam)
 {
@@ -391,13 +380,7 @@ int rnp_set_fecparam(struct net_device *netdev,
 
 	return -EINVAL;
 }
-
-/**
- * rnp_get_msglevel - get msglevel
- * @netdev: network interface device structure
- *
- * This function is called when ethtool DEVNAME.
- **/
+#endif
 u32 rnp_get_msglevel(struct net_device *netdev)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
@@ -405,13 +388,6 @@ u32 rnp_get_msglevel(struct net_device *netdev)
 	return adapter->msg_enable;
 }
 
-/**
- * rnp_set_msglevel - set msglevel
- * @netdev: network interface device structure
- * @data: msglevel value
- *
- * This function is called when ethtool -s DEVNAME msglvl.
- **/
 void rnp_set_msglevel(struct net_device *netdev, u32 data)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
@@ -419,15 +395,7 @@ void rnp_set_msglevel(struct net_device *netdev, u32 data)
 	adapter->msg_enable = data;
 }
 
-/**
- * rnp_set_phys_id - control led status for this netdev
- * @netdev: network interface device structure
- * @state: state structure
- *
- * This function is called when ethtool -p.
- **/
-int rnp_set_phys_id(struct net_device *netdev,
-		    enum ethtool_phys_id_state state)
+int rnp_set_phys_id(struct net_device *netdev, enum ethtool_phys_id_state state)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 	struct rnp_hw *hw = &adapter->hw;
@@ -451,19 +419,16 @@ int rnp_set_phys_id(struct net_device *netdev,
 	}
 	return 0;
 }
-
-/**
- * rnp_get_ts_info - get the time stamping and PTP hardware clock capabilities
- * @dev: network interface device structure
- * @info: info structure
- *
- * This function is called when ethtool -T:.
- **/
+#ifdef HAVE_ETHTOOL_GET_TS_INFO
+#ifdef HAVE_ETHTOOL_KERNEL_TS_INFO
+int rnp_get_ts_info(struct net_device *dev, struct kernel_ethtool_ts_info *info)
+#else
 int rnp_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
+#endif
 {
 	struct rnp_adapter *adapter = netdev_priv(dev);
 
-	/*For we just set it as pf0 */
+	/* For we just set it as pf0 */
 	if (!(adapter->flags2 & RNP_FLAG2_PTP_ENABLED))
 		return ethtool_op_get_ts_info(dev, info);
 
@@ -472,39 +437,49 @@ int rnp_get_ts_info(struct net_device *dev, struct ethtool_ts_info *info)
 	else
 		info->phc_index = -1;
 
-	info->so_timestamping = SOF_TIMESTAMPING_TX_HARDWARE |
-				SOF_TIMESTAMPING_RX_HARDWARE |
-				SOF_TIMESTAMPING_RX_SOFTWARE |
-				SOF_TIMESTAMPING_TX_SOFTWARE |
-				SOF_TIMESTAMPING_SOFTWARE |
-				SOF_TIMESTAMPING_RAW_HARDWARE;
+	dbg("phc_index is %d\n", info->phc_index);
+	info->so_timestamping =
+		SOF_TIMESTAMPING_TX_HARDWARE | SOF_TIMESTAMPING_RX_HARDWARE |
+		SOF_TIMESTAMPING_RX_SOFTWARE | SOF_TIMESTAMPING_TX_SOFTWARE |
+		SOF_TIMESTAMPING_SOFTWARE | SOF_TIMESTAMPING_RAW_HARDWARE;
+
 	info->tx_types = (1 << HWTSTAMP_TX_OFF) | (1 << HWTSTAMP_TX_ON);
+
 	info->rx_filters = BIT(HWTSTAMP_FILTER_NONE) |
 			   BIT(HWTSTAMP_FILTER_PTP_V1_L4_SYNC) |
 			   BIT(HWTSTAMP_FILTER_PTP_V1_L4_DELAY_REQ) |
 			   BIT(HWTSTAMP_FILTER_PTP_V1_L4_EVENT) |
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_SYNC) |
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_EVENT) |
+#ifdef PTP_802_AS1
+			   /* 802.AS1 */
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_EVENT) |
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_SYNC) |
+			   BIT(HWTSTAMP_FILTER_PTP_V2_L2_DELAY_REQ) |
+#endif
 			   BIT(HWTSTAMP_FILTER_PTP_V2_L4_DELAY_REQ) |
 			   BIT(HWTSTAMP_FILTER_ALL);
 
 	return 0;
 }
+#endif
 
 static unsigned int rnp_max_channels(struct rnp_adapter *adapter)
 {
 	unsigned int max_combined;
 	struct rnp_hw *hw = &adapter->hw;
 
-	/* SR-IOV currently only allows 2 queue on the PF */
-	/* dcb on max support 32 */
-	/* support up to 16 queues with RSS */
-	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED)
+	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
+		/* SR-IOV currently only allows 2 queue on the PF */
 		max_combined = hw->sriov_ring_limit;
-	else if (adapter->flags & RNP_FLAG_DCB_ENABLED)
+	} else if (adapter->flags & RNP_FLAG_DCB_ENABLED) {
+		/* dcb on max support 32 */
 		max_combined = 32;
-	else
+	} else {
+		/* support up to 16 queues with RSS */
 		max_combined = adapter->max_ring_pair_counts;
+		/* should not large than q_vectors ? */
+	}
 #ifdef RNP_MAX_RINGS
 	if (max_combined > RNP_MAX_RINGS)
 		max_combined = RNP_MAX_RINGS;
@@ -513,13 +488,6 @@ static unsigned int rnp_max_channels(struct rnp_adapter *adapter)
 	return max_combined;
 }
 
-/**
- * rnp_get_channels - set ring num
- * @dev: network interface device structure
- * @ch: channel structure
- *
- * This function is called when ethtool -l.
- **/
 void rnp_get_channels(struct net_device *dev, struct ethtool_channels *ch)
 {
 	struct rnp_adapter *adapter = netdev_priv(dev);
@@ -547,13 +515,6 @@ void rnp_get_channels(struct net_device *dev, struct ethtool_channels *ch)
 		return;
 }
 
-/**
- * rnp_set_channels - set ring num
- * @dev: network interface device structure
- * @ch: channel structure
- *
- * This function is called when ethtool -L.
- **/
 int rnp_set_channels(struct net_device *dev, struct ethtool_channels *ch)
 {
 	struct rnp_adapter *adapter = netdev_priv(dev);
@@ -585,18 +546,12 @@ int rnp_set_channels(struct net_device *dev, struct ethtool_channels *ch)
 	return rnp_setup_tc(dev, netdev_get_num_tc(dev));
 }
 
-/**
- * rnp_get_module_info - get size and type of eeprom within a plug-in module
- * @dev: network interface device structure
- * @modinfo: modinfo structure
- *
- * This function is called when ethtool -m.
- **/
-int rnp_get_module_info(struct net_device *dev,
+int rnp_get_module_info(struct net_device *netdev,
 			struct ethtool_modinfo *modinfo)
 {
-	struct rnp_adapter *adapter = netdev_priv(dev);
+	struct rnp_adapter *adapter = netdev_priv(netdev);
 	struct rnp_hw *hw = &adapter->hw;
+	struct device *dev = &adapter->pdev->dev;
 	u8 module_id, diag_supported;
 	int rc;
 
@@ -604,21 +559,20 @@ int rnp_get_module_info(struct net_device *dev,
 
 	if (hw->is_sgmii)
 		return -EIO;
-	rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0, SFF_MODULE_ID_OFFSET,
-					    1, &module_id);
+
+	rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0, SFF_MODULE_ID_OFFSET, 1,
+					    &module_id);
 	if (rc || module_id == 0xff)
 		return -EIO;
-	rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0,
-					    SFF_DIAG_SUPPORT_OFFSET, 1,
-					    &diag_supported);
+	rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0, SFF_DIAG_SUPPORT_OFFSET,
+					    1, &diag_supported);
 	if (!rc) {
 		switch (module_id) {
 		case SFF_MODULE_ID_SFP:
 			modinfo->type = ETH_MODULE_SFF_8472;
 			modinfo->eeprom_len = ETH_MODULE_SFF_8472_LEN;
 			if (!diag_supported)
-				modinfo->eeprom_len =
-					ETH_MODULE_SFF_8436_LEN;
+				modinfo->eeprom_len = ETH_MODULE_SFF_8436_LEN;
 			break;
 		case SFF_MODULE_ID_QSFP:
 		case SFF_MODULE_ID_QSFP_PLUS:
@@ -630,6 +584,8 @@ int rnp_get_module_info(struct net_device *dev,
 			modinfo->eeprom_len = ETH_MODULE_SFF_8636_LEN;
 			break;
 		default:
+			dev_info(dev, "%s: m_id:0x%x diag_supported:0x%x\n",
+			       __func__, module_id, diag_supported);
 			rc = -EOPNOTSUPP;
 			break;
 		}
@@ -638,16 +594,8 @@ int rnp_get_module_info(struct net_device *dev,
 	return rc;
 }
 
-/**
- * rnp_get_module_eeprom - get module eeprom info
- * @dev: network interface device structure
- * @eeprom: eeprom structure
- * @data: data buffer
- *
- * This function is called when ethtool -m.
- **/
-int rnp_get_module_eeprom(struct net_device *dev,
-			  struct ethtool_eeprom *eeprom, u8 *data)
+int rnp_get_module_eeprom(struct net_device *dev, struct ethtool_eeprom *eeprom,
+			  u8 *data)
 {
 	struct rnp_adapter *adapter = netdev_priv(dev);
 	struct rnp_hw *hw = &adapter->hw;
@@ -665,8 +613,8 @@ int rnp_get_module_eeprom(struct net_device *dev,
 	if (start < ETH_MODULE_SFF_8436_LEN) {
 		if (start + eeprom->len > ETH_MODULE_SFF_8436_LEN)
 			length = ETH_MODULE_SFF_8436_LEN - start;
-		rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0, start,
-						    length, data);
+		rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA0, start, length,
+						    data);
 		if (rc)
 			return rc;
 		start += length;
@@ -677,30 +625,25 @@ int rnp_get_module_eeprom(struct net_device *dev,
 	/* Read A2 portion of the EEPROM */
 	if (length) {
 		start -= ETH_MODULE_SFF_8436_LEN;
-		rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA2, start,
-						    length, data);
+		rc = rnp_mbx_sfp_module_eeprom_info(hw, 0xA2, start, length,
+						    data);
 	}
 
 	return rc;
 }
-
-/**
- * rnp_get_ringparam - get ring desc num
- * @netdev: network interface device structure
- * @ring: ring structure
- * @ker: ker info
- * @extack: extack info
- *
- * This function is called when ethtool -g.
- **/
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
 void rnp_get_ringparam(struct net_device *netdev,
 		       struct ethtool_ringparam *ring,
 		       struct kernel_ethtool_ringparam __always_unused *ker,
 		       struct netlink_ext_ack __always_unused *extack)
+#else
+void rnp_get_ringparam(struct net_device *netdev,
+		       struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
-
 	/* all ring share the same status*/
+
 	ring->rx_max_pending = RNP_MAX_RXD;
 	ring->tx_max_pending = RNP_MAX_TXD;
 	ring->rx_mini_max_pending = 0;
@@ -711,19 +654,13 @@ void rnp_get_ringparam(struct net_device *netdev,
 	ring->rx_jumbo_pending = 0;
 }
 
-/**
- * rnp_set_ringparam - set ring desc num
- * @netdev: network interface device structure
- * @ring: ring structure
- * @ker: ker info
- * @extack: extack info
- *
- * This function is called when ethtool -G.
- **/
-int rnp_set_ringparam(struct net_device *netdev,
-		      struct ethtool_ringparam *ring,
+#ifdef HAVE_ETHTOOL_EXTENDED_RINGPARAMS
+int rnp_set_ringparam(struct net_device *netdev, struct ethtool_ringparam *ring,
 		      struct kernel_ethtool_ringparam __always_unused *ker,
 		      struct netlink_ext_ack __always_unused *extack)
+#else
+int rnp_set_ringparam(struct net_device *netdev, struct ethtool_ringparam *ring)
+#endif /* HAVE_ETHTOOL_EXTENDED_RINGPARAMS */
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 	struct rnp_ring *temp_ring;
@@ -734,31 +671,31 @@ int rnp_set_ringparam(struct net_device *netdev,
 	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED)
 		return -EINVAL;
 
-	if (ring->rx_mini_pending || ring->rx_jumbo_pending)
+	if ((ring->rx_mini_pending) || (ring->rx_jumbo_pending))
 		return -EINVAL;
 
-	if (ring->tx_pending < RNP_MIN_TXD ||
-	    ring->tx_pending > RNP_MAX_TXD ||
-	    ring->rx_pending < RNP_MIN_RXD ||
-	    ring->rx_pending > RNP_MAX_RXD) {
-		netdev_info(netdev,
-			    "Descriptors requested (Tx: %d / Rx: %d) out of range [%d-%d]\n",
-			    ring->tx_pending, ring->rx_pending, RNP_MIN_TXD,
-			    RNP_MAX_TXD);
+	if ((ring->tx_pending < RNP_MIN_TXD) ||
+	    (ring->tx_pending > RNP_MAX_TXD) ||
+	    (ring->rx_pending < RNP_MIN_RXD) ||
+	    (ring->rx_pending > RNP_MAX_RXD)) {
+		netdev_info(
+			netdev,
+			"Descriptors requested (Tx: %d / Rx: %d) out of range [%d-%d]\n",
+			ring->tx_pending, ring->rx_pending, RNP_MIN_TXD,
+			RNP_MAX_TXD);
 		return -EINVAL;
 	}
 
-	new_tx_count =
-		clamp_t(u32, ring->tx_pending, RNP_MIN_TXD, RNP_MAX_TXD);
+	new_tx_count = clamp_t(u32, ring->tx_pending, RNP_MIN_TXD, RNP_MAX_TXD);
 	new_tx_count = ALIGN(new_tx_count, RNP_REQ_TX_DESCRIPTOR_MULTIPLE);
-
-	new_rx_count =
-		clamp_t(u32, ring->rx_pending, RNP_MIN_RXD, RNP_MAX_RXD);
+	new_rx_count = clamp_t(u32, ring->rx_pending, RNP_MIN_RXD, RNP_MAX_RXD);
 	new_rx_count = ALIGN(new_rx_count, RNP_REQ_RX_DESCRIPTOR_MULTIPLE);
 
-	if (new_tx_count == adapter->tx_ring_item_count &&
-	    new_rx_count == adapter->rx_ring_item_count)
+	if ((new_tx_count == adapter->tx_ring_item_count) &&
+	    (new_rx_count == adapter->rx_ring_item_count)) {
+		/* nothing to do */
 		return 0;
+	}
 
 	while (test_and_set_bit(__RNP_RESETTING, &adapter->state))
 		usleep_range(1000, 2000);
@@ -781,6 +718,7 @@ int rnp_set_ringparam(struct net_device *netdev,
 		goto clear_reset;
 	}
 	memset(temp_ring, 0x00, i * sizeof(struct rnp_ring));
+
 	if (new_rx_count != adapter->rx_ring_item_count) {
 		for (i = 0; i < adapter->num_rx_queues; i++) {
 			adapter->rx_ring[i]->reset_count = new_rx_count;
@@ -791,8 +729,8 @@ int rnp_set_ringparam(struct net_device *netdev,
 		}
 	}
 	rnp_down(adapter);
-
-	/* Setup new Tx resources and free the old Tx resources in that order.
+	/*
+	 * Setup new Tx resources and free the old Tx resources in that order.
 	 * We can then assign the new resources to the rings via a memcpy.
 	 * The advantage to this approach is that we are guaranteed to still
 	 * have resources even in the case of an allocation failure.
@@ -803,8 +741,7 @@ int rnp_set_ringparam(struct net_device *netdev,
 			       sizeof(struct rnp_ring));
 
 			temp_ring[i].count = new_tx_count;
-			err = rnp_setup_tx_resources(&temp_ring[i],
-						     adapter);
+			err = rnp_setup_tx_resources(&temp_ring[i], adapter);
 			if (err) {
 				while (i) {
 					i--;
@@ -834,13 +771,11 @@ int rnp_set_ringparam(struct net_device *netdev,
 				temp_ring[i].count = new_rx_count;
 			} else {
 				/* setup temp count */
-				temp_ring[i].count =
-					temp_ring[i].temp_count;
-				adapter->rx_ring[i]->reset_count =
-					new_rx_count;
+				temp_ring[i].count = temp_ring[i].temp_count;
+				adapter->rx_ring[i]->reset_count = new_rx_count;
+				new_rx_count = temp_ring[i].temp_count;
 			}
-			err = rnp_setup_rx_resources(&temp_ring[i],
-						     adapter);
+			err = rnp_setup_rx_resources(&temp_ring[i], adapter);
 			if (err) {
 				while (i) {
 					i--;
@@ -863,22 +798,15 @@ err_setup:
 	vfree(temp_ring);
 clear_reset:
 	clear_bit(__RNP_RESETTING, &adapter->state);
-
 	return err;
 }
 
-/**
- * rnp_get_dump_flag - get dump flag
- * @netdev: network interface device structure
- * @dump: dump structure
- *
- * This function is called when ethtool -w.
- **/
 int rnp_get_dump_flag(struct net_device *netdev, struct ethtool_dump *dump)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 
 	rnp_mbx_get_dump(&adapter->hw, 0, NULL, 0);
+
 	dump->flag = adapter->hw.dump.flag;
 	dump->len = adapter->hw.dump.len;
 	dump->version = adapter->hw.dump.version;
@@ -886,22 +814,13 @@ int rnp_get_dump_flag(struct net_device *netdev, struct ethtool_dump *dump)
 	return 0;
 }
 
-/**
- * rnp_get_dump_data - get dump data
- * @netdev: network interface device structure
- * @dump: dump struct
- * @buffer: buffer for data
- *
- * This function is called when ethtool -w.
- **/
 int rnp_get_dump_data(struct net_device *netdev, struct ethtool_dump *dump,
 		      void *buffer)
 {
 	int err;
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 
-	err = rnp_mbx_get_dump(&adapter->hw, dump->flag, buffer,
-			       dump->len);
+	err = rnp_mbx_get_dump(&adapter->hw, dump->flag, buffer, dump->len);
 	if (err)
 		return err;
 
@@ -912,13 +831,6 @@ int rnp_get_dump_data(struct net_device *netdev, struct ethtool_dump *dump,
 	return 0;
 }
 
-/**
- * rnp_set_dump - set dump flag, data
- * @netdev: network interface device structure
- * @dump: setup value
- *
- * This function is called when ethtool -W.
- **/
 int rnp_set_dump(struct net_device *netdev, struct ethtool_dump *dump)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
@@ -928,30 +840,27 @@ int rnp_set_dump(struct net_device *netdev, struct ethtool_dump *dump)
 	return 0;
 }
 
-/**
- * rnp_get_coalesce - get coalesce info from hw
- * @netdev: network interface device structure
- * @coal: value from ethtool
- * @kernel_coal: kernel_coal
- * @extack: extack
- *
- * This function is called when ethtool -c.
- **/
 int rnp_get_coalesce(struct net_device *netdev,
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
 		     struct ethtool_coalesce *coal,
 		     struct kernel_ethtool_coalesce *kernel_coal,
 		     struct netlink_ext_ack *extack)
+#else
+		     struct ethtool_coalesce *coal)
+#endif
+
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 
 	coal->use_adaptive_tx_coalesce = adapter->adaptive_tx_coal;
-	coal->tx_coalesce_usecs = adapter->tx_usecs;
+	coal->tx_coalesce_usecs = adapter->tx_usecs_usr_set;
 	coal->tx_coalesce_usecs_irq = 0;
 	coal->tx_max_coalesced_frames = adapter->tx_frames;
 	coal->tx_max_coalesced_frames_irq = adapter->tx_work_limit;
+
 	coal->use_adaptive_rx_coalesce = adapter->adaptive_rx_coal;
 	coal->rx_coalesce_usecs_irq = 0;
-	coal->rx_coalesce_usecs = adapter->rx_usecs;
+	coal->rx_coalesce_usecs = adapter->rx_usecs_usr_set;
 	coal->rx_max_coalesced_frames = adapter->rx_frames;
 	coal->rx_max_coalesced_frames_irq = adapter->napi_budge;
 
@@ -971,35 +880,34 @@ int rnp_get_coalesce(struct net_device *netdev,
 	return 0;
 }
 
-/**
- * rnp_set_coalesce - setup coalesce info to hw
- * @netdev: network interface device structure
- * @ec: coalesce info
- * @kernel_coal: kernel_coal
- * @extack: extack
- *
- * This function is called when ethtool -C.
- **/
 int rnp_set_coalesce(struct net_device *netdev,
+#ifdef HAVE_ETHTOOL_COALESCE_EXTACK
 		     struct ethtool_coalesce *ec,
 		     struct kernel_ethtool_coalesce *kernel_coal,
 		     struct netlink_ext_ack *extack)
+#else
+		     struct ethtool_coalesce *ec)
+#endif
+
 {
 	int reset = 0;
 	struct rnp_adapter *adapter = netdev_priv(netdev);
 	u32 value;
-
-	/* we don't support close tx and rx coalesce */
-	if (!(ec->use_adaptive_tx_coalesce) ||
-	    !(ec->use_adaptive_rx_coalesce))
+	if (ec->use_adaptive_tx_coalesce)
 		return -EINVAL;
 
-	if (ec->tx_max_coalesced_frames_irq < RNP_MIN_TX_WORK ||
-	    ec->tx_max_coalesced_frames_irq > RNP_MAX_TX_WORK)
+	if (ec->use_adaptive_rx_coalesce)
+		adapter->adaptive_rx_coal = 1;
+	else
+		adapter->adaptive_rx_coal = 0;
+
+	/* check coalesce frame irq */
+	if ((ec->tx_max_coalesced_frames_irq < RNP_MIN_TX_WORK) ||
+	    (ec->tx_max_coalesced_frames_irq > RNP_MAX_TX_WORK))
 		return -EINVAL;
 
-	value = clamp_t(u32, ec->tx_max_coalesced_frames_irq,
-			RNP_MIN_TX_WORK, RNP_MAX_TX_WORK);
+	value = clamp_t(u32, ec->tx_max_coalesced_frames_irq, RNP_MIN_TX_WORK,
+			RNP_MAX_TX_WORK);
 	value = ALIGN(value, RNP_WORK_ALIGN);
 
 	if (adapter->tx_work_limit != value) {
@@ -1007,32 +915,36 @@ int rnp_set_coalesce(struct net_device *netdev,
 		adapter->tx_work_limit = value;
 	}
 
-	if (ec->tx_max_coalesced_frames < RNP_MIN_TX_FRAME ||
-	    ec->tx_max_coalesced_frames > RNP_MAX_TX_FRAME)
+	if ((ec->tx_max_coalesced_frames < RNP_MIN_TX_FRAME) ||
+	    (ec->tx_max_coalesced_frames > RNP_MAX_TX_FRAME))
 		return -EINVAL;
 
-	value = clamp_t(u32, ec->tx_max_coalesced_frames,
-			RNP_MIN_TX_FRAME, RNP_MAX_TX_FRAME);
+	value = clamp_t(u32, ec->tx_max_coalesced_frames, RNP_MIN_TX_FRAME,
+			RNP_MAX_TX_FRAME);
 	if (adapter->tx_frames != value) {
 		reset = 1;
 		adapter->tx_frames = value;
 	}
-	if (ec->tx_coalesce_usecs < RNP_MIN_TX_USEC ||
-	    ec->tx_coalesce_usecs > RNP_MAX_TX_USEC)
+
+	/* check vlaue */
+	if ((ec->tx_coalesce_usecs < RNP_MIN_TX_USEC) ||
+	    (ec->tx_coalesce_usecs > RNP_MAX_TX_USEC))
 		return -EINVAL;
 
-	value = clamp_t(u32, ec->tx_coalesce_usecs,
-			RNP_MIN_TX_USEC, RNP_MAX_TX_USEC);
+	value = clamp_t(u32, ec->tx_coalesce_usecs, RNP_MIN_TX_USEC,
+			RNP_MAX_TX_USEC);
 	if (adapter->tx_usecs != value) {
 		reset = 1;
 		adapter->tx_usecs = value;
+		adapter->tx_usecs_usr_set = value;
 	}
 
-	if (ec->rx_max_coalesced_frames_irq < RNP_MIN_RX_WORK ||
-	    ec->rx_max_coalesced_frames_irq > RNP_MAX_RX_WORK)
+	if ((ec->rx_max_coalesced_frames_irq < RNP_MIN_RX_WORK) ||
+	    (ec->rx_max_coalesced_frames_irq > RNP_MAX_RX_WORK))
 		return -EINVAL;
-	value = clamp_t(u32, ec->rx_max_coalesced_frames_irq,
-			RNP_MIN_RX_WORK, RNP_MAX_RX_WORK);
+
+	value = clamp_t(u32, ec->rx_max_coalesced_frames_irq, RNP_MIN_RX_WORK,
+			RNP_MAX_RX_WORK);
 	value = ALIGN(value, RNP_WORK_ALIGN);
 
 	if (adapter->napi_budge != value) {
@@ -1040,40 +952,39 @@ int rnp_set_coalesce(struct net_device *netdev,
 		adapter->napi_budge = value;
 	}
 
-	if (ec->rx_max_coalesced_frames < RNP_MIN_RX_FRAME ||
-	    ec->rx_max_coalesced_frames > RNP_MAX_RX_FRAME)
+	if ((ec->rx_max_coalesced_frames < RNP_MIN_RX_FRAME) ||
+	    (ec->rx_max_coalesced_frames > RNP_MAX_RX_FRAME))
 		return -EINVAL;
 
-	value = clamp_t(u32, ec->rx_max_coalesced_frames,
-			RNP_MIN_RX_FRAME, RNP_MAX_RX_FRAME);
+	value = clamp_t(u32, ec->rx_max_coalesced_frames, RNP_MIN_RX_FRAME,
+			RNP_MAX_RX_FRAME);
 	if (adapter->rx_frames != value) {
 		reset = 1;
 		adapter->rx_frames = value;
 	}
 
-	if (ec->rx_coalesce_usecs < RNP_MIN_RX_USEC ||
-	    ec->rx_coalesce_usecs > RNP_MAX_RX_USEC)
+	/* check vlaue */
+	if ((ec->rx_coalesce_usecs < RNP_MIN_RX_USEC) ||
+	    (ec->rx_coalesce_usecs > RNP_MAX_RX_USEC))
 		return -EINVAL;
-	value = clamp_t(u32, ec->rx_coalesce_usecs,
-			RNP_MIN_RX_USEC, RNP_MAX_RX_USEC);
+
+	value = clamp_t(u32, ec->rx_coalesce_usecs, RNP_MIN_RX_USEC,
+			RNP_MAX_RX_USEC);
+
 	if (adapter->rx_usecs != value) {
 		reset = 1;
 		adapter->rx_usecs = value;
+		adapter->rx_usecs_usr_set = value;
 	}
-
 	/* other setup is not supported */
-	if (ec->pkt_rate_low || ec->pkt_rate_high ||
-	    ec->rx_coalesce_usecs_low ||
-	    ec->rx_max_coalesced_frames_low ||
-	    ec->tx_coalesce_usecs_low ||
-	    ec->tx_max_coalesced_frames_low ||
-	    ec->rx_coalesce_usecs_high ||
-	    ec->rx_max_coalesced_frames_high ||
-	    ec->tx_coalesce_usecs_high ||
-	    ec->tx_max_coalesced_frames_high ||
-	    ec->rate_sample_interval ||
-	    ec->tx_coalesce_usecs_irq ||
-	    ec->rx_coalesce_usecs_irq)
+	if ((ec->pkt_rate_low) || (ec->pkt_rate_high) ||
+	    (ec->rx_coalesce_usecs_low) || (ec->rx_max_coalesced_frames_low) ||
+	    (ec->tx_coalesce_usecs_low) || (ec->tx_max_coalesced_frames_low) ||
+	    (ec->rx_coalesce_usecs_high) ||
+	    (ec->rx_max_coalesced_frames_high) ||
+	    (ec->tx_coalesce_usecs_high) ||
+	    (ec->tx_max_coalesced_frames_high) || (ec->rate_sample_interval) ||
+	    (ec->tx_coalesce_usecs_irq) || (ec->rx_coalesce_usecs_irq))
 		return -EINVAL;
 
 	if (reset)
@@ -1081,6 +992,99 @@ int rnp_set_coalesce(struct net_device *netdev,
 
 	return 0;
 }
+
+#ifndef HAVE_NDO_SET_FEATURES
+u32 rnp_get_rx_csum(struct net_device *netdev)
+{
+	return !!(netdev->features & NETIF_F_RXCSUM);
+}
+
+int rnp_set_rx_csum(struct net_device *netdev, u32 data)
+{
+	if (data)
+		netdev->features |= NETIF_F_RXCSUM;
+	else
+		netdev->features &= ~NETIF_F_RXCSUM;
+
+	return 0;
+}
+
+int rnp_set_tx_csum(struct net_device *netdev, u32 data)
+{
+	struct rnp_adapter *adapter = netdev_priv(netdev);
+#ifdef NETIF_F_IPV6_CSUM
+	u32 feature_list = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
+#else
+	u32 feature_list = NETIF_F_IP_CSUM;
+#endif
+
+	switch (adapter->hw.hw_type) {
+	case rnp_hw_n10:
+	case rnp_hw_n400:
+#ifdef HAVE_ENCAP_TSO_OFFLOAD
+		if (data)
+			netdev->hw_enc_features |= NETIF_F_GSO_UDP_TUNNEL;
+		else
+			netdev->hw_enc_features &= ~NETIF_F_GSO_UDP_TUNNEL;
+		feature_list |= NETIF_F_GSO_UDP_TUNNEL;
+#endif /* HAVE_ENCAP_TSO_OFFLOAD */
+		feature_list |= NETIF_F_SCTP_CSUM;
+		break;
+	default:
+		break;
+	}
+
+	if (data)
+		netdev->features |= feature_list;
+	else
+		netdev->features &= ~feature_list;
+
+	return 0;
+}
+
+#ifdef NETIF_F_TSO
+int rnp_set_tso(struct net_device *netdev, u32 data)
+{
+#ifdef NETIF_F_TSO6
+	u32 feature_list = NETIF_F_TSO | NETIF_F_TSO6;
+#else
+	u32 feature_list = NETIF_F_TSO;
+#endif
+
+	if (data)
+		netdev->features |= feature_list;
+	else
+		netdev->features &= ~feature_list;
+
+#ifndef HAVE_NETDEV_VLAN_FEATURES
+	if (!data) {
+		struct rnp_adapter *adapter = netdev_priv(netdev);
+		struct net_device *v_netdev;
+		int i;
+
+		/* disable TSO on all VLANs if they're present */
+		if (!adapter->vlgrp)
+			goto tso_out;
+
+		for (i = 0; i < VLAN_GROUP_ARRAY_LEN; i++) {
+			v_netdev = vlan_group_get_device(adapter->vlgrp, i);
+			if (!v_netdev)
+				continue;
+
+			v_netdev->features &= ~feature_list;
+			vlan_group_set_device(adapter->vlgrp, i, v_netdev);
+		}
+	}
+
+tso_out:
+
+#endif /* HAVE_NETDEV_VLAN_FEATURES */
+	return 0;
+}
+#endif
+#endif
+
+#ifdef ETHTOOL_GRXRINGS
 
 static int rnp_get_rss_hash_opts(struct rnp_adapter *adapter,
 				 struct ethtool_rxnfc *cmd)
@@ -1091,10 +1095,12 @@ static int rnp_get_rss_hash_opts(struct rnp_adapter *adapter,
 	switch (cmd->flow_type) {
 	case TCP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case UDP_V4_FLOW:
 	case SCTP_V4_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case AH_ESP_V4_FLOW:
 	case AH_V4_FLOW:
@@ -1104,10 +1110,12 @@ static int rnp_get_rss_hash_opts(struct rnp_adapter *adapter,
 		break;
 	case TCP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case UDP_V6_FLOW:
 	case SCTP_V6_FLOW:
 		cmd->data |= RXH_L4_B_0_1 | RXH_L4_B_2_3;
+		/* fall through */
 		fallthrough;
 	case AH_ESP_V6_FLOW:
 	case AH_V6_FLOW:
@@ -1139,7 +1147,6 @@ static int rnp_get_ethtool_fdir_entry(struct rnp_adapter *adapter,
 
 	if (!rule || fsp->location != rule->sw_idx)
 		return -EINVAL;
-
 	/* set flow type field */
 	switch (rule->filter.formatted.flow_type) {
 	case RNP_ATR_FLOW_TYPE_TCPV4:
@@ -1169,8 +1176,7 @@ static int rnp_get_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	case RNP_ATR_FLOW_TYPE_ETHER:
 		fsp->flow_type = ETHER_FLOW;
 		/* support proto and mask only in this mode */
-		fsp->h_u.ether_spec.h_proto =
-			rule->filter.layer2_formate.proto;
+		fsp->h_u.ether_spec.h_proto = rule->filter.layer2_formate.proto;
 		fsp->m_u.ether_spec.h_proto = 0xffff;
 		break;
 	default:
@@ -1218,28 +1224,25 @@ static int rnp_get_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	}
 
 	/* record action */
-	if (rule->action == RNP_FDIR_DROP_QUEUE) {
+	if (rule->action == RNP_FDIR_DROP_QUEUE)
 		fsp->ring_cookie = RX_CLS_FLOW_DISC;
-	} else {
+	else {
 		int add = 0;
 
 		if (rule->action & 0x1)
 			add = 1;
-		if (rule->vf_num != 0) {
-			fsp->ring_cookie =
-				((u64)rule->vf_num << 32) |
-				(add);
-		} else {
+
+		if (rule->vf_num != 0)
+			fsp->ring_cookie = ((u64)rule->vf_num << 32) | (add);
+		else
 			fsp->ring_cookie = rule->action;
-		}
 	}
 
 	return 0;
 }
 
 static int rnp_get_ethtool_fdir_all(struct rnp_adapter *adapter,
-				    struct ethtool_rxnfc *cmd,
-				    u32 *rule_locs)
+				    struct ethtool_rxnfc *cmd, u32 *rule_locs)
 {
 	struct hlist_node *node2;
 	struct rnp_fdir_filter *rule;
@@ -1247,6 +1250,7 @@ static int rnp_get_ethtool_fdir_all(struct rnp_adapter *adapter,
 
 	/* report total rule count */
 	cmd->data = adapter->fdir_pballoc;
+
 	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
 				  fdir_node) {
 		if (cnt == cmd->rule_cnt)
@@ -1254,31 +1258,31 @@ static int rnp_get_ethtool_fdir_all(struct rnp_adapter *adapter,
 		rule_locs[cnt] = rule->sw_idx;
 		cnt++;
 	}
+
 	cmd->rule_cnt = cnt;
 
 	return 0;
 }
 
-/**
- * rnp_get_rxnfc- get nfc info from hw
- * @netdev: network interface device structure
- * @cmd: value from ethtool
- * @rule_locs: location for this rule if need
- *
- **/
-int rnp_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
+int rnp_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
+#ifdef HAVE_ETHTOOL_GET_RXNFC_VOID_RULE_LOCS
+		  void *rule_locs)
+#else
 		  u32 *rule_locs)
+#endif
 {
-	struct rnp_adapter *adapter = netdev_priv(netdev);
+	struct rnp_adapter *adapter = netdev_priv(dev);
 	int ret = -EOPNOTSUPP;
 	struct rnp_hw *hw = &adapter->hw;
 
 	switch (cmd->cmd) {
 	case ETHTOOL_GRXRINGS:
-		if (adapter->flags & RNP_FLAG_SRIOV_ENABLED)
+		if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
+			/* we fix 2 when srio on */
 			cmd->data = hw->sriov_ring_limit;
-		else
+		} else {
 			cmd->data = adapter->num_rx_queues;
+		}
 		ret = 0;
 		break;
 	case ETHTOOL_GRXCLSRLCNT:
@@ -1289,8 +1293,7 @@ int rnp_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 		ret = rnp_get_ethtool_fdir_entry(adapter, cmd);
 		break;
 	case ETHTOOL_GRXCLSRLALL:
-		ret = rnp_get_ethtool_fdir_all(adapter, cmd,
-					       (u32 *)rule_locs);
+		ret = rnp_get_ethtool_fdir_all(adapter, cmd, (u32 *)rule_locs);
 		break;
 	case ETHTOOL_GRXFH:
 		ret = rnp_get_rss_hash_opts(adapter, cmd);
@@ -1301,14 +1304,13 @@ int rnp_get_rxnfc(struct net_device *netdev, struct ethtool_rxnfc *cmd,
 
 	return ret;
 }
-
 #define UDP_RSS_FLAGS \
 	(RNP_FLAG2_RSS_FIELD_IPV4_UDP | RNP_FLAG2_RSS_FIELD_IPV6_UDP)
-
 static int rnp_set_rss_hash_opt(struct rnp_adapter *adapter,
 				struct ethtool_rxnfc *nfc)
 {
-	/* RSS does not support anything other than hashing
+	/*
+	 * RSS does not support anything other than hashing
 	 * to queues on src and dst IPs and ports
 	 */
 	if (nfc->data &
@@ -1320,10 +1322,8 @@ static int rnp_set_rss_hash_opt(struct rnp_adapter *adapter,
 	case TCP_V6_FLOW:
 	case UDP_V4_FLOW:
 	case UDP_V6_FLOW:
-		if (!(nfc->data & RXH_IP_SRC) ||
-		    !(nfc->data & RXH_IP_DST) ||
-		    !(nfc->data & RXH_L4_B_0_1) ||
-		    !(nfc->data & RXH_L4_B_2_3))
+		if (!(nfc->data & RXH_IP_SRC) || !(nfc->data & RXH_IP_DST) ||
+		    !(nfc->data & RXH_L4_B_0_1) || !(nfc->data & RXH_L4_B_2_3))
 			return -EINVAL;
 		break;
 	case AH_ESP_V4_FLOW:
@@ -1334,10 +1334,8 @@ static int rnp_set_rss_hash_opt(struct rnp_adapter *adapter,
 	case AH_V6_FLOW:
 	case ESP_V6_FLOW:
 	case SCTP_V6_FLOW:
-		if (!(nfc->data & RXH_IP_SRC) ||
-		    !(nfc->data & RXH_IP_DST) ||
-		    (nfc->data & RXH_L4_B_0_1) ||
-		    (nfc->data & RXH_L4_B_2_3))
+		if (!(nfc->data & RXH_IP_SRC) || !(nfc->data & RXH_IP_DST) ||
+		    (nfc->data & RXH_L4_B_0_1) || (nfc->data & RXH_L4_B_2_3))
 			return -EINVAL;
 		break;
 	default:
@@ -1348,7 +1346,7 @@ static int rnp_set_rss_hash_opt(struct rnp_adapter *adapter,
 
 static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 				     struct ethtool_rx_flow_spec *fsp,
-				     u8 *flow_type,
+				     uint8_t *flow_type,
 				     struct rnp_fdir_filter *input)
 {
 	int i;
@@ -1358,7 +1356,7 @@ static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 		return 0;
 
 	switch (fsp->flow_type & ~FLOW_EXT) {
-	/* todo ipv6 is not considered */
+	/* todo ipv6 is not considered*/
 	case TCP_V4_FLOW:
 		*flow_type = RNP_ATR_FLOW_TYPE_TCPV4;
 		break;
@@ -1433,18 +1431,18 @@ static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 				e_err(drv, "tuple 5 count full\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.ip4src != 0 &&
-			    fsp->m_u.usr_ip4_spec.ip4src != 0xffffffff) {
+			if ((fsp->h_u.usr_ip4_spec.ip4src != 0) &&
+			    (fsp->m_u.usr_ip4_spec.ip4src != 0xffffffff)) {
 				e_err(drv, "ip src mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.ip4dst != 0 &&
-			    fsp->m_u.usr_ip4_spec.ip4dst != 0xffffffff) {
+			if ((fsp->h_u.usr_ip4_spec.ip4dst != 0) &&
+			    (fsp->m_u.usr_ip4_spec.ip4dst != 0xffffffff)) {
 				e_err(drv, "ip dst mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.usr_ip4_spec.proto != 0 &&
-			    fsp->m_u.usr_ip4_spec.proto != 0xff) {
+			if ((fsp->h_u.usr_ip4_spec.proto != 0) &&
+			    (fsp->m_u.usr_ip4_spec.proto != 0xff)) {
 				e_err(drv, "ip l4 proto mask error\n");
 				ret = 0;
 			}
@@ -1453,9 +1451,10 @@ static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 				e_err(drv, "tcam count full\n");
 				ret = 0;
 			}
+			/* tcam mode can support mask */
 		}
 		/* not support l4_4_bytes */
-		if (fsp->h_u.usr_ip4_spec.l4_4_bytes != 0) {
+		if ((fsp->h_u.usr_ip4_spec.l4_4_bytes != 0)) {
 			e_err(drv, "ip l4_4_bytes error\n");
 			ret = 0;
 		}
@@ -1466,23 +1465,23 @@ static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 				e_err(drv, "tuple 5 count full\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.ip4src != 0 &&
-			    fsp->m_u.tcp_ip4_spec.ip4src != 0xffffffff) {
+			if ((fsp->h_u.tcp_ip4_spec.ip4src != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.ip4src != 0xffffffff)) {
 				e_err(drv, "src mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.ip4dst != 0 &&
-			    fsp->m_u.tcp_ip4_spec.ip4dst != 0xffffffff) {
+			if ((fsp->h_u.tcp_ip4_spec.ip4dst != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.ip4dst != 0xffffffff)) {
 				e_err(drv, "dst mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.psrc != 0 &&
-			    fsp->m_u.tcp_ip4_spec.psrc != 0xffff) {
+			if ((fsp->h_u.tcp_ip4_spec.psrc != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.psrc != 0xffff)) {
 				e_err(drv, "src port mask error\n");
 				ret = 0;
 			}
-			if (fsp->h_u.tcp_ip4_spec.pdst != 0 &&
-			    fsp->m_u.tcp_ip4_spec.pdst != 0xffff) {
+			if ((fsp->h_u.tcp_ip4_spec.pdst != 0) &&
+			    (fsp->m_u.tcp_ip4_spec.pdst != 0xffff)) {
 				e_err(drv, "src port mask error\n");
 				ret = 0;
 			}
@@ -1502,16 +1501,8 @@ static int rnp_flowspec_to_flow_type(struct rnp_adapter *adapter,
 	return ret;
 }
 
-/**
- * rnp_update_ethtool_fdir_entry- update a fidr entry to hw
- * @adapter: board private structure
- * @input: network interface device structure
- * @sw_idx: soft idx for this entry
- *
- **/
 int rnp_update_ethtool_fdir_entry(struct rnp_adapter *adapter,
-				  struct rnp_fdir_filter *input,
-				  u16 sw_idx)
+				  struct rnp_fdir_filter *input, u16 sw_idx)
 {
 	struct rnp_hw *hw = &adapter->hw;
 	struct hlist_node *node2;
@@ -1519,15 +1510,18 @@ int rnp_update_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	bool deleted = false;
 	u16 hw_idx_layer2 = 0;
 	u16 hw_idx_tuple5 = 0;
+
 	s32 err;
 
 	parent = NULL;
 	rule = NULL;
+
 	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
 				  fdir_node) {
 		/* hash found, or no matching entry */
 		if (rule->sw_idx >= sw_idx)
 			break;
+
 		parent = rule;
 	}
 
@@ -1538,7 +1532,7 @@ int rnp_update_ethtool_fdir_entry(struct rnp_adapter *adapter,
 		 * and we should not issue filter commands while the interface
 		 * is down
 		 */
-		if (netif_running(adapter->netdev) && !input) {
+		if (netif_running(adapter->netdev) && (!input)) {
 			err = rnp_fdir_erase_perfect_filter(adapter->fdir_mode,
 							    hw, &rule->filter,
 							    rule->hw_idx);
@@ -1548,10 +1542,12 @@ int rnp_update_ethtool_fdir_entry(struct rnp_adapter *adapter,
 
 		adapter->fdir_filter_count--;
 		if (rule->filter.formatted.flow_type ==
-		    RNP_ATR_FLOW_TYPE_ETHER)
+		    RNP_ATR_FLOW_TYPE_ETHER) {
+			/* used to determine hw reg offset */
 			adapter->layer2_count++;
-		else
+		} else {
 			adapter->tuple_5_count++;
+		}
 
 		hlist_del(&rule->fdir_node);
 		kfree(rule);
@@ -1572,62 +1568,114 @@ int rnp_update_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	if (parent)
 		hlist_add_behind(&input->fdir_node, &parent->fdir_node);
 	else
-		hlist_add_head(&input->fdir_node,
-			       &adapter->fdir_filter_list);
+		hlist_add_head(&input->fdir_node, &adapter->fdir_filter_list);
 
 	/* we must setup all */
-	if (adapter->fdir_mode != fdir_mode_tcam)
+	/* should first earase all tcam and l2 rule */
+
+	if (adapter->fdir_mode != fdir_mode_tcam) {
 		hw->ops.clr_all_layer2_remapping(hw);
-	else
+		/* earase all layer2 */
+	} else {
 		hw->ops.clr_all_tuple5_remapping(hw);
+		/* earase all tcam */
+	}
 
 	/* setup hw */
 	hlist_for_each_entry_safe(rule, node2, &adapter->fdir_filter_list,
 				  fdir_node) {
-		if (!netif_running(adapter->netdev))
-			break;
+		if (netif_running(adapter->netdev)) {
+			/* hw_idx */
+			if (rule->filter.formatted.flow_type ==
+			    RNP_ATR_FLOW_TYPE_ETHER) {
+				rule->hw_idx = hw_idx_layer2++;
+			} else {
+				rule->hw_idx = hw_idx_tuple5++;
+			}
 
-		if (rule->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER)
-			rule->hw_idx = hw_idx_layer2++;
-		else
-			rule->hw_idx = hw_idx_tuple5++;
+			if ((!rule->vf_num) &&
+			    (rule->action != ACTION_TO_MPE)) {
+				int idx = rule->action;
 
-		if (!rule->vf_num && (rule->action != ACTION_TO_MPE)) {
-			int idx = rule->action;
-
-			err = rnp_fdir_write_perfect_filter(
-					adapter->fdir_mode, hw,
-					&rule->filter, rule->hw_idx,
+				err = rnp_fdir_write_perfect_filter(
+					adapter->fdir_mode, hw, &rule->filter,
+					rule->hw_idx,
 					(rule->action == RNP_FDIR_DROP_QUEUE) ?
-					RNP_FDIR_DROP_QUEUE :
-					adapter->rx_ring[idx]->rnp_queue_idx,
+						RNP_FDIR_DROP_QUEUE :
+						adapter->rx_ring[idx]
+							->rnp_queue_idx,
 					(adapter->priv_flags &
 					 RNP_PRIV_FLAG_REMAP_PRIO) ?
-					true : false);
-		} else {
-			err = rnp_fdir_write_perfect_filter(
-					adapter->fdir_mode, hw,
-					&rule->filter, rule->hw_idx,
+						true :
+						false);
+			} else {
+				/* ACTION_TO_MPE use this */
+				err = rnp_fdir_write_perfect_filter(
+					adapter->fdir_mode, hw, &rule->filter,
+					rule->hw_idx,
 					(rule->action == RNP_FDIR_DROP_QUEUE) ?
-					RNP_FDIR_DROP_QUEUE :
-					rule->action,
+						RNP_FDIR_DROP_QUEUE :
+						rule->action,
 					(adapter->priv_flags &
 					 RNP_PRIV_FLAG_REMAP_PRIO) ?
-					true : false);
+						true :
+						false);
+			}
+			if (err)
+				return -EINVAL;
 		}
-		if (err)
-			return -EINVAL;
 	}
 
 	/* update counts */
 	adapter->fdir_filter_count++;
-
-	/* used to determine hw reg offset */
-	if (input->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER)
+	if (input->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER) {
+		/* used to determine hw reg offset */
 		adapter->layer2_count--;
-	else
+	} else {
 		adapter->tuple_5_count--;
+	}
 	return 0;
+}
+
+/* used to dbg flo_spec info */
+static void print_fsp(struct ethtool_rx_flow_spec *fsp)
+{
+	int i;
+
+	switch (fsp->flow_type & ~FLOW_EXT) {
+	case ETHER_FLOW:
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src 0x%02x\n", fsp->h_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst 0x%02x\n", fsp->h_u.ether_spec.h_dest[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("src mask 0x%02x\n",
+			    fsp->m_u.ether_spec.h_source[i]);
+		for (i = 0; i < ETH_ALEN; i++)
+			dbg("dst mask 0x%02x\n", fsp->m_u.ether_spec.h_dest[i]);
+
+		dbg("proto type is %x\n", fsp->h_u.ether_spec.h_proto);
+
+		break;
+
+	default:
+		dbg("flow type is %x\n", fsp->flow_type);
+
+		dbg("ip4 src ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4src);
+		dbg("ip4 src ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4src);
+
+		dbg("ip4 dst ip is %x\n", fsp->h_u.tcp_ip4_spec.ip4dst);
+		dbg("ip4 dst ip mask is %x\n", fsp->m_u.tcp_ip4_spec.ip4dst);
+
+		dbg("ip4 src port is %x\n", fsp->h_u.tcp_ip4_spec.psrc);
+		dbg("ip4 src port mask is %x\n", fsp->m_u.tcp_ip4_spec.psrc);
+
+		dbg("ip4 dst port is %x\n", fsp->h_u.tcp_ip4_spec.pdst);
+		dbg("ip4 dst port mask is %x\n", fsp->m_u.tcp_ip4_spec.pdst);
+
+		dbg("l4 proto type is %x\n", fsp->h_u.usr_ip4_spec.proto);
+		break;
+	}
 }
 
 static int rnp_add_ethtool_fdir_entry(struct rnp_adapter *adapter,
@@ -1637,8 +1685,10 @@ static int rnp_add_ethtool_fdir_entry(struct rnp_adapter *adapter,
 		(struct ethtool_rx_flow_spec *)&cmd->fs;
 	struct rnp_fdir_filter *input;
 	struct rnp_hw *hw = &adapter->hw;
+	/* we don't support mask */
 	int err;
 	int vf_fix = 0;
+
 	u32 ring_cookie_high = fsp->ring_cookie >> 32;
 
 	if (hw->feature_flags & RNP_NET_FEATURE_VF_FIXED)
@@ -1647,28 +1697,33 @@ static int rnp_add_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	if (!(adapter->flags & RNP_FLAG_FDIR_PERFECT_CAPABLE))
 		return -EOPNOTSUPP;
 
-	/* Don't allow programming if the action is a queue greater than
+	/*
+	 * Don't allow programming if the action is a queue greater than
 	 * the number of online Rx queues.
 	 */
-
 	/* is sriov is on, allow vf and queue */
 	/* vf should smaller than num_vfs */
+	print_fsp(fsp);
 	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
-		if (fsp->ring_cookie != RX_CLS_FLOW_DISC &&
+		if ((fsp->ring_cookie != RX_CLS_FLOW_DISC) &&
 		    (((ring_cookie_high & 0xff) > adapter->num_vfs) ||
 		     ((fsp->ring_cookie & (u64)0xffffffff) >=
 		      hw->sriov_ring_limit)))
-			return -EINVAL;
+		      /* return error if not mpe */
+			if (fsp->ring_cookie != ACTION_TO_MPE)
+				return -EINVAL;
+
 	} else {
-		if (fsp->ring_cookie != RX_CLS_FLOW_DISC &&
-		    fsp->ring_cookie >= adapter->num_rx_queues) {
+		if ((fsp->ring_cookie != RX_CLS_FLOW_DISC) &&
+		    (fsp->ring_cookie >= adapter->num_rx_queues)) {
+			/* ACTION_TO_MPE to mpe special */
 			if (fsp->ring_cookie != ACTION_TO_MPE)
 				return -EINVAL;
 		}
 	}
 
 	/* Don't allow indexes to exist outside of available space */
-	if (fsp->location >= adapter->fdir_pballoc) {
+	if (fsp->location >= (adapter->fdir_pballoc)) {
 		e_err(drv, "Location out of range\n");
 		return -EINVAL;
 	}
@@ -1681,15 +1736,15 @@ static int rnp_add_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	input->sw_idx = fsp->location;
 
 	/* record flow type */
-	if (!rnp_flowspec_to_flow_type(adapter, fsp,
-				       &input->filter.formatted.flow_type,
-				       input)) {
+	if (!rnp_flowspec_to_flow_type(
+		    adapter, fsp, &input->filter.formatted.flow_type, input)) {
 		e_err(drv, "Unrecognized flow type\n");
 		goto err_out;
 	}
 
-	/* if this sw_idx used before, use the old one */
-	if (input->filter.formatted.flow_type ==
+	if (input->filter.formatted.flow_type == RNP_ATR_FLOW_TYPE_ETHER) {
+		/* used to determine hw reg offset */
+	} else if (input->filter.formatted.flow_type ==
 		   RNP_ATR_FLOW_TYPE_IPV4) {
 		/* Copy input into formatted structures */
 		input->filter.formatted.src_ip[0] =
@@ -1719,32 +1774,31 @@ static int rnp_add_ethtool_fdir_entry(struct rnp_adapter *adapter,
 			fsp->h_u.tcp_ip4_spec.ip4dst;
 		input->filter.formatted.dst_ip_mask[0] =
 			fsp->m_u.usr_ip4_spec.ip4dst;
-		input->filter.formatted.src_port =
-			fsp->h_u.tcp_ip4_spec.psrc;
+		input->filter.formatted.src_port = fsp->h_u.tcp_ip4_spec.psrc;
 		input->filter.formatted.src_port_mask =
 			fsp->m_u.tcp_ip4_spec.psrc;
-		input->filter.formatted.dst_port =
-			fsp->h_u.tcp_ip4_spec.pdst;
+		input->filter.formatted.dst_port = fsp->h_u.tcp_ip4_spec.pdst;
 		input->filter.formatted.dst_port_mask =
 			fsp->m_u.tcp_ip4_spec.pdst;
 	}
 
 	/* determine if we need to drop or route the packet */
-	if (fsp->ring_cookie == RX_CLS_FLOW_DISC) {
+	if (fsp->ring_cookie == RX_CLS_FLOW_DISC)
 		input->action = RNP_FDIR_DROP_QUEUE;
-	} else {
+	else {
 		input->vf_num = (fsp->ring_cookie >> 32) & 0xff;
 		if (input->vf_num) {
 			/* in vf mode input->action is the real queue nums */
 			if (adapter->priv_flags & RNP_PRIV_FLAG_REMAP_MODE) {
 				input->action = (fsp->ring_cookie & 0xffffffff);
 			} else {
-				input->action = 2 * (input->vf_num + vf_fix - 1) +
+				input->action =
+					2 * (((fsp->ring_cookie >> 32) & 0xff) +
+					     vf_fix - 1) +
 					(fsp->ring_cookie & 0xffffffff);
 			}
-		} else {
+		} else
 			input->action = fsp->ring_cookie;
-		}
 	}
 
 	spin_lock(&adapter->fdir_perfect_lock);
@@ -1771,13 +1825,6 @@ static int rnp_del_ethtool_fdir_entry(struct rnp_adapter *adapter,
 	return err;
 }
 
-/**
- * rnp_set_rxnfc - add / del fdir entry or set hash function
- * @dev: network interface device structure
- * @cmd: value from ethtool
- *
- * This function is called when ethtool -N.
- **/
 int rnp_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 {
 	struct rnp_adapter *adapter = netdev_priv(dev);
@@ -1799,13 +1846,23 @@ int rnp_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
 
 	return ret;
 }
+#endif
 
-/**
- * rnp_rss_indir_size - get rss table size
- * @netdev: network interface device structure
- *
- * This function is called when ethtool wants hw's rss table size.
- **/
+#ifdef ETHTOOL_SRXNTUPLE
+/*
+ * We need to keep this around for kernels 2.6.33-2.6.39 in order to avoid
+ * a null pointer dereference as it was assumend if the NETIF_F_NTUPLE flag
+ * was defined that this function was present.
+ */
+int rnp_set_rx_ntuple(struct net_device __always_unused *dev,
+		      struct ethtool_rx_ntuple __always_unused *cmd)
+{
+	return -EOPNOTSUPP;
+}
+#endif
+
+#if defined(ETHTOOL_GRSSH) && defined(ETHTOOL_SRSSH)
+
 u32 rnp_rss_indir_size(struct net_device *netdev)
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
@@ -1813,43 +1870,43 @@ u32 rnp_rss_indir_size(struct net_device *netdev)
 	return rnp_rss_indir_tbl_entries(adapter);
 }
 
-/**
- * rnp_get_rxfh_key_size - get rss key size
- * @netdev: network interface device structure
- *
- * This function is called when ethtool wants hw's rss key size.
- **/
-
 u32 rnp_get_rxfh_key_size(struct net_device *netdev)
 {
 	return RNP_RSS_KEY_SIZE;
 }
 
-static void rnp_get_reta(struct rnp_adapter *adapter, u32 *indir)
+void rnp_get_reta(struct rnp_adapter *adapter, u32 *indir)
 {
 	int i, reta_size = rnp_rss_indir_tbl_entries(adapter);
 	u16 rss_m = adapter->ring_feature[RING_F_RSS].mask;
 
-	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED)
-		rss_m = adapter->ring_feature[RING_F_RSS].indices - 1;
-
-	for (i = 0; i < reta_size; i++)
-		indir[i] = adapter->rss_indir_tbl[i] & rss_m;
+	if (adapter->flags & RNP_FLAG_SRIOV_ENABLED) {
+		for (i = 0; i < reta_size; i++)
+			indir[i] = adapter->rss_indir_tbl[i];
+	} else {
+		for (i = 0; i < reta_size; i++)
+			indir[i] = adapter->rss_indir_tbl[i] & rss_m;
+	}
 }
 
-/**
- * rnp_get_rxfh - get indir, key or hfunc info
- * @netdev: network interface device structure
- * @indir: rss table value
- * @key: rss key value
- * @hfunc: rss hash function value
- *
- * This function is called when ethtool -x.
- **/
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+int rnp_get_rxfh(struct net_device *netdev, struct ethtool_rxfh_param *rxfh)
+#else
+#ifdef HAVE_RXFH_HASHFUNC
 int rnp_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
+#else
+int rnp_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
+#endif
+#endif
 {
 	struct rnp_adapter *adapter = netdev_priv(netdev);
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	u32 *indir = rxfh->indir;
+	u8 *key = rxfh->key;
+	u8 *hfunc = &rxfh->hfunc;
+#endif
 
+#ifdef HAVE_RXFH_HASHFUNC
 	if (hfunc) {
 		switch (adapter->rss_func_mode) {
 		case rss_func_top:
@@ -1863,88 +1920,13 @@ int rnp_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key, u8 *hfunc)
 			break;
 		}
 	}
+#endif
 
 	if (indir)
 		rnp_get_reta(adapter, indir);
 
 	if (key)
-		memcpy(key, adapter->rss_key,
-		       rnp_get_rxfh_key_size(netdev));
-
-	return 0;
-}
-
-static int rnp_rss_indir_tbl_max(struct rnp_adapter *adapter)
-{
-	if (adapter->hw.rss_type == rnp_rss_uv3p)
-		return 8;
-	else if (adapter->hw.rss_type == rnp_rss_uv440)
-		return 128;
-	else if (adapter->hw.rss_type == rnp_rss_n10)
-		return 128;
-	else
-		return 128;
-}
-
-/**
- * rnp_set_rxfh - setup indir, key or hfunc to hw
- * @netdev: network interface device structure
- * @indir: rss table value
- * @key: rss key value
- * @hfunc: rss hash function value
- *
- * This function is called when ethtool -X.
- **/
-int rnp_set_rxfh(struct net_device *netdev, const u32 *indir,
-		 const u8 *key, const u8 hfunc)
-{
-	struct rnp_adapter *adapter = netdev_priv(netdev);
-	struct rnp_hw *hw = &adapter->hw;
-	int i;
-	u32 reta_entries = rnp_rss_indir_tbl_entries(adapter);
-
-	if (hfunc) {
-		if (hw->ops.set_rss_hfunc) {
-			if (hw->ops.set_rss_hfunc(hw, hfunc))
-				return -EINVAL;
-		} else {
-			return -EINVAL;
-		}
-
-	} else {
-		if (hw->ops.set_rss_hfunc)
-			hw->ops.set_rss_hfunc(hw, hfunc);
-	}
-	if ((indir) && (adapter->flags & RNP_FLAG_SRIOV_ENABLED))
-		return -EINVAL;
-
-	/* Fill out the redirection table */
-	if (indir) {
-		int max_queues = min_t(int, adapter->num_rx_queues,
-				       rnp_rss_indir_tbl_max(adapter));
-
-		if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) &&
-		    max_queues > hw->sriov_ring_limit)
-			max_queues = hw->sriov_ring_limit;
-
-		/* Verify user input. */
-		for (i = 0; i < reta_entries; i++)
-			if (indir[i] >= max_queues)
-				return -EINVAL;
-
-		/* store rss tbl */
-		for (i = 0; i < reta_entries; i++)
-			adapter->rss_indir_tbl[i] = indir[i];
-
-		rnp_store_reta(adapter);
-	}
-
-	/* Fill out the rss hash key */
-	if (key) {
-		memcpy(adapter->rss_key, key,
-		       rnp_get_rxfh_key_size(netdev));
-		rnp_store_key(adapter);
-	}
+		memcpy(key, adapter->rss_key, rnp_get_rxfh_key_size(netdev));
 
 	return 0;
 }
@@ -1962,24 +1944,23 @@ enum {
 #define PXE_OFF 0x4a000
 #define PXE_SZ (512 * 1024)
 
-static int rnp_flash_firmware(struct rnp_adapter *adapter, int region,
+static int rnp_flash_firmware(struct rnp_adapter *adapter,
+			      int region,
 			      const u8 *data, int bytes)
 {
 	struct rnp_hw *hw = &adapter->hw;
 
 	switch (region) {
-	case PART_FW:
+	case PART_FW: {
 		if (*((u32 *)(data + 28)) != 0xA51BBEAF)
 			return -EINVAL;
 		if (bytes > PXE_OFF) {
-			/* fw with pxe */
 			int err;
 			int wbytes_seg1 = bytes - PXE_OFF;
 
 			if (wbytes_seg1 > PXE_SZ)
 				wbytes_seg1 = PXE_SZ;
 
-			/* fw */
 			err = rnp_fw_update(hw, PART_FW, data, UCFG_OFF);
 			if (err)
 				return err;
@@ -1991,37 +1972,45 @@ static int rnp_flash_firmware(struct rnp_adapter *adapter, int region,
 			return 0;
 		}
 		break;
-	case PART_CFG:
+	}
+	case PART_CFG: {
 		if (*((u32 *)(data)) != 0x00010cf9)
 			return -EINVAL;
 		break;
-	case PART_MACSN:
+	}
+	case PART_MACSN: {
 		break;
-	case PART_PCSPHY:
+	}
+	case PART_PCSPHY: {
 		if (*((u16 *)(data)) != 0x081d)
 			return -EINVAL;
 		break;
-	case PART_PXE:
-		if ((*((u16 *)(data)) != 0xaa55) && (*((u16 *)(data)) != 0x5a4d))
+	}
+	case PART_PXE: {
+		if ((*((u16 *)(data)) != 0xaa55) &&
+		    (*((u16 *)(data)) != 0x5a4d)) {
 			return -EINVAL;
+		}
 		break;
-	default:
+	}
+	default: {
 		return -EINVAL;
+	}
 	}
 	return rnp_fw_update(hw, region, data, bytes);
 }
 
 static int rnp_flash_firmware_from_file(struct net_device *dev,
-					struct rnp_adapter *adapter,
-					int region, const char *filename)
+					struct rnp_adapter *adapter, int region,
+					const char *filename)
 {
 	const struct firmware *fw;
 	int rc;
 
 	rc = request_firmware(&fw, filename, &dev->dev);
 	if (rc != 0) {
-		netdev_err(dev, "Error %d requesting firmware file: %s\n",
-			   rc, filename);
+		netdev_err(dev, "Error %d requesting firmware file: %s\n", rc,
+			   filename);
 		return rc;
 	}
 
@@ -2030,23 +2019,124 @@ static int rnp_flash_firmware_from_file(struct net_device *dev,
 	return rc;
 }
 
-/**
- * rnp_flash_device - update flash to hw
- * @netdev: network interface device structure
- * @flash: parameters from ethtool
- *
- * This function is called when ethtool -f.
- **/
-int rnp_flash_device(struct net_device *netdev, struct ethtool_flash *flash)
+int rnp_flash_device(struct net_device *dev, struct ethtool_flash *flash)
 {
-	struct rnp_adapter *adapter = netdev_priv(netdev);
+	struct rnp_adapter *adapter = netdev_priv(dev);
 
 	if (IS_VF(adapter->hw.pfvfnum)) {
-		netdev_err(netdev,
+		netdev_err(dev,
 			   "flashdev not supported from a virtual function\n");
 		return -EINVAL;
 	}
 
-	return rnp_flash_firmware_from_file(netdev, adapter, flash->region,
-			flash->data);
+	return rnp_flash_firmware_from_file(dev, adapter, flash->region,
+					    flash->data);
+}
+static int rnp_rss_indir_tbl_max(struct rnp_adapter *adapter)
+{
+	if (adapter->hw.rss_type == rnp_rss_uv3p)
+		return 8;
+	else if (adapter->hw.rss_type == rnp_rss_uv440)
+		return 128;
+	else if (adapter->hw.rss_type == rnp_rss_n10)
+		return 128;
+	else
+		return 128;
+}
+
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+int rnp_set_rxfh(struct net_device *netdev,
+		 struct ethtool_rxfh_param *rxfh,
+		 struct netlink_ext_ack *extack)
+#else
+#ifdef HAVE_RXFH_HASHFUNC
+int rnp_set_rxfh(struct net_device *netdev,
+		 const u32 *indir, const u8 *key,
+		 const u8 hfunc)
+#else
+#ifdef HAVE_RXFH_NONCONST
+int rnp_set_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
+#else
+int rnp_set_rxfh(struct net_device *netdev, const u32 *indir, const u8 *key)
+#endif /* HAVE_RXFH_NONCONST */
+#endif /* HAVE_RXFH_HASHFUNC */
+#endif
+{
+	struct rnp_adapter *adapter = netdev_priv(netdev);
+	int i;
+	u32 reta_entries = rnp_rss_indir_tbl_entries(adapter);
+#ifdef HAVE_ETHTOOL_RXFH_PARAM
+	const u32 *indir = rxfh->indir;
+	const u8 *key = rxfh->key;
+	const u8 hfunc = rxfh->hfunc;
+#endif
+
+#ifdef HAVE_RXFH_HASHFUNC
+	if (hfunc != ETH_RSS_HASH_NO_CHANGE &&
+	    hfunc != ETH_RSS_HASH_TOP)
+		return -EOPNOTSUPP;
+#endif
+	if ((indir) && (adapter->flags & RNP_FLAG_SRIOV_ENABLED))
+		return -EINVAL;
+
+	/* Fill out the redirection table */
+	if (indir) {
+		int max_queues = min_t(int, adapter->num_rx_queues,
+				       rnp_rss_indir_tbl_max(adapter));
+
+		/* Allow max 2 queues w/ SR-IOV. */
+		if ((adapter->flags & RNP_FLAG_SRIOV_ENABLED) &&
+		    (max_queues > 2))
+			max_queues = 2;
+
+		/* Verify user input. */
+		for (i = 0; i < reta_entries; i++)
+			if (indir[i] >= max_queues)
+				return -EINVAL;
+
+		/* store rss tbl */
+		for (i = 0; i < reta_entries; i++)
+			adapter->rss_indir_tbl[i] = indir[i];
+
+		rnp_store_reta(adapter);
+	}
+
+	/* Fill out the rss hash key */
+	if (key) {
+		memcpy(adapter->rss_key, key, rnp_get_rxfh_key_size(netdev));
+		rnp_store_key(adapter);
+	}
+
+	return 0;
+}
+
+#endif
+
+#ifdef HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT
+static const struct ethtool_ops_ext rnp_ethtool_ops_ext = {
+	.size = sizeof(struct ethtool_ops_ext),
+#ifdef HAVE_ETHTOOL_GET_TS_INFO
+	.get_ts_info = rnp_get_ts_info,
+#endif
+	.set_phys_id = rnp_set_phys_id,
+	.get_channels = rnp_get_channels,
+	.set_channels = rnp_set_channels,
+#ifdef ETHTOOL_GMODULEINFO
+	.get_module_info = rnp_get_module_info,
+	.get_module_eeprom = rnp_get_module_eeprom,
+#endif
+#if defined(ETHTOOL_GRSSH) && defined(ETHTOOL_SRSSH)
+	.get_rxfh_indir_size = rnp_rss_indir_size,
+	.get_rxfh_key_size = rnp_get_rxfh_key_size,
+	.get_rxfh = rnp_get_rxfh,
+	.set_rxfh = rnp_set_rxfh,
+#endif /* ETHTOOL_GRSSH && ETHTOOL_SRSSH */
+};
+#endif /* HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT */
+
+void rnp_set_ethtool_ops(struct net_device *netdev)
+{
+#ifdef HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT
+	set_ethtool_ops_ext(netdev, &rnp_ethtool_ops_ext);
+#endif /* HAVE_RHEL6_ETHTOOL_OPS_EXT_STRUCT */
 }
