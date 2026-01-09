@@ -103,7 +103,6 @@ obj-$(CONFIG_SCSI_MPT3SAS)	+= mpt3sas/
 obj-$(CONFIG_SCSI_HISI_RAID)	+= hisi_raid/
 obj-$(CONFIG_SCSI_MPI3MR)	+= mpi3mr/
 obj-$(CONFIG_SCSI_3SNIC_SSSRAID)	+= sssraid/
-obj-$(CONFIG_SCSI_LEAPIORAID) += leapioraid/
 obj-$(CONFIG_SCSI_CETC52RAID) += cetc52raid/
 obj-$(CONFIG_SCSI_PS3STOR)	+= linkdata/
 obj-$(CONFIG_SCSI_ACARD)	+= atp870u.o
@@ -157,6 +156,7 @@ obj-$(CONFIG_CHR_DEV_SCH)	+= ch.o
 obj-$(CONFIG_SCSI_ENCLOSURE)	+= ses.o
 
 obj-$(CONFIG_SCSI_HISI_SAS) += hisi_sas/
+obj-$(CONFIG_SCSI_LEAPRAID) += leapraid/
 
 # This goes last, so that "real" scsi devices probe earlier
 obj-$(CONFIG_SCSI_DEBUG)	+= scsi_debug.o
