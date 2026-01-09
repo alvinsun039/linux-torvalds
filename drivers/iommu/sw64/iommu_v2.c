@@ -1666,18 +1666,6 @@ static bool sunway_iommu_capable(struct device *dev, enum iommu_cap cap)
 	}
 }
 
-static void sunway_iommu_probe_finalize(struct device *dev)
-{
-	struct iommu_domain *domain;
-
-	domain = iommu_get_domain_for_dev(dev);
-	if (domain->type & __IOMMU_DOMAIN_DMA_API)
-		iommu_setup_dma_ops(dev, SW64_DMA_START,
-					SW64_64BIT_DMA_LIMIT - SW64_DMA_START);
-	else
-		set_dma_ops(dev, get_arch_dma_ops());
-}
-
 static void sunway_iommu_get_resv_regions(struct device *dev,
 					  struct list_head *head)
 {
@@ -1725,7 +1713,6 @@ const struct iommu_ops sunway_iommu_ops = {
 	.capable = sunway_iommu_capable,
 	.domain_alloc = sunway_iommu_domain_alloc,
 	.probe_device = sunway_iommu_probe_device,
-	.probe_finalize = sunway_iommu_probe_finalize,
 	.release_device = sunway_iommu_release_device,
 	.device_group = sunway_iommu_device_group,
 	.pgsize_bitmap	= SZ_8K | SZ_8M | SZ_512M | SZ_8G,
