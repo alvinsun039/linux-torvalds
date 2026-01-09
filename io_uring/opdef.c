@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/io_uring.h>
+#include <linux/io_uring/cmd.h>
 
 #include "io_uring.h"
 #include "opdef.h"
@@ -103,7 +104,7 @@ const struct io_issue_def io_issue_defs[] = {
 		.iopoll_queue		= 1,
 		.async_size		= sizeof(struct io_async_rw),
 		.prep			= io_prep_read_fixed,
-		.issue			= io_read,
+		.issue			= io_read_fixed,
 	},
 	[IORING_OP_WRITE_FIXED] = {
 		.needs_file		= 1,
@@ -117,7 +118,7 @@ const struct io_issue_def io_issue_defs[] = {
 		.iopoll_queue		= 1,
 		.async_size		= sizeof(struct io_async_rw),
 		.prep			= io_prep_write_fixed,
-		.issue			= io_write,
+		.issue			= io_write_fixed,
 	},
 	[IORING_OP_POLL_ADD] = {
 		.needs_file		= 1,
@@ -415,7 +416,7 @@ const struct io_issue_def io_issue_defs[] = {
 		.plug			= 1,
 		.iopoll			= 1,
 		.iopoll_queue		= 1,
-		.async_size		= 2 * sizeof(struct io_uring_sqe),
+		.async_size		= sizeof(struct io_async_cmd),
 		.prep			= io_uring_cmd_prep,
 		.issue			= io_uring_cmd,
 	},
@@ -490,6 +491,26 @@ const struct io_issue_def io_issue_defs[] = {
 		.hash_reg_file		= 1,
 		.prep			= io_ftruncate_prep,
 		.issue			= io_ftruncate,
+	},
+	[IORING_OP_BIND] = {
+#if defined(CONFIG_NET)
+		.needs_file		= 1,
+		.prep			= io_bind_prep,
+		.issue			= io_bind,
+		.async_size		= sizeof(struct io_async_msghdr),
+#else
+		.prep			= io_eopnotsupp_prep,
+#endif
+	},
+	[IORING_OP_LISTEN] = {
+#if defined(CONFIG_NET)
+		.needs_file		= 1,
+		.prep			= io_listen_prep,
+		.issue			= io_listen,
+		.async_size		= sizeof(struct io_async_msghdr),
+#else
+		.prep			= io_eopnotsupp_prep,
+#endif
 	},
 };
 
@@ -677,6 +698,7 @@ const struct io_cold_def io_cold_defs[] = {
 	},
 	[IORING_OP_URING_CMD] = {
 		.name			= "URING_CMD",
+		.cleanup		= io_uring_cmd_cleanup,
 	},
 	[IORING_OP_SEND_ZC] = {
 		.name			= "SEND_ZC",
@@ -710,6 +732,12 @@ const struct io_cold_def io_cold_defs[] = {
 	},
 	[IORING_OP_FTRUNCATE] = {
 		.name			= "FTRUNCATE",
+	},
+	[IORING_OP_BIND] = {
+		.name			= "BIND",
+	},
+	[IORING_OP_LISTEN] = {
+		.name			= "LISTEN",
 	},
 };
 

@@ -16,7 +16,7 @@
 #include "waitid.h"
 #include "../kernel/exit.h"
 
-static void io_waitid_cb(struct io_kiocb *req, struct io_tw_state *ts);
+static void io_waitid_cb(struct io_kiocb *req, io_tw_token_t tw);
 
 #define IO_WAITID_CANCEL_FLAG	BIT(31)
 #define IO_WAITID_REF_MASK	GENMASK(30, 0)
@@ -181,13 +181,13 @@ static inline bool io_waitid_drop_issue_ref(struct io_kiocb *req)
 	return true;
 }
 
-static void io_waitid_cb(struct io_kiocb *req, struct io_tw_state *ts)
+static void io_waitid_cb(struct io_kiocb *req, io_tw_token_t tw)
 {
 	struct io_waitid_async *iwa = req->async_data;
 	struct io_ring_ctx *ctx = req->ctx;
 	int ret;
 
-	io_tw_lock(ctx, ts);
+	io_tw_lock(ctx, tw);
 
 	ret = __do_wait(&iwa->wo);
 
@@ -217,7 +217,7 @@ static void io_waitid_cb(struct io_kiocb *req, struct io_tw_state *ts)
 	}
 
 	io_waitid_complete(req, ret);
-	io_req_task_complete(req, ts);
+	io_req_task_complete(req, tw);
 }
 
 static int io_waitid_wait(struct wait_queue_entry *wait, unsigned mode,
@@ -246,9 +246,15 @@ static int io_waitid_wait(struct wait_queue_entry *wait, unsigned mode,
 int io_waitid_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
 	struct io_waitid *iw = io_kiocb_to_cmd(req, struct io_waitid);
+	struct io_waitid_async *iwa;
 
 	if (sqe->addr || sqe->buf_index || sqe->addr3 || sqe->waitid_flags)
 		return -EINVAL;
+
+	iwa = io_uring_alloc_async_data(NULL, req);
+	if (unlikely(!iwa))
+		return -ENOMEM;
+	iwa->req = req;
 
 	iw->which = READ_ONCE(sqe->len);
 	iw->upid = READ_ONCE(sqe->fd);
@@ -260,15 +266,9 @@ int io_waitid_prep(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 int io_waitid(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_waitid *iw = io_kiocb_to_cmd(req, struct io_waitid);
+	struct io_waitid_async *iwa = req->async_data;
 	struct io_ring_ctx *ctx = req->ctx;
-	struct io_waitid_async *iwa;
 	int ret;
-
-	iwa = io_uring_alloc_async_data_nocache(req);
-	if (!iwa)
-		return -ENOMEM;
-
-	iwa->req = req;
 
 	ret = kernel_waitid_prepare(&iwa->wo, iw->which, iw->upid, &iw->info,
 					iw->options, NULL);
@@ -292,7 +292,7 @@ int io_waitid(struct io_kiocb *req, unsigned int issue_flags)
 	hlist_add_head(&req->hash_node, &ctx->waitid_list);
 
 	init_waitqueue_func_entry(&iwa->wo.child_wait, io_waitid_wait);
-	iwa->wo.child_wait.private = req->task;
+	iwa->wo.child_wait.private = req->tctx->task;
 	iw->head = &current->signal->wait_chldexit;
 	add_wait_queue(iw->head, &iwa->wo.child_wait);
 

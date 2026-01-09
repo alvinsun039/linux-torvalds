@@ -10,13 +10,15 @@
 #include <linux/poll.h>
 #include <linux/nospec.h>
 #include <linux/compat.h>
-#include <linux/io_uring.h>
+#include <linux/io_uring/cmd.h>
+#include <linux/indirect_call_wrapper.h>
 
 #include <uapi/linux/io_uring.h>
 
 #include "io_uring.h"
 #include "opdef.h"
 #include "kbuf.h"
+#include "alloc_cache.h"
 #include "rsrc.h"
 #include "poll.h"
 #include "rw.h"
@@ -85,9 +87,9 @@ static int io_import_vec(int ddir, struct io_kiocb *req,
 	int ret, nr_segs;
 	struct iovec *iov;
 
-	if (io->free_iovec) {
-		nr_segs = io->free_iov_nr;
-		iov = io->free_iovec;
+	if (io->vec.iovec) {
+		nr_segs = io->vec.nr;
+		iov = io->vec.iovec;
 	} else {
 		nr_segs = 1;
 		iov = &io->fast_iov;
@@ -99,9 +101,7 @@ static int io_import_vec(int ddir, struct io_kiocb *req,
 		return ret;
 	if (iov) {
 		req->flags |= REQ_F_NEED_CLEANUP;
-		io->free_iov_nr = io->iter.nr_segs;
-		kfree(io->free_iovec);
-		io->free_iovec = iov;
+		io_vec_reset_iovec(&io->vec, iov, io->iter.nr_segs);
 	}
 	return 0;
 }
@@ -142,28 +142,18 @@ static inline int io_import_rw_buffer(int rw, struct io_kiocb *req,
 	return 0;
 }
 
-static void io_rw_iovec_free(struct io_async_rw *rw)
-{
-	if (rw->free_iovec) {
-		kfree(rw->free_iovec);
-		rw->free_iov_nr = 0;
-		rw->free_iovec = NULL;
-	}
-}
-
 static void io_rw_recycle(struct io_kiocb *req, unsigned int issue_flags)
 {
 	struct io_async_rw *rw = req->async_data;
-	struct iovec *iov;
 
-	if (unlikely(issue_flags & IO_URING_F_UNLOCKED)) {
-		io_rw_iovec_free(rw);
+	if (unlikely(issue_flags & IO_URING_F_UNLOCKED))
 		return;
-	}
-	iov = rw->free_iovec;
-	if (io_alloc_cache_put(&req->ctx->rw_cache, &rw->cache)) {
-		if (iov)
-			kasan_mempool_poison_object(iov);
+
+	io_alloc_cache_vec_kasan(&rw->vec);
+	if (rw->vec.nr > IO_VEC_CACHE_SOFT_CAP)
+		io_vec_free(&rw->vec);
+
+	if (io_alloc_cache_put(&req->ctx->rw_cache, rw)) {
 		req->async_data = NULL;
 		req->flags &= ~REQ_F_ASYNC_DATA;
 	}
@@ -207,32 +197,15 @@ static void io_req_rw_cleanup(struct io_kiocb *req, unsigned int issue_flags)
 static int io_rw_alloc_async(struct io_kiocb *req)
 {
 	struct io_ring_ctx *ctx = req->ctx;
-	struct io_cache_entry *entry;
 	struct io_async_rw *rw;
 
-	entry = io_alloc_cache_get(&ctx->rw_cache);
-	if (entry) {
-		rw = container_of(entry, struct io_async_rw, cache);
-		if (rw->free_iovec) {
-			kasan_mempool_unpoison_object(rw->free_iovec,
-				rw->free_iov_nr * sizeof(struct iovec));
-			req->flags |= REQ_F_NEED_CLEANUP;
-		}
-		req->flags |= REQ_F_ASYNC_DATA;
-		req->async_data = rw;
-		goto done;
-	}
-
-	if (!io_alloc_async_data(req)) {
-		rw = req->async_data;
-		rw->free_iovec = NULL;
-		rw->free_iov_nr = 0;
-done:
-		rw->bytes_done = 0;
-		return 0;
-	}
-
-	return -ENOMEM;
+	rw = io_uring_alloc_async_data(&ctx->rw_cache, req);
+	if (!rw)
+		return -ENOMEM;
+	if (rw->vec.iovec)
+		req->flags |= REQ_F_NEED_CLEANUP;
+	rw->bytes_done = 0;
+	return 0;
 }
 
 static int __io_prep_rw(struct io_kiocb *req, const struct io_uring_sqe *sqe,
@@ -331,40 +304,30 @@ int io_prep_writev(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 	return io_prep_rwv(req, sqe, ITER_SOURCE);
 }
 
-static int io_prep_rw_fixed(struct io_kiocb *req, const struct io_uring_sqe *sqe,
+static int io_init_rw_fixed(struct io_kiocb *req, unsigned int issue_flags,
 			    int ddir)
 {
 	struct io_rw *rw = io_kiocb_to_cmd(req, struct io_rw);
-	struct io_ring_ctx *ctx = req->ctx;
-	struct io_mapped_ubuf *imu;
-	struct io_async_rw *io;
-	u16 index;
+	struct io_async_rw *io = req->async_data;
 	int ret;
 
-	ret = __io_prep_rw(req, sqe, ddir);
-	if (unlikely(ret))
-		return ret;
+	if (io->bytes_done)
+		return 0;
 
-	if (unlikely(req->buf_index >= ctx->nr_user_bufs))
-		return -EFAULT;
-	index = array_index_nospec(req->buf_index, ctx->nr_user_bufs);
-	imu = ctx->user_bufs[index];
-	io_req_set_rsrc_node(req, ctx);
-
-	io = req->async_data;
-	ret = io_import_fixed(ddir, &io->iter, imu, rw->addr, rw->len);
+	ret = io_import_reg_buf(req, &io->iter, rw->addr, rw->len, ddir,
+				issue_flags);
 	iov_iter_save_state(&io->iter, &io->iter_state);
 	return ret;
 }
 
 int io_prep_read_fixed(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
-	return io_prep_rw_fixed(req, sqe, ITER_DEST);
+	return __io_prep_rw(req, sqe, ITER_DEST);
 }
 
 int io_prep_write_fixed(struct io_kiocb *req, const struct io_uring_sqe *sqe)
 {
-	return io_prep_rw_fixed(req, sqe, ITER_SOURCE);
+	return __io_prep_rw(req, sqe, ITER_SOURCE);
 }
 
 /*
@@ -436,12 +399,6 @@ static bool io_rw_should_reissue(struct io_kiocb *req)
 	 */
 	if (percpu_ref_is_dying(&ctx->refs))
 		return false;
-	/*
-	 * Play it safe and assume not safe to re-import and reissue if we're
-	 * not in the original thread group (or in task context).
-	 */
-	if (!same_thread_group(req->task, current) || !in_task())
-		return false;
 
 	iov_iter_restore(&io->iter, &io->iter_state);
 	return true;
@@ -501,7 +458,7 @@ static inline int io_fixup_rw_res(struct io_kiocb *req, long res)
 	return res;
 }
 
-void io_req_rw_complete(struct io_kiocb *req, struct io_tw_state *ts)
+void io_req_rw_complete(struct io_kiocb *req, io_tw_token_t tw)
 {
 	struct io_rw *rw = io_kiocb_to_cmd(req, struct io_rw);
 	struct kiocb *kiocb = &rw->kiocb;
@@ -518,7 +475,7 @@ void io_req_rw_complete(struct io_kiocb *req, struct io_tw_state *ts)
 		req->cqe.flags |= io_put_kbuf(req, req->cqe.res, 0);
 
 	io_req_rw_cleanup(req, 0);
-	io_req_task_complete(req, ts);
+	io_req_task_complete(req, tw);
 }
 
 static void io_complete_rw(struct kiocb *kiocb, long res)
@@ -619,6 +576,7 @@ static inline loff_t *io_kiocb_ppos(struct kiocb *kiocb)
  */
 static ssize_t loop_rw_iter(int ddir, struct io_rw *rw, struct iov_iter *iter)
 {
+	struct io_kiocb *req = cmd_to_io_kiocb(rw);
 	struct kiocb *kiocb = &rw->kiocb;
 	struct file *file = kiocb->ki_filp;
 	ssize_t ret = 0;
@@ -634,6 +592,8 @@ static ssize_t loop_rw_iter(int ddir, struct io_rw *rw, struct iov_iter *iter)
 	if ((kiocb->ki_flags & IOCB_NOWAIT) &&
 	    !(kiocb->ki_filp->f_flags & O_NONBLOCK))
 		return -EAGAIN;
+	if ((req->flags & REQ_F_BUF_NODE) && req->buf_node->buf->is_kbuf)
+		return -EFAULT;
 
 	ppos = io_kiocb_ppos(kiocb);
 
@@ -1119,6 +1079,28 @@ ret_eagain:
 	}
 }
 
+int io_read_fixed(struct io_kiocb *req, unsigned int issue_flags)
+{
+	int ret;
+
+	ret = io_init_rw_fixed(req, issue_flags, ITER_DEST);
+	if (unlikely(ret))
+		return ret;
+
+	return io_read(req, issue_flags);
+}
+
+int io_write_fixed(struct io_kiocb *req, unsigned int issue_flags)
+{
+	int ret;
+
+	ret = io_init_rw_fixed(req, issue_flags, ITER_SOURCE);
+	if (unlikely(ret))
+		return ret;
+
+	return io_write(req, issue_flags);
+}
+
 void io_rw_fail(struct io_kiocb *req)
 {
 	int res;
@@ -1271,15 +1253,10 @@ int io_do_iopoll(struct io_ring_ctx *ctx, bool force_nonspin)
 	return nr_events;
 }
 
-void io_rw_cache_free(struct io_cache_entry *entry)
+void io_rw_cache_free(const void *entry)
 {
-	struct io_async_rw *rw;
+	struct io_async_rw *rw = (struct io_async_rw *) entry;
 
-	rw = container_of(entry, struct io_async_rw, cache);
-	if (rw->free_iovec) {
-		kasan_mempool_unpoison_object(rw->free_iovec,
-				rw->free_iov_nr * sizeof(struct iovec));
-		io_rw_iovec_free(rw);
-	}
+	io_vec_free(&rw->vec);
 	kfree(rw);
 }

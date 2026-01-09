@@ -46,13 +46,8 @@ static __cold int io_uring_show_cred(struct seq_file *m, unsigned int id,
 	return 0;
 }
 
-/*
- * Caller holds a reference to the file already, we don't need to do
- * anything else to get an extra reference.
- */
-__cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
+static void __io_uring_show_fdinfo(struct io_ring_ctx *ctx, struct seq_file *m)
 {
-	struct io_ring_ctx *ctx = file->private_data;
 	struct io_overflow_cqe *ocqe;
 	struct io_rings *r = ctx->rings;
 	unsigned int sq_mask = ctx->sq_entries - 1, cq_mask = ctx->cq_entries - 1;
@@ -65,7 +60,6 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 	unsigned int sq_entries, cq_entries;
 	int sq_pid = -1, sq_cpu = -1;
 	u64 sq_total_time = 0, sq_work_time = 0;
-	bool has_lock;
 	unsigned int i;
 
 	if (ctx->flags & IORING_SETUP_CQE32)
@@ -135,15 +129,7 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 		seq_printf(m, "\n");
 	}
 
-	/*
-	 * Avoid ABBA deadlock between the seq lock and the io_uring mutex,
-	 * since fdinfo case grabs it in the opposite direction of normal use
-	 * cases. If we fail to get the lock, we just don't iterate any
-	 * structures that could be going away outside the io_uring mutex.
-	 */
-	has_lock = mutex_trylock(&ctx->uring_lock);
-
-	if (has_lock && (ctx->flags & IORING_SETUP_SQPOLL)) {
+	if (ctx->flags & IORING_SETUP_SQPOLL) {
 		struct io_sq_data *sq = ctx->sq_data;
 		struct task_struct *tsk;
 
@@ -173,22 +159,30 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 	seq_printf(m, "SqThreadCpu:\t%d\n", sq_cpu);
 	seq_printf(m, "SqTotalTime:\t%llu\n", sq_total_time);
 	seq_printf(m, "SqWorkTime:\t%llu\n", sq_work_time);
-	seq_printf(m, "UserFiles:\t%u\n", ctx->nr_user_files);
-	for (i = 0; has_lock && i < ctx->nr_user_files; i++) {
-		struct file *f = io_file_from_index(&ctx->file_table, i);
+	seq_printf(m, "UserFiles:\t%u\n", ctx->file_table.data.nr);
+	for (i = 0; i < ctx->file_table.data.nr; i++) {
+		struct file *f = NULL;
 
-		if (f)
-			seq_printf(m, "%5u: %s\n", i, file_dentry(f)->d_iname);
+		if (ctx->file_table.data.nodes[i])
+			f = io_slot_file(ctx->file_table.data.nodes[i]);
+		if (f) {
+			seq_printf(m, "%5u: ", i);
+			seq_file_path(m, f, " \t\n\\");
+			seq_puts(m, "\n");
+		}
+	}
+	seq_printf(m, "UserBufs:\t%u\n", ctx->buf_table.nr);
+	for (i = 0; i < ctx->buf_table.nr; i++) {
+		struct io_mapped_ubuf *buf = NULL;
+
+		if (ctx->buf_table.nodes[i])
+			buf = ctx->buf_table.nodes[i]->buf;
+		if (buf)
+			seq_printf(m, "%5u: 0x%llx/%u\n", i, buf->ubuf, buf->len);
 		else
 			seq_printf(m, "%5u: <none>\n", i);
 	}
-	seq_printf(m, "UserBufs:\t%u\n", ctx->nr_user_bufs);
-	for (i = 0; has_lock && i < ctx->nr_user_bufs; i++) {
-		struct io_mapped_ubuf *buf = ctx->user_bufs[i];
-
-		seq_printf(m, "%5u: 0x%llx/%u\n", i, buf->ubuf, buf->len);
-	}
-	if (has_lock && !xa_empty(&ctx->personalities)) {
+	if (!xa_empty(&ctx->personalities)) {
 		unsigned long index;
 		const struct cred *cred;
 
@@ -198,17 +192,14 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 	}
 
 	seq_puts(m, "PollList:\n");
-	for (i = 0; has_lock && i < (1U << ctx->cancel_table.hash_bits); i++) {
+	for (i = 0; i < (1U << ctx->cancel_table.hash_bits); i++) {
 		struct io_hash_bucket *hb = &ctx->cancel_table.hbs[i];
 		struct io_kiocb *req;
 
 		hlist_for_each_entry(req, &hb->list, hash_node)
 			seq_printf(m, "  op=%d, task_works=%d\n", req->opcode,
-					task_work_pending(req->task));
+					task_work_pending(req->tctx->task));
 	}
-
-	if (has_lock)
-		mutex_unlock(&ctx->uring_lock);
 
 	seq_puts(m, "CqOverflowList:\n");
 	spin_lock(&ctx->completion_lock);
@@ -221,5 +212,24 @@ __cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
 	}
 
 	spin_unlock(&ctx->completion_lock);
+}
+
+/*
+ * Caller holds a reference to the file already, we don't need to do
+ * anything else to get an extra reference.
+ */
+__cold void io_uring_show_fdinfo(struct seq_file *m, struct file *file)
+{
+	struct io_ring_ctx *ctx = file->private_data;
+
+	/*
+	 * Avoid ABBA deadlock between the seq lock and the io_uring mutex,
+	 * since fdinfo case grabs it in the opposite direction of normal use
+	 * cases.
+	 */
+	if (mutex_trylock(&ctx->uring_lock)) {
+		__io_uring_show_fdinfo(ctx, m);
+		mutex_unlock(&ctx->uring_lock);
+	}
 }
 #endif

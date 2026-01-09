@@ -2,48 +2,30 @@
 #ifndef IOU_RSRC_H
 #define IOU_RSRC_H
 
-#include <net/af_unix.h>
+#include <linux/nospec.h>
+#include <linux/lockdep.h>
 
-#include "alloc_cache.h"
+#define IO_VEC_CACHE_SOFT_CAP		256
 
 enum {
 	IORING_RSRC_FILE		= 0,
 	IORING_RSRC_BUFFER		= 1,
 };
 
-struct io_rsrc_put {
+struct io_rsrc_node {
+	unsigned char			type;
+	int				refs;
+
 	u64 tag;
 	union {
-		void *rsrc;
-		struct file *file;
+		unsigned long file_ptr;
 		struct io_mapped_ubuf *buf;
 	};
 };
 
-struct io_rsrc_data {
-	struct io_ring_ctx		*ctx;
-
-	u64				**tags;
-	unsigned int			nr;
-	u16				rsrc_type;
-	bool				quiesce;
-};
-
-struct io_rsrc_node {
-	union {
-		struct io_cache_entry		cache;
-		struct io_ring_ctx		*ctx;
-	};
-	int				refs;
-	bool				empty;
-	u16				type;
-	struct list_head		node;
-	struct io_rsrc_put		item;
-};
-
-struct io_fixed_file {
-	/* file * with additional FFS_* flags */
-	unsigned long file_ptr;
+enum {
+	IO_IMU_DEST	= 1 << ITER_DEST,
+	IO_IMU_SOURCE	= 1 << ITER_SOURCE,
 };
 
 struct io_mapped_ubuf {
@@ -53,6 +35,10 @@ struct io_mapped_ubuf {
 	unsigned int    folio_shift;
 	refcount_t	refs;
 	unsigned long	acct_pages;
+	void		(*release)(void *);
+	void		*priv;
+	bool		is_kbuf;
+	u8		dir;
 	struct bio_vec	bvec[] __counted_by(nr_bvecs);
 };
 
@@ -62,23 +48,25 @@ struct io_imu_folio_data {
 	/* For non-head/tail folios, has to be fully included */
 	unsigned int	nr_pages_mid;
 	unsigned int	folio_shift;
+	unsigned int	nr_folios;
+	unsigned long	first_folio_page_idx;
 };
 
-void io_rsrc_node_ref_zero(struct io_rsrc_node *node);
-void io_rsrc_node_destroy(struct io_ring_ctx *ctx, struct io_rsrc_node *ref_node);
-struct io_rsrc_node *io_rsrc_node_alloc(struct io_ring_ctx *ctx);
-int io_queue_rsrc_removal(struct io_rsrc_data *data, unsigned idx, void *rsrc);
+bool io_rsrc_cache_init(struct io_ring_ctx *ctx);
+void io_rsrc_cache_free(struct io_ring_ctx *ctx);
+struct io_rsrc_node *io_rsrc_node_alloc(struct io_ring_ctx *ctx, int type);
+void io_free_rsrc_node(struct io_ring_ctx *ctx, struct io_rsrc_node *node);
+void io_rsrc_data_free(struct io_ring_ctx *ctx, struct io_rsrc_data *data);
+int io_rsrc_data_alloc(struct io_rsrc_data *data, unsigned nr);
 
-int io_import_fixed(int ddir, struct iov_iter *iter,
-			   struct io_mapped_ubuf *imu,
-			   u64 buf_addr, size_t len);
+int io_import_reg_buf(struct io_kiocb *req, struct iov_iter *iter,
+			u64 buf_addr, size_t len, int ddir,
+			unsigned issue_flags);
 
 int io_register_clone_buffers(struct io_ring_ctx *ctx, void __user *arg);
-void __io_sqe_buffers_unregister(struct io_ring_ctx *ctx);
 int io_sqe_buffers_unregister(struct io_ring_ctx *ctx);
 int io_sqe_buffers_register(struct io_ring_ctx *ctx, void __user *arg,
 			    unsigned int nr_args, u64 __user *tags);
-void __io_sqe_files_unregister(struct io_ring_ctx *ctx);
 int io_sqe_files_unregister(struct io_ring_ctx *ctx);
 int io_sqe_files_register(struct io_ring_ctx *ctx, void __user *arg,
 			  unsigned nr_args, u64 __user *tags);
@@ -90,41 +78,60 @@ int io_register_rsrc_update(struct io_ring_ctx *ctx, void __user *arg,
 int io_register_rsrc(struct io_ring_ctx *ctx, void __user *arg,
 			unsigned int size, unsigned int type);
 
+bool io_check_coalesce_buffer(struct page **page_array, int nr_pages,
+			      struct io_imu_folio_data *data);
+
+static inline struct io_rsrc_node *io_rsrc_node_lookup(struct io_rsrc_data *data,
+						       int index)
+{
+	if (index < data->nr)
+		return data->nodes[array_index_nospec(index, data->nr)];
+	return NULL;
+}
+
 static inline void io_put_rsrc_node(struct io_ring_ctx *ctx, struct io_rsrc_node *node)
 {
 	lockdep_assert_held(&ctx->uring_lock);
-
-	if (node && !--node->refs)
-		io_rsrc_node_ref_zero(node);
+	if (!--node->refs)
+		io_free_rsrc_node(ctx, node);
 }
 
-static inline void __io_req_set_rsrc_node(struct io_kiocb *req,
-					  struct io_ring_ctx *ctx)
+static inline bool io_reset_rsrc_node(struct io_ring_ctx *ctx,
+				      struct io_rsrc_data *data, int index)
 {
-	lockdep_assert_held(&ctx->uring_lock);
-	req->rsrc_node = ctx->rsrc_node;
-	ctx->rsrc_node->refs++;
+	struct io_rsrc_node *node = data->nodes[index];
+
+	if (!node)
+		return false;
+	io_put_rsrc_node(ctx, node);
+	data->nodes[index] = NULL;
+	return true;
 }
 
-static inline void io_req_set_rsrc_node(struct io_kiocb *req,
-					struct io_ring_ctx *ctx)
+static inline void io_req_put_rsrc_nodes(struct io_kiocb *req)
 {
-	if (!req->rsrc_node)
-		__io_req_set_rsrc_node(req, ctx);
+	if (req->file_node) {
+		io_put_rsrc_node(req->ctx, req->file_node);
+		req->file_node = NULL;
+	}
+	if (req->flags & REQ_F_BUF_NODE) {
+		io_put_rsrc_node(req->ctx, req->buf_node);
+		req->buf_node = NULL;
+	}
 }
 
-static inline u64 *io_get_tag_slot(struct io_rsrc_data *data, unsigned int idx)
+static inline void io_req_assign_rsrc_node(struct io_rsrc_node **dst_node,
+					   struct io_rsrc_node *node)
 {
-	unsigned int off = idx & IO_RSRC_TAG_TABLE_MASK;
-	unsigned int table_idx = idx >> IO_RSRC_TAG_TABLE_SHIFT;
-
-	return &data->tags[table_idx][off];
+	node->refs++;
+	*dst_node = node;
 }
 
-static inline int io_rsrc_init(struct io_ring_ctx *ctx)
+static inline void io_req_assign_buf_node(struct io_kiocb *req,
+					  struct io_rsrc_node *node)
 {
-	ctx->rsrc_node = io_rsrc_node_alloc(ctx);
-	return ctx->rsrc_node ? 0 : -ENOMEM;
+	io_req_assign_rsrc_node(&req->buf_node, node);
+	req->flags |= REQ_F_BUF_NODE;
 }
 
 int io_files_update(struct io_kiocb *req, unsigned int issue_flags);
@@ -136,6 +143,22 @@ static inline void __io_unaccount_mem(struct user_struct *user,
 				      unsigned long nr_pages)
 {
 	atomic_long_sub(nr_pages, &user->locked_vm);
+}
+
+void io_vec_free(struct iou_vec *iv);
+
+static inline void io_vec_reset_iovec(struct iou_vec *iv,
+				      struct iovec *iovec, unsigned nr)
+{
+	io_vec_free(iv);
+	iv->iovec = iovec;
+	iv->nr = nr;
+}
+
+static inline void io_alloc_cache_vec_kasan(struct iou_vec *iv)
+{
+	if (IS_ENABLED(CONFIG_KASAN))
+		io_vec_free(iv);
 }
 
 #endif
