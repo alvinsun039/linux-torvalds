@@ -2020,11 +2020,14 @@ static int __nvme_alloc_host_mem(struct nvme_dev *dev, u64 preferred,
 	if (!size)
 		goto out_free_bufs;
 
+	/* 修复：根据实际分配的数量更新 descs_size */
+	descs_size = i * sizeof(*descs);
+
 	dev->nr_host_mem_descs = i;
 	dev->host_mem_size = size;
 	dev->host_mem_descs = descs;
 	dev->host_mem_descs_dma = descs_dma;
-	dev->host_mem_descs_size = descs_size;
+	dev->host_mem_descs_size = descs_size;  /* 这里使用更新后的 descs_size */
 	dev->host_mem_desc_bufs = bufs;
 	return 0;
 
