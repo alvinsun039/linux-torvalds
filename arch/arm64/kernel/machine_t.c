@@ -44,7 +44,8 @@ DEFINE_CPU_CHECK_FUNC(ft2500, CONFIG_ARCH_PHYTIUM);
 DEFINE_CPU_CHECK_FUNC(ftd2000, CONFIG_ARCH_PHYTIUM);
 DEFINE_CPU_CHECK_FUNC(ftd3000, CONFIG_ARCH_PHYTIUM);
 DEFINE_CPU_CHECK_FUNC(fte2000, CONFIG_ARCH_PHYTIUM);
-DEFINE_CPU_CHECK_FUNC(fts5000, CONFIG_ARCH_PHYTIUM);
+DEFINE_CPU_CHECK_FUNC(fts5000c, CONFIG_ARCH_PHYTIUM);
+DEFINE_CPU_CHECK_FUNC(fts5000c_e, CONFIG_ARCH_PHYTIUM);
 DEFINE_CPU_CHECK_FUNC(kunpeng920, CONFIG_ARCH_HISI);
 
 /* Vendor check functions without static_key (CPU register read is already fast) */
@@ -136,8 +137,10 @@ static int __init detect_phytium_cpu_type(void)
 		static_branch_enable(&machine_t_cpu_fte2000_key);
 		return 0;
 	case PHYTIUM_CPU_S5000C_E:
+		static_branch_enable(&machine_t_cpu_fts5000c_e_key);
+		return 0;
 	case PHYTIUM_CPU_S5000C:
-		static_branch_enable(&machine_t_cpu_fts5000_key);
+		static_branch_enable(&machine_t_cpu_fts5000c_key);
 		return 0;
 	default:
 		return -ENODATA;
