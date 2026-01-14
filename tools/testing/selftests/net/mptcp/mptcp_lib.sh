@@ -493,6 +493,8 @@ mptcp_lib_ns_init() {
 		ip netns add "${!netns}" || exit ${KSFT_SKIP}
 		ip -net "${!netns}" link set lo up
 		ip netns exec "${!netns}" sysctl -q net.mptcp.enabled=1
+		ip netns exec "${!netns}" sysctl -q net.ipv4.conf.all.rp_filter=0
+		ip netns exec "${!netns}" sysctl -q net.ipv4.conf.default.rp_filter=0
 	done
 }
 
