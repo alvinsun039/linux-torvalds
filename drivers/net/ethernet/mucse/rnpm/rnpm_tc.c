@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #include <linux/netdevice.h>
 #ifdef NETIF_F_HW_TC
@@ -17,7 +17,8 @@ static void __maybe_unused rnpm_setup_txr_prio(void __iomem *ioaddr,
 {
 	u16 dma_ring_idx = tx_ring->rnpm_queue_idx;
 
-	rnpm_wr_reg(ioaddr + RNPM_DMA_REG_TX_ARB_DEF_LVL(dma_ring_idx), prio);
+	rnpm_wr_reg(ioaddr + RNPM_DMA_REG_TX_ARB_DEF_LVL(dma_ring_idx),
+		    prio);
 }
 
 int rnpm_setup_tx_maxrate(void __iomem *ioaddr, struct rnpm_ring *tx_ring,

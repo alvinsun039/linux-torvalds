@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -46,7 +46,7 @@ enum txgbe_data_func
 /**
  * data operation
  **/
-ssize_t
+static ssize_t
 simple_read_from_pcibar(struct txgbe_adapter *adapter, int res,
 		void __user *buf, size_t size, loff_t *ppos)
 {
@@ -72,7 +72,7 @@ simple_read_from_pcibar(struct txgbe_adapter *adapter, int res,
 	return size;
 }
 
-ssize_t
+static ssize_t
 simple_read_from_flash(struct txgbe_adapter *adapter,
 		void __user *buf, size_t size, loff_t *ppos)
 {
@@ -117,7 +117,7 @@ simple_read_from_flash(struct txgbe_adapter *adapter,
 	return size;
 }
 
-ssize_t
+static ssize_t
 simple_write_to_flash(struct txgbe_adapter *adapter,
 	const void __user *from, size_t size, loff_t *ppos, size_t available)
 {

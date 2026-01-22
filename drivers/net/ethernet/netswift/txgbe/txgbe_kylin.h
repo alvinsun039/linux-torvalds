@@ -90,7 +90,7 @@
 #endif 
 
 #ifndef DEFAULT_TXD
-#define DEFAULT_TXD 512				/*deepinsw : 1024	default to 512*/
+#define DEFAULT_TXD 1024	/* deepinsw 1024 */
 #endif 
 
 #ifndef DEFAULT_TX_WORK
@@ -100,6 +100,13 @@
 #ifndef CL72_KRTR_PRBS_MODE_EN
 #define CL72_KRTR_PRBS_MODE_EN 0xffff			/*open kr prbs check */
 #endif 
+
+#ifndef CL74_KRTR_TRAINNING_TIMEOUT
+#define CL74_KRTR_TRAINNING_TIMEOUT 3000
+#endif
+#ifndef AN_TRAINNING_MODE
+#define AN_TRAINNING_MODE 0
+#endif
 
 #ifndef TXGBE_STATIC_ITR
 #define TXGBE_STATIC_ITR 1		/* static itr configure */
@@ -117,12 +124,41 @@
 #define TXGBE_DIS_COMP_TIMEOUT 1 /* dis completion timeout, default 1 to dis */
 #endif
 
+#ifndef TXGBE_LINK_FAULT
+#define TXGBE_LINK_FAULT 0 /* Check single fiber inserted/removed, default 0 */
+#endif
+
+#ifndef TXGBE_TXHEAD_WB
+// default 1 to 64BYTE, 0 to 4BYTE, 2 to 64BYTE allign(for test), 3 to no use
+#define TXGBE_TXHEAD_WB 0
+#endif
+
 #ifndef AN73_TRAINNING_MODE
 #define AN73_TRAINNING_MODE 1	/* 0 : kd5886 1: centc 2: wx2wx */
 #endif
 
 #ifndef CL72_KRTR_PRBS31_EN
 #define CL72_KRTR_PRBS31_EN 0
+#endif
+
+#ifndef TXGBE_SWFW_MBOX_AML
+#define TXGBE_SWFW_MBOX_AML
+#endif
+
+#ifndef TXGBE_DMA_RESET
+#define TXGBE_DMA_RESET 1
+#endif
+
+#ifndef TXGBE_1588_PPS_LEVEL
+#define TXGBE_1588_PPS_LEVEL 10
+#endif
+
+#ifndef TXGBE_1588_PPS_WIDTH
+#define TXGBE_1588_PPS_WIDTH 120
+#endif
+
+#ifndef TXGBE_1588_TOD_ENABLE
+#define TXGBE_1588_TOD_ENABLE 1
 #endif
 
 /**************************performance************************************/
@@ -143,18 +179,6 @@
 #ifndef KR_MODE
 #define KR_MODE 0
 #endif 
-
-#ifndef KR_AN73_PRESET
-#define KR_AN73_PRESET 0
-#endif
-
-#ifndef KR_POLLING
-#define KR_POLLING 0
-#endif 
-
-#ifndef KR_RESTART_T_MODE
-#define KR_RESTART_T_MODE 0
-#endif
 
 #ifndef KR_SET
 #define KR_SET 0
@@ -4890,6 +4914,10 @@ static inline bool __kc_is_link_local_ether_addr(const u8 *addr)
 #define HAVE_SRIOV_CONFIGURE
 #endif
 
+#if (SLE_VERSION_CODE && SLE_VERSION_CODE <= SLE_VERSION(11, 4, 0))
+#define NEED_DIV64_U64_REM
+#endif
+
 #ifndef PCI_EXP_LNKCAP_SLS_2_5GB
 #define PCI_EXP_LNKCAP_SLS_2_5GB 0x00000001 /* LNKCAP2 SLS Vector bit 0 */
 #endif
@@ -5829,6 +5857,18 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #if RHEL_RELEASE_CODE && (RHEL_RELEASE_CODE > RHEL_RELEASE_VERSION(7,2))
 #define HAVE_NDO_FDB_ADD_VID
 #endif
+#ifndef ETH_MODULE_SFF_8079
+#define ETH_MODULE_SFF_8079		0x1
+#endif
+#ifndef ETH_MODULE_SFF_8079_LEN
+#define ETH_MODULE_SFF_8079_LEN		256
+#endif
+#ifndef ETH_MODULE_SFF_8472
+#define ETH_MODULE_SFF_8472		0x2
+#endif
+#ifndef ETH_MODULE_SFF_8472_LEN
+#define ETH_MODULE_SFF_8472_LEN		512
+#endif
 #ifndef ETH_MODULE_SFF_8636
 #define ETH_MODULE_SFF_8636		0x3
 #endif
@@ -5869,6 +5909,9 @@ static inline struct sk_buff *__kc_napi_alloc_skb(struct napi_struct *napi, unsi
 #define HAVE_INCLUDE_LINUX_TIMECOUNTER_H
 #define HAVE_NDO_BRIDGE_SET_DEL_LINK_FLAGS
 #endif /* 3.20.0 */
+#ifdef NEED_GET_VLAN_ID
+#define skb_vlan_tag_get_id(__skb)      ((__skb)->vlan_tci & VLAN_VID_MASK)
+#endif
 
 /*****************************************************************************/
 #if ( LINUX_VERSION_CODE < KERNEL_VERSION(4,0,0) )
@@ -6644,6 +6687,22 @@ static inline bool uuid_equal(const uuid_t *u1, const uuid_t *u2)
 #ifndef ethtool_link_ksettings_del_link_mode
 #define ethtool_link_ksettings_del_link_mode(ptr, name, mode)		\
 	__clear_bit(ETHTOOL_LINK_MODE_ ## mode ## _BIT, (ptr)->link_modes.name)
+#endif
+#ifndef ETHTOOL_LINK_MODE_1000baseX_Full_BIT
+#define ETHTOOL_LINK_MODE_1000baseX_Full_BIT    ETHTOOL_LINK_MODE_1000baseT_Full_BIT
+#define HAVE_NO_ETHTOOL_1000X
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseCR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseCR_Full_BIT  ETHTOOL_LINK_MODE_1000baseT_Full_BIT
+#define HAVE_NO_ETHTOOL_10000CR
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseSR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseSR_Full_BIT  ETHTOOL_LINK_MODE_1000baseT_Full_BIT
+#define HAVE_NO_ETHTOOL_10000SR
+#endif
+#ifndef ETHTOOL_LINK_MODE_10000baseLR_Full_BIT
+#define ETHTOOL_LINK_MODE_10000baseLR_Full_BIT  ETHTOOL_LINK_MODE_1000baseT_Full_BIT
+#define HAVE_NO_ETHTOOL_10000LR
 #endif
 #endif /* ETHTOOL_GLINKSETTINGS */
 #if (SLE_VERSION_CODE && (SLE_VERSION_CODE >= SLE_VERSION(12,4,0)))

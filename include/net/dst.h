@@ -260,9 +260,9 @@ static inline void dst_hold(struct dst_entry *dst)
 
 static inline void dst_use_noref(struct dst_entry *dst, unsigned long time)
 {
-	if (unlikely(time != dst->lastuse)) {
+	if (unlikely(time != READ_ONCE(dst->lastuse))) {
 		dst->__use++;
-		dst->lastuse = time;
+		WRITE_ONCE(dst->lastuse, time);
 	}
 }
 
@@ -452,13 +452,15 @@ static inline void dst_link_failure(struct sk_buff *skb)
 
 static inline void dst_set_expires(struct dst_entry *dst, int timeout)
 {
-	unsigned long expires = jiffies + timeout;
+	unsigned long old, expires = jiffies + timeout;
 
 	if (expires == 0)
 		expires = 1;
 
-	if (dst->expires == 0 || time_before(expires, dst->expires))
-		dst->expires = expires;
+	old = READ_ONCE(dst->expires);
+
+	if (!old || time_before(expires, old))
+		WRITE_ONCE(dst->expires, expires);
 }
 
 static inline unsigned int dst_dev_overhead(struct dst_entry *dst,
@@ -497,7 +499,7 @@ INDIRECT_CALLABLE_DECLARE(struct dst_entry *ipv4_dst_check(struct dst_entry *,
 							   u32));
 static inline struct dst_entry *dst_check(struct dst_entry *dst, u32 cookie)
 {
-	if (dst->obsolete)
+	if (READ_ONCE(dst->obsolete))
 		dst = INDIRECT_CALL_INET(dst->ops->check, ip6_dst_check,
 					 ipv4_dst_check, dst, cookie);
 	return dst;
@@ -582,6 +584,11 @@ static inline void skb_dst_update_pmtu_no_confirm(struct sk_buff *skb, u32 mtu)
 		dst->ops->update_pmtu(dst, NULL, skb, mtu, false);
 }
 
+static inline struct net_device *dst_dev(const struct dst_entry *dst)
+{
+	return READ_ONCE(dst->dev);
+}
+
 static inline struct net_device *dst_dev_rcu(const struct dst_entry *dst)
 {
 	return rcu_dereference(dst->dev_rcu);
@@ -592,9 +599,24 @@ static inline struct net *dst_dev_net_rcu(const struct dst_entry *dst)
 	return dev_net_rcu(dst_dev_rcu(dst));
 }
 
+static inline struct net_device *skb_dst_dev(const struct sk_buff *skb)
+{
+	return dst_dev(skb_dst(skb));
+}
+
 static inline struct net_device *skb_dst_dev_rcu(const struct sk_buff *skb)
 {
 	return dst_dev_rcu(skb_dst(skb));
+}
+
+static inline struct net *skb_dst_dev_net(const struct sk_buff *skb)
+{
+	return dev_net(skb_dst_dev(skb));
+}
+
+static inline struct net *skb_dst_dev_net_rcu(const struct sk_buff *skb)
+{
+	return dev_net_rcu(skb_dst_dev_rcu(skb));
 }
 
 struct dst_entry *dst_blackhole_check(struct dst_entry *dst, u32 cookie);

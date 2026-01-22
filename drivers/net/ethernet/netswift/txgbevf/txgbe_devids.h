@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -35,5 +35,12 @@
 #define TXGBE_DEV_ID_SP_KR_KX_KX4               0x1002
 #define TXGBE_DEV_ID_SP_XAUI                    0x1003
 #define TXGBE_DEV_ID_SP_SGMII                   0x1004
+
+#define TXGBE_DEV_ID_AML_VF                     0x5001
+#define TXGBE_DEV_ID_AML5024_VF                 0x5024
+#define TXGBE_DEV_ID_AML5124_VF                 0x5124
+#define TXGBE_DEV_ID_AML503F_VF                 0x503f
+#define TXGBE_DEV_ID_AML513F_VF                 0x513f
+
 
 #endif /* _TXGBE_DEVIDS_H_ */

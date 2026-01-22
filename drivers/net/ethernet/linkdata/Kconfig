@@ -5,6 +5,7 @@
 
 config NET_VENDOR_LINKDATA
 	bool "Linkdata devices"
+	depends on 64BIT
 	default y
 	help
 	  If you have a network (Ethernet) card from Linkdata, say Y.

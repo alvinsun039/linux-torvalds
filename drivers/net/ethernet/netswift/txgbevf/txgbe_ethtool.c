@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -130,7 +130,7 @@ static const char txgbe_gstrings_test[][ETH_GSTRING_LEN] = {
 #define TXGBE_TEST_LEN (sizeof(txgbe_gstrings_test) / ETH_GSTRING_LEN)
 #endif /* ETHTOOL_TEST */
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbevf_get_link_ksettings(struct net_device *netdev,
 				      struct ethtool_link_ksettings *cmd)
 #else
@@ -143,10 +143,18 @@ static int txgbe_get_settings(struct net_device *netdev,
 	u32 link_speed = 0;
 	bool link_up = false;
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 	ethtool_link_ksettings_zero_link_mode(cmd, supported);
-	ethtool_link_ksettings_add_link_mode(cmd, supported,
-					     10000baseT_Full);
+	if (hw->mac.type == txgbe_mac_aml40) {
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
+				     40000baseSR4_Full);
+	} else {
+		ethtool_link_ksettings_add_link_mode(cmd, supported,
+						     10000baseT_Full);
+		if (hw->mac.type == txgbe_mac_aml)
+			ethtool_link_ksettings_add_link_mode(cmd, supported,
+							     25000baseSR_Full);
+	}
 	cmd->base.autoneg = AUTONEG_DISABLE;
 	cmd->base.port = -1;
 #else
@@ -171,7 +179,17 @@ static int txgbe_get_settings(struct net_device *netdev,
 	if (link_up) {
 		__u32 speed = SPEED_10000;
 
+/* amlite: speed updates */
 		switch(link_speed) {
+		case TXGBE_LINK_SPEED_50GB_FULL:
+			speed = SPEED_50000;
+			break;
+		case TXGBE_LINK_SPEED_40GB_FULL:
+			speed = SPEED_40000;
+			break;
+		case TXGBE_LINK_SPEED_25GB_FULL:
+			speed = SPEED_25000;
+			break;
 		case TXGBE_LINK_SPEED_10GB_FULL:
 			speed = SPEED_10000;
 			break;
@@ -183,7 +201,7 @@ static int txgbe_get_settings(struct net_device *netdev,
 			break;
 		}
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 		cmd->base.speed = speed;
 		cmd->base.duplex = DUPLEX_FULL;
 	} else {
@@ -202,7 +220,7 @@ static int txgbe_get_settings(struct net_device *netdev,
 	return 0;
 }
 
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 static int txgbevf_set_link_ksettings(struct net_device __always_unused *netdev,
 		       const struct ethtool_link_ksettings __always_unused *cmd)
 #else
@@ -401,13 +419,13 @@ static void txgbe_get_drvinfo(struct net_device *netdev,
 {
 	struct txgbe_adapter *adapter = netdev_priv(netdev);
 
-	strlcpy(drvinfo->driver, txgbe_driver_name,
+	strscpy(drvinfo->driver, txgbe_driver_name,
 		sizeof(drvinfo->driver));
-	strlcpy(drvinfo->version, txgbe_driver_version,
+	strscpy(drvinfo->version, txgbe_driver_version,
 		sizeof(drvinfo->version));
-	strlcpy(drvinfo->fw_version, txgbe_firmware_version,
+	strscpy(drvinfo->fw_version, txgbe_firmware_version,
 		sizeof(drvinfo->fw_version));
-	strlcpy(drvinfo->bus_info, pci_name(adapter->pdev),
+	strscpy(drvinfo->bus_info, pci_name(adapter->pdev),
 		sizeof(drvinfo->bus_info));
 }
 
@@ -946,11 +964,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 	struct txgbe_hw *hw = &adapter->hw;
 	u32 flags = adapter->flagsd;
 
-	/* Consistent with the X710 that the hash rules are the same as PF driver
-		In fact, VF can use its own independent rules, And the interface is
-		already implemented, but need to set TXGBE_RDB_RA_CTL bit0 on pf driver*/
-	return -EOPNOTSUPP;
-
 	/*
 	 * RSS does not support anything other than hashing
 	 * to queues on src and dst IPs and ports
@@ -1019,7 +1032,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 	/* if we changed something we need to update flags */
 	if (flags != adapter->flagsd) {
 		u32 vfmrqc = 0;
-		u32 vf_reg_mrqc = 0;
 
 		if ((flags & UDP_RSS_FLAGS) &&
 		    !(adapter->flagsd & UDP_RSS_FLAGS))
@@ -1027,12 +1039,15 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 
 		adapter->flagsd = flags;
 
-		vf_reg_mrqc = rd32(hw, TXGBE_VXMRQC);
+		vfmrqc = rd32(hw, TXGBE_VXMRQC) >> 16;
 		/* Perform hash on these packet types */
 		vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV4 |
 			  TXGBE_VXMRQC_RSS_ALG_IPV4_TCP |
 			  TXGBE_VXMRQC_RSS_ALG_IPV6 |
 			  TXGBE_VXMRQC_RSS_ALG_IPV6_TCP;
+
+		vfmrqc &= ~(TXGBE_VXMRQC_RSS_ALG_IPV4_UDP |
+			    TXGBE_VXMRQC_RSS_ALG_IPV6_UDP);
 
 		if (flags & TXGBE_F_ENA_RSS_IPV4UDP)
 			vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV4_UDP;
@@ -1041,7 +1056,7 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 			vfmrqc |= TXGBE_VXMRQC_RSS_ALG_IPV6_UDP;
 
 		wr32m(hw, TXGBE_VXMRQC, TXGBE_VXMRQC_RSS(~0),
-			TXGBE_VXMRQC_RSS(vfmrqc) | vf_reg_mrqc);
+			TXGBE_VXMRQC_RSS(vfmrqc));
 	}
 
 	return 0;
@@ -1050,11 +1065,6 @@ static int txgbe_set_rss_hash_opt(struct txgbe_adapter *adapter,
 static int txgbe_get_rss_hash_opts(struct txgbe_adapter *adapter,
 				   struct ethtool_rxnfc *cmd)
 {
-	/* Consistent with the X710 that the hash rules are the same as PF driver and not support get
-		In fact, VF can use its own independent rules, And the interface is
-		already implemented, but need to set TXGBE_RDB_RA_CTL bit0 on pf driver*/
-	return -EOPNOTSUPP;
-
 	cmd->data = 0;
 
 	/* Report default options for RSS on txgbevf */
@@ -1300,31 +1310,16 @@ static int txgbe_get_rxfh(struct net_device *netdev, u32 *indir, u8 *key)
 	if (hfunc)
 		*hfunc = ETH_RSS_HASH_TOP;
 #endif
-	if(adapter->hw.mac.type == 1){
-		
-		if (key)
-			memcpy(key, adapter->rss_key, txgbe_get_rxfh_key_size(netdev));
-			//memcpy(key, adapter->rss_key, sizeof(adapter->rss_key));
-	
-		if (indir) {
-			int i;
+	if (!indir && !key)
+		return 0;
+	spin_lock_bh(&adapter->mbx_lock);
+	if (indir)
+		err = txgbevf_get_reta_locked(&adapter->hw, indir,
+					      adapter->num_rx_queues);
 
-			for (i = 0; i < TXGBE_VFRETA_SIZE; i++)
-				indir[i] = adapter->rss_indir_tbl[i];
-		}	
-	} else {
-		if(!indir && !key)
-			return 0;
-		spin_lock_bh(&adapter->mbx_lock);
-		if(indir)
-			err = txgbevf_get_reta_locked(&adapter->hw, indir,
-					adapter->num_rx_queues);
-
-		if(!err && key)
-			err = txgbevf_get_rss_key_locked(&adapter->hw, key);
-		spin_unlock_bh(&adapter->mbx_lock);
-	
-	}
+	if (!err && key)
+		err = txgbevf_get_rss_key_locked(&adapter->hw, key);
+	spin_unlock_bh(&adapter->mbx_lock);
 	return err;
 }
 #endif /* ETHTOOL_GRSSH && ETHTOOL_SRSSH */
@@ -1333,7 +1328,7 @@ static struct ethtool_ops txgbe_ethtool_ops = {
 #ifdef ETHTOOL_COALESCE_USECS
 	.supported_coalesce_params = ETHTOOL_COALESCE_USECS,
 #endif
-#ifdef HAVE_ETHTOOL_CONVERT_U32_AND_LINK_MODE
+#ifdef ETHTOOL_GLINKSETTINGS
 	.get_link_ksettings	= txgbevf_get_link_ksettings,
 	.set_link_ksettings	= txgbevf_set_link_ksettings,
 #else

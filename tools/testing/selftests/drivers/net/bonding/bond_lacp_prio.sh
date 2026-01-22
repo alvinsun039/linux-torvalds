@@ -25,6 +25,29 @@ lib_dir=$(dirname "$0")
 # shellcheck disable=SC1091
 source "$lib_dir"/../../../net/lib.sh
 
+log_test()
+{
+	local rc=$1
+	local expected=$2
+	local msg="$3"
+
+	if [ ${rc} -eq ${expected} ]; then
+		EXIT_STATUS=0
+		printf "TEST: %-60s  [ OK ]\n" "${msg}"
+		nsuccess=$((nsuccess+1))
+	else
+		EXIT_STATUS=1
+		nfail=$((nfail+1))
+		printf "TEST: %-60s  [FAIL]\n" "${msg}"
+		if [ "${PAUSE_ON_FAIL}" = "yes" ]; then
+			echo
+			echo "hit enter to continue, 'q' to quit"
+			read a
+			[ "$a" = "q" ] && exit 1
+		fi
+	fi
+}
+
 setup_links()
 {
 	# shellcheck disable=SC2154
@@ -94,15 +117,15 @@ setup_ns c_ns s_ns b_ns
 setup_links
 
 test_port_prio_setting
-log_test "bond 802.3ad" "actor_port_prio setting"
+log_test ${RET} 0 "bond 802.3ad actor_port_prio setting"
 
 test_agg_reselect eth0
-log_test "bond 802.3ad" "actor_port_prio select"
+log_test ${RET} 0 "bond 802.3ad actor_port_prio select"
 
 # Change the actor port prio and re-test
 ip -n "${c_ns}" link set eth0 type bond_slave actor_port_prio 10
 ip -n "${c_ns}" link set eth2 type bond_slave actor_port_prio 1000
 test_agg_reselect eth2
-log_test "bond 802.3ad" "actor_port_prio switch"
+log_test ${RET} 0 "bond 802.3ad actor_port_prio switch"
 
 exit "${EXIT_STATUS}"

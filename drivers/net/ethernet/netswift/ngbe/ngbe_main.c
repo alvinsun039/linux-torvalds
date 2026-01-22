@@ -80,13 +80,13 @@ static const char ngbe_driver_string[] =
 #define RELEASE_TAG
 
 #if defined(NGBE_SUPPORT_KYLIN)
-#define DRV_VERSION     __stringify(1.2.6-kylin)
+#define DRV_VERSION     __stringify(1.2.6.5-kylin)
 #elif defined(CONFIG_EULER_KERNEL)
-#define DRV_VERSION     __stringify(1.2.6-kylin)
+#define DRV_VERSION     __stringify(1.2.6.5-kylin)
 #elif defined(CONFIG_UOS_KERNEL)
-#define DRV_VERSION     __stringify(1.2.6-kylin)
+#define DRV_VERSION     __stringify(1.2.6.5-kylin)
 #else
-#define DRV_VERSION     __stringify(1.2.6-kylin)
+#define DRV_VERSION     __stringify(1.2.6.5-kylin)
 #endif
 const char ngbe_driver_version[32] = DRV_VERSION;
 static const char ngbe_copyright[] =
@@ -587,43 +587,58 @@ static void ngbe_tx_timeout_reset(struct ngbe_adapter *adapter)
 {
 	struct ngbe_adapter *adapter = netdev_priv(netdev);
 	struct ngbe_hw *hw = &adapter->hw;
+	bool tdm_desc_fatal = false;
+	u16 vid, pci_cmd;	u32 head, tail;
+	u32 value = 0;
 	int i;
-	u16 vid = 0;
-	u16 cmd = 0;
-	u32 reg32 = 0;
-	u32 head, tail;
 
 	pci_read_config_word(adapter->pdev, PCI_VENDOR_ID, &vid);
 	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci vendor id is 0x%x\n", vid);
 
-	pci_read_config_word(adapter->pdev, PCI_COMMAND, &cmd);
-	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", cmd);
-
-	reg32 = rd32(&adapter->hw, 0x10000);
-	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", reg32);
+	pci_read_config_word(adapter->pdev, PCI_COMMAND, &pci_cmd);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "pci command reg is 0x%x.\n", pci_cmd);
+	value = rd32(&adapter->hw, 0x10000);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x10000 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d0);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d0 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d4);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d4 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180d8);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180d8 value is 0x%08x\n", value);
+	value = rd32(&adapter->hw, 0x180dc);
+	ERROR_REPORT1(NGBE_ERROR_POLLING, "reg 0x180dc value is 0x%08x\n", value);
 
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		head = rd32(&adapter->hw, NGBE_PX_TR_RP(adapter->tx_ring[i]->reg_idx));
 		tail = rd32(&adapter->hw, NGBE_PX_TR_WP(adapter->tx_ring[i]->reg_idx));
 
 		ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"tx ring %d next_to_use is %d, next_to_clean is %d\n", 
-			i, adapter->tx_ring[i]->next_to_use, adapter->tx_ring[i]->next_to_clean);
+			      "tx ring %d next_to_use is %d, next_to_clean is %d\n",
+			      i, adapter->tx_ring[i]->next_to_use,
+			      adapter->tx_ring[i]->next_to_clean);
 		ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"tx ring %d hw rp is 0x%x, wp is 0x%x\n", i, head, tail);
+			      "tx ring %d hw rp is 0x%x, wp is 0x%x\n",
+			      i, head, tail);
 	}
 
-	reg32 = rd32(&adapter->hw, NGBE_PX_IMS);
+	value = rd32(&adapter->hw, NGBE_PX_IMS);
 	ERROR_REPORT1(NGBE_ERROR_POLLING,
-			"PX_IMS value is 0x%08x\n", reg32);
-	if (reg32 && reg32 != NGBE_FAILED_READ_CFG_DWORD) {
+		      "PX_IMS value is 0x%08x\n", value);
+
+	if (value && value != NGBE_FAILED_READ_CFG_DWORD) {
 		ERROR_REPORT1(NGBE_ERROR_POLLING, "clear interrupt mask.\n");
-		wr32(&adapter->hw, NGBE_PX_ICS, reg32);
-		wr32(&adapter->hw, NGBE_PX_IMC, reg32);
+		wr32(&adapter->hw, NGBE_PX_ICS, value);
+		wr32(&adapter->hw, NGBE_PX_IMC, value);
 	}
+
+	/* only check pf queue tdm desc error : [0,7] is valid */
+	if (rd32(&adapter->hw, NGBE_TDM_DESC_FATAL) & GENMASK(7, 0))
+		tdm_desc_fatal = true;
 
 	if (NGBE_RECOVER_CHECK == 1) {
-		if (vid == NGBE_FAILED_READ_CFG_WORD) {
+		if (vid == NGBE_FAILED_READ_CFG_WORD ||
+		    tdm_desc_fatal ||
+		    !(pci_cmd & BIT(1))) {
 			ngbe_tx_timeout_dorecovery(adapter);
 		} else {
 			ngbe_print_tx_hang_status(adapter);
@@ -4601,7 +4616,7 @@ static void ngbe_mac_set_default_filter(struct ngbe_adapter *adapter,
 			    NGBE_PSR_MAC_SWC_AD_H_AV);
 }
 
-int ngbe_add_mac_filter(struct ngbe_adapter *adapter, u8 *addr, u16 pool)
+int ngbe_add_mac_filter(struct ngbe_adapter *adapter, const u8 *addr, u16 pool)
 {
 	struct ngbe_hw *hw = &adapter->hw;
 	u32 i;
@@ -4650,7 +4665,7 @@ static void ngbe_flush_sw_mac_table(struct ngbe_adapter *adapter)
 	ngbe_sync_mac_table(adapter);
 }
 
-int ngbe_del_mac_filter(struct ngbe_adapter *adapter, u8 *addr, u16 pool)
+int ngbe_del_mac_filter(struct ngbe_adapter *adapter, const u8 *addr, u16 pool)
 {
 	/* search table for addr, if found, set to 0 and sync */
 	u32 i;
@@ -4714,6 +4729,26 @@ int ngbe_write_uc_addr_list(struct net_device *netdev, int pool)
 	}
 	return count;
 }
+
+static int ngbe_uc_sync(struct net_device *netdev, const unsigned char *addr)
+{
+	struct ngbe_adapter *adapter = netdev_priv(netdev);
+	int ret;
+
+	ret = ngbe_add_mac_filter(adapter, addr, VMDQ_P(0));
+
+	return min_t(int, ret, 0);
+}
+
+static int ngbe_uc_unsync(struct net_device *netdev, const unsigned char *addr)
+{
+	struct ngbe_adapter *adapter = netdev_priv(netdev);
+
+	ngbe_del_mac_filter(adapter, addr, VMDQ_P(0));
+
+	return 0;
+}
+
 
 #endif
 
@@ -4911,10 +4946,9 @@ void ngbe_set_rx_mode(struct net_device *netdev)
 	 * sufficient space to store all the addresses then enable
 	 * unicast promiscuous mode
 	 */
-	count = ngbe_write_uc_addr_list(netdev, VMDQ_P(0));
-	if (count < 0) {
+	if (__dev_uc_sync(netdev, ngbe_uc_sync, ngbe_uc_unsync)) {
 		vmolr &= ~NGBE_PSR_VM_L2CTL_ROPE;
-		vmolr |= NGBE_PSR_VM_L2CTL_UPE;
+		fctrl |= NGBE_PSR_CTL_UPE;
 	}
 
 	/*
@@ -5655,6 +5689,7 @@ void ngbe_reset(struct ngbe_adapter *adapter)
 		break;
 	case NGBE_ERR_MASTER_REQUESTS_PENDING:
 		e_dev_err("master disable timed out\n");
+		ngbe_tx_timeout_dorecovery(adapter);
 		break;
 	case NGBE_ERR_EEPROM_VERSION:
 		/* We are running on a pre-production device, log a warning */
@@ -7851,37 +7886,6 @@ static void ngbe_service_task(struct work_struct *work)
 	ngbe_service_event_complete(adapter);
 }
 
-static u8 get_ipv6_proto(struct sk_buff *skb, int offset)
-{
-	struct ipv6hdr *hdr = (struct ipv6hdr *)(skb->data + offset);
-	u8 nexthdr = hdr->nexthdr;
-
-	offset += sizeof(struct ipv6hdr);
-
-	while (ipv6_ext_hdr(nexthdr)) {
-		struct ipv6_opt_hdr _hdr, *hp;
-
-		if (nexthdr == NEXTHDR_NONE)
-			break;
-
-		hp = skb_header_pointer(skb, offset, sizeof(_hdr), &_hdr);
-		if (!hp)
-			break;
-
-		if (nexthdr == NEXTHDR_FRAGMENT) {
-			break;
-		} else if (nexthdr == NEXTHDR_AUTH) {
-			offset +=  ipv6_authlen(hp);
-		} else {
-			offset +=  ipv6_optlen(hp);
-		}
-
-		nexthdr = hp->nexthdr;
-	}
-
-	return nexthdr;
-}
-
 union network_header {
 	struct iphdr *ipv4;
 	struct ipv6hdr *ipv6;
@@ -7891,6 +7895,9 @@ union network_header {
 static ngbe_dptype encode_tx_desc_ptype(const struct ngbe_tx_buffer *first)
 {
 	struct sk_buff *skb = first->skb;
+	unsigned char *exthdr;
+	unsigned char *l4_hdr;
+	__be16 frag_off;
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 	u8 tun_prot = 0;
 #endif
@@ -7909,7 +7916,12 @@ static ngbe_dptype encode_tx_desc_ptype(const struct ngbe_tx_buffer *first)
 			ptype = NGBE_PTYPE_TUN_IPV4;
 			break;
 		case __constant_htons(ETH_P_IPV6):
-			tun_prot = get_ipv6_proto(skb, skb_network_offset(skb));
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
+			tun_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &tun_prot, &frag_off);
 			if (tun_prot == NEXTHDR_FRAGMENT)
 				goto encap_frag;
 			ptype = NGBE_PTYPE_TUN_IPV6;
@@ -7918,7 +7930,8 @@ static ngbe_dptype encode_tx_desc_ptype(const struct ngbe_tx_buffer *first)
 			goto exit;
 		}
 
-		if (tun_prot == IPPROTO_IPIP) {
+		if (tun_prot == IPPROTO_IPIP ||
+		    tun_prot == IPPROTO_IPV6) {
 			hdr.raw = (void *)inner_ip_hdr(skb);
 			ptype |= NGBE_PTYPE_PKT_IPIP;
 		} else if (tun_prot == IPPROTO_UDP) {
@@ -7936,8 +7949,12 @@ static ngbe_dptype encode_tx_desc_ptype(const struct ngbe_tx_buffer *first)
 			}
 			break;
 		case 6:
-			l4_prot = get_ipv6_proto(skb,
-						 skb_inner_network_offset(skb));
+			l4_hdr = skb_inner_transport_header(skb);
+			exthdr = skb_inner_network_header(skb) + sizeof(struct ipv6hdr);
+			l4_prot = inner_ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &l4_prot, &frag_off);
 			ptype |= NGBE_PTYPE_PKT_IPV6;
 			if (l4_prot == NEXTHDR_FRAGMENT) {
 				ptype |= NGBE_PTYPE_TYP_IPFRAG;
@@ -7961,7 +7978,12 @@ encap_frag:
 			break;
 #ifdef NETIF_F_IPV6_CSUM
 		case __constant_htons(ETH_P_IPV6):
-			l4_prot = get_ipv6_proto(skb, skb_network_offset(skb));
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
+			l4_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &l4_prot, &frag_off);
 			ptype = NGBE_PTYPE_PKT_IP | NGBE_PTYPE_PKT_IPV6;
 			if (l4_prot == NEXTHDR_FRAGMENT) {
 				ptype |= NGBE_PTYPE_TYP_IPFRAG;
@@ -8031,6 +8053,9 @@ static int ngbe_tso(struct ngbe_ring *tx_ring,
 	u32 tunhdr_eiplen_tunlen = 0;
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 	u8 tun_prot = 0;
+	unsigned char *exthdr;
+	unsigned char *l4_hdr;
+	__be16 frag_off;
 	bool enc = skb->encapsulation;
 #endif /* HAVE_ENCAP_TSO_OFFLOAD */
 #ifdef NETIF_F_TSO6
@@ -8119,7 +8144,12 @@ static int ngbe_tso(struct ngbe_ring *tx_ring,
 			first->tx_flags |= NGBE_TX_FLAGS_OUTER_IPV4;
 			break;
 		case __constant_htons(ETH_P_IPV6):
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 			tun_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					 &tun_prot, &frag_off);
 			break;
 		default:
 			break;
@@ -8144,6 +8174,7 @@ static int ngbe_tso(struct ngbe_ring *tx_ring,
 					NGBE_TXD_TUNNEL_LEN_SHIFT);
 			break;
 		case IPPROTO_IPIP:
+		case IPPROTO_IPV6:
 			tunhdr_eiplen_tunlen = (((char *)inner_ip_hdr(skb)-
 						(char *)ip_hdr(skb)) >> 2) <<
 						NGBE_TXD_OUTER_IPLEN_SHIFT;
@@ -8188,6 +8219,7 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 	u32 type_tucmd;
 
 	if (skb->ip_summed != CHECKSUM_PARTIAL) {
+csum_failed:
 		if (!(first->tx_flags & NGBE_TX_FLAGS_HW_VLAN) &&
 		    !(first->tx_flags & NGBE_TX_FLAGS_CC))
 			return;
@@ -8195,6 +8227,9 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 				  NGBE_TXD_MACLEN_SHIFT;
 	} else {
 		u8 l4_prot = 0;
+		unsigned char *exthdr;
+		unsigned char *l4_hdr;
+		__be16 frag_off;
 #ifdef HAVE_ENCAP_TSO_OFFLOAD
 		union {
 			struct iphdr *ipv4;
@@ -8216,7 +8251,12 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 				tun_prot = ip_hdr(skb)->protocol;
 				break;
 			case __constant_htons(ETH_P_IPV6):
+				l4_hdr = skb_transport_header(skb);
+				exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 				tun_prot = ipv6_hdr(skb)->nexthdr;
+				if (l4_hdr != exthdr)
+					ipv6_skip_exthdr(skb, exthdr - skb->data,
+						 &tun_prot, &frag_off);
 				break;
 			default:
 				if (unlikely(net_ratelimit())) {
@@ -8246,6 +8286,7 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 					NGBE_TXD_TUNNEL_LEN_SHIFT);
 				break;
 			case IPPROTO_IPIP:
+			case IPPROTO_IPV6:
 				tunhdr_eiplen_tunlen =
 					(((char *)inner_ip_hdr(skb)-
 					(char *)ip_hdr(skb)) >> 2) <<
@@ -8271,7 +8312,11 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 		case 6:
 			vlan_macip_lens |=
 				(transport_hdr.raw - network_hdr.raw) >> 1;
+			exthdr = network_hdr.raw + sizeof(struct ipv6hdr);
 			l4_prot = network_hdr.ipv6->nexthdr;
+			if (transport_hdr.raw != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+						&l4_prot, &frag_off);
 			break;
 		default:
 			break;
@@ -8286,7 +8331,12 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 #ifdef NETIF_F_IPV6_CSUM
 		case __constant_htons(ETH_P_IPV6):
 			vlan_macip_lens |= skb_network_header_len(skb) >> 1;
+			l4_hdr = skb_transport_header(skb);
+			exthdr = skb_network_header(skb) + sizeof(struct ipv6hdr);
 			l4_prot = ipv6_hdr(skb)->nexthdr;
+			if (l4_hdr != exthdr)
+				ipv6_skip_exthdr(skb, exthdr - skb->data,
+					&l4_prot, &frag_off);
 			break;
 #endif /* NETIF_F_IPV6_CSUM */
 		default:
@@ -8315,7 +8365,8 @@ static void ngbe_tx_csum(struct ngbe_ring *tx_ring,
 					NGBE_TXD_L4LEN_SHIFT;
 			break;
 		default:
-			break;
+			skb_checksum_help(skb);
+			goto csum_failed;
 		}
 
 		/* update TX checksum flag */
@@ -9861,10 +9912,7 @@ static int __devinit ngbe_probe(struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
-	/* errata 16 */
-	pcie_capability_clear_and_set_word(pdev, PCI_EXP_DEVCTL,
-		PCI_EXP_DEVCTL_READRQ,
-		0x1000);
+	pcie_set_readrq(pdev, 128);
 
 #ifdef HAVE_TX_MQ
 	netdev = alloc_etherdev_mq(sizeof(struct ngbe_adapter), NGBE_MAX_TX_QUEUES);

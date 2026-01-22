@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -62,19 +62,26 @@ struct txgbe_mac_operations {
 	s32 (*update_mc_addr_list)(struct txgbe_hw *, u8 *, u32,
 				   txgbe_mc_addr_itr, bool);
 	s32 (*update_xcast_mode)(struct txgbe_hw *, int);
-	s32 (*get_link_state)(struct txgbe_hw *hw, bool *link_state);
+	s32 (*get_link_state)(struct txgbe_hw *hw, u16 *link_state);
 	s32 (*enable_mc)(struct txgbe_hw *);
 	s32 (*disable_mc)(struct txgbe_hw *);
 	s32 (*clear_vfta)(struct txgbe_hw *);
 	s32 (*set_vfta)(struct txgbe_hw *, u32, u32, bool, bool);
 };
 
+enum txgbe_mac_type {
+	txgbe_mac_unknown = 0,
+	txgbe_mac_sp,
+	txgbe_mac_aml,
+	txgbe_mac_aml40
+};
+
 struct txgbe_mac_info {
+	enum txgbe_mac_type type;
+
 	struct txgbe_mac_operations ops;
 	u8 addr[6];
 	u8 perm_addr[6];
-
-	enum txgbe_mac_type type;
 
 	s32  mc_filter_type;
 
@@ -143,11 +150,14 @@ struct txgbe_hw {
 	u16 subsystem_device_id;
 	u16 vendor_id;
 
+	bool pf_is_down;
+
 	u8  revision_id;
 	bool adapter_stopped;
 
 	int api_version;
-	
+
+	u16 tpid[8];
 	u32 b4_buf[16];
 };
 
@@ -193,7 +203,7 @@ s32 txgbe_update_mc_addr_list_vf(struct txgbe_hw *hw, u8 *mc_addr_list,
 				 u32 mc_addr_count, txgbe_mc_addr_itr,
 				 bool clear);
 s32 txgbe_update_xcast_mode(struct txgbe_hw *hw, int xcast_mode);
-s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state);
+s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, u16 *link_state);
 s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 		      bool vlan_on, bool vlvf_bypass);
 s32 txgbe_rlpml_set_vf(struct txgbe_hw *hw, u16 max_size);

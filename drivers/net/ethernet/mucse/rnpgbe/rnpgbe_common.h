@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #ifndef _RNPGBE_COMMON_H_
 #define _RNPGBE_COMMON_H_
@@ -9,6 +9,7 @@
 #include "rnpgbe_type.h"
 #include "rnpgbe.h"
 #include "rnpgbe_regs.h"
+#include "rnp_compat.h"
 
 struct rnpgbe_adapter;
 
@@ -19,7 +20,7 @@ struct rnpgbe_adapter;
 #define rx_buf_dump buf_dump
 #define rx_dbg(fmt, args...)                                                   \
 	printk(KERN_DEBUG "[ %s:%d ] " fmt, __func__, __LINE__, ##args)
-#else
+#else /* CONFIG_RNP_RX_DEBUG */
 #define rx_debug_printk(fmt, args...)
 #define rx_buf_dump(a, b, c)
 #define rx_dbg(fmt, args...)
@@ -29,10 +30,9 @@ struct rnpgbe_adapter;
 #define desc_hex_dump(msg, buf, len)                                           \
 	print_hex_dump(KERN_WARNING, msg, DUMP_PREFIX_OFFSET, 16, 1, (buf),    \
 		       (len), false)
-
 #define tx_dbg(fmt, args...)                                                   \
 	printk(KERN_DEBUG "[ %s:%d ] " fmt, __func__, __LINE__, ##args)
-#else
+#else /* CONFIG_RNP_TX_DEBUG */
 #define desc_hex_dump(msg, buf, len)
 #define tx_dbg(fmt, args...)
 #endif /* CONFIG_RNP_TX_DEBUG */
@@ -40,16 +40,16 @@ struct rnpgbe_adapter;
 #ifdef DEBUG
 #define dbg(fmt, args...)                                                      \
 	printk(KERN_DEBUG "[ %s:%d ] " fmt, __func__, __LINE__, ##args)
-#else
+#else /* DEBUG */
 #define dbg(fmt, args...)
-#endif
+#endif /* DEBUG */
 
 #ifdef CONFIG_RNP_VF_DEBUG
 #define vf_dbg(fmt, args...)                                                   \
 	printk(KERN_DEBUG "[ %s:%d ] " fmt, __func__, __LINE__, ##args)
-#else
+#else /* CONFIG_RNP_VF_DEBUG */
 #define vf_dbg(fmt, args...)
-#endif
+#endif /* CONFIG_RNP_VF_DEBUG */
 
 /* ================= registers  read/write helper ===== */
 #define p_rnpgbe_wr_reg(reg, val)                                              \
@@ -75,36 +75,44 @@ static inline unsigned int rnpgbe_rd_reg(void *reg)
 	dbg(" rd-reg: %p <== 0x%08x\n", reg, v);
 	return v;
 }
-
 #define rnpgbe_wr_reg(reg, val)                                                \
 	do {                                                                   \
 		dbg(" wr-reg: %p <== 0x%08x \t#%-4d %s\n", (reg), (val),       \
 		    __LINE__, __FILE__);                                       \
 		iowrite32((val), (void *)(reg));                               \
 	} while (0)
-#else
-#define rnpgbe_rd_reg(reg) readl((void *)(reg))
-#define rnpgbe_wr_reg(reg, val) writel((val), (void *)(reg))
-#endif
+#else /* IO_PRINT */
+#define rnpgbe_rd_reg(reg) readl(reg)
+#define rnpgbe_wr_reg(reg, val) writel(val, reg)
+#endif /* IO_PRINT */
 
-#define rd32(hw, off) rnpgbe_rd_reg((hw)->hw_addr + (off))
-#define wr32(hw, off, val) rnpgbe_wr_reg((hw)->hw_addr + (off), (val))
+//#define rd32(hw, off) rnpgbe_rd_reg((hw)->hw_addr + (off))
+//#define wr32(hw, off, val) rnpgbe_wr_reg((hw)->hw_addr + (off), (val))
 
 #define nic_rd32(nic, off) rnpgbe_rd_reg((nic)->nic_base_addr + (off))
 #define nic_wr32(nic, off, val)                                                \
 	rnpgbe_wr_reg((nic)->nic_base_addr + (off), (val))
 
+/*
 #define dma_rd32(dma, off) rnpgbe_rd_reg((dma)->dma_base_addr + (off))
 #define dma_wr32(dma, off, val)                                                \
 	rnpgbe_wr_reg((dma)->dma_base_addr + (off), (val))
 
+
+//#define eth_rd32(eth, off) rnpgbe_rd_reg((eth)->eth_base_addr + (off))
+#define eth_wr32(eth, off, val)                                                \
+	rnpgbe_wr_reg((eth)->eth_base_addr + (off), (val))
+*/
+
 #define dma_ring_rd32(dma, off) rnpgbe_rd_reg((dma)->dma_ring_addr + (off))
 #define dma_ring_wr32(dma, off, val)                                           \
 	rnpgbe_wr_reg((dma)->dma_ring_addr + (off), (val))
-
-#define eth_rd32(eth, off) rnpgbe_rd_reg((eth)->eth_base_addr + (off))
-#define eth_wr32(eth, off, val)                                                \
-	rnpgbe_wr_reg((eth)->eth_base_addr + (off), (val))
+u32 hw_rd32(struct rnpgbe_hw *hw, u32 off);
+void hw_wr32(struct rnpgbe_hw *hw, u32 off, u32 val);
+u32 dma_rd32(struct rnpgbe_dma_info *dma, u32 off);
+void dma_wr32(struct rnpgbe_dma_info *dma, u32 off, u32 val);
+u32 eth_rd32(struct rnpgbe_eth_info *eth, u32 off);
+void eth_wr32(struct rnpgbe_eth_info *eth, u32 off, u32 val);
 
 #define mac_rd32(mac, off) rnpgbe_rd_reg((mac)->mac_addr + (off))
 #define mac_wr32(mac, off, val) rnpgbe_wr_reg((mac)->mac_addr + (off), (val))
@@ -121,11 +129,11 @@ static inline unsigned int rnpgbe_rd_reg_1(int ring, u32 off, void *reg)
 	rnpgbe_rd_reg_1(ring->rnpgbe_queue_idx, off, (ring)->ring_addr + (off))
 #define ring_wr32(ring, off, val)                                              \
 	rnpgbe_wr_reg((ring)->ring_addr + (off), (val))
-#else
+#else /* debug_ring */
 #define ring_rd32(ring, off) rnpgbe_rd_reg((ring)->ring_addr + (off))
 #define ring_wr32(ring, off, val)                                              \
 	rnpgbe_wr_reg((ring)->ring_addr + (off), (val))
-#endif
+#endif /* debug_ring */
 
 #define pwr32(hw, off, val) p_rnpgbe_wr_reg((hw)->hw_addr + (off), (val))
 
@@ -138,7 +146,7 @@ static inline unsigned int rnpgbe_rd_reg_1(int ring, u32 off, void *reg)
 		u32 reg = reg_def;                                             \
 		u32 value = rd32(hw, reg);                                     \
 		dbg("before set  %x %x\n", reg, value);                        \
-		value |= (0x01 << (bit));                                        \
+		value |= (0x01 << bit);                                        \
 		dbg("after set %x %x\n", reg, value);                          \
 		wr32(hw, reg, value);                                          \
 	} while (0)
@@ -148,7 +156,7 @@ static inline unsigned int rnpgbe_rd_reg_1(int ring, u32 off, void *reg)
 		u32 reg = reg_def;                                             \
 		u32 value = rd32(hw, reg);                                     \
 		dbg("before clr %x %x\n", reg, value);                         \
-		value &= (~(0x01 << (bit)));                                     \
+		value &= (~(0x01 << bit));                                     \
 		dbg("after clr %x %x\n", reg, value);                          \
 		wr32(hw, reg, value);                                          \
 	} while (0)
@@ -162,7 +170,7 @@ static inline unsigned int rnpgbe_rd_reg_1(int ring, u32 off, void *reg)
 	((NETIF_MSG_##nlevel & adapter->msg_enable) ?                          \
 		 (void)(netdev_printk(KERN_##klevel, adapter->netdev, fmt,     \
 				      ##args)) :                               \
-		 NULL)
+		 (void)0)
 
 /* ==== log helper === */
 #ifdef HW_DEBUG
@@ -172,12 +180,12 @@ static inline unsigned int rnpgbe_rd_reg_1(int ring, u32 off, void *reg)
 #define hw_dbg(hw, fmt, args...)
 #define eth_dbg(hw, fmt, args...)
 #endif
-
+//#define RNP_DEBUG_OPEN
 #ifdef RNP_DEBUG_OPEN
 #define rnpgbe_dbg(fmt, args...) printk(KERN_DEBUG fmt, ##args)
-#else
+#else /* RNP_DEBUG_OPEN */
 #define rnpgbe_dbg(fmt, args...)
-#endif
+#endif /* RNP_DEBUG_OPEN */
 #define rnpgbe_info(fmt, args...) printk(KERN_DEBUG "rnp-info: " fmt, ##args)
 #define rnpgbe_warn(fmt, args...) printk(KERN_DEBUG "rnp-warn: " fmt, ##args)
 #define rnpgbe_err(fmt, args...) printk(KERN_ERR "rnp-err : " fmt, ##args)
@@ -208,12 +216,12 @@ static inline void buf_dump_line(const char *msg, int line, void *buf, int len)
 			   buf);
 
 	for (i = 0; i < len; ++i) {
-		if (i != 0 && (i % 16) == 0 && (offset >= (1024 - 10 * 16))) {
+		if ((i != 0) && (i % 16) == 0 && (offset >= (1024 - 10 * 16))) {
 			printk(KERN_DEBUG "%s\n", msg_buf);
 			offset = 0;
 		}
 
-		if (i != 0 && (i % 16) == 0) {
+		if ((i != 0) && (i % 16) == 0) {
 			offset += snprintf(msg_buf + offset, msg_len,
 					   "\n%03x: ", i);
 		}
@@ -223,9 +231,9 @@ static inline void buf_dump_line(const char *msg, int line, void *buf, int len)
 	offset += snprintf(msg_buf + offset, msg_len, "\n");
 	printk(KERN_DEBUG "%s\n", msg_buf);
 }
-#else
-#define buf_dump_line(msg, line, buf, len)
-#endif
+#else /* CONFIG_RNP_TX_DEBUG */
+#define buf_dump_line(msg, line, buf, len) ;
+#endif /* CONFIG_RNP_TX_DEBUG */
 
 static inline __le64 build_ctob(u32 vlan_cmd, u32 mac_ip_len, u32 size)
 {
@@ -244,12 +252,12 @@ static inline void buf_dump(const char *msg, void *buf, int len)
 			   "=== %s #%d ==\n000: ", msg, len);
 
 	for (i = 0; i < len; ++i) {
-		if (i != 0 && (i % 16) == 0 && (offset >= (1024 - 10 * 16))) {
+		if ((i != 0) && (i % 16) == 0 && (offset >= (1024 - 10 * 16))) {
 			printk(KERN_DEBUG "%s\n", msg_buf);
 			offset = 0;
 		}
 
-		if (i != 0 && (i % 16) == 0) {
+		if ((i != 0) && (i % 16) == 0) {
 			offset += snprintf(msg_buf + offset, msg_len,
 					   "\n%03x: ", i);
 		}
@@ -288,5 +296,5 @@ extern unsigned int rnpgbe_loglevel;
 			printk(KERN_DEBUG fmt, ##args);                        \
 		}                                                              \
 	} while (0)
-
-#endif /* RNPGBE_COMMON */
+int pci_device_check_offline(struct pci_dev *pdev);
+#endif /* _RNPGBE_COMMON_H_ */

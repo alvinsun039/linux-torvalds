@@ -4209,9 +4209,6 @@ static void intel_iommu_release_device(struct device *dev)
 
 static void intel_iommu_probe_finalize(struct device *dev)
 {
-	set_dma_ops(dev, NULL);
-	iommu_setup_dma_ops(dev, 0, U64_MAX);
-
 	if (is_zhaoxin_kh40000())
 		kh40000_bind_iommu_dma_ops(dev);
 }

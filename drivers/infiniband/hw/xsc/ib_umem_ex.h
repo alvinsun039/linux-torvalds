@@ -28,7 +28,6 @@ struct ib_umem_ex *ib_umem_ex(struct ib_umem *umem);
 #ifndef MLX_PEER_SUPPORT
 typedef void (*umem_invalidate_func_t)(void *invalidation_cookie,
 	struct ib_umem_ex *umem_ex, unsigned long addr, size_t size);
-
 struct invalidation_ctx {
 	struct ib_umem_ex *umem_ex;
 	u64 context_ticket;

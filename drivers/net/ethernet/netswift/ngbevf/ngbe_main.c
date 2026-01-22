@@ -3050,7 +3050,8 @@ void ngbe_down(struct ngbevf_adapter *adapter)
 #ifdef HAVE_PCI_ERS
 	if (!pci_channel_offline(adapter->pdev))
 #endif
-		ngbe_reset(adapter);
+		if (adapter->pf_running)
+			ngbe_reset(adapter);
 
 	ngbe_clean_all_tx_rings(adapter);
 	ngbe_clean_all_rx_rings(adapter);
@@ -4814,7 +4815,14 @@ int ngbe_xmit_frame_ring(struct sk_buff *skb,
 	}
 #endif /* NETIF_F_HW_VLAN_TX || NETIF_F_HW_VLAN_CTAG_TX */
 	//protocol = vlan_get_protocol(skb);
+	if (protocol == htons(ETH_P_8021Q) || protocol == htons(ETH_P_8021AD)) {
+		struct vlan_hdr *vhdr, _vhdr;
+		vhdr = skb_header_pointer(skb, ETH_HLEN, sizeof(_vhdr), &_vhdr);
+		if (!vhdr)
+			goto out_drop;
 
+		protocol = vhdr->h_vlan_encapsulated_proto;
+	}
 	/* record initial flags and protocol */
 	first->tx_flags = tx_flags;
 	first->protocol = protocol;

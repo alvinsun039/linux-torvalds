@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -160,7 +160,7 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 	wr32m(hw, TXGBE_VXCTRL, TXGBE_VXCTRL_RST, TXGBE_VXCTRL_RST);
 	txgbe_flush(hw);
 
-	msleep(50);
+	udelay(50);
 
 	/* we cannot reset while the RSTI / RSTD bits are asserted */
 	while (!mbx->ops.check_for_rst(hw, 0) && timeout) {
@@ -171,6 +171,10 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 	/* restore msix vectors */
 	for (i = 0; i < 16; i++)
 		txgbe_wr32(hw->b4_addr, i * 4, hw->b4_buf[i]);
+
+	/* amlite: bme */
+	if (hw->mac.type == txgbe_mac_aml || hw->mac.type == txgbe_mac_aml40)
+		wr32(hw, 0x4B8, 0x1);
 
 	if (!timeout)
 		return TXGBE_ERR_RESET_FAILED;
@@ -186,7 +190,7 @@ s32 txgbe_reset_hw_vf(struct txgbe_hw *hw)
 	if (err)
 		return err;
 
-	msleep(10);
+	udelay(10);
 
 	/*
 	 * set our "perm_addr" based on info provided by PF
@@ -438,7 +442,7 @@ s32 txgbe_update_xcast_mode(struct txgbe_hw *hw, int xcast_mode)
  *
  * Returns state of the operation error or success.
  **/
-s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state)
+s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, u16 *link_state)
 {
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	u32 msgbuf[2];
@@ -447,7 +451,6 @@ s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state)
 
 	msgbuf[0] = TXGBE_VF_GET_LINK_STATE;
 	msgbuf[1] = 0x0;
-
 	err = mbx->ops.write_posted(hw, msgbuf, 2, 0);
 	if (err)
 		return err;
@@ -479,9 +482,13 @@ s32 txgbe_get_link_state_vf(struct txgbe_hw *hw, bool *link_state)
 s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 		      bool vlan_on, bool vlvf_bypass)
 {
+	struct txgbe_adapter *adapter = hw->back;
+	struct net_device *netdev = adapter->netdev;
 	struct txgbe_mbx_info *mbx = &hw->mbx;
+	bool vlan_offload = false;
 	u32 msgbuf[2];
 	s32 err;
+
 	UNREFERENCED_2PARAMETER(vind, vlvf_bypass);
 	UNREFERENCED_2PARAMETER(vlan_on, vlan);
 
@@ -489,6 +496,31 @@ s32 txgbe_set_vfta_vf(struct txgbe_hw *hw, u32 vlan, u32 vind,
 	msgbuf[1] = vlan;
 	/* Setting the 8 bit field MSG INFO to TRUE indicates "add" */
 	msgbuf[0] |= vlan_on << TXGBE_VT_MSGINFO_SHIFT;
+
+	/* define ctag and stag macros in same patch, no need to
+	 *judge code flow in different condition
+	 */
+#if defined(NETIF_F_HW_VLAN_STAG_TX) && defined(NETIF_F_HW_VLAN_CTAG_TX)
+	if ((netdev->features & NETIF_F_HW_VLAN_STAG_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_STAG_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_STAG_FILTER) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_CTAG_FILTER))
+		vlan_offload = true;
+	else
+		vlan_offload = false;
+#else
+	if ((netdev->features & NETIF_F_HW_VLAN_TX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_RX) ||
+	   (netdev->features & NETIF_F_HW_VLAN_FILTER))
+		vlan_offload = true;
+	else
+		vlan_offload = false;
+#endif
+
+	/* if vf vlan offload is disabled, allow to create vlan under pf port vlan */
+	msgbuf[0] |= vlan_offload << TXGBE_VT_MSGINFO_VLAN_OFFLOAD_SHIFT;
 
 	err = mbx->ops.write_posted(hw, msgbuf, 2, 0);
 	if (!err)
@@ -612,6 +644,109 @@ s32 txgbe_setup_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed speed,
 	return 0;
 }
 
+#define   TXGBE_PFLINK_SPEED(g)        (GENMASK(19, 0) & ((g) >> 1))
+
+static int txgbe_notify_vf_link_status(struct txgbe_hw *hw, u32 *msgbuf)
+{
+	u32 links_reg = msgbuf[1];
+	u32 lan_speed = 0;
+	struct txgbe_adapter *adapter = hw->back;
+	struct txgbe_mac_info *mac = &hw->mac;
+
+	adapter->link_status_flag = true;
+	adapter->pf_link_up = links_reg & TXGBE_VXSTATUS_UP;
+
+	if (msgbuf[1] & BIT(31)) {
+		adapter->pf_speed = 0;
+		adapter->pf_link_up = false;
+		hw->pf_is_down = true;
+		adapter->flagsd &= ~TXGBE_F_REQ_RESET;
+	} else {
+		hw->pf_is_down = false;
+	}
+
+	if (!adapter->pf_link_up) {
+		adapter->pf_speed = 0;
+		return 0;
+	}
+
+	if (TXGBE_PFLINK_SPEED(links_reg) == 0) {
+		adapter->pf_link_up = false;
+		return 0;
+	}
+
+	adapter->pf_speed = TXGBE_PFLINK_SPEED(links_reg);
+	/* if pf notify vf link up, no need to rcv mailbox msg until a new interrupt*/
+	switch (adapter->pf_speed) {
+	case SPEED_40000:
+		lan_speed = TXGBE_LINK_SPEED_40GB_FULL;
+		break;
+	case SPEED_25000:
+		lan_speed = TXGBE_LINK_SPEED_25GB_FULL;
+		break;
+	case SPEED_10000:
+		lan_speed = TXGBE_LINK_SPEED_10GB_FULL;
+		break;
+	case SPEED_1000:
+		lan_speed = TXGBE_LINK_SPEED_1GB_FULL;
+		break;
+	default:
+		lan_speed = 0;
+		break;
+	}
+	adapter->pf_speed = lan_speed;
+	/* if pf notify vf link up, no need to rcv mailbox msg until a new interrupt*/
+	mac->get_link_status = false;
+	return 0;
+}
+
+static int txgbe_pf_ping_vf(struct txgbe_hw *hw, u32 *msgbuf)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	s32 err = 0;
+	u32 in_msg = msgbuf[0];
+
+	if (!(in_msg & TXGBE_VT_MSGTYPE_CTS)) {
+		/* msg is not CTS, we need to do reset */
+		if (adapter->pf_running)
+			err = -1;
+	}
+
+	return err;
+}
+
+static int txgbe_rcv_msg_from_pf(struct txgbe_hw *hw)
+{
+	struct txgbe_adapter *adapter = hw->back;
+	u16 mbx_size = TXGBE_VXMAILBOX_SIZE;
+	u32 msgbuf[TXGBE_VXMAILBOX_SIZE];
+	int retval;
+
+	retval = txgbe_read_mbx(hw, msgbuf, mbx_size, 0);
+
+	if (retval) {
+		/* if the read failed it could just be a mailbox collision, best wait
+		 * until we are called again and don't report an error
+		 */
+		return 0;
+	}
+
+	switch ((msgbuf[0] & 0xFF)) {
+	case TXGBE_NOFITY_VF_LINK_STATUS:
+		if (msgbuf[0] & TXGBE_VT_MSGTYPE_NRN)
+			adapter->pf_running = false;
+		else
+			adapter->pf_running = true;
+		retval = txgbe_notify_vf_link_status(hw, msgbuf);
+		break;
+	default:
+		retval = txgbe_pf_ping_vf(hw, msgbuf);
+		break;
+	}
+
+	return retval;
+}
+
 /**
  *  txgbe_check_mac_link_vf - Get link/speed status
  *  @hw: pointer to hardware structure
@@ -624,6 +759,7 @@ s32 txgbe_setup_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed speed,
 s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 			    bool *link_up, bool autoneg_wait_to_complete)
 {
+	struct txgbe_adapter *adapter = hw->back;
 	struct txgbe_mbx_info *mbx = &hw->mbx;
 	struct txgbe_mac_info *mac = &hw->mac;
 	s32 err = 0;
@@ -640,6 +776,30 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 
 	if (!mac->get_link_status)
 		goto out;
+
+	/* test for link */
+	if (!txgbe_check_for_msg(hw, 0)) {
+		if (txgbe_rcv_msg_from_pf(hw)) {
+			err = -1;
+			goto out;
+		}
+	}
+	if (adapter->link_state == TXGBE_VF_LINK_STATE_ENABLE) {
+		*link_up = true;
+		*speed = adapter->pf_speed;
+		return 0;
+	} else if (adapter->link_state == TXGBE_VF_LINK_STATE_DISABLE) {
+		goto out;
+	}
+
+	if (adapter->link_status_flag) {
+		*link_up = adapter->pf_link_up;
+		*speed = adapter->pf_speed;
+		return 0;
+	}
+
+	if (hw->pf_is_down)
+		return 0;
 
 	/* if link status is down no point in checking to see if pf is up */
 	links_reg = rd32(hw, TXGBE_VXSTATUS);
@@ -660,16 +820,38 @@ s32 txgbe_check_mac_link_vf(struct txgbe_hw *hw, txgbe_link_speed *speed,
 			goto out;
 	}
 
-	switch (TXGBE_VXSTATUS_SPEED(links_reg)) {
-	case TXGBE_VXSTATUS_SPEED_10G:
-		*speed = TXGBE_LINK_SPEED_10GB_FULL;
-		break;
-	case TXGBE_VXSTATUS_SPEED_1G:
-		*speed = TXGBE_LINK_SPEED_1GB_FULL;
-		break;
-	case TXGBE_VXSTATUS_SPEED_100M:
-		*speed = TXGBE_LINK_SPEED_100_FULL;
-		break;
+/* amlite: speed updates */
+	if (hw->mac.type == txgbe_mac_aml40) {
+		if (TXGBE_VXSTATUS_AML_SPEED(links_reg) ==
+						TXGBE_VXSTATUS_SPEED_AML_40G)
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+	} else if (hw->mac.type == txgbe_mac_aml) {
+		switch (TXGBE_VXSTATUS_AML_SPEED(links_reg)) {
+		case TXGBE_VXSTATUS_SPEED_AML_10G:
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_25G:
+			*speed = TXGBE_LINK_SPEED_25GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_40G:
+			*speed = TXGBE_LINK_SPEED_40GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_AML_50G:
+			*speed = TXGBE_LINK_SPEED_50GB_FULL;
+			break;
+		}
+	} else {
+		switch (TXGBE_VXSTATUS_SPEED(links_reg)) {
+		case TXGBE_VXSTATUS_SPEED_10G:
+			*speed = TXGBE_LINK_SPEED_10GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_1G:
+			*speed = TXGBE_LINK_SPEED_1GB_FULL;
+			break;
+		case TXGBE_VXSTATUS_SPEED_100M:
+			*speed = TXGBE_LINK_SPEED_100_FULL;
+			break;
+		}
 	}
 
 	/* if the read failed it could just be a mailbox collision, best wait

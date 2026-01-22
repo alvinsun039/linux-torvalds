@@ -1,15 +1,19 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-/* Copyright(c) 2022 - 2024 Mucse Corporation. */
+/* Copyright(c) 2022 - 2025 Mucse Corporation. */
 
 #ifndef _RNPVF_DEFINES_H_
 #define _RNPVF_DEFINES_H_
+
 #include <linux/skbuff.h>
 #include <linux/highmem.h>
+#include "rnpvf_compat.h"
 /* Device IDs */
 #define RNP_DEV_ID_N10_PF0_VF 0x8001
 #define RNP_DEV_ID_N10_PF1_VF 0x8002
+
 #define RNP_DEV_ID_N10_PF0_VF_N 0x1010
 #define RNP_DEV_ID_N10_PF1_VF_N 0x1011
+
 #define RNP_VF_IRQ_CLEAR_MASK 7
 #define RNP_VF_MAX_TX_QUEUES 8
 #define RNP_VF_MAX_RX_QUEUES 8
@@ -68,7 +72,7 @@ struct rnp_tx_desc {
 			__le16 ip_len : 9;
 			__le16 mac_len : 7;
 		};
-		__le16 mac_ip_len; /* used only in  tso & csum */
+		__le16 mac_ip_len;
 	};
 	__le16 vlan;
 #define RNP_TXD_FLAGS_VLAN_PRIO_MASK 0xe000
@@ -76,13 +80,13 @@ struct rnp_tx_desc {
 #define RNP_TX_FLAGS_VLAN_CFI_SHIFT 12
 
 	__le16 cmd;
-#define RNP_TXD_VLAN_VALID (0x1 << 15)
-#define RNP_TXD_SVLAN_TYPE (0x1 << 14)
+#define RNP_TXD_VLAN_VALID (1 << 15)
+#define RNP_TXD_SVLAN_TYPE (1 << 14)
 #define RNP_TXD_VLAN_CTRL_NOP (0x00 << 13)
 #define RNP_TXD_VLAN_CTRL_RM_VLAN (0x01 << 13)
 #define RNP_TXD_VLAN_CTRL_INSERT_VLAN (0x02 << 13)
-#define RNP_TXD_L4_CSUM (0x1 << 12) /* udp tcp sctp csum */
-#define RNP_TXD_IP_CSUM (0x1 << 11)
+#define RNP_TXD_L4_CSUM (1 << 12)
+#define RNP_TXD_IP_CSUM (1 << 11)
 #define RNP_TXD_TUNNEL_MASK (0x3000000)
 #define RNP_TXD_TUNNEL_VXLAN (0x01 << 8)
 #define RNP_TXD_TUNNEL_NVGRE (0x02 << 8)
@@ -90,26 +94,27 @@ struct rnp_tx_desc {
 #define RNP_TXD_L4_TYPE_TCP (0x01 << 6)
 #define RNP_TXD_L4_TYPE_SCTP (0x02 << 6)
 #define RNP_TXD_FLAG_IPv4 (0 << 5)
-#define RNP_TXD_FLAG_IPv6 (0x1 << 5)
-#define RNP_TXD_FLAG_TSO (0x1 << 4)
-#define RNP_TXD_CMD_RS (0x1 << 2)
-#define RNP_TXD_STAT_DD (0x1 << 1)
-#define RNP_TXD_CMD_EOP (0x1 << 0)
+#define RNP_TXD_FLAG_IPv6 (1 << 5)
+#define RNP_TXD_FLAG_TSO (1 << 4)
+#define RNP_TXD_CMD_RS (1 << 2)
+#define RNP_TXD_STAT_DD (1 << 1)
+#define RNP_TXD_CMD_EOP (1 << 0)
 } __packed;
 
 struct rnp_tx_ctx_desc {
-	__le16 mss_len;
-	u8 vfnum;
-	u8 l4_hdr_len;
-	u8 tunnel_hdr_len;
-	__le16 inner_vlan;
-	u8 vf_veb_flags;
-#define VF_IGNORE_VLAN (0x1 << 1) /* bit 57 */
-#define VF_VEB_MARK (0x1 << 0) /* bit 56 */
+	__le32 mss_len_vf_num;
+	__le32 inner_vlan_tunnel_len;
+	//__le16 mss_len;
+	//u8 vfnum;
+	//u8 l4_hdr_len;
+	//u8 tunnel_hdr_len;
+	//__le16 inner_vlan;
+	//u8 vf_veb_flags;
+#define VF_IGNORE_VLAN (1 << 25) //bit 57
+#define VF_VEB_MARK (1 << 24) //bit 56
 	__le32 res;
-	__le16 rev1;
-	__le16 cmd;
-#define RNP_TXD_FLAG_TO_RPU (0x1 << 15)
+	__le32 resv_cmd;
+#define RNP_TXD_FLAG_TO_RPU (1 << 15)
 #define RNP_TXD_SMAC_CTRL_NOP (0x00 << 12)
 #define RNP_TXD_SMAC_CTRL_REPLACE_MACADDR0 (0x02 << 12)
 #define RNP_TXD_SMAC_CTRL_REPLACE_MACADDR1 (0bx06 << 12)
@@ -117,9 +122,9 @@ struct rnp_tx_ctx_desc {
 #define RNP_TXD_CTX_VLAN_CTRL_RM_VLAN (0x01 << 10)
 #define RNP_TXD_CTX_VLAN_CTRL_INSERT_VLAN (0x02 << 10)
 #define RNP_TXD_MTI_CRC_PAD_CTRL (0x01000000)
-#define RNP_TXD_CTX_CTRL_DESC (0x1 << 3)
-#define RNP_TXD_CTX_CMD_RS (0x1 << 2)
-#define RNP_TXD_STAT_DD (0x1 << 1)
+#define RNP_TXD_CTX_CTRL_DESC (0x080000)
+#define RNP_TXD_CTX_CMD_RS (1 << 2)
+#define RNP_TXD_STAT_DD (1 << 1)
 } __packed;
 
 /* Receive Descriptor - Advanced */
@@ -133,22 +138,22 @@ union rnp_rx_desc {
 			};
 		};
 		u8 dumy[6];
-		__le16 cmd;
-#define RNP_RXD_FLAG_RS (0x1 << 2)
+		__le16 cmd; /* DD back */
+#define RNP_RXD_FLAG_RS (1 << 2)
 	};
 
 	struct {
 		__le32 rss_hash;
 		__le16 mark;
 		__le16 rev1;
-#define RNP_RX_L3_TYPE_MASK (0x1 << 15) /* 1 is ipv4 */
-#define VEB_VF_PKG (0x1 << 0) /* bit 48 */
-#define VEB_VF_IGNORE_VLAN (0x1 << 1) /* bit 49 */
+#define RNP_RX_L3_TYPE_MASK (1 << 15) /* 1 is ipv4 */
+#define VEB_VF_PKG (1 << 0) /* bit 48 */
+#define VEB_VF_IGNORE_VLAN (1 << 1) /* bit 49 */
 		__le16 len;
 		__le16 padding_len;
 		__le16 vlan;
 		__le16 cmd;
-#define RNP_RXD_STAT_VLAN_VALID (0x1 << 15)
+#define RNP_RXD_STAT_VLAN_VALID (1 << 15)
 #define RNP_RXD_STAT_STAG (0x01 << 14)
 #define RNP_RXD_STAT_TUNNEL_NVGRE (0x02 << 13)
 #define RNP_RXD_STAT_TUNNEL_VXLAN (0x01 << 13)
@@ -160,15 +165,16 @@ union rnp_rx_desc {
 #define RNP_RXD_STAT_L4_SCTP (0x02 << 6)
 #define RNP_RXD_STAT_L4_TCP (0x01 << 6)
 #define RNP_RXD_STAT_L4_UDP (0x03 << 6)
-#define RNP_RXD_STAT_IPV6 (0x1 << 5)
-#define RNP_RXD_STAT_IPV4 (0x0 << 5)
-#define RNP_RXD_STAT_PTP (0x1 << 4)
-#define RNP_RXD_STAT_DD (0x1 << 1)
-#define RNP_RXD_STAT_EOP (0x1 << 0)
+#define RNP_RXD_STAT_IPV6 (1 << 5)
+#define RNP_RXD_STAT_IPV4 (0 << 5)
+#define RNP_RXD_STAT_PTP (1 << 4)
+#define RNP_RXD_STAT_DD (1 << 1)
+#define RNP_RXD_STAT_EOP (1 << 0)
 	} wb;
 } __packed;
 
 /* Interrupt register bitmasks */
+
 #define RNP_EITR_CNT_WDIS 0x80000000
 #define RNP_MAX_EITR 0x00000FF8
 #define RNP_MIN_EITR 8
@@ -204,7 +210,6 @@ static inline void buf_dump_line(const char *msg, int line, void *buf,
 {
 	int i, offset = 0;
 	int msg_len = 1024;
-	//u8 msg_buf[msg_len];
 	u8 msg_buf[1024];
 	u8 *ptr = (u8 *)buf;
 
@@ -213,13 +218,13 @@ static inline void buf_dump_line(const char *msg, int line, void *buf,
 			   line, buf);
 
 	for (i = 0; i < len; ++i) {
-		if (i != 0 && (i % 16) == 0 &&
+		if ((i != 0) && (i % 16) == 0 &&
 		    (offset >= (1024 - 10 * 16))) {
 			printk("%s\n", msg_buf);
 			offset = 0;
 		}
 
-		if (i != 0 && (i % 16) == 0) {
+		if ((i != 0) && (i % 16) == 0) {
 			offset += snprintf(msg_buf + offset, msg_len,
 					   "\n%03x: ", i);
 		}
@@ -245,13 +250,13 @@ static inline void buf_dump(const char *msg, void *buf, int len)
 			   "=== %s #%d ==\n000: ", msg, len);
 
 	for (i = 0; i < len; ++i) {
-		if (i != 0 && (i % 16) == 0 &&
+		if ((i != 0) && (i % 16) == 0 &&
 		    (offset >= (1024 - 10 * 16))) {
 			printk("%s\n", msg_buf);
 			offset = 0;
 		}
 
-		if (i != 0 && (i % 16) == 0) {
+		if ((i != 0) && (i % 16) == 0) {
 			offset += snprintf(msg_buf + offset, msg_len,
 					   "\n%03x: ", i);
 		}
@@ -262,11 +267,17 @@ static inline void buf_dump(const char *msg, void *buf, int len)
 	offset += snprintf(msg_buf + offset, msg_len, "\n=== done ==\n");
 	printk(KERN_DEBUG "%s\n", msg_buf);
 }
-
+#ifndef NO_SKB_DUMP
 static inline void _rnp_skb_dump(const struct sk_buff *skb, bool full_pkt)
 {
 	static atomic_t can_dump_full = ATOMIC_INIT(5);
+#if defined(RHEL_RELEASE_CODE)
+#if RHEL_RELEASE_CODE == RHEL_RELEASE_VERSION(7, 1)
 	struct skb_shared_info *sh = skb_shinfo(skb);
+#endif
+#else
+	struct skb_shared_info *sh = skb_shinfo(skb);
+#endif
 	struct net_device *dev = skb->dev;
 	struct sk_buff *list_skb;
 	bool has_mac, has_trans;
@@ -288,10 +299,31 @@ static inline void _rnp_skb_dump(const struct sk_buff *skb, bool full_pkt)
 	has_mac = skb_mac_header_was_set(skb);
 	has_trans = skb_transport_header_was_set(skb);
 
+#if defined(RHEL_RELEASE_CODE)
+#if RHEL_RELEASE_CODE == RHEL_RELEASE_VERSION(7, 1)
 	printk(KERN_DEBUG
 	       "%sskb len=%u headroom=%u headlen=%u tailroom=%u\n"
 	       "mac=(%d,%d) net=(%d,%d) trans=%d\n"
-	       "shinfo(txflags=%u nr_frags=%u gso(size=%u type=%u segs=%u))\n"
+	       "shinfo(txflags=%u nr_frags=%u gso(size=%hu type=%u segs=%hu))\n"
+	       "csum(0x%x ip_summed=%u complete_sw=%u valid=%u level=%u)\n"
+	       "hash(rx:0x%x  l4=%u) proto=0x%04x pkttype=%u iif=%d\n",
+	       level, skb->len, headroom, skb_headlen(skb), tailroom,
+	       has_mac ? skb->mac_header : -1,
+	       has_mac ? (skb->network_header - skb->mac_header) : -1,
+	       skb->network_header,
+	       has_trans ? skb_network_header_len(skb) : -1,
+	       has_trans ? skb->transport_header : -1, sh->tx_flags,
+	       sh->nr_frags, sh->gso_size, sh->gso_type, sh->gso_segs,
+	       skb->csum, skb->ip_summed, skb->csum_complete_sw,
+	       skb->csum_valid, skb->csum_level, skb->rxhash,
+	       skb->l4_rxhash, ntohs(skb->protocol), skb->pkt_type,
+	       skb->skb_iif);
+#endif
+#else
+	printk(KERN_DEBUG
+	       "%sskb len=%u headroom=%u headlen=%u tailroom=%u\n"
+	       "mac=(%d,%d) net=(%d,%d) trans=%d\n"
+	       "shinfo(txflags=%u nr_frags=%u gso(size=%hu type=%u segs=%hu))\n"
 	       "csum(0x%x ip_summed=%u complete_sw=%u valid=%u level=%u)\n"
 	       "hash(0x%x sw=%u l4=%u) proto=0x%04x pkttype=%u iif=%d\n",
 	       level, skb->len, headroom, skb_headlen(skb), tailroom,
@@ -305,6 +337,7 @@ static inline void _rnp_skb_dump(const struct sk_buff *skb, bool full_pkt)
 	       skb->csum_valid, skb->csum_level, skb->hash, skb->sw_hash,
 	       skb->l4_hash, ntohs(skb->protocol), skb->pkt_type,
 	       skb->skb_iif);
+#endif
 
 	if (dev)
 		printk(KERN_DEBUG "%sdev name=%s feat=0x%pNF\n", level,
@@ -340,6 +373,7 @@ static inline void _rnp_skb_dump(const struct sk_buff *skb, bool full_pkt)
 			_rnp_skb_dump(list_skb, true);
 	}
 }
+#endif
 
 #define TRACE() printk(KERN_DEBUG "=[%s] %d == \n", __func__, __LINE__)
 
@@ -353,12 +387,13 @@ static inline void _rnp_skb_dump(const struct sk_buff *skb, bool full_pkt)
 #define rnpvf_skb_dump(skb, full_pkt)
 #endif
 
+
 #ifdef CONFIG_RNP_RX_DEBUG
 #define rx_debug_printk printk
 #define rx_buf_dump buf_dump
 #else
 #define rx_debug_printk(fmt, args...)
 #define rx_buf_dump(a, b, c)
-#endif /* CONFIG_RNP_RX_DEBUG */
+#endif //CONFIG_RNP_RX_DEBUG
 
 #endif /* _RNPVF_DEFINES_H_ */

@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -80,7 +80,9 @@
 					    * this are the NACK */
 #define TXGBE_VT_MSGTYPE_CTS    0x20000000 /* Indicates that VF is still
 					    * clear to send requests */
+#define TXGBE_VT_MSGTYPE_NRN    0x10000000 /* Indicates that PF is not running */
 #define TXGBE_VT_MSGINFO_SHIFT  16
+#define TXGBE_VT_MSGINFO_VLAN_OFFLOAD_SHIFT  17
 /* bits 23:16 are used for extra info for certain messages */
 #define TXGBE_VT_MSGINFO_MASK   (0xFF << TXGBE_VT_MSGINFO_SHIFT)
 
@@ -106,6 +108,8 @@ enum txgbe_pfvf_api_rev {
 #define TXGBE_VF_SET_MAC_ADDR   0x02 /* VF requests PF to set MAC addr */
 #define TXGBE_VF_SET_MULTICAST  0x03 /* VF requests PF to set MC addr */
 #define TXGBE_VF_SET_VLAN       0x04 /* VF requests PF to set VLAN */
+
+#define TXGBE_NOFITY_VF_LINK_STATUS 0x01 /* PF notify VF link status*/
 
 /* mailbox API, version 1.0 VF requests */
 #define TXGBE_VF_SET_LPE        0x05 /* VF requests PF to set VMOLR.LPE */
@@ -152,7 +156,7 @@ enum txgbe_pfvf_api_rev {
 #define TXGBE_PF_TRANSPARENT_VLAN       0x0101 /* enable transparent vlan */
 
 #define TXGBE_VF_MBX_INIT_TIMEOUT       2000 /* number of retries on mailbox */
-#define TXGBE_VF_MBX_INIT_DELAY         500  /* microseconds between retries */
+#define TXGBE_VF_MBX_INIT_DELAY         50  /* microseconds between retries */
 
 s32 txgbe_read_mbx(struct txgbe_hw *, u32 *, u16, u16);
 s32 txgbe_write_mbx(struct txgbe_hw *, u32 *, u16, u16);

@@ -48,7 +48,7 @@ static struct dst_entry *dst_cache_per_cpu_get(struct dst_cache *dst_cache,
 	dst_hold(dst);
 
 	if (unlikely(!time_after(idst->refresh_ts, dst_cache->reset_ts) ||
-		     (dst->obsolete && !dst->ops->check(dst, idst->cookie)))) {
+		     (READ_ONCE(dst->obsolete) && !dst->ops->check(dst, idst->cookie)))) {
 		dst_cache_per_cpu_dst_set(idst, NULL, 0);
 		dst_release(dst);
 		goto fail;
@@ -83,7 +83,7 @@ struct rtable *dst_cache_get_ip4(struct dst_cache *dst_cache, __be32 *saddr)
 		return NULL;
 
 	*saddr = idst->in_saddr.s_addr;
-	return container_of(dst, struct rtable, dst);
+	return dst_rtable(dst);
 }
 EXPORT_SYMBOL_GPL(dst_cache_get_ip4);
 

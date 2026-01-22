@@ -115,6 +115,7 @@ snd-soc-da9055-objs := da9055.o
 snd-soc-dmic-objs := dmic.o
 snd-soc-es7134-objs := es7134.o
 snd-soc-es7241-objs := es7241.o
+snd-soc-es8311-objs := es8311.o
 snd-soc-es8316-objs := es8316.o
 snd-soc-es8323-objs := es8323.o
 snd-soc-es8326-objs := es8326.o

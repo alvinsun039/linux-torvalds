@@ -416,11 +416,11 @@ static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
 					   const void *daddr)
 {
 	const struct rtable *rt = container_of(dst, struct rtable, dst);
-	struct net_device *dev = dst->dev;
+	struct net_device *dev;
 	struct neighbour *n;
 
 	rcu_read_lock();
-
+	dev = dst_dev_rcu(dst);
 	if (likely(rt->rt_gw_family == AF_INET)) {
 		n = ip_neigh_gw4(dev, rt->rt_gw4);
 	} else if (rt->rt_gw_family == AF_INET6) {
@@ -443,7 +443,7 @@ static struct neighbour *ipv4_neigh_lookup(const struct dst_entry *dst,
 static void ipv4_confirm_neigh(const struct dst_entry *dst, const void *daddr)
 {
 	const struct rtable *rt = container_of(dst, struct rtable, dst);
-	struct net_device *dev = dst->dev;
+	struct net_device *dev = dst_dev(dst);
 	const __be32 *pkey = daddr;
 
 	if (rt->rt_gw_family == AF_INET) {
@@ -733,7 +733,7 @@ static void update_or_create_fnhe(struct fib_nh_common *nhc, __be32 daddr,
 		 */
 		rt = rcu_dereference(nhc->nhc_rth_input);
 		if (rt)
-			rt->dst.obsolete = DST_OBSOLETE_KILL;
+			WRITE_ONCE(rt->dst.obsolete, DST_OBSOLETE_KILL);
 
 		for_each_possible_cpu(i) {
 			struct rtable __rcu **prt;
@@ -741,7 +741,7 @@ static void update_or_create_fnhe(struct fib_nh_common *nhc, __be32 daddr,
 			prt = per_cpu_ptr(nhc->nhc_pcpu_rth_output, i);
 			rt = rcu_dereference(*prt);
 			if (rt)
-				rt->dst.obsolete = DST_OBSOLETE_KILL;
+				WRITE_ONCE(rt->dst.obsolete, DST_OBSOLETE_KILL);
 		}
 	}
 
@@ -813,7 +813,7 @@ static void __ip_do_redirect(struct rtable *rt, struct sk_buff *skb, struct flow
 						jiffies + ip_rt_gc_timeout);
 			}
 			if (kill_route)
-				rt->dst.obsolete = DST_OBSOLETE_KILL;
+				WRITE_ONCE(rt->dst.obsolete, DST_OBSOLETE_KILL);
 			call_netevent_notifiers(NETEVENT_NEIGH_UPDATE, n);
 		}
 		neigh_release(n);
@@ -847,7 +847,7 @@ static void ip_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_buf
 	u32 mark = skb->mark;
 	__u8 tos = iph->tos;
 
-	rt = (struct rtable *) dst;
+	rt = dst_rtable(dst);
 
 	__build_flow_key(net, &fl4, sk, iph, oif, tos, prot, mark, 0);
 	__ip_do_redirect(rt, skb, &fl4, true);
@@ -856,11 +856,11 @@ static void ip_do_redirect(struct dst_entry *dst, struct sock *sk, struct sk_buf
 static void ipv4_negative_advice(struct sock *sk,
 				 struct dst_entry *dst)
 {
-	struct rtable *rt = (struct rtable *)dst;
+	struct rtable *rt = dst_rtable(dst);
 
-	if ((dst->obsolete > 0) ||
+	if ((READ_ONCE(dst->obsolete) > 0) ||
 	    (rt->rt_flags & RTCF_REDIRECTED) ||
-	    rt->dst.expires)
+	    READ_ONCE(rt->dst.expires))
 		sk_dst_reset(sk);
 }
 
@@ -1049,7 +1049,8 @@ static void __ip_rt_update_pmtu(struct rtable *rt, struct flowi4 *fl4, u32 mtu)
 	}
 
 	if (rt->rt_pmtu == mtu && !lock &&
-	    time_before(jiffies, dst->expires - net->ipv4.ip_rt_mtu_expires / 2))
+	    time_before(jiffies, READ_ONCE(dst->expires) -
+				 net->ipv4.ip_rt_mtu_expires / 2))
 		goto out;
 
 	if (fib_lookup(net, fl4, &res, 0) == 0) {
@@ -1080,7 +1081,7 @@ static void ip_rt_update_pmtu(struct dst_entry *dst, struct sock *sk,
 			      struct sk_buff *skb, u32 mtu,
 			      bool confirm_neigh)
 {
-	struct rtable *rt = (struct rtable *) dst;
+	struct rtable *rt = dst_rtable(dst);
 	struct flowi4 fl4;
 
 	ip_rt_build_flow_key(&fl4, sk, skb);
@@ -1151,8 +1152,8 @@ void ipv4_sk_update_pmtu(struct sk_buff *skb, struct sock *sk, u32 mtu)
 
 	__build_flow_key(net, &fl4, sk, iph, 0, 0, 0, 0, 0);
 
-	rt = (struct rtable *)odst;
-	if (odst->obsolete && !odst->ops->check(odst, 0)) {
+	rt = dst_rtable(odst);
+	if (READ_ONCE(odst->obsolete) && !odst->ops->check(odst, 0)) {
 		rt = ip_route_output_flow(sock_net(sk), &fl4, sk);
 		if (IS_ERR(rt))
 			goto out;
@@ -1160,7 +1161,7 @@ void ipv4_sk_update_pmtu(struct sk_buff *skb, struct sock *sk, u32 mtu)
 		new = true;
 	}
 
-	__ip_rt_update_pmtu((struct rtable *)xfrm_dst_path(&rt->dst), &fl4, mtu);
+	__ip_rt_update_pmtu(dst_rtable(xfrm_dst_path(&rt->dst)), &fl4, mtu);
 
 	if (!dst_check(&rt->dst, 0)) {
 		if (new)
@@ -1217,7 +1218,7 @@ EXPORT_SYMBOL_GPL(ipv4_sk_redirect);
 INDIRECT_CALLABLE_SCOPE struct dst_entry *ipv4_dst_check(struct dst_entry *dst,
 							 u32 cookie)
 {
-	struct rtable *rt = (struct rtable *) dst;
+	struct rtable *rt = dst_rtable(dst);
 
 	/* All IPV4 dsts are created with ->obsolete set to the value
 	 * DST_OBSOLETE_FORCE_CHK which forces validation calls down
@@ -1227,7 +1228,8 @@ INDIRECT_CALLABLE_SCOPE struct dst_entry *ipv4_dst_check(struct dst_entry *dst,
 	 * this is indicated by setting obsolete to DST_OBSOLETE_KILL or
 	 * DST_OBSOLETE_DEAD.
 	 */
-	if (dst->obsolete != DST_OBSOLETE_FORCE_CHK || rt_is_expired(rt))
+	if (READ_ONCE(dst->obsolete) != DST_OBSOLETE_FORCE_CHK ||
+	    rt_is_expired(rt))
 		return NULL;
 	return dst;
 }
@@ -1557,10 +1559,8 @@ void rt_del_uncached_list(struct rtable *rt)
 
 static void ipv4_dst_destroy(struct dst_entry *dst)
 {
-	struct rtable *rt = (struct rtable *)dst;
-
 	ip_dst_metrics_put(dst);
-	rt_del_uncached_list(rt);
+	rt_del_uncached_list(dst_rtable(dst));
 }
 
 void rt_flush_dev(struct net_device *dev)
@@ -1590,7 +1590,7 @@ void rt_flush_dev(struct net_device *dev)
 static bool rt_cache_valid(const struct rtable *rt)
 {
 	return	rt &&
-		rt->dst.obsolete == DST_OBSOLETE_FORCE_CHK &&
+		READ_ONCE(rt->dst.obsolete) == DST_OBSOLETE_FORCE_CHK &&
 		!rt_is_expired(rt);
 }
 
@@ -2643,7 +2643,7 @@ add:
 			if (IN_DEV_MFORWARD(in_dev) &&
 			    !ipv4_is_local_multicast(fl4->daddr)) {
 				rth->dst.input = ip_mr_input;
-				rth->dst.output = ip_mc_output;
+				rth->dst.output = ip_mr_output;
 			}
 		}
 #endif
@@ -2864,7 +2864,7 @@ static struct dst_ops ipv4_dst_blackhole_ops = {
 
 struct dst_entry *ipv4_blackhole_route(struct net *net, struct dst_entry *dst_orig)
 {
-	struct rtable *ort = (struct rtable *) dst_orig;
+	struct rtable *ort = dst_rtable(dst_orig);
 	struct rtable *rt;
 
 	rt = dst_alloc(&ipv4_dst_blackhole_ops, NULL, 1, DST_OBSOLETE_DEAD, 0);
@@ -2909,9 +2909,9 @@ struct rtable *ip_route_output_flow(struct net *net, struct flowi4 *flp4,
 
 	if (flp4->flowi4_proto) {
 		flp4->flowi4_oif = rt->dst.dev->ifindex;
-		rt = (struct rtable *)xfrm_lookup_route(net, &rt->dst,
-							flowi4_to_flowi(flp4),
-							sk, 0);
+		rt = dst_rtable(xfrm_lookup_route(net, &rt->dst,
+						  flowi4_to_flowi(flp4),
+						  sk, 0));
 	}
 
 	return rt;
@@ -3041,7 +3041,7 @@ static int rt_fill_info(struct net *net, __be32 dst, __be32 src,
 		}
 	}
 
-	expires = rt->dst.expires;
+	expires = READ_ONCE(rt->dst.expires);
 	if (expires) {
 		unsigned long now = jiffies;
 

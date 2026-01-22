@@ -1,6 +1,6 @@
 /*******************************************************************************
 
-  WangXun(R) 10GbE PCI Express Virtual Function Linux Network Driver
+  WangXun(R) 25/10GbE PCI Express Virtual Function Linux Network Driver
   Copyright(c) 2015 - 2017 Beijing WangXun Technology Co., Ltd.
 
   This program is free software; you can redistribute it and/or modify it
@@ -41,10 +41,18 @@
 #define   TXGBE_VXRXMEMWRAP_EMPTY(g, i)  ((0x8 << 4*(i) & (g)) >> 4*(i))
 #define TXGBE_VXSTATUS              0x00004
 #define   TXGBE_VXSTATUS_UP            ((0x1) << 0)
+
 #define   TXGBE_VXSTATUS_SPEED(g)      ((0x7 & (g)) >> 1)
 #define     TXGBE_VXSTATUS_SPEED_10G   (0x1)
 #define     TXGBE_VXSTATUS_SPEED_1G    (0x2)
 #define     TXGBE_VXSTATUS_SPEED_100M  (0x4)
+
+#define   TXGBE_VXSTATUS_AML_SPEED(g)      ((0x1E & (g)) >> 1)
+#define   TXGBE_VXSTATUS_SPEED_AML_50G   (0x1)
+#define   TXGBE_VXSTATUS_SPEED_AML_40G   (0x2)
+#define   TXGBE_VXSTATUS_SPEED_AML_25G   (0x4)
+#define   TXGBE_VXSTATUS_SPEED_AML_10G   (0x8)
+
 #define   TXGBE_VXSTATUS_BUSY          ((0x1) << 4)
 #define   TXGBE_VXSTATUS_LANID         ((0x1) << 8)
 #define TXGBE_VXCTRL                0x00008
@@ -79,6 +87,8 @@
 #define TXGBE_VXLLI                 0x00118
 #define TXGBE_VXITR(i)               0x00200 + (4 * (i)) /* i=[0,1] */
 #define   TXGBE_VXITR_INTERVAL(f)    ((0x1FF & (f)) << 3)
+#define TXGBE_AMLITE_INTERVAL(f)     (0xFFF & (f))
+
 #define   TXGBE_VXITR_LLI            ((0x1) << 15)
 #define   TXGBE_VXITR_LLI_CREDIT(f)  ((0x1F & (f)) << 16)
 #define   TXGBE_VXITR_CNT(f)         ((0x7F & (f)) << 21)

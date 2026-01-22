@@ -83,7 +83,7 @@ struct sk_buff *nf_reject_skb_v6_tcp_reset(struct net *net,
 
 	skb_reserve(nskb, LL_MAX_HEADER);
 	nip6h = nf_reject_ip6hdr_put(nskb, oldskb, IPPROTO_TCP,
-				     net->ipv6.devconf_all->hop_limit);
+				     READ_ONCE(net->ipv6.devconf_all->hop_limit));
 	nf_reject_ip6_tcphdr_put(nskb, oldskb, oth, otcplen);
 	nip6h->payload_len = htons(nskb->len - sizeof(struct ipv6hdr));
 
@@ -154,7 +154,7 @@ struct sk_buff *nf_reject_skb_v6_unreach(struct net *net,
 
 	skb_reserve(nskb, LL_MAX_HEADER);
 	nip6h = nf_reject_ip6hdr_put(nskb, oldskb, IPPROTO_ICMPV6,
-				     net->ipv6.devconf_all->hop_limit);
+				     READ_ONCE(net->ipv6.devconf_all->hop_limit));
 
 	skb_reset_transport_header(nskb);
 	icmp6h = skb_put_zero(nskb, sizeof(struct icmp6hdr));
@@ -330,7 +330,7 @@ void nf_send_reset6(struct net *net, struct sock *sk, struct sk_buff *oldskb,
 		skb_dst_set(oldskb, dst);
 	}
 
-	fl6.flowi6_oif = l3mdev_master_ifindex(skb_dst(oldskb)->dev);
+	fl6.flowi6_oif = l3mdev_master_ifindex(skb_dst_dev(oldskb));
 	fl6.flowi6_mark = IP6_REPLY_MARK(net, oldskb->mark);
 	security_skb_classify_flow(oldskb, flowi6_to_flowi_common(&fl6));
 	dst = ip6_route_output(net, NULL, &fl6);
