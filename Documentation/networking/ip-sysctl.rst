@@ -1277,6 +1277,14 @@ tcp_rto_max_ms - INTEGER
 
 	Default: 120,000
 
+tcp_nodelayack - BOOLEAN
+	Controls global TCP delayed ack.
+
+	If set, enable tcp quick ack.
+	If unset, disable tcp quick ack(delay ack).
+
+	Default: 0
+
 UDP variables
 =============
 

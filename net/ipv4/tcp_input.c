@@ -341,6 +341,9 @@ static bool tcp_in_quickack_mode(struct sock *sk)
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	const struct dst_entry *dst = __sk_dst_get(sk);
 
+	if (READ_ONCE(sysctl_tcp_nodelay_ack))
+		return true;
+
 	return (dst && dst_metric(dst, RTAX_QUICKACK)) ||
 		(icsk->icsk_ack.quick && !inet_csk_in_pingpong_mode(sk));
 }
