@@ -4,7 +4,7 @@
 
 config CCUSR_RAID
 	tristate "CCUSR HW-RAID Adapter"
-	depends on PCI && SCSI
+	depends on 64BIT && PCI && SCSI
 	default m
 	help
 	  This driver supports C*Core CCUSR series of RAID controllers.
