@@ -3,10 +3,6 @@
 
 #include <linux/sort.h>
 
-#define __bf_shf_m(x) (__builtin_ffsll(x) - 1)
-#define FIELD_PREP_M(_mask, _val) \
-	({ ((typeof(_mask))(_val) << __bf_shf_m(_mask)) & (_mask); })
-
 void field_set(u32 *psrcdata, u32 bithigh, u32 bitlow, u32 setvalue)
 {
 	*psrcdata &= ~GENMASK(bithigh, bitlow);
