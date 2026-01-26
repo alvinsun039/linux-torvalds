@@ -95,7 +95,6 @@ int of_dma_configure_id(struct device *dev, struct device_node *np,
 {
 	const struct bus_dma_region *map = NULL;
 	struct device_node *bus_np;
-	u64 dma_start = 0;
 	u64 mask, end = 0;
 	bool coherent;
 	int iommu_ret;
@@ -117,16 +116,8 @@ int of_dma_configure_id(struct device *dev, struct device_node *np,
 		if (!force_dma)
 			return ret == -ENODEV ? 0 : ret;
 	} else {
-		const struct bus_dma_region *r = map;
-
 		/* Determine the overall bounds of all DMA regions */
-		for (dma_start = ~0; r->size; r++) {
-			/* Take lower and upper limits */
-			if (r->dma_start < dma_start)
-				dma_start = r->dma_start;
-			if (r->dma_start + r->size > end)
-				end = r->dma_start + r->size;
-		}
+		end = dma_range_map_max(map);
 	}
 
 	/*
@@ -182,7 +173,7 @@ int of_dma_configure_id(struct device *dev, struct device_node *np,
 	} else
 		dev_dbg(dev, "device is behind an iommu\n");
 
-	arch_setup_dma_ops(dev, dma_start, end - dma_start + 1, coherent);
+	arch_setup_dma_ops(dev, coherent);
 
 	if (iommu_ret)
 		of_dma_set_restricted_buffer(dev, np);
