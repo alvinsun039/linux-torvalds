@@ -28,6 +28,7 @@
 #define TPM_DIGEST_SIZE 20	/* Max TPM v1.2 PCR size */
 
 #define TPM2_MAX_DIGEST_SIZE	SHA512_DIGEST_SIZE
+#define TPM_MAX_DIGEST_SIZE	TPM2_MAX_DIGEST_SIZE
 #define TPM2_MAX_PCR_BANKS	8
 
 struct tpm_chip;
