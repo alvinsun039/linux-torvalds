@@ -865,7 +865,7 @@ static inline void build_mbx_wol_set(struct mbx_fw_cmd_req *req,
 static inline void mbx_fw_req_set_reply(struct mbx_fw_cmd_req *req,
 					dma_addr_t reply)
 {
-	req->reply_hi = (reply >> 32);
+	req->reply_hi = (u32)((u64)(reply >> 32));
 	req->reply_lo = (reply) & 0xffffffff;
 }
 
