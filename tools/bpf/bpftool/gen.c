@@ -685,9 +685,16 @@ static void codegen_destroy(struct bpf_object *obj, const char *obj_name)
 static int gen_trace(struct bpf_object *obj, const char *obj_name, const char *header_guard)
 {
 	DECLARE_LIBBPF_OPTS(gen_loader_opts, opts);
+	struct bpf_load_and_run_opts sopts = {};
+	char sig_buf[MAX_SIG_SIZE];
+	__u8 prog_sha[SHA256_DIGEST_LENGTH];
 	struct bpf_map *map;
+
 	char ident[256];
 	int err = 0;
+
+	if (sign_progs)
+		opts.gen_hash = true;
 
 	err = bpf_object__gen_loader(obj, &opts);
 	if (err)
@@ -698,6 +705,7 @@ static int gen_trace(struct bpf_object *obj, const char *obj_name, const char *h
 		p_err("failed to load object file");
 		goto out;
 	}
+
 	/* If there was no error during load then gen_loader_opts
 	 * are populated with the loader program.
 	 */
@@ -735,17 +743,22 @@ static int gen_trace(struct bpf_object *obj, const char *obj_name, const char *h
 
 		codegen("\
 		\n\
-			skel->%1$s = skel_prep_map_data((void *)\"\\	    \n\
-		", ident);
+			{						    \n\
+				static const char data[] __attribute__((__aligned__(8))) = \"\\\n\
+		");
 		mmap_data = bpf_map__initial_value(map, &mmap_size);
 		print_hex(mmap_data, mmap_size);
 		codegen("\
 		\n\
-		\", %1$zd, %2$zd);					    \n\
-			if (!skel->%3$s)				    \n\
-				goto cleanup;				    \n\
-			skel->maps.%3$s.initial_value = (__u64) (long) skel->%3$s;\n\
-		", bpf_map_mmap_sz(map), mmap_size, ident);
+		\";							    \n\
+									    \n\
+				skel->%1$s = skel_prep_map_data((void *)data, %2$zd,\n\
+								sizeof(data) - 1);\n\
+				if (!skel->%1$s)			    \n\
+					goto cleanup;			    \n\
+				skel->maps.%1$s.initial_value = (__u64) (long) skel->%1$s;\n\
+			}						    \n\
+			", ident, bpf_map_mmap_sz(map));
 	}
 	codegen("\
 		\n\
@@ -760,32 +773,74 @@ static int gen_trace(struct bpf_object *obj, const char *obj_name, const char *h
 		{							    \n\
 			struct bpf_load_and_run_opts opts = {};		    \n\
 			int err;					    \n\
-									    \n\
-			opts.ctx = (struct bpf_loader_ctx *)skel;	    \n\
-			opts.data_sz = %2$d;				    \n\
-			opts.data = (void *)\"\\			    \n\
+			static const char opts_data[] __attribute__((__aligned__(8))) = \"\\\n\
 		",
-		obj_name, opts.data_sz);
+		obj_name);
 	print_hex(opts.data, opts.data_sz);
 	codegen("\
 		\n\
 		\";							    \n\
+			static const char opts_insn[] __attribute__((__aligned__(8))) = \"\\\n\
 		");
-
-	codegen("\
-		\n\
-			opts.insns_sz = %d;				    \n\
-			opts.insns = (void *)\"\\			    \n\
-		",
-		opts.insns_sz);
 	print_hex(opts.insns, opts.insns_sz);
 	codegen("\
 		\n\
-		\";							    \n\
+		\";\n");
+
+	if (sign_progs) {
+		sopts.insns = opts.insns;
+		sopts.insns_sz = opts.insns_sz;
+		sopts.excl_prog_hash = prog_sha;
+		sopts.excl_prog_hash_sz = sizeof(prog_sha);
+		sopts.signature = sig_buf;
+		sopts.signature_sz = MAX_SIG_SIZE;
+
+		err = bpftool_prog_sign(&sopts);
+		if (err < 0) {
+			p_err("failed to sign program");
+			goto out;
+		}
+
+		codegen("\
+		\n\
+			static const char opts_sig[] __attribute__((__aligned__(8))) = \"\\\n\
+		");
+		print_hex((const void *)sig_buf, sopts.signature_sz);
+		codegen("\
+		\n\
+		\";\n");
+
+		codegen("\
+		\n\
+			static const char opts_excl_hash[] __attribute__((__aligned__(8))) = \"\\\n\
+		");
+		print_hex((const void *)prog_sha, sizeof(prog_sha));
+		codegen("\
+		\n\
+		\";\n");
+
+		codegen("\
+		\n\
+			opts.signature = (void *)opts_sig;			\n\
+			opts.signature_sz = sizeof(opts_sig) - 1;		\n\
+			opts.excl_prog_hash = (void *)opts_excl_hash;		\n\
+			opts.excl_prog_hash_sz = sizeof(opts_excl_hash) - 1;	\n\
+			opts.keyring_id = skel->keyring_id;			\n\
+		");
+	}
+
+	codegen("\
+		\n\
+			opts.ctx = (struct bpf_loader_ctx *)skel;	    \n\
+			opts.data_sz = sizeof(opts_data) - 1;		    \n\
+			opts.data = (void *)opts_data;			    \n\
+			opts.insns_sz = sizeof(opts_insn) - 1;		    \n\
+			opts.insns = (void *)opts_insn;			    \n\
+									    \n\
 			err = bpf_load_and_run(&opts);			    \n\
 			if (err < 0)					    \n\
 				return err;				    \n\
-		", obj_name);
+		");
 	bpf_object__for_each_map(map, obj) {
 		const char *mmap_flags;
 
@@ -1233,7 +1288,7 @@ static int do_skeleton(int argc, char **argv)
 		err = -errno;
 		libbpf_strerror(err, err_buf, sizeof(err_buf));
 		p_err("failed to open BPF object file: %s", err_buf);
-		goto out;
+		goto out_obj;
 	}
 
 	bpf_object__for_each_map(map, obj) {
@@ -1344,6 +1399,13 @@ static int do_skeleton(int argc, char **argv)
 		}
 
 		printf("\t} links;\n");
+	}
+
+	if (sign_progs) {
+		codegen("\
+		\n\
+			__s32 keyring_id;				   \n\
+		");
 	}
 
 	if (btf) {
@@ -1543,6 +1605,7 @@ static int do_skeleton(int argc, char **argv)
 	err = 0;
 out:
 	bpf_object__close(obj);
+out_obj:
 	if (obj_data)
 		munmap(obj_data, mmap_sz);
 	close(fd);
@@ -1921,7 +1984,7 @@ static int do_help(int argc, char **argv)
 		"       %1$s %2$s help\n"
 		"\n"
 		"       " HELP_SPEC_OPTIONS " |\n"
-		"                    {-L|--use-loader} }\n"
+		"                    {-L|--use-loader} | [ {-S|--sign } {-k} <private_key.pem> {-i} <certificate.x509> ]}\n"
 		"",
 		bin_name, "gen");
 

@@ -661,6 +661,15 @@ module_exit(__governor##_exit)
 struct cpufreq_governor *cpufreq_default_governor(void);
 struct cpufreq_governor *cpufreq_fallback_governor(void);
 
+#ifdef CONFIG_CPU_FREQ_GOV_SCHEDUTIL
+bool sugov_is_governor(struct cpufreq_policy *policy);
+#else
+static inline bool sugov_is_governor(struct cpufreq_policy *policy)
+{
+	return false;
+}
+#endif
+
 static inline void cpufreq_policy_apply_limits(struct cpufreq_policy *policy)
 {
 	if (policy->max < policy->cur)
@@ -1256,14 +1265,6 @@ static inline int of_perf_domain_get_sharing_cpumask(int pcpu, const char *list_
 }
 #endif
 
-#if defined(CONFIG_ENERGY_MODEL) && defined(CONFIG_CPU_FREQ_GOV_SCHEDUTIL)
-void sched_cpufreq_governor_change(struct cpufreq_policy *policy,
-			struct cpufreq_governor *old_gov);
-#else
-static inline void sched_cpufreq_governor_change(struct cpufreq_policy *policy,
-			struct cpufreq_governor *old_gov) { }
-#endif
-
 extern unsigned int arch_freq_get_on_cpu(int cpu);
 
 #ifndef arch_set_freq_scale
@@ -1285,6 +1286,8 @@ unsigned int cpufreq_generic_get(unsigned int cpu);
 void cpufreq_generic_init(struct cpufreq_policy *policy,
 		struct cpufreq_frequency_table *table,
 		unsigned int transition_latency);
+
+bool cpufreq_ready_for_eas(const struct cpumask *cpu_mask);
 
 static inline void cpufreq_register_em_with_opp(struct cpufreq_policy *policy)
 {

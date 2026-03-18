@@ -1503,7 +1503,7 @@ static int cpufreq_policy_online(struct cpufreq_policy *policy,
 
 		/*
 		 * Register with the energy model before
-		 * sched_cpufreq_governor_change() is called, which will result
+		 * em_rebuild_sched_domains() is called, which will result
 		 * in rebuilding of the sched domains, which should only be done
 		 * once the energy model is properly initialized for the policy
 		 * first.
@@ -2688,7 +2688,6 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 		ret = cpufreq_start_governor(policy);
 		if (!ret) {
 			pr_debug("governor change\n");
-			sched_cpufreq_governor_change(policy, old_gov);
 			return 0;
 		}
 		cpufreq_exit_governor(policy);
@@ -3060,6 +3059,36 @@ static int __init cpufreq_core_init(void)
 
 	return 0;
 }
+
+static bool cpufreq_policy_is_good_for_eas(unsigned int cpu)
+{
+	struct cpufreq_policy *policy __free(put_cpufreq_policy);
+
+	policy = cpufreq_cpu_get(cpu);
+	if (!policy) {
+		pr_debug("cpufreq policy not set for CPU: %d\n", cpu);
+		return false;
+	}
+
+	return sugov_is_governor(policy);
+}
+
+bool cpufreq_ready_for_eas(const struct cpumask *cpu_mask)
+{
+	unsigned int cpu;
+
+	/* Do not attempt EAS if schedutil is not being used. */
+	for_each_cpu(cpu, cpu_mask) {
+		if (!cpufreq_policy_is_good_for_eas(cpu)) {
+			pr_debug("rd %*pbl: schedutil is mandatory for EAS\n",
+				 cpumask_pr_args(cpu_mask));
+			return false;
+		}
+	}
+
+	return true;
+}
+
 module_param(off, int, 0444);
 module_param_string(default_governor, default_governor, CPUFREQ_NAME_LEN, 0444);
 core_initcall(cpufreq_core_init);

@@ -1152,7 +1152,7 @@ static inline void build_ddr_csl(struct mbx_fw_cmd_req *req, void *cookie,
 
 	if (enable) {
 		req->ddr_csl.bytes = bytes;
-		req->ddr_csl.ddr_phy_hi = (dma_phy >> 32);
+		req->ddr_csl.ddr_phy_hi = (u32)((u64)(dma_phy >> 32));
 		req->ddr_csl.ddr_phy_lo = dma_phy & 0xffffffff;
 	} else {
 		req->ddr_csl.bytes = 0;

@@ -13394,6 +13394,14 @@ void unregister_fair_sched_group(struct task_group *tg)
 				list_del_leaf_cfs_rq(cfs_rq);
 			}
 			remove_entity_load_avg(se);
+#ifdef CONFIG_SMP
+			/*
+			 * Clear parent's h_load_next if it points to the
+			 * sched_entity being freed to avoid stale pointer.
+			 */
+			if (READ_ONCE(cfs_rq_of(se)->h_load_next) == se)
+				WRITE_ONCE(cfs_rq_of(se)->h_load_next, NULL);
+#endif
 		}
 
 		/*

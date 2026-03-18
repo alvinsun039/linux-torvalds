@@ -28,6 +28,8 @@
 #include <linux/pm_qos.h>
 #include <linux/bitfield.h>
 #include <trace/events/power.h>
+#include <linux/units.h>
+#include <linux/cacheinfo.h>
 
 #include <asm/cpu.h>
 #include <asm/div64.h>
@@ -220,6 +222,7 @@ struct global_params {
  * @sched_flags:	Store scheduler flags for possible cross CPU update
  * @hwp_boost_min:	Last HWP boosted min performance
  * @suspended:		Whether or not the driver has been suspended.
+ * @pd_registered:	Set when a perf domain is registered for this CPU.
  * @hwp_notify_work:	workqueue for HWP notifications.
  *
  * This structure stores per CPU instance data for all CPUs.
@@ -259,6 +262,9 @@ struct cpudata {
 	unsigned int sched_flags;
 	u32 hwp_boost_min;
 	bool suspended;
+#ifdef CONFIG_ENERGY_MODEL
+	bool pd_registered;
+#endif
 	struct delayed_work hwp_notify_work;
 };
 
@@ -302,14 +308,16 @@ static bool hwp_is_hybrid;
 
 static struct cpufreq_driver *intel_pstate_driver __read_mostly;
 
-#define HYBRID_SCALING_FACTOR		78741
+#define INTEL_PSTATE_CORE_SCALING	100000
+#define HYBRID_SCALING_FACTOR_ADL	78741
 #define HYBRID_SCALING_FACTOR_MTL	80000
+#define HYBRID_SCALING_FACTOR_LNL	86957
 
-static int hybrid_scaling_factor = HYBRID_SCALING_FACTOR;
+static int hybrid_scaling_factor;
 
 static inline int core_get_scaling(void)
 {
-	return 100000;
+	return INTEL_PSTATE_CORE_SCALING;
 }
 
 #ifdef CONFIG_ACPI
@@ -413,18 +421,15 @@ static int intel_pstate_get_cppc_guaranteed(int cpu)
 static int intel_pstate_cppc_get_scaling(int cpu)
 {
 	struct cppc_perf_caps cppc_perf;
-	int ret;
-
-	ret = cppc_get_perf_caps(cpu, &cppc_perf);
 
 	/*
-	 * If the nominal frequency and the nominal performance are not
-	 * zero and the ratio between them is not 100, return the hybrid
-	 * scaling factor.
+	 * Compute the perf-to-frequency scaling factor for the given CPU if
+	 * possible, unless it would be 0.
 	 */
-	if (!ret && cppc_perf.nominal_perf && cppc_perf.nominal_freq &&
-	    cppc_perf.nominal_perf * 100 != cppc_perf.nominal_freq)
-		return hybrid_scaling_factor;
+	if (!cppc_get_perf_caps(cpu, &cppc_perf) &&
+	    cppc_perf.nominal_perf && cppc_perf.nominal_freq)
+		return div_u64(cppc_perf.nominal_freq * KHZ_PER_MHZ,
+			       cppc_perf.nominal_perf);
 
 	return core_get_scaling();
 }
@@ -940,12 +945,127 @@ static struct freq_attr *hwp_cpufreq_attrs[] = {
 	NULL,
 };
 
+static bool no_cas __ro_after_init;
+
 static struct cpudata *hybrid_max_perf_cpu __read_mostly;
+
+static void hybrid_get_type(void *data);
 /*
  * Protects hybrid_max_perf_cpu, the capacity_perf fields in struct cpudata,
  * and the x86 arch scale-invariance information from concurrent updates.
  */
 static DEFINE_MUTEX(hybrid_capacity_lock);
+
+#ifdef CONFIG_ENERGY_MODEL
+#define HYBRID_EM_STATE_COUNT	4
+
+static int hybrid_active_power(struct device *dev, unsigned long *power,
+			       unsigned long *freq)
+{
+	/*
+	 * Create four "states" corresponding to 40%, 60%, 80%, and 100% of the
+	 * full capacity.
+	 *
+	 * For this purpose, return the "frequency" of 2 for the first
+	 * performance level and otherwise leave the value set by the caller.
+	 */
+	if (!*freq)
+		*freq = 2;
+
+	/* No power information. */
+	*power = EM_MAX_POWER;
+
+	return 0;
+}
+
+static bool hybrid_has_l3(unsigned int cpu)
+{
+	struct cpu_cacheinfo *cacheinfo = get_cpu_cacheinfo(cpu);
+	unsigned int i;
+
+	if (!cacheinfo)
+		return false;
+
+	for (i = 0; i < cacheinfo->num_leaves; i++) {
+		if (cacheinfo->info_list[i].level == 3)
+			return true;
+	}
+
+	return false;
+}
+
+static int hybrid_get_cost(struct device *dev, unsigned long freq,
+			   unsigned long *cost)
+{
+	u8 cpu_type = 0;
+
+	smp_call_function_single(dev->id, hybrid_get_type, &cpu_type, 1);
+	/* Facilitate load balancing between CPUs of the same type. */
+	*cost = freq;
+	/*
+	 * Adjust the cost depending on CPU type.
+	 *
+	 * The idea is to start loading up LPE-cores before E-cores and start
+	 * to populate E-cores when LPE-cores are utilized above 60% of the
+	 * capacity.  Similarly, P-cores start to be populated when E-cores are
+	 * utilized above 60% of the capacity.
+	 */
+	if (cpu_type == INTEL_CPU_TYPE_ATOM) {
+		if (hybrid_has_l3(dev->id)) /* E-core */
+			*cost += 1;
+	} else { /* P-core */
+		*cost += 2;
+	}
+
+	return 0;
+}
+
+static bool hybrid_register_perf_domain(unsigned int cpu)
+{
+	static const struct em_data_callback cb
+			= EM_ADV_DATA_CB(hybrid_active_power, hybrid_get_cost);
+	struct cpudata *cpudata = all_cpu_data[cpu];
+	struct device *cpu_dev;
+
+	/*
+	 * Registering EM perf domains without enabling asymmetric CPU capacity
+	 * support is not really useful and one domain should not be registered
+	 * more than once.
+	 */
+	if (!hybrid_max_perf_cpu || cpudata->pd_registered)
+		return false;
+
+	cpu_dev = get_cpu_device(cpu);
+	if (!cpu_dev)
+		return false;
+
+	if (em_dev_register_pd_no_update(cpu_dev, HYBRID_EM_STATE_COUNT, &cb,
+					 cpumask_of(cpu), false))
+		return false;
+
+	cpudata->pd_registered = true;
+
+	return true;
+}
+
+static void hybrid_register_all_perf_domains(void)
+{
+	unsigned int cpu;
+
+	for_each_online_cpu(cpu)
+		hybrid_register_perf_domain(cpu);
+}
+
+static void hybrid_update_perf_domain(struct cpudata *cpu)
+{
+	if (cpu->pd_registered)
+		em_adjust_cpu_capacity(cpu->cpu);
+}
+#else /* !CONFIG_ENERGY_MODEL */
+static inline bool hybrid_register_perf_domain(unsigned int cpu) { return false; }
+static inline void hybrid_register_all_perf_domains(void) {}
+static inline void hybrid_update_perf_domain(struct cpudata *cpu) {}
+#endif /* CONFIG_ENERGY_MODEL */
 
 static void hybrid_set_cpu_capacity(struct cpudata *cpu)
 {
@@ -953,6 +1073,9 @@ static void hybrid_set_cpu_capacity(struct cpudata *cpu)
 			      hybrid_max_perf_cpu->capacity_perf,
 			      cpu->capacity_perf,
 			      cpu->pstate.max_pstate_physical);
+	hybrid_update_perf_domain(cpu);
+
+	topology_set_cpu_scale(cpu->cpu, arch_scale_cpu_capacity(cpu->cpu));
 
 	pr_debug("CPU%d: perf = %u, max. perf = %u, base perf = %d\n", cpu->cpu,
 		 cpu->capacity_perf, hybrid_max_perf_cpu->capacity_perf,
@@ -1041,10 +1164,19 @@ static void hybrid_refresh_cpu_capacity_scaling(void)
 	guard(mutex)(&hybrid_capacity_lock);
 
 	__hybrid_refresh_cpu_capacity_scaling();
+	/*
+	 * Perf domains are not registered before setting hybrid_max_perf_cpu,
+	 * so register them all after setting up CPU capacity scaling.
+	 */
+	hybrid_register_all_perf_domains();
 }
 
 static void hybrid_init_cpu_capacity_scaling(bool refresh)
 {
+	/* Bail out if enabling capacity-aware scheduling is prohibited. */
+	if (no_cas)
+		return;
+
 	/*
 	 * If hybrid_max_perf_cpu is set at this point, the hybrid CPU capacity
 	 * scaling has been enabled already and the driver is just changing the
@@ -1060,11 +1192,11 @@ static void hybrid_init_cpu_capacity_scaling(bool refresh)
 	 * the capacity of SMT threads is not deterministic even approximately,
 	 * do not do that when SMT is in use.
 	 */
-	if (hwp_is_hybrid && !sched_smt_active() && arch_enable_hybrid_capacity_scale()) {
+	if (hwp_is_hybrid && !cpu_smt_possible() && arch_enable_hybrid_capacity_scale()) {
 		hybrid_refresh_cpu_capacity_scaling();
 		/*
 		 * Disabling ITMT causes sched domains to be rebuilt to disable asym
-		 * packing and enable asym capacity.
+		 * packing and enable asym capacity and EAS.
 		 */
 		sched_clear_itmt_support();
 	}
@@ -1142,6 +1274,14 @@ static void hybrid_update_capacity(struct cpudata *cpu)
 	}
 
 	hybrid_set_cpu_capacity(cpu);
+	/*
+	 * If the CPU was offline to start with and it is going online for the
+	 * first time, a perf domain needs to be registered for it if hybrid
+	 * capacity scaling has been enabled already.  In that case, sched
+	 * domains need to be rebuilt to take the new perf domain into account.
+	 */
+	if (hybrid_register_perf_domain(cpu->cpu))
+		em_rebuild_sched_domains();
 
 unlock:
 	mutex_unlock(&hybrid_capacity_lock);
@@ -2206,24 +2346,30 @@ static void hybrid_get_type(void *data)
 
 static int hwp_get_cpu_scaling(int cpu)
 {
-	u8 cpu_type = 0;
+	if (hybrid_scaling_factor) {
+		u8 cpu_type = 0;
 
-	smp_call_function_single(cpu, hybrid_get_type, &cpu_type, 1);
-	/* P-cores have a smaller perf level-to-freqency scaling factor. */
-	if (cpu_type == 0x40)
-		return hybrid_scaling_factor;
+		smp_call_function_single(cpu, hybrid_get_type, &cpu_type, 1);
 
-	/* Use default core scaling for E-cores */
-	if (cpu_type == 0x20)
+		/*
+		 * Return the hybrid scaling factor for P-cores and use the
+		 * default core scaling for E-cores.
+		 */
+		if (cpu_type == 0x40)
+			return hybrid_scaling_factor;
+
+		if (cpu_type == 0x20)
+			return core_get_scaling();
+	}
+
+	/* Use core scaling on non-hybrid systems. */
+	if (!cpu_feature_enabled(X86_FEATURE_HYBRID_CPU))
 		return core_get_scaling();
 
 	/*
-	 * If reached here, this system is either non-hybrid (like Tiger
-	 * Lake) or hybrid-capable (like Alder Lake or Raptor Lake) with
-	 * no E cores (in which case CPUID for hybrid support is 0).
-	 *
-	 * The CPPC nominal_frequency field is 0 for non-hybrid systems,
-	 * so the default core scaling will be used for them.
+	 * The system is hybrid, but the hybrid scaling factor is not known or
+	 * the CPU type is not one of the above, so use CPPC to compute the
+	 * scaling factor for this CPU.
 	 */
 	return intel_pstate_cppc_get_scaling(cpu);
 }
@@ -3663,7 +3809,13 @@ static const struct x86_cpu_id intel_epp_default[] = {
 };
 
 static const struct x86_cpu_id intel_hybrid_scaling_factor[] = {
+	X86_MATCH_VFM(INTEL_ALDERLAKE, HYBRID_SCALING_FACTOR_ADL),
+	X86_MATCH_VFM(INTEL_ALDERLAKE_L, HYBRID_SCALING_FACTOR_ADL),
+	X86_MATCH_VFM(INTEL_RAPTORLAKE, HYBRID_SCALING_FACTOR_ADL),
+	X86_MATCH_VFM(INTEL_RAPTORLAKE_P, HYBRID_SCALING_FACTOR_ADL),
+	X86_MATCH_VFM(INTEL_RAPTORLAKE_S, HYBRID_SCALING_FACTOR_ADL),
 	X86_MATCH_INTEL_FAM6_MODEL(METEORLAKE_L, HYBRID_SCALING_FACTOR_MTL),
+	X86_MATCH_VFM(INTEL_LUNARLAKE_M, HYBRID_SCALING_FACTOR_LNL),
 	{}
 };
 
@@ -3822,6 +3974,9 @@ static int __init intel_pstate_setup(char *str)
 
 	if (!strcmp(str, "no_hwp"))
 		no_hwp = 1;
+
+	if (!strcmp(str, "no_cas"))
+		no_cas = true;
 
 	if (!strcmp(str, "force"))
 		force_load = 1;

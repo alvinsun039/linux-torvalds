@@ -6159,6 +6159,13 @@ L:	linux-gpio@vger.kernel.org
 S:	Maintained
 F:	drivers/gpio/gpio-gpio-mm.c
 
+DIBS (DIRECT INTERNAL BUFFER SHARING)
+M:	Alexandra Winter <wintera@linux.ibm.com>
+L:	netdev@vger.kernel.org
+S:	Supported
+F:	drivers/dibs/
+F:	include/linux/dibs.h
+
 DIOLAN U2C-12 I2C DRIVER
 M:	Guenter Roeck <linux@roeck-us.net>
 L:	linux-i2c@vger.kernel.org
@@ -8699,6 +8706,17 @@ F:	include/uapi/linux/futex.h
 F:	kernel/futex/*
 F:	tools/perf/bench/futex*
 F:	tools/testing/selftests/futex/
+
+FWCTL SUBSYSTEM
+M:	Dave Jiang <dave.jiang@intel.com>
+M:	Jason Gunthorpe <jgg@nvidia.com>
+M:	Saeed Mahameed <saeedm@nvidia.com>
+R:	Jonathan Cameron <Jonathan.Cameron@huawei.com>
+S:	Maintained
+F:	Documentation/userspace-api/fwctl/
+F:	drivers/fwctl/
+F:	include/linux/fwctl.h
+F:	include/uapi/fwctl/
 
 GATEWORKS SYSTEM CONTROLLER (GSC) DRIVER
 M:	Tim Harvey <tharvey@gateworks.com>
@@ -19363,8 +19381,7 @@ S:	Maintained
 W:	https://github.com/sched-ext/scx
 T:	git://git.kernel.org/pub/scm/linux/kernel/git/tj/sched_ext.git
 F:	include/linux/sched/ext.h
-F:	kernel/sched/ext.h
-F:	kernel/sched/ext.c
+F:	kernel/sched/ext*
 F:	tools/sched_ext/
 F:	tools/testing/selftests/sched_ext
 

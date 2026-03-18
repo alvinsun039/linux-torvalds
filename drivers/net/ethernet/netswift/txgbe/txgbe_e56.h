@@ -1839,7 +1839,11 @@ typedef union {
 
 #define TXGBE_E56_PHY_LINK_UP 0x4
 
-#define __bf_shf_m(x) (__builtin_ffsll(x) - 1)
+#if defined(__riscv)
+#define __bf_shf_m(x) ((x) ? __ffs(x) - 1 : 0)
+#else
+#define __bf_shf_m(x) ((x) ? __builtin_ffsll(x) - 1 : 0)
+#endif
 
 #define FIELD_PREP_M(_mask, _val)					\
 	({								\

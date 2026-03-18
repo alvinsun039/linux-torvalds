@@ -9,6 +9,7 @@
 #include <linux/etherdevice.h>
 #include <linux/filter.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
@@ -187,9 +188,9 @@ static int gve_alloc_stats_report(struct gve_priv *priv)
 	int tx_stats_num, rx_stats_num;
 
 	tx_stats_num = (GVE_TX_STATS_REPORT_NUM + NIC_TX_STATS_REPORT_NUM) *
-		       gve_num_tx_queues(priv);
+				priv->tx_cfg.max_queues;
 	rx_stats_num = (GVE_RX_STATS_REPORT_NUM + NIC_RX_STATS_REPORT_NUM) *
-		       priv->rx_cfg.num_queues;
+				priv->rx_cfg.max_queues;
 	priv->stats_report_len = struct_size(priv->stats_report, stats,
 					     size_add(tx_stats_num, rx_stats_num));
 	priv->stats_report =
@@ -239,6 +240,18 @@ static irqreturn_t gve_intr_dqo(int irq, void *arg)
 	/* Interrupts are automatically masked */
 	napi_schedule_irqoff(&block->napi);
 	return IRQ_HANDLED;
+}
+
+static int gve_is_napi_on_home_cpu(struct gve_priv *priv, u32 irq)
+{
+	int cpu_curr = smp_processor_id();
+	const struct cpumask *aff_mask;
+
+	aff_mask = irq_get_effective_affinity_mask(irq);
+	if (unlikely(!aff_mask))
+		return 1;
+
+	return cpumask_test_cpu(cpu_curr, aff_mask);
 }
 
 int gve_napi_poll(struct napi_struct *napi, int budget)
@@ -310,8 +323,21 @@ int gve_napi_poll_dqo(struct napi_struct *napi, int budget)
 		reschedule |= work_done == budget;
 	}
 
-	if (reschedule)
-		return budget;
+	if (reschedule) {
+		/* Reschedule by returning budget only if already on the correct
+		 * cpu.
+		 */
+		if (likely(gve_is_napi_on_home_cpu(priv, block->irq)))
+			return budget;
+
+		/* If not on the cpu with which this queue's irq has affinity
+		 * with, we avoid rescheduling napi and arm the irq instead so
+		 * that napi gets rescheduled back eventually onto the right
+		 * cpu.
+		 */
+		if (work_done == budget)
+			work_done--;
+	}
 
 	if (likely(napi_complete_done(napi, work_done))) {
 		/* Enable interrupts again.
@@ -410,12 +436,13 @@ static int gve_alloc_notify_blocks(struct gve_priv *priv)
 		block->priv = priv;
 		err = request_irq(priv->msix_vectors[msix_idx].vector,
 				  gve_is_gqi(priv) ? gve_intr : gve_intr_dqo,
-				  0, block->name, block);
+				  IRQF_NO_AUTOEN, block->name, block);
 		if (err) {
 			dev_err(&priv->pdev->dev,
 				"Failed to receive msix vector %d\n", i);
 			goto abort_with_some_ntfy_blocks;
 		}
+		block->irq = priv->msix_vectors[msix_idx].vector;
 		irq_set_affinity_hint(priv->msix_vectors[msix_idx].vector,
 				      get_cpu_mask(i % active_cpus));
 		block->irq_db_index = &priv->irq_db_indices[i].index;
@@ -429,6 +456,7 @@ abort_with_some_ntfy_blocks:
 		irq_set_affinity_hint(priv->msix_vectors[msix_idx].vector,
 				      NULL);
 		free_irq(priv->msix_vectors[msix_idx].vector, block);
+		block->irq = 0;
 	}
 	kvfree(priv->ntfy_blocks);
 	priv->ntfy_blocks = NULL;
@@ -462,6 +490,7 @@ static void gve_free_notify_blocks(struct gve_priv *priv)
 		irq_set_affinity_hint(priv->msix_vectors[msix_idx].vector,
 				      NULL);
 		free_irq(priv->msix_vectors[msix_idx].vector, block);
+		block->irq = 0;
 	}
 	free_irq(priv->msix_vectors[priv->mgmt_msix_idx].vector, priv);
 	kvfree(priv->ntfy_blocks);

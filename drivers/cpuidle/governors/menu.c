@@ -155,53 +155,52 @@ static void menu_update(struct cpuidle_driver *drv, struct cpuidle_device *dev);
  */
 static unsigned int get_typical_interval(struct menu_device *data)
 {
-	int i, divisor;
-	unsigned int min, max, thresh, avg;
-	uint64_t sum, variance;
-
-	thresh = INT_MAX; /* Discard outliers above this value */
+	s64 value, min_thresh = -1, max_thresh = UINT_MAX;
+	unsigned int max, min, divisor;
+	u64 avg, variance, avg_sq;
+	int i;
 
 again:
-
-	/* First calculate the average of past intervals */
-	min = UINT_MAX;
+	/* Compute the average and variance of past intervals. */
 	max = 0;
-	sum = 0;
+	min = UINT_MAX;
+	avg = 0;
+	variance = 0;
 	divisor = 0;
 	for (i = 0; i < INTERVALS; i++) {
-		unsigned int value = data->intervals[i];
-		if (value <= thresh) {
-			sum += value;
-			divisor++;
-			if (value > max)
-				max = value;
+		value = data->intervals[i];
+		/*
+		 * Discard the samples outside the interval between the min and
+		 * max thresholds.
+		 */
+		if (value <= min_thresh || value >= max_thresh)
+			continue;
 
-			if (value < min)
-				min = value;
-		}
+		divisor++;
+
+		avg += value;
+		variance += value * value;
+
+		if (value > max)
+			max = value;
+
+		if (value < min)
+			min = value;
 	}
 
 	if (!max)
 		return UINT_MAX;
 
-	if (divisor == INTERVALS)
-		avg = sum >> INTERVAL_SHIFT;
-	else
-		avg = div_u64(sum, divisor);
-
-	/* Then try to determine variance */
-	variance = 0;
-	for (i = 0; i < INTERVALS; i++) {
-		unsigned int value = data->intervals[i];
-		if (value <= thresh) {
-			int64_t diff = (int64_t)value - avg;
-			variance += diff * diff;
-		}
-	}
-	if (divisor == INTERVALS)
+	if (divisor == INTERVALS) {
+		avg >>= INTERVAL_SHIFT;
 		variance >>= INTERVAL_SHIFT;
-	else
+	} else {
+		do_div(avg, divisor);
 		do_div(variance, divisor);
+	}
+
+	avg_sq = avg * avg;
+	variance -= avg_sq;
 
 	/*
 	 * The typical interval is obtained when standard deviation is
@@ -216,17 +215,16 @@ again:
 	 * Use this result only if there is no timer to wake us up sooner.
 	 */
 	if (likely(variance <= U64_MAX/36)) {
-		if ((((u64)avg*avg > variance*36) && (divisor * 4 >= INTERVALS * 3))
-							|| variance <= 400) {
+		if ((avg_sq > variance * 36 && divisor * 4 >= INTERVALS * 3) ||
+		    variance <= 400)
 			return avg;
-		}
 	}
 
 	/*
-	 * If we have outliers to the upside in our distribution, discard
-	 * those by setting the threshold to exclude these outliers, then
+	 * If there are outliers, discard them by setting thresholds to exclude
+	 * data points at a large enough distance from the average, then
 	 * calculate the average and standard deviation again. Once we get
-	 * down to the bottom 3/4 of our samples, stop excluding samples.
+	 * down to the last 3/4 of our samples, stop excluding samples.
 	 *
 	 * This can deal with workloads that have long pauses interspersed
 	 * with sporadic activity with a bunch of short pauses.
@@ -242,7 +240,12 @@ again:
 	if (divisor * 4 <= INTERVALS * 3)
 		return UINT_MAX;
 
-	thresh = max - 1;
+	/* Update the thresholds for the next round. */
+	if (avg - min > max - avg)
+		min_thresh = min;
+	else
+		max_thresh = max;
+
 	goto again;
 }
 
@@ -276,7 +279,7 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 
 	/* Find the shortest expected idle interval. */
 	predicted_ns = get_typical_interval(data) * NSEC_PER_USEC;
-	if (predicted_ns > RESIDENCY_THRESHOLD_NS) {
+	if (predicted_ns > RESIDENCY_THRESHOLD_NS || tick_nohz_tick_stopped()) {
 		unsigned int timer_us;
 
 		/* Determine the time till the closest timer. */
@@ -296,6 +299,16 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 				   RESOLUTION * DECAY * NSEC_PER_USEC);
 		/* Use the lowest expected idle interval to pick the idle state. */
 		predicted_ns = min((u64)timer_us * NSEC_PER_USEC, predicted_ns);
+		/*
+		 * If the tick is already stopped, the cost of possible short
+		 * idle duration misprediction is much higher, because the CPU
+		 * may be stuck in a shallow idle state for a long time as a
+		 * result of it.  In that case, say we might mispredict and use
+		 * the known time till the closest timer event for the idle
+		 * state selection.
+		 */
+		if (tick_nohz_tick_stopped() && predicted_ns < TICK_NSEC)
+			predicted_ns = data->next_timer_ns;
 	} else {
 		/*
 		 * Because the next timer event is not going to be determined
@@ -305,10 +318,10 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		 */
 		data->next_timer_ns = KTIME_MAX;
 		delta_tick = TICK_NSEC / 2;
-		data->bucket = which_bucket(KTIME_MAX);
+		data->bucket = BUCKETS - 1;
 	}
 
-	if (unlikely(drv->state_count <= 1 || latency_req == 0) ||
+	if (drv->state_count <= 1 || latency_req == 0 ||
 	    ((data->next_timer_ns < drv->states[1].target_residency_ns ||
 	      latency_req < drv->states[1].exit_latency_ns) &&
 	     !dev->states_usage[0].disable)) {
@@ -320,16 +333,6 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		*stop_tick = !(drv->states[0].flags & CPUIDLE_FLAG_POLLING);
 		return 0;
 	}
-
-	/*
-	 * If the tick is already stopped, the cost of possible short idle
-	 * duration misprediction is much higher, because the CPU may be stuck
-	 * in a shallow idle state for a long time as a result of it.  In that
-	 * case, say we might mispredict and use the known time till the closest
-	 * timer event for the idle state selection.
-	 */
-	if (tick_nohz_tick_stopped() && predicted_ns < TICK_NSEC)
-		predicted_ns = data->next_timer_ns;
 
 	/*
 	 * Find the idle state with the lowest power while satisfying

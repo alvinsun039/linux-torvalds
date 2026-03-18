@@ -1664,7 +1664,14 @@ static int remote_partition_enable(struct cpuset *cs, int new_prs,
 static void remote_partition_disable(struct cpuset *cs, struct tmpmasks *tmp)
 {
 	WARN_ON_ONCE(!is_remote_partition(cs));
-	WARN_ON_ONCE(!cpumask_subset(cs->effective_xcpus, subpartitions_cpus));
+	/*
+	 * When a CPU is offlined, top_cpuset may end up with no available CPUs,
+	 * which should clear subpartitions_cpus. We should not emit a warning for this
+	 * scenario: the hierarchy is updated from top to bottom, so subpartitions_cpus
+	 * may already be cleared when disabling the partition.
+	 */
+	WARN_ON_ONCE(!cpumask_subset(cs->effective_xcpus, subpartitions_cpus) &&
+		     !cpumask_empty(subpartitions_cpus));
 
 	spin_lock_irq(&callback_lock);
 	cs->remote_partition = false;
@@ -3972,8 +3979,9 @@ retry:
 	if (remote || (is_partition_valid(cs) && is_partition_valid(parent)))
 		compute_partition_effective_cpumask(cs, &new_cpus);
 
-	if (remote && cpumask_empty(&new_cpus) &&
-	    partition_is_populated(cs, NULL)) {
+	if (remote && (cpumask_empty(subpartitions_cpus) ||
+			(cpumask_empty(&new_cpus) &&
+			 partition_is_populated(cs, NULL)))) {
 		cs->prs_err = PERR_HOTPLUG;
 		remote_partition_disable(cs, tmp);
 		compute_effective_cpumask(&new_cpus, cs, parent);
@@ -3986,9 +3994,12 @@ retry:
 	 * 1) empty effective cpus but not valid empty partition.
 	 * 2) parent is invalid or doesn't grant any cpus to child
 	 *    partitions.
+	 * 3) subpartitions_cpus is empty.
 	 */
-	if (is_local_partition(cs) && (!is_partition_valid(parent) ||
-				tasks_nocpu_error(parent, cs, &new_cpus)))
+	if (is_local_partition(cs) &&
+	    (!is_partition_valid(parent) ||
+	     tasks_nocpu_error(parent, cs, &new_cpus) ||
+	     cpumask_empty(subpartitions_cpus)))
 		partcmd = partcmd_invalidate;
 	/*
 	 * On the other hand, an invalid partition root may be transitioned
@@ -4179,23 +4190,12 @@ void __init cpuset_init_smp(void)
 	BUG_ON(!cpuset_migrate_mm_wq);
 }
 
-/**
- * cpuset_cpus_allowed - return cpus_allowed mask from a tasks cpuset.
- * @tsk: pointer to task_struct from which to obtain cpuset->cpus_allowed.
- * @pmask: pointer to struct cpumask variable to receive cpus_allowed set.
- *
- * Description: Returns the cpumask_var_t cpus_allowed of the cpuset
- * attached to the specified @tsk.  Guaranteed to return some non-empty
- * subset of cpu_active_mask, even if this means going outside the
- * tasks cpuset, except when the task is in the top cpuset.
- **/
-
-void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
+/*
+ * Return cpus_allowed mask from a task's cpuset.
+ */
+static void __cpuset_cpus_allowed_locked(struct task_struct *tsk, struct cpumask *pmask)
 {
-	unsigned long flags;
 	struct cpuset *cs;
-
-	spin_lock_irqsave(&callback_lock, flags);
 
 	cs = task_cs(tsk);
 	if (cs != &top_cpuset)
@@ -4216,7 +4216,39 @@ void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
 		if (!cpumask_intersects(pmask, cpu_active_mask))
 			cpumask_copy(pmask, possible_mask);
 	}
+}
 
+/**
+ * cpuset_cpus_allowed_locked - return cpus_allowed mask from a task's cpuset.
+ * @tsk: pointer to task_struct from which to obtain cpuset->cpus_allowed.
+ * @pmask: pointer to struct cpumask variable to receive cpus_allowed set.
+ *
+ * Similir to cpuset_cpus_allowed() except that the caller must have acquired
+ * cpuset_mutex.
+ */
+void cpuset_cpus_allowed_locked(struct task_struct *tsk, struct cpumask *pmask)
+{
+	lockdep_assert_held(&cpuset_mutex);
+	__cpuset_cpus_allowed_locked(tsk, pmask);
+}
+
+/**
+ * cpuset_cpus_allowed - return cpus_allowed mask from a task's cpuset.
+ * @tsk: pointer to task_struct from which to obtain cpuset->cpus_allowed.
+ * @pmask: pointer to struct cpumask variable to receive cpus_allowed set.
+ *
+ * Description: Returns the cpumask_var_t cpus_allowed of the cpuset
+ * attached to the specified @tsk.  Guaranteed to return some non-empty
+ * subset of cpu_active_mask, even if this means going outside the
+ * tasks cpuset, except when the task is in the top cpuset.
+ **/
+
+void cpuset_cpus_allowed(struct task_struct *tsk, struct cpumask *pmask)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&callback_lock, flags);
+	__cpuset_cpus_allowed_locked(tsk, pmask);
 	spin_unlock_irqrestore(&callback_lock, flags);
 }
 

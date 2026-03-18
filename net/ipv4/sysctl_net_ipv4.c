@@ -53,6 +53,8 @@ static int tcp_tw_timeout_max = 600 * HZ;
 /* obsolete */
 static int sysctl_tcp_low_latency __read_mostly;
 
+bool sysctl_tcp_nodelay_ack __read_mostly;
+
 /* Update system visible IP port range */
 static void set_local_port_range(struct net *net, unsigned int low, unsigned int high)
 {
@@ -597,6 +599,13 @@ static struct ctl_table ipv4_table[] = {
 		.procname       = "connect_port_randomization",
 		.data           = &sysctl_connect_port_randomization,
 		.maxlen         = sizeof(sysctl_connect_port_randomization),
+		.mode           = 0644,
+		.proc_handler   = proc_dobool,
+	},
+	{
+		.procname       = "tcp_nodelayack",
+		.data           = &sysctl_tcp_nodelay_ack,
+		.maxlen         = sizeof(sysctl_tcp_nodelay_ack),
 		.mode           = 0644,
 		.proc_handler   = proc_dobool,
 	},
