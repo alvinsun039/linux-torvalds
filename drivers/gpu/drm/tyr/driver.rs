@@ -16,7 +16,11 @@ use kernel::{
         DmaMask, //
     },
     drm,
-    drm::ioctl,
+    drm::{
+        driver::Registration,
+        ioctl,
+        UnregisteredDevice, //
+    },
     io::{
         poll,
         Io, //
@@ -152,8 +156,8 @@ impl platform::Driver for TyrPlatformDriverData {
                 gpu_info,
         });
 
-        let tdev = drm::UnregisteredDevice::<TyrDrmDriver>::new(pdev.as_ref(), data)?;
-        let tdev = drm::driver::Registration::new_foreign_owned(tdev, pdev.as_ref(), 0)?;
+        let tdev = UnregisteredDevice::<TyrDrmDriver>::new(pdev.as_ref(), data)?;
+        let tdev = Registration::new_foreign_owned(tdev, pdev.as_ref(), 0)?;
 
         let driver = TyrPlatformDriverData {
             _device: tdev.into(),
