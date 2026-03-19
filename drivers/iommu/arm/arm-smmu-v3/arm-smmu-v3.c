@@ -4048,53 +4048,11 @@ static void arm_smmu_setup_msis(struct arm_smmu_device *smmu)
 	devm_add_action_or_reset(dev, arm_smmu_free_msis, dev);
 }
 
-#ifdef CONFIG_PM_SLEEP
-static void arm_smmu_resume_msis(struct arm_smmu_device *smmu)
-{
-	struct msi_desc *desc;
-	struct device *dev = smmu->dev;
-
-	if (!dev->msi.domain)
-		return;
-
-	msi_for_each_desc(desc, dev, MSI_DESC_ASSOCIATED) {
-		switch (desc->msi_index) {
-		case EVTQ_MSI_INDEX:
-		case GERROR_MSI_INDEX:
-		case PRIQ_MSI_INDEX: {
-			phys_addr_t *cfg = arm_smmu_msi_cfg[desc->msi_index];
-			struct msi_msg *msg = &desc->msg;
-			phys_addr_t doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
-
-			doorbell &= MSI_CFG0_ADDR_MASK;
-			writeq_relaxed(doorbell, smmu->base + cfg[0]);
-			writel_relaxed(msg->data, smmu->base + cfg[1]);
-			writel_relaxed(ARM_SMMU_MEMATTR_DEVICE_nGnRE,
-							smmu->base + cfg[2]);
-			break;
-		}
-		default:
-				break;
-		}
-	}
-}
-#else
-static void arm_smmu_resume_msis(struct arm_smmu_device *smmu)
-{
-}
-#endif
-
-static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu, bool resume)
+static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu)
 {
 	int irq, ret;
 
-	if (!resume)
-		arm_smmu_setup_msis(smmu);
-	else {
-		/* The irq doesn't need to be re-requested during resume */
-		arm_smmu_resume_msis(smmu);
-		return;
-	}
+	arm_smmu_setup_msis(smmu);
 
 	/* Request interrupt lines */
 	irq = smmu->evtq.q.irq;
@@ -4136,7 +4094,7 @@ static void arm_smmu_setup_unique_irqs(struct arm_smmu_device *smmu, bool resume
 	}
 }
 
-static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu, bool resume)
+static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu)
 {
 	int ret, irq;
 	u32 irqen_flags = IRQ_CTRL_EVTQ_IRQEN | IRQ_CTRL_GERROR_IRQEN;
@@ -4163,7 +4121,7 @@ static int arm_smmu_setup_irqs(struct arm_smmu_device *smmu, bool resume)
 		if (ret < 0)
 			dev_warn(smmu->dev, "failed to enable combined irq\n");
 	} else
-		arm_smmu_setup_unique_irqs(smmu, resume);
+		arm_smmu_setup_unique_irqs(smmu);
 
 	if (smmu->features & ARM_SMMU_FEAT_PRI)
 		irqen_flags |= IRQ_CTRL_PRIQ_IRQEN;
@@ -4316,7 +4274,7 @@ static int arm_smmu_device_reset(struct arm_smmu_device *smmu)
 		}
 	}
 
-	ret = arm_smmu_setup_irqs(smmu, resume);
+	ret = arm_smmu_setup_irqs(smmu);
 	if (ret) {
 		dev_err(smmu->dev, "failed to setup irqs\n");
 		return ret;
