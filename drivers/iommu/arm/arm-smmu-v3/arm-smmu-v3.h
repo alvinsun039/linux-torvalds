@@ -208,10 +208,8 @@ struct arm_smmu_device;
  * 2lvl: 128k L1 entries,
  *       256 lazy entries per table (each table covers a PCI bus)
  */
-#define STRTAB_L1_SZ_SHIFT		20
 #define STRTAB_SPLIT			8
 
-#define STRTAB_L1_DESC_DWORDS		1
 #define STRTAB_L1_DESC_SPAN		GENMASK_ULL(4, 0)
 #define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(51, 6)
 
@@ -220,6 +218,26 @@ struct arm_smmu_device;
 struct arm_smmu_ste {
 	__le64 data[STRTAB_STE_DWORDS];
 };
+
+#define STRTAB_NUM_L2_STES		(1 << STRTAB_SPLIT)
+struct arm_smmu_strtab_l2 {
+	struct arm_smmu_ste stes[STRTAB_NUM_L2_STES];
+};
+
+struct arm_smmu_strtab_l1 {
+	__le64 l2ptr;
+};
+#define STRTAB_MAX_L1_ENTRIES		(1 << 17)
+
+static inline u32 arm_smmu_strtab_l1_idx(u32 sid)
+{
+	return sid / STRTAB_NUM_L2_STES;
+}
+
+static inline u32 arm_smmu_strtab_l2_idx(u32 sid)
+{
+	return sid % STRTAB_NUM_L2_STES;
+}
 
 #define STRTAB_STE_0_V			(1UL << 0)
 #define STRTAB_STE_0_CFG		GENMASK_ULL(3, 1)
@@ -628,13 +646,6 @@ struct arm_smmu_priq {
 };
 
 /* High-level stream table and context descriptor structures */
-struct arm_smmu_strtab_l1_desc {
-	u8				span;
-
-	struct arm_smmu_ste		*l2ptr;
-	dma_addr_t			l2ptr_dma;
-};
-
 struct arm_smmu_ctx_desc {
 	u16				asid;
 };
@@ -676,13 +687,19 @@ struct arm_smmu_s2_cfg {
 };
 
 struct arm_smmu_strtab_cfg {
-	__le64				*strtab;
-	dma_addr_t			strtab_dma;
-	struct arm_smmu_strtab_l1_desc	*l1_desc;
-	unsigned int			num_l1_ents;
-
-	u64				strtab_base;
-	u32				strtab_base_cfg;
+	union {
+		struct {
+			struct arm_smmu_ste *table;
+			dma_addr_t ste_dma;
+			unsigned int num_ents;
+		} linear;
+		struct {
+			struct arm_smmu_strtab_l1 *l1tab;
+			struct arm_smmu_strtab_l2 **l2ptrs;
+			dma_addr_t l1_dma;
+			unsigned int num_l1_ents;
+		} l2;
+	};
 };
 
 struct arm_smmu_impl_ops {

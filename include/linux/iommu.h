@@ -130,7 +130,7 @@ struct iopf_group {
 	/* list node for iommu_fault_param::faults */
 	struct list_head pending_node;
 	struct work_struct work;
-	struct iommu_domain *domain;
+	struct iommu_attach_handle *attach_handle;
 	/* The device's fault data parameter. */
 	struct iommu_fault_param *fault_param;
 	/* Used by handler provider to hook the group on its own lists. */
@@ -608,6 +608,10 @@ iommu_copy_struct_from_full_user_array(void *kdst, size_t kdst_entry_size,
  * @default_domain: If not NULL this will always be set as the default domain.
  *                  This should be an IDENTITY/BLOCKED/PLATFORM domain.
  *                  Do not use in new drivers.
+ * @user_pasid_table: IOMMU driver supports user-managed PASID table. There is
+ *                    no user domain for each PASID and the I/O page faults are
+ *                    forwarded through the user domain attached to the device
+ *                    RID.
  */
 struct iommu_ops {
 	bool (*capable)(struct device *dev, enum iommu_cap);
@@ -655,6 +659,7 @@ struct iommu_ops {
 	struct iommu_domain *blocked_domain;
 	struct iommu_domain *release_domain;
 	struct iommu_domain *default_domain;
+	u8 user_pasid_table:1;
 
 #ifdef CONFIG_SMMU_BYPASS_DEV
 #ifndef __GENKSYMS__
@@ -1147,9 +1152,6 @@ int iommu_attach_device_pasid(struct iommu_domain *domain,
 			      struct iommu_attach_handle *handle);
 void iommu_detach_device_pasid(struct iommu_domain *domain,
 			       struct device *dev, ioasid_t pasid);
-struct iommu_domain *
-iommu_get_domain_for_dev_pasid(struct device *dev, ioasid_t pasid,
-			       unsigned int type);
 ioasid_t iommu_alloc_global_pasid(struct device *dev);
 void iommu_free_global_pasid(ioasid_t pasid);
 #else /* CONFIG_IOMMU_API */
@@ -1491,13 +1493,6 @@ static inline void iommu_detach_device_pasid(struct iommu_domain *domain,
 {
 }
 
-static inline struct iommu_domain *
-iommu_get_domain_for_dev_pasid(struct device *dev, ioasid_t pasid,
-			       unsigned int type)
-{
-	return NULL;
-}
-
 static inline ioasid_t iommu_alloc_global_pasid(struct device *dev)
 {
 	return IOMMU_PASID_INVALID;
@@ -1654,7 +1649,7 @@ struct iopf_queue *iopf_queue_alloc(const char *name);
 void iopf_queue_free(struct iopf_queue *queue);
 int iopf_queue_discard_partial(struct iopf_queue *queue);
 void iopf_free_group(struct iopf_group *group);
-void iommu_report_device_fault(struct device *dev, struct iopf_fault *evt);
+int iommu_report_device_fault(struct device *dev, struct iopf_fault *evt);
 void iopf_group_response(struct iopf_group *group,
 			 enum iommu_page_response_code status);
 #else
@@ -1692,9 +1687,10 @@ static inline void iopf_free_group(struct iopf_group *group)
 {
 }
 
-static inline void
+static inline int
 iommu_report_device_fault(struct device *dev, struct iopf_fault *evt)
 {
+	return -ENODEV;
 }
 
 static inline void iopf_group_response(struct iopf_group *group,
