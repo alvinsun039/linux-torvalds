@@ -5409,7 +5409,11 @@ exit:
 }
 
 static int cfg80211_rtw_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
+#if (KYLIN_RELEASE_CODE >= KYLIN_RELEASE_VERSION(11, 1))
+		struct cfg80211_ap_update *info)
+#else
 		struct cfg80211_beacon_data *info)
+#endif
 {
 	int ret = 0;
 	_adapter *adapter = (_adapter *)rtw_netdev_priv(ndev);
