@@ -1,0 +1,29 @@
+kind: pipeline
+type: docker
+name: build-arm64
+
+trigger:
+  event:
+    - push
+    - pull_request
+
+clone:
+  depth: 1
+
+platform:
+  arch: arm64
+
+steps:
+  - name: compile
+    image: kdev:ubuntu2404
+    security_context:
+      devices:
+        - /dev/kvm          # 只挂载 KVM 设备
+    commands:
+      - 'echo "Event: ${DRONE_BUILD_EVENT}"'
+      - 'echo "Commit: ${DRONE_COMMIT_SHA}"'
+      - 'echo "Branch: ${DRONE_BRANCH}"'
+      - ls -lah /dev/kvm
+      - make defconfig
+      - make olddefconfig
+      - make -j$(nproc) Image modules
