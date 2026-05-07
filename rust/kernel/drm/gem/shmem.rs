@@ -402,6 +402,14 @@ impl<T: DriverObject> DerefMut for Object<T> {
 
 impl<T: DriverObject> Sealed for Object<T> {}
 
+impl<T: DriverObject> PartialEq for Object<T> {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.as_raw() == other.as_raw()
+    }
+}
+impl<T: DriverObject> Eq for Object<T> {}
+
 impl<T: DriverObject> gem::IntoGEMObject for Object<T> {
     fn as_raw(&self) -> *mut bindings::drm_gem_object {
         // SAFETY:
