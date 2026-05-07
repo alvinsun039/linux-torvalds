@@ -342,6 +342,19 @@ impl<T: drm::Driver, C: DeviceContext> Device<T, C> {
     }
 }
 
+impl<T: drm::Driver> Device<T, Registered> {
+    /// Returns the primary minor index (the number in `/dev/dri/cardN`).
+    #[inline(always)]
+    pub fn primary_index(&self) -> u32 {
+        // SAFETY: `self.as_raw()` is a valid pointer to a `struct drm_device`.
+        // `primary` is set during `drm_dev_register()` and never modified afterwards;
+        // since `Self` is `Registered`, it is guaranteed initialized.
+        // `drm_minor.index` is also immutable after initialization.
+        let index = unsafe { (*(*self.as_raw()).primary).index };
+        index as u32
+    }
+}
+
 impl<T: drm::Driver> Deref for Device<T, Registered> {
     type Target = T::Data;
 
