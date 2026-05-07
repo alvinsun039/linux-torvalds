@@ -246,6 +246,39 @@ pub(crate) trait BaseObjectPrivate: IntoGEMObject {
 
 impl<T: IntoGEMObject> BaseObjectPrivate for T {}
 
+/// RAII guard for `drm_device.object_name_lock`.
+///
+/// While this guard is alive, the `name` and `dma_buf` fields of GEM objects
+/// on the same device may be safely read. This is useful for batch access
+/// to avoid repeated lock/unlock overhead.
+///
+/// # Invariants
+///
+/// `object_name_lock` is held for the lifetime of this guard.
+pub(crate) struct ObjectNameLockGuard<'a, T: BaseObjectPrivate>(&'a T);
+
+impl<'a, T: BaseObjectPrivate> ObjectNameLockGuard<'a, T> {
+    /// Acquires `drm_device.object_name_lock` and returns a guard.
+    #[inline]
+    pub(crate) fn new(obj: &'a T) -> Self {
+        // SAFETY: `object_name_lock` is initialized during `drm_dev_init()` and
+        // valid for the lifetime of the device. The GEM object holds a reference
+        // to the device, so the device (and its lock) remain valid.
+        // `struct drm_gem_object.dev` is initialized and valid for as long as the
+        // GEM object lives.
+        unsafe { bindings::mutex_lock_nested(&raw mut (*(*obj.as_raw()).dev).object_name_lock, 0) };
+        Self(obj)
+    }
+}
+
+impl<T: BaseObjectPrivate> Drop for ObjectNameLockGuard<'_, T> {
+    #[inline]
+    fn drop(&mut self) {
+        // SAFETY: We are releasing the lock acquired in `new`.
+        unsafe { bindings::mutex_unlock(&raw mut (*(*self.0.as_raw()).dev).object_name_lock) };
+    }
+}
+
 /// A base GEM object.
 ///
 /// # Invariants
