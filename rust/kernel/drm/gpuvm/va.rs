@@ -142,6 +142,52 @@ impl RawGpuVa {
     }
 }
 
+const DRM_GPUVA_LIST_ENTRY_OFFSET: usize = offset_of!(bindings::drm_gpuva, rb.entry);
+type RawGpuVaIter<'a> = CListIter<'a, RawGpuVa, DRM_GPUVA_LIST_ENTRY_OFFSET>;
+
+/// An iterator over the VA mappings in a [`GpuVm`].
+pub struct GpuVaIter<'a, T: DriverGpuVm> {
+    raw_gpuva_iter: RawGpuVaIter<'a>,
+    kern_gpuva_ptr: *mut bindings::drm_gpuva,
+    _marker: PhantomData<&'a T>,
+}
+
+impl<'a, T: DriverGpuVm> GpuVaIter<'a, T> {
+    #[inline(always)]
+    pub(crate) fn new(gpuvm: &'a UniqueRefGpuVm<T>) -> Self {
+        // SAFETY: `gpuvm` is a `UniqueRefGpuVm`, guaranteeing exclusive access
+        // to the interval tree.
+        let head = unsafe { &raw mut (*gpuvm.as_raw()).rb.list };
+        // SAFETY: `head` is a valid pointer to a drm_gpuva list head.
+        let clist = unsafe { CList::<RawGpuVa, DRM_GPUVA_LIST_ENTRY_OFFSET>::from_raw(head) };
+        let kern_gpuva_ptr = gpuvm.kernel_alloc_va().as_raw();
+
+        Self {
+            raw_gpuva_iter: clist.iter(),
+            kern_gpuva_ptr,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T: DriverGpuVm> Iterator for GpuVaIter<'a, T> {
+    type Item = &'a GpuVa<T>;
+
+    #[inline(always)]
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut curr = self.raw_gpuva_iter.next()?;
+
+        if curr.as_raw() == self.kern_gpuva_ptr {
+            // Skip kernel reserved node.
+            curr = self.raw_gpuva_iter.next()?;
+        }
+
+        // SAFETY: We have skipped the kernel reserved node, all remaining
+        // entries are valid GpuVa<T> instances.
+        Some(unsafe { GpuVa::from_raw(curr.as_raw()) })
+    }
+}
+
 /// A pre-allocated [`GpuVa`] object.
 ///
 /// # Invariants

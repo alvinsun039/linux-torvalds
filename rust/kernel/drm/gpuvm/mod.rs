@@ -326,6 +326,12 @@ impl<T: DriverGpuVm> UniqueRefGpuVm<T> {
         // SAFETY: By the type invariants we may access `data`.
         unsafe { &mut *self.0.data.get() }
     }
+
+    /// Returns an iterator over the VA mappings in this GpuVm.
+    #[inline(always)]
+    pub fn va_mappings(&self) -> GpuVaIter<'_, T> {
+        GpuVaIter::new(self)
+    }
 }
 
 impl<T: DriverGpuVm> Deref for UniqueRefGpuVm<T> {
