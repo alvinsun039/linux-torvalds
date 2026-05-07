@@ -12,6 +12,11 @@ __rust_helper void rust_helper_refcount_set(refcount_t *r, int n)
 	refcount_set(r, n);
 }
 
+__rust_helper unsigned int rust_helper_refcount_read(refcount_t *r)
+{
+	return refcount_read(r);
+}
+
 __rust_helper void rust_helper_refcount_inc(refcount_t *r)
 {
 	refcount_inc(r);

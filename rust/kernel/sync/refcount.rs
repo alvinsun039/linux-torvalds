@@ -36,6 +36,26 @@ impl Refcount {
         self.0.get()
     }
 
+    /// Construct a [`Refcount`] reference from a raw pointer.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must point to a valid `refcount_t` for the duration of `'a`.
+    #[inline(always)]
+    pub unsafe fn from_raw<'a>(ptr: *mut bindings::refcount_t) -> &'a Self {
+        // SAFETY: `Refcount` is `repr(transparent)` over `Opaque<refcount_t>`.
+        unsafe { &*ptr.cast() }
+    }
+
+    /// Read the refcount value.
+    ///
+    /// Provides no memory ordering guarantees; caller must ensure appropriate ordering.
+    #[inline(always)]
+    pub fn read(&self) -> u32 {
+        // SAFETY: `self.as_ptr()` is valid. `refcount_read` is an atomic read.
+        unsafe { bindings::refcount_read(self.as_ptr()) }
+    }
+
     /// Get the underlying atomic counter that backs the refcount.
     ///
     /// NOTE: Usage of this function is discouraged as it can circumvent the protections offered by
