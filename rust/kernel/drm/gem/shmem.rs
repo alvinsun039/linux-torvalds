@@ -360,6 +360,30 @@ impl<T: DriverObject> Object<T> {
     pub fn owned_vmap<const SIZE: usize>(&self) -> Result<VMapOwned<T, SIZE>> {
         self.make_vmap()
     }
+
+    /// Returns the resident size of this object.
+    #[inline]
+    pub fn resident_size(&self) -> usize {
+        let _guard = DmaResvGuard::new(self);
+        // SAFETY: The `dma_resv` lock is held by the guard.
+        // The `pages` field is written under `dma_resv` lock in
+        // `drm_gem_shmem_get_pages_locked()` and `drm_gem_shmem_put_pages_locked()`.
+        if unsafe { (*self.as_raw_shmem()).pages }.is_null() {
+            0
+        } else {
+            self.size()
+        }
+    }
+
+    /// Returns the state for madvise of this object.
+    #[inline]
+    pub fn madv(&self) -> i32 {
+        let _guard = DmaResvGuard::new(self);
+        // SAFETY: The `dma_resv` lock is held by the guard.
+        // The `madv` field is written under `dma_resv` lock in
+        // `drm_gem_shmem_madvise_locked()` and `drm_gem_shmem_purge_locked()`.
+        unsafe { (*self.as_raw_shmem()).madv }
+    }
 }
 
 impl<T: DriverObject> Deref for Object<T> {
