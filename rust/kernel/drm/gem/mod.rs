@@ -19,9 +19,12 @@ use crate::{
     },
     error::to_result,
     prelude::*,
-    sync::aref::{
-        ARef,
-        AlwaysRefCounted, //
+    sync::{
+        aref::{
+            ARef,
+            AlwaysRefCounted, //
+        },
+        Refcount, //
     },
     types::Opaque,
 };
@@ -215,6 +218,16 @@ pub trait BaseObject: IntoGEMObject {
         // The `import_attach` field is invariant over the lifetime of the object,
         // as documented in `include/drm/drm_gem.h`.
         !unsafe { (*self.as_raw()).import_attach }.is_null()
+    }
+
+    /// Returns the reference count of the object.
+    #[inline]
+    fn refcount(&self) -> u32 {
+        // SAFETY: `self.as_raw()` is a valid pointer to a `struct drm_gem_object`.
+        // The `refcount` field is initialized during object creation and valid
+        // while the object is alive.
+        let refcount = unsafe { Refcount::from_raw(&raw mut (*self.as_raw()).refcount.refcount) };
+        refcount.read()
     }
 
     /// Creates a new handle for the object associated with a given `File`
