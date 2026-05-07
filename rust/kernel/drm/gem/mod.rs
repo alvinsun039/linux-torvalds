@@ -179,6 +179,35 @@ pub trait BaseObject: IntoGEMObject {
         unsafe { (*self.as_raw()).size }
     }
 
+    /// Returns the globally unique name of the object.
+    ///
+    /// In DRM, GEM object names are `int` handles used for cross-process sharing
+    /// via `flink`. A value of 0 means no name has been allocated.
+    ///
+    /// This method acquires `drm_device.object_name_lock` internally. For batch
+    /// access to fields protected by the same lock, use
+    /// [`ObjectNameLockGuard`] instead.
+    #[inline]
+    fn name(&self) -> i32 {
+        let _guard = ObjectNameLockGuard::new(self);
+        // SAFETY: `object_name_lock` is held by the guard, and `self.as_raw()`
+        // is a valid pointer to a `struct drm_gem_object`.
+        unsafe { (*self.as_raw()).name }
+    }
+
+    /// Returns true if the object is exported.
+    ///
+    /// This method acquires `drm_device.object_name_lock` internally. For batch
+    /// access to fields protected by the same lock, use
+    /// [`ObjectNameLockGuard`] instead.
+    #[inline]
+    fn is_exported(&self) -> bool {
+        let _guard = ObjectNameLockGuard::new(self);
+        // SAFETY: `object_name_lock` is held by the guard, and `self.as_raw()`
+        // is a valid pointer to a `struct drm_gem_object`.
+        !unsafe { (*self.as_raw()).dma_buf }.is_null()
+    }
+
     /// Creates a new handle for the object associated with a given `File`
     /// (or returns an existing one).
     fn create_handle<D, F>(&self, file: &drm::File<F>) -> Result<u32>
