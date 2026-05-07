@@ -51,6 +51,7 @@ use kernel::{
 };
 
 use crate::{
+    debugfs::TyrDebugFSData,
     file::TyrDrmFileData,
     fw::{
         irq::job_irq_init,
@@ -89,6 +90,9 @@ pub(crate) struct TyrDrmDeviceData {
     ///
     /// This is mainly queried by userspace, i.e.: Mesa.
     pub(crate) gpu_info: GpuInfo,
+
+    /// Per-device debugfs data.
+    pub(crate) debugfs_data: Arc<TyrDebugFSData>,
 }
 
 fn issue_soft_reset(dev: &Device<Bound>, iomem: &Devres<IoMem>) -> Result {
@@ -159,6 +163,8 @@ impl platform::Driver for TyrPlatformDriverData {
         let platform: ARef<platform::Device> = pdev.into();
 
         let mmu = Mmu::new(pdev, iomem.as_arc_borrow(), &gpu_info)?;
+        let debugfs_data = Arc::new(TyrDebugFSData {}, GFP_KERNEL)?;
+        let debugfs_data_clone = debugfs_data.clone();
 
         let firmware = Firmware::new(
             pdev,
@@ -195,9 +201,12 @@ impl platform::Driver for TyrPlatformDriverData {
                     _sram: sram_regulator,
                 }),
                 gpu_info,
+                debugfs_data: debugfs_data_clone,
         });
 
-        Registration::new_foreign_owned(uninit_ddev, pdev.as_ref(), data, 0)?;
+        let ddev = Registration::new_foreign_owned(uninit_ddev, pdev.as_ref(), data, 0)?;
+
+        crate::debugfs::debugfs_init(ddev, pdev, debugfs_data.as_arc_borrow())?;
 
         // We need this to be dev_info!() because dev_dbg!() does not work at
         // all in Rust for now, and we need to see whether probe succeeded.
