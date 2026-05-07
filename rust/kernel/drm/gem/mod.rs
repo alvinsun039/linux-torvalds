@@ -279,6 +279,42 @@ impl<T: BaseObjectPrivate> Drop for ObjectNameLockGuard<'_, T> {
     }
 }
 
+/// RAII guard for the read side of `drm_vma_offset_manager.vm_lock`.
+///
+/// While this guard is alive, `vma_node.vm_node.start` may be safely read.
+///
+/// # Invariants
+///
+/// The read side of `vm_lock` is held for the lifetime of this guard.
+pub(crate) struct VmaOffsetReadGuard<'a, T: BaseObjectPrivate>(&'a T);
+
+impl<'a, T: BaseObjectPrivate> VmaOffsetReadGuard<'a, T> {
+    /// Acquires the read side of `vm_lock` and returns a guard.
+    #[inline]
+    pub(crate) fn new(obj: &'a T) -> Self {
+        // SAFETY: `vma_offset_manager` and its `vm_lock` are initialized in
+        // `drm_gem_init()` (called from `drm_dev_init()`) and valid for the
+        // lifetime of the device. The GEM object holds a reference to the
+        // device, so the device (and its lock) remain valid.
+        // `struct drm_gem_object.dev` is initialized and valid for as long as the
+        // GEM object lives.
+        unsafe { bindings::_raw_read_lock(&raw mut (*(*(*obj.as_raw()).dev).vma_offset_manager).vm_lock) };
+        Self(obj)
+    }
+}
+
+impl<T: BaseObjectPrivate> Drop for VmaOffsetReadGuard<'_, T> {
+    #[inline]
+    fn drop(&mut self) {
+        // SAFETY: We are releasing the read lock acquired in `new`.
+        unsafe {
+            bindings::_raw_read_unlock(
+                &raw mut (*(*(*self.0.as_raw()).dev).vma_offset_manager).vm_lock,
+            )
+        };
+    }
+}
+
 /// A base GEM object.
 ///
 /// # Invariants
