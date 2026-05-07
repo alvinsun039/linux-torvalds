@@ -230,6 +230,18 @@ pub trait BaseObject: IntoGEMObject {
         refcount.read()
     }
 
+    /// Returns the offset for mmap, or 0 if no offset has been allocated.
+    ///
+    /// This method acquires the read side of `drm_vma_offset_manager.vm_lock`
+    /// internally. For batch access, use [`VmaOffsetReadGuard`] instead.
+    #[inline]
+    fn mmap_offset(&self) -> u64 {
+        let _guard = VmaOffsetReadGuard::new(self);
+        // SAFETY: The read side of `vm_lock` is held by the guard, and
+        // `self.as_raw()` is a valid pointer to a `struct drm_gem_object`.
+        unsafe { (*self.as_raw()).vma_node.vm_node.start }
+    }
+
     /// Creates a new handle for the object associated with a given `File`
     /// (or returns an existing one).
     fn create_handle<D, F>(&self, file: &drm::File<F>) -> Result<u32>
