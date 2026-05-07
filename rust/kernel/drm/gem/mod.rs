@@ -28,6 +28,7 @@ use crate::{
 use core::{
     marker::PhantomData,
     ops::Deref,
+    ptr,
     ptr::NonNull, //
 };
 
@@ -312,6 +313,36 @@ impl<T: BaseObjectPrivate> Drop for VmaOffsetReadGuard<'_, T> {
                 &raw mut (*(*(*self.0.as_raw()).dev).vma_offset_manager).vm_lock,
             )
         };
+    }
+}
+
+/// RAII guard for a GEM object's `dma_resv` lock.
+///
+/// While this guard is alive, fields protected by `dma_resv` may be safely read.
+///
+/// # Invariants
+///
+/// The `dma_resv` lock is held for the lifetime of this guard.
+// TODO: This should be replaced with a WwMutex equivalent once we have such bindings in the kernel.
+pub(crate) struct DmaResvGuard<'a, T: BaseObjectPrivate>(&'a T);
+
+impl<'a, T: BaseObjectPrivate> DmaResvGuard<'a, T> {
+    /// Acquires the `dma_resv` lock and returns a guard.
+    #[inline(always)]
+    pub(crate) fn new(obj: &'a T) -> Self {
+        // SAFETY: The `dma_resv` lock is initialized throughout the lifetime of
+        // the GEM object.
+        unsafe { bindings::dma_resv_lock(obj.raw_dma_resv(), ptr::null_mut()) };
+
+        Self(obj)
+    }
+}
+
+impl<T: BaseObjectPrivate> Drop for DmaResvGuard<'_, T> {
+    #[inline(always)]
+    fn drop(&mut self) {
+        // SAFETY: We are releasing the lock acquired in `new`.
+        unsafe { bindings::dma_resv_unlock(self.0.raw_dma_resv()) };
     }
 }
 
