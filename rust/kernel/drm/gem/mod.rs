@@ -208,6 +208,15 @@ pub trait BaseObject: IntoGEMObject {
         !unsafe { (*self.as_raw()).dma_buf }.is_null()
     }
 
+    /// Returns true if the object is imported.
+    #[inline]
+    fn is_imported(&self) -> bool {
+        // SAFETY: `self.as_raw()` is a valid pointer to a `struct drm_gem_object`.
+        // The `import_attach` field is invariant over the lifetime of the object,
+        // as documented in `include/drm/drm_gem.h`.
+        !unsafe { (*self.as_raw()).import_attach }.is_null()
+    }
+
     /// Creates a new handle for the object associated with a given `File`
     /// (or returns an existing one).
     fn create_handle<D, F>(&self, file: &drm::File<F>) -> Result<u32>
