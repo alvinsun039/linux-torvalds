@@ -183,6 +183,13 @@ impl<T: DriverGpuVm> GpuVm<T> {
         self.vm.get()
     }
 
+    /// Returns the name of this GpuVm.
+    #[inline(always)]
+    pub fn name(&self) -> &CStr {
+        // SAFETY: The `name` field is immutable and points to a NUL-terminated string.
+        unsafe { CStr::from_char_ptr((*self.as_raw()).name) }
+    }
+
     /// The start of the VA space.
     #[inline]
     pub fn va_start(&self) -> u64 {
