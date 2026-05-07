@@ -206,6 +206,13 @@ impl<T: DriverGpuVm> GpuVm<T> {
         Range { start, end }
     }
 
+    /// Returns the kernel-allocated VA for this GpuVm.
+    #[inline(always)]
+    pub fn kernel_alloc_va(&self) -> &RawGpuVa {
+        // SAFETY: The `self.as_raw()` is guaranteed to be a valid pointer to a drm_gpuvm.
+        unsafe { RawGpuVa::from_raw(&raw mut (*self.as_raw()).kernel_alloc_node) }
+    }
+
     /// Get or create the [`GpuVmBo`] for this gem object.
     #[inline]
     pub fn obtain(

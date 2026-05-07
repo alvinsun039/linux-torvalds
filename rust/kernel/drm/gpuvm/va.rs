@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0 OR MIT
 
 use super::*;
+use crate::interop::list::{
+    CList,
+    CListIter, //
+};
+use core::{
+    marker::PhantomData,
+    mem::offset_of, //
+};
 
 /// Represents that a range of a GEM object is mapped in this [`GpuVm`] instance.
 ///
@@ -94,6 +102,43 @@ impl<T: DriverGpuVm> GpuVa<T> {
         // because this VA is associated with a `GpuVmBo<T>`. The BO is in the GEM list by the type
         // invariants.
         unsafe { GpuVmBo::from_raw((*self.as_raw()).vm_bo) }
+    }
+}
+
+/// Represents that a range of a GEM object is mapped in the kernel.
+#[repr(transparent)]
+pub struct RawGpuVa(Opaque<bindings::drm_gpuva>);
+
+impl RawGpuVa {
+    /// Access this [`RawGpuVa`] from a raw pointer.
+    ///
+    /// # Safety
+    ///
+    /// For the duration of `'a`, the pointer must reference a valid `drm_gpuva`.
+    #[inline(always)]
+    pub unsafe fn from_raw<'a>(ptr: *mut bindings::drm_gpuva) -> &'a Self {
+        // SAFETY: `drm_gpuva` and `RawGpuVa` have the same layout.
+        unsafe { &*(ptr.cast()) }
+    }
+
+    /// Returns a raw pointer to underlying C value.
+    #[inline(always)]
+    pub fn as_raw(&self) -> *mut bindings::drm_gpuva {
+        self.0.get()
+    }
+
+    /// Returns the address of this mapping in the GPU virtual address space.
+    #[inline(always)]
+    pub fn addr(&self) -> u64 {
+        // SAFETY: `self.as_raw()` is guaranteed to be a valid pointer to a `drm_gpuva`.
+        unsafe { (*self.as_raw()).va.addr }
+    }
+
+    /// Returns the length of this mapping.
+    #[inline(always)]
+    pub fn length(&self) -> u64 {
+        // SAFETY: `self.as_raw()` is guaranteed to be a valid pointer to a `drm_gpuva`.
+        unsafe { (*self.as_raw()).va.range }
     }
 }
 
