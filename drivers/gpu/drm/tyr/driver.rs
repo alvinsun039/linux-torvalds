@@ -166,6 +166,7 @@ impl platform::Driver for TyrPlatformDriverData {
         let debugfs_data = Arc::pin_init(
             try_pin_init!(TyrDebugFSData {
                 vms <- new_mutex!(KVec::new()),
+                gems <- new_mutex!(KVec::new()),
             }),
             GFP_KERNEL,
         )?;

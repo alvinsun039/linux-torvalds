@@ -193,6 +193,10 @@ impl PinnedDrop for Firmware {
             .vms
             .lock()
             .retain(|vm| vm.as_ref() != self.vm.as_ref());
+
+        for sec in self.sections.iter() {
+            self.debugfs_data.gems.lock().retain(|bo| bo != &sec.mem.bo);
+        }
     }
 }
 
@@ -271,6 +275,8 @@ impl Firmware {
                 KernelBoVaAlloc::Explicit(va),
                 parsed.vm_map_flags,
             )?;
+
+            debugfs_data.gems.lock().push(mem.bo.clone(), GFP_KERNEL)?;
 
             let section_start = parsed.data_range.start as usize;
             let section_end = parsed.data_range.end as usize;

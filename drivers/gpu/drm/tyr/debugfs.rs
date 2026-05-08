@@ -33,11 +33,98 @@ global_lock! {
     pub(crate) unsafe(uninit) static DEBUGFS_ROOT: Mutex<Option<debugfs::Dir>> = None;
 }
 
+impl_flags!(
+    #[derive(Debug, Clone, Default, Copy, PartialEq, Eq)]
+    struct BoStateFlags(u32);
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    enum BoStateFlag {
+        Imported = 1 << 0,
+        Exported = 1 << 1,
+    }
+);
+
+/// Writes per-BO debug information for the "gems" debugfs file.
+fn show_bo(bo: &Bo, f: &mut impl Write) -> core::fmt::Result {
+    let refcount: u32 = bo.refcount();
+    let size: usize = bo.size();
+    let resident_size: usize = bo.resident_size();
+
+    let name: i32 = bo.name();
+    let is_exported = bo.is_exported();
+    let mmap_offset = bo.mmap_offset();
+
+    let mut gem_state_flags = BoStateFlags::default();
+
+    if bo.is_imported() {
+        gem_state_flags |= BoStateFlag::Imported;
+    }
+    if is_exported {
+        gem_state_flags |= BoStateFlag::Exported;
+    }
+
+    writeln!(
+        f,
+        "{:<16}{:<16}{:<16}{:<16}0x{:<16x}0x{:<8x}",
+        name,
+        refcount,
+        size,
+        resident_size,
+        mmap_offset,
+        u32::from(gem_state_flags),
+    )
+}
+
+fn show_gems(data: &Arc<TyrDebugFSData>, f: &mut fmt::Formatter<'_>) -> core::fmt::Result {
+    writeln!(
+        f,
+        "GEM state flags: {:?} (0x{:x}), {:?} (0x{:x})",
+        BoStateFlag::Imported,
+        BoStateFlag::Imported as u32,
+        BoStateFlag::Exported,
+        BoStateFlag::Exported as u32,
+    )?;
+    writeln!(
+        f,
+        "global-name     refcount        size            resident-size   file-offset       state",
+    )?;
+    writeln!(
+        f,
+        "--------------------------------------------------------------------------------------------",
+    )?;
+
+    let mut total_size: usize = 0;
+    let mut total_resident: usize = 0;
+    let mut total_reclaimable: usize = 0;
+    let gems = data.gems.lock();
+    for bo in gems.iter() {
+        total_size += bo.size();
+        total_resident += bo.resident_size();
+        if bo.madv() > 0 {
+            total_reclaimable += bo.resident_size();
+        }
+        show_bo(bo, f)?;
+    }
+
+    writeln!(
+        f,
+        "============================================================================================",
+    )?;
+    writeln!(
+        f,
+        "Total size: {}, Total resident: {}, Total reclaimable: {}",
+        total_size, total_resident, total_reclaimable,
+    )?;
+    Ok(())
+}
+
 /// Per-device debugfs data.
 #[pin_data]
 pub(crate) struct TyrDebugFSData {
     #[pin]
     pub(crate) vms: Mutex<KVec<Arc<Vm>>>,
+    #[pin]
+    pub(crate) gems: Mutex<KVec<ARef<Bo>>>,
 }
 
 /// Writes VM debug information for the "gpuvas" debugfs file.
@@ -95,6 +182,7 @@ pub(crate) fn debugfs_init(
         let debugfs_data: Arc<TyrDebugFSData> = debugfs_data.into();
         let scope_init = root_dir.scope(debugfs_data, &dir_name, |data, dir| {
             dir.read_callback_file(c"gpuvas", data, &show_gpuvas);
+            dir.read_callback_file(c"gems", data, &show_gems);
         });
         kernel::devres::register(pdev.as_ref(), scope_init, GFP_KERNEL)
     } else {
