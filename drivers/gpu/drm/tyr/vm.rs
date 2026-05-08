@@ -324,6 +324,14 @@ pub(crate) struct Vm {
     va_range: Range<u64>,
 }
 
+impl PartialEq for Vm {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.gpuvm == other.gpuvm
+    }
+}
+impl Eq for Vm {}
+
 impl Vm {
     /// Creates a new GPU virtual address space.
     ///
