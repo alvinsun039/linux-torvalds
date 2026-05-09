@@ -45,6 +45,7 @@ use kernel::{
 };
 
 use crate::{
+    debugfs::TyrDebugFSData,
     driver::{
         IoMem,
         TyrDrmDevice, //
@@ -177,6 +178,9 @@ pub(crate) struct Firmware {
     /// The global FW interface.
     #[pin]
     global_iface: Mutex<GlobalInterface>,
+
+    /// Shared debugfs state for tracking live GEMs and VMs.
+    debugfs_data: Arc<TyrDebugFSData>,
 }
 
 #[pinned_drop]
@@ -184,6 +188,11 @@ impl PinnedDrop for Firmware {
     fn drop(self: Pin<&mut Self>) {
         // AS slots retain a VM ref, we need to kill the circular ref manually.
         self.vm.kill();
+
+        self.debugfs_data
+            .vms
+            .lock()
+            .retain(|vm| vm.as_ref() != self.vm.as_ref());
     }
 }
 
@@ -242,6 +251,7 @@ impl Firmware {
         ddev: &TyrDrmDevice<Uninit>,
         mmu: ArcBorrow<'_, Mmu>,
         gpu_info: &GpuInfo,
+        debugfs_data: ArcBorrow<'_, TyrDebugFSData>,
     ) -> Result<Arc<Firmware>> {
         let vm = Vm::new(pdev, ddev, mmu, gpu_info)?;
 
@@ -276,18 +286,21 @@ impl Firmware {
             sections.push(Section { data, mem }, GFP_KERNEL)?;
         }
 
+        let vm_clone = vm.clone();
         let firmware = Arc::pin_init(
             try_pin_init!(Firmware {
                 pdev: pdev.into(),
                 iomem,
-                vm,
+                vm: vm_clone,
                 sections,
                 ready_wait: new_wait!()?,
                 fw_ready: Arc::new(AtomicBool::new(false), GFP_KERNEL)?,
                 global_iface <- new_mutex!(GlobalInterface::new()?),
+                debugfs_data: debugfs_data.into(),
             }),
             GFP_KERNEL,
         )?;
+        debugfs_data.vms.lock().push(vm, GFP_KERNEL)?;
 
         Ok(firmware)
     }

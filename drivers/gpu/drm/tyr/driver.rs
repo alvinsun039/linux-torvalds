@@ -163,7 +163,12 @@ impl platform::Driver for TyrPlatformDriverData {
         let platform: ARef<platform::Device> = pdev.into();
 
         let mmu = Mmu::new(pdev, iomem.as_arc_borrow(), &gpu_info)?;
-        let debugfs_data = Arc::new(TyrDebugFSData {}, GFP_KERNEL)?;
+        let debugfs_data = Arc::pin_init(
+            try_pin_init!(TyrDebugFSData {
+                vms <- new_mutex!(KVec::new()),
+            }),
+            GFP_KERNEL,
+        )?;
         let debugfs_data_clone = debugfs_data.clone();
 
         let firmware = Firmware::new(
@@ -172,6 +177,7 @@ impl platform::Driver for TyrPlatformDriverData {
             &uninit_ddev,
             mmu.as_arc_borrow(),
             &gpu_info,
+            debugfs_data.as_arc_borrow(),
         )?;
 
         let job_irq = job_irq_init(

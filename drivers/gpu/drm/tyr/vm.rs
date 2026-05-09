@@ -316,12 +316,12 @@ pub(crate) struct Vm {
     pdev: ARef<platform::Device>,
     /// DRM GPUVM core for managing virtual address space.
     #[pin]
-    gpuvm_unique: Mutex<UniqueRefGpuVm<GpuVmData>>,
+    pub(crate) gpuvm_unique: Mutex<UniqueRefGpuVm<GpuVmData>>,
     /// Non-core part of the GPUVM. Can be used for stuff that doesn't modify the
     /// internal mapping tree, like GpuVm::obtain()
-    gpuvm: ARef<GpuVm<GpuVmData>>,
+    pub(crate) gpuvm: ARef<GpuVm<GpuVmData>>,
     /// VA range for this VM.
-    va_range: Range<u64>,
+    pub(crate) va_range: Range<u64>,
 }
 
 impl PartialEq for Vm {
